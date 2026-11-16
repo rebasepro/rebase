@@ -1,5 +1,5 @@
 ---
-sourceHash: ceff4ba3bdacfb06
+sourceHash: 85e4a1ff6e52e6b4
 title: Búsqueda
 sidebar_label: Búsqueda
 description: Cómo se comporta .search() por defecto y cómo una tabla se habilita para la búsqueda de texto completo con clasificación sobre las columnas especificadas — incluyendo contenido JSONB y arrays.
@@ -97,19 +97,14 @@ Postgres recalcula la columna en cada escritura de un campo de origen y rechaza 
 intento de escribir en ella directamente, por lo que el índice no puede desincronizarse de la fila. La columna
 nunca es devuelta por la API.
 
-Se generan en `.rebase/sql/search.sql`, junto a `schema.sql` y
-`policies.sql`, y `rebase db push` los aplica por ti — nada adicional que
-ejecutar. Tienen su propio archivo porque una columna `tsvector` generada necesita que
-exista primero una función auxiliar `IMMUTABLE` (`unaccent` es solo `STABLE`, y
-aplanar un documento `jsonb` necesita una función que retorne conjuntos), y Atlas — el
-motor detrás de `db push` — no puede gestionar funciones en su plan gratuito.
+Se generan en `.rebase/sql/search.sql` junto a `schema.sql` y `policies.sql`, y `rebase
+db push` los aplica sin pasos adicionales. Una columna `tsvector` generada necesita
+primero una función auxiliar `IMMUTABLE` (`unaccent` es solo `STABLE`). Ptah Compat
+recibe la función, la columna y el índice juntos en `schema.sql`. El archivo
+`search.sql` se conserva para el arranque y la recuperación.
 
-Una consecuencia que vale la pena conocer si despliegas mediante migraciones en lugar de push:
-añadir un bloque `search` por sí solo no produce ninguna migración, porque el esquema que
-Atlas compara no ha cambiado. `rebase db generate` lo indica cuando esto ocurre.
-El bloque todavía se aplica mediante `rebase db push` y por la verificación del esquema en
-el momento del arranque; para incluirlo explícitamente en una migración, añade `.rebase/sql/search.sql`,
-que `rebase db generate` acaba de escribir, al final de una de ellas.
+Un cambio exclusivo en un bloque `search` crea una migración con `rebase db generate`.
+El mismo cambio aparece en el plan habitual de `rebase db push --dry-run`.
 
 ### Modificar el bloque más adelante
 

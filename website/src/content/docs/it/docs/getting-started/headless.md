@@ -1,5 +1,5 @@
 ---
-sourceHash: 471f34b7c0546357
+sourceHash: 5671e6dd17d1c27b
 title: Solo backend (headless)
 sidebar_label: Solo backend
 description: Esegui Rebase come Backend-as-a-Service headless sul tuo PostgreSQL — API REST, autenticazione, storage e realtime, senza pannello di amministrazione e senza backend/schema.
@@ -119,7 +119,7 @@ quel momento il progetto contiene le tabelle nel codice e l'introspezione all'av
 essere ciò che definisce l'API.
 
 Lo scaffold headless
-installa Atlas in `backend/`, quindi `rebase db push`, `rebase db generate`
+installa Ptah Compat in `backend/`, quindi `rebase db push`, `rebase db generate`
 e `pnpm run db:migrate` funzionano su tali tabelle esattamente come in qualsiasi altro progetto.
 
 ## Utilizzo

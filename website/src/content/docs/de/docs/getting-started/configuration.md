@@ -1,5 +1,5 @@
 ---
-sourceHash: 3e2fc07d941f1427
+sourceHash: cb7cd2cb2b7562c3
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -29,12 +29,9 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 
 > **Bei einer verwalteten Datenbank bedeutet `sslmode=require` möglicherweise nicht das, was es besagt.**
 >
-> Für `psql` und jedes libpq-Tool bedeutet `require` „verschlüsselt, Zertifikat nicht
-> geprüft“. Der Node-Treiber, auf dem Rebase läuft, interpretiert dies als `verify-full`. Eine
-> Datenbank, deren Zertifikat von keiner öffentlichen Zertifizierungsstelle signiert wurde – was bei
-> verwaltetem Postgres häufig vorkommt –, verweigert der Runtime den Zugriff mit `self-signed certificate`,
-> während `psql` mit derselben URL eine Verbindung herstellt. Die Runtime und die `rebase db`-Befehle
-> brechen mit einer entsprechenden Meldung ab.
+> Rebase und der Node-Treiber akzeptieren dies – verschlüsseln, aber das
+> Zertifikat nicht prüfen. `psql`, `pg_dump`, `pg_restore` tun dies nicht
+> und stufen nicht herab: Sie verweigern den Start mit `invalid sslmode value: "no-verify"`.
 >
 > Wählen Sie eine der folgenden Optionen:
 >
@@ -401,10 +398,16 @@ Wird von `rebase` gelesen, nicht vom Server. Nichts hier beeinflusst ein Deploym
 | `REBASE_ROOT_RULES` | `0` verhindert, dass `rebase init` und `rebase skills install` die Projektregeln in die `CLAUDE.md` und `AGENTS.md` des Repository-Roots schreiben, gedacht für ein Root-Verzeichnis, dessen Agenten-Dateien Sie manuell pflegen. | an |
 | `REBASE_CLOUD_URL` | Die Control-Plane, mit der `rebase cloud` kommuniziert. | — |
 | `REBASE_CLOUD_EMAIL` | Das Konto, als das sich `rebase cloud login` anmeldet, anstatt danach zu fragen. | — |
-| `REBASE_CLOUD_PASSWORD` | Dessen Passwort, damit ein Secret-Store es übergeben kann, ohne dass es in den Shell-Verlauf gelangt. | — |
-| `REBASE_TOKEN` | Ein Token aus `rebase cloud tokens create`. Wenn gesetzt, authentifiziert sich jeder `rebase cloud`-Befehl damit anstelle der Sitzung aus `rebase cloud login` und liest oder schreibt die gespeicherte Sitzung niemals. In einem Verzeichnis, das durch `rebase cloud init --claim` verknüpft wurde, wird es zugunsten des tokenspezifischen Tokens dieses Projekts zurückgestellt, wenn es keinen Scope für das Projekt besitzt. Die Methode zur Ausführung von `rebase cloud` in CI – siehe [CI und Agenten](/docs/deployment/cloud/#ci-and-agents). Der [MCP-Server](/docs/ai/mcp/) übergibt es an die CLI, die seine Cloud-Tools starten, und sendet es niemals an die App: Setzen Sie dafür `REBASE_API_TOKEN`. | — |
-| `REBASE_DEBUG` | `1` gibt den zugrunde liegenden Fehler und Anfragedetails anstelle der kurzen Nachricht aus. Der erste Schritt zur Fehlersuche, wenn ein `rebase cloud`-Befehl ohne hilfreiche Meldung fehlschlägt. | — |
-| `REBASE_ATLAS_DEV_URL` | Die leere Datenbank, gegen die `rebase db push`, `db generate` und `db migrate` planen, anstelle der Datenbank `<db>_dev_diff`, die sie neben `DATABASE_URL` erstellen. Rebase erstellt oder löscht keine hier benannte Datenbank und verweigert eine, die mit `DATABASE_URL` identisch ist. Auf der verwalteten Entwicklungsdatenbank setzt die CLI dies auf eine eigene, temporäre In-Memory-PGlite-Instanz. Setzen Sie dies dort, wo `CREATE DATABASE` nicht gewährt wird. | `<db>_dev_diff` |
+| `REBASE_CLOUD_PASSWORD` | Das zugehörige Passwort, damit ein Secret-Store es übergeben kann, ohne dass es in die Shell-Historie gelangt. | — |
+| `REBASE_TOKEN` | Ein Token aus `rebase cloud tokens create`. Wenn gesetzt, authentifiziert sich jeder `rebase cloud`-Befehl damit anstelle der `rebase cloud login`-Sitzung und liest oder schreibt niemals die gespeicherte Sitzung. In einem Verzeichnis, das mit `rebase cloud init --claim` verknüpft wurde, wird es für das projekteigene Token zurückgestellt, wenn es keinen Scope für das Projekt besitzt. Die Methode zur Ausführung von `rebase cloud` in der CI – siehe [CI und Agenten](/docs/deployment/cloud/#ci-and-agents). Der [MCP-Server](/docs/ai/mcp/) übergibt es an die CLI, die seine Cloud-Tools starten, und sendet es niemals an die App: Setzen Sie dafür `REBASE_API_TOKEN`. | — |
+| `REBASE_DEBUG` | `1` gibt den zugrunde liegenden Fehler und die Anfragedetails anstelle der kurzen Nachricht aus. Das Erste, was Sie setzen sollten, wenn ein `rebase cloud`-Befehl ohne hilfreiche Meldung fehlschlägt. | — |
+| `REBASE_ATLAS_DEV_URL` | Leere Dev-Datenbank für `db push` und `db generate`. Der Name bleibt für bestehende Projekte erhalten. Rebase verwaltet eine hier angegebene Datenbank nicht und verweigert die Ziel-URL. Verwaltetes PGlite erhält eine flüchtige In-Memory-Datenbank. Verwenden Sie dies ohne `CREATE DATABASE`; `db migrate` braucht sie nicht. | `<db>_dev_diff` |
+| `PTAH_TRUST_REPLAY_SQL` | Nur auf `1` setzen, wenn Sie dem Migrations-SQL vertrauen, das auf einem gemeinsam genutzten PostgreSQL-Entwicklungsserver ausgeführt wird. Es läuft mit den Rechten der Entwicklungsverbindung. Erstellte Rollen können auf dem Server verbleiben. | nicht gesetzt |
+| `PTAH_DEV_SERVER_DISPOSABLE` | Nur auf `1` setzen, wenn der gesamte Entwicklungsserver verworfen werden kann. Rebase setzt dies für seinen verwalteten PGlite-Entwicklungsserver automatisch. | nicht gesetzt |
+| `PTAH_ATLAS_ALLOW_UNMATCHED_EXCLUDE` | Rebase setzt dies, damit dieselbe Ausschlussliste auch funktioniert, wenn ein Objekt fehlt. Keine manuelle Einstellung erforderlich. | `1` bei Datenbankbefehlen |
+| `PTAH_ATLAS_MIGRATE_DIFF_EXCLUDE` | Rebase setzt dies bei `db generate` anhand der Selektoren geschützter Objekte. Keine manuelle Einstellung erforderlich. | generiert |
+| `PTAH_ATLAS_MIGRATE_DIFF_INCLUDE` | Rebase setzt dies bei `db generate` anhand der Selektoren deklarierter Objekte. Keine manuelle Einstellung erforderlich. | generiert |
+| `REBASE_PTAH_DEV_PGLITE` | Interne Kennzeichnung der verwalteten PGlite-Entwicklungsverbindung. Rebase setzt sie automatisch. | nicht gesetzt |
 | `REBASE_DEV_NO_DB` | `rebase dev` startet keine Datenbank und provisioniert nichts – Sie bringen Ihre eigene mit. Entspricht `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Legt den Port des Frontend-Dev-Servers fest, den `rebase dev` andernfalls aus dem Projektpfad ableitet. | — |
 | `REBASE_DEV_READY_TIMEOUT_MS` | Wie lange `rebase dev` darauf wartet, dass sich das Backend meldet, bevor gemeldet wird, dass es nicht gestartet ist. `0` deaktiviert den Bericht. | `30000` |

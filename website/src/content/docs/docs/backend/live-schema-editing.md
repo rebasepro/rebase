@@ -277,9 +277,10 @@ refusing you after you have decided:
 
 ## If your project keeps versioned migrations
 
-Applying here does **not** write a migration, and cannot: a migration is Atlas's
-format with an integrity file, minted by an external binary against a throwaway
-database, and a running server has neither.
+Applying here does **not** write a migration. `rebase db generate` uses Ptah
+Compat to compare the declared schema with migration history on a throwaway
+database and updates the history's `atlas.sum`. The running server does not
+perform that workflow.
 
 What it does commit is the table file, and that is what `rebase db generate`
 writes the migration from. So the migration is one command away:
@@ -519,7 +520,7 @@ working in:
   ensure path is the only thing that changes a schema and it can only add.
 - No migration file is written. A project provisioned by boot-ensure needs none;
   a project provisioned by migrations should run `rebase db generate`, which
-  mints one through Atlas with the integrity hash Atlas requires.
+  writes one through Ptah Compat and updates `atlas.sum`.
 - Postgres only. The capability is detected on the driver, and a driver
   without it answers `SCHEMA_EDITING_UNSUPPORTED`.
 - A deployment whose tables are derived from the database serves an applied

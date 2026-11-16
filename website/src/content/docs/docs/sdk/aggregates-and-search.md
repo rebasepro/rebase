@@ -324,17 +324,11 @@ for every row of the table. Page with `meta.hasMore`, which stays exact.
   `type "vector" does not exist` on a database that has neither, naming both
   ways out.
 
-The column, its ANN index and that `CREATE EXTENSION` are generated into
-`.rebase/sql/vector.sql`, next to `schema.sql` and `policies.sql`, and `rebase db
-push` applies them for you. They have a file of their own because Atlas — the
-engine behind `db push` — computes its diff by materialising `schema.sql` in a
-scratch database it wipes at the start of every run, so a `VECTOR(n)` in there
-is resolved against a database that can never have pgvector.
-
-`rebase db generate` appends that file to the migration it writes, so a
-migration replayed against a fresh database builds the column too. A change to
-the vector property alone produces no migration, because the schema Atlas diffs
-is unchanged — `db generate` says so when it happens.
+The column, its ANN index, and `CREATE EXTENSION` are part of the desired
+`schema.sql` that Ptah Compat plans for `rebase db push` and `db generate`.
+Rebase also writes `.rebase/sql/vector.sql` for boot and recovery. The ordinary
+migration plan includes a change to the vector property or its index, even
+when nothing else in the table changes.
 
 ### The index
 

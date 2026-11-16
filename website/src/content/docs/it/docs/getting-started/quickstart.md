@@ -1,5 +1,5 @@
 ---
-sourceHash: 6f9ed21db2b9e2a4
+sourceHash: 4fa776203d5e5bb5
 title: Guida rapida
 sidebar_label: Guida rapida
 description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 minuti.
@@ -24,7 +24,7 @@ Questo esegue lo scaffold di un progetto con due pacchetti. Se termini come *tab
 
 - **Node.js** 22.22+ — ogni scaffold, headless incluso, dichiara `"node": ">=22.22.0"`
 - **pnpm** (consigliato) o npm
-- **Su Windows**, leggi prima [Windows](/docs/getting-started/windows/): uno strumento, Atlas, ha bisogno del proprio binario per Windows
+- **Windows:** consulta la [guida per Windows](/docs/getting-started/windows/).
 
 Nessun database da installare e niente Docker. `rebase dev` esegue un PostgreSQL gestito per il progetto, con i suoi dati in `.rebase/`. Consulta [Variante: usa il tuo PostgreSQL](#variante-usa-il-tuo-postgresql) se preferisci fornirne uno — un'installazione locale, Neon, Supabase, o il container fornito da questo scaffold.
 
@@ -85,16 +85,19 @@ Quindi avvia i server di sviluppo come sopra. Un `DATABASE_URL` impostato non vi
 toccato, e uno che punta a qualcosa di diverso da questa macchina viene lasciato completamente
 inalterato.
 
-I comandi di migrazione pianificano le modifiche con [Atlas](https://atlasgo.io/), il
-motore di migrazione dello schema con cui Rebase esegue la pianificazione, che necessita di un secondo database vuoto
-con cui effettuare il confronto. Su un database tuo, Rebase ne crea uno accanto; su quello
-gestito, che serve esattamente un database, avvia un PGlite temporaneo per la
-durata del comando.
-In entrambi i casi:
+I comandi di migrazione usano Ptah Compat per pianificare lo schema
+dichiarato. Serve un secondo database vuoto. Rebase lo crea accanto
+al tuo database PostgreSQL; per il database gestito avvia un PGlite
+temporaneo. Puoi applicare lo schema in entrambi i casi:
 
 ```bash
 pnpm run db:push
 ```
+
+Se `db generate` riproduce migrazioni su un server PostgreSQL
+condiviso, imposta `PTAH_TRUST_REPLAY_SQL=1` solo se ritieni sicuro
+eseguire quell’SQL con i privilegi della connessione di sviluppo.
+Il PGlite gestito non richiede questa opzione.
 
 L'avvio crea già le tabelle mancanti — e le relative
 politiche [RLS](/docs/collections/security-rules/), la sicurezza a livello di riga di PostgreSQL,

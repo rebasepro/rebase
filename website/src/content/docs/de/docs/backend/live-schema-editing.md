@@ -1,5 +1,5 @@
 ---
-sourceHash: 97486e7c061d503d
+sourceHash: fbe861c484005a2e
 title: Live-Schema-Bearbeitung
 description: Tabellen für ein laufendes Backend erstellen und ändern – die Bearbeitung wird in backend/schema geschrieben, zuerst in Ihr Repository committet und dann angewendet.
 ---
@@ -299,10 +299,10 @@ Grund angeben, anstatt Sie erst nach Ihrer Entscheidung abzuweisen:
 
 ## Wenn Ihr Projekt versionierte Migrationen verwendet
 
-Das Anwenden an dieser Stelle schreibt **keine** Migration und kann dies auch
-nicht: Eine Migration liegt im Format von Atlas mit einer Integritätsdatei vor,
-die von einer externen Binärdatei gegen eine temporäre Wegwerf-Datenbank erzeugt
-wird – und ein laufender Server besitzt keines von beidem.
+Das Anwenden an dieser Stelle schreibt **keine** Migration. `rebase db generate`
+vergleicht mit Ptah Compat das deklarierte Schema mit der Migrationshistorie in einer
+temporären Datenbank und aktualisiert `atlas.sum`. Der laufende Server führt diesen
+Ablauf nicht aus.
 
 Was committet wird, ist die Tabellendatei, und genau daraus schreibt
 `rebase db generate` die Migration. Die Migration ist also nur einen Befehl
@@ -566,8 +566,7 @@ jemand anderes arbeitet, sicher ist:
   der Ensure-Pfad das Einzige ist, was ein Schema ändert, und er kann nur hinzufügen.
 - Es wird keine Migrationsdatei geschrieben. Ein über Boot-Ensure bereitgestelltes
   Projekt benötigt keine; ein über Migrationen bereitgestelltes Projekt sollte
-  `rebase db generate` ausführen, wodurch eine Migration über Atlas mit dem von
-  Atlas geforderten Integritäts-Hash erstellt wird.
+  `rebase db generate` ausführen, wodurch Ptah Compat eine Migration schreibt und `atlas.sum` aktualisiert.
 - Nur Postgres. Die Fähigkeit wird am Treiber erkannt, und ein Treiber ohne diese
   Funktion antwortet mit `SCHEMA_EDITING_UNSUPPORTED`.
 - Ein Deployment, dessen Tabellen aus der Datenbank abgeleitet werden, stellt

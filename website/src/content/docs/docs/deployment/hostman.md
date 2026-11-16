@@ -67,9 +67,8 @@ FROM rebasepro/server:0.33.2
 COPY --from=build --chown=node:node /app/dist-bundle /bundle
 ```
 
-Three details matter here:
+Two details matter here:
 
-- **`node:22`, not `node:22-slim`.** Installing the CLI downloads the Atlas schema engine, which needs `curl` and CA certificates. The slim image has neither, and the install fails.
 - **`--chown=node:node`.** The runtime runs as `node` and links its own packages into the bundle at start. A root-owned bundle still serves, but logs a warning for every package it could not link.
 - **No source in the final image.** It holds the runtime and your compiled bundle. Upgrading Rebase later is a change to the second `FROM` line.
 

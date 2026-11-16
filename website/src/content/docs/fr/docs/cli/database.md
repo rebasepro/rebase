@@ -1,5 +1,5 @@
 ---
-sourceHash: 535fb9801df93ad9
+sourceHash: 1823d98cb985e205
 title: Commandes de base de données
 sidebar_label: Commandes de base de données
 description: Les commandes rebase db — push, generate et migrate, sauvegardes et restaurations, extraction d'une copie, chaîne de connexion, base de données de développement gérée et branches.
@@ -184,7 +184,16 @@ rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocke
 
 :::note[Sur la base de données de développement gérée]
 `push`, `generate` et `migrate` fonctionnent ici comme sur n'importe quelle base de données.
-`push` et `generate` planifient leur travail avec Atlas, qui a besoin d'une seconde base de données vide pour effectuer des comparaisons — or l'instance PGlite gérée n'en fournit qu'une seule. Ainsi, sur la base de données gérée, chacune d'elles démarre une seconde instance PGlite éphémère en mémoire pour Atlas, puis l'arrête à la fin de la commande. C'est de cette manière qu'une colonne y est supprimée, renommée ou restreinte : `rebase dev` ne fait qu'ajouter. La barrière de sécurité destructive est la même que partout ailleurs. Pour qu'Atlas planifie plutôt son travail sur une base de données vide qui vous est propre, définissez `REBASE_ATLAS_DEV_URL` vers celle-ci ; Rebase ne crée ni ne supprime aucune base de données ainsi désignée.
+`push` et `generate` planifient leur travail avec Ptah Compat, qui a besoin
+d'une seconde base de données vide pour effectuer des comparaisons — or
+l'instance PGlite gérée n'en fournit qu'une seule. Ainsi, sur la base de données
+gérée, chacune d'elles démarre une seconde instance PGlite éphémère en mémoire
+pour Ptah Compat, puis l'arrête à la fin de la commande. C'est de cette manière
+qu'une colonne y est supprimée, renommée ou restreinte : `rebase dev` ne fait
+qu'ajouter. La barrière de sécurité destructive est la même que partout
+ailleurs. Pour que Ptah Compat planifie plutôt son travail sur une base de
+données vide qui vous est propre, définissez `REBASE_ATLAS_DEV_URL` vers
+celle-ci ; Rebase ne crée ni ne supprime aucune base de données ainsi désignée.
 
 `branch` y est refusée. `CREATE DATABASE ... TEMPLATE` sur PGlite écrit une entrée de catalogue et ne copie rien, la branche pointerait donc vers la base de données dont elle a été clonée — chaque écriture que vous souhaitiez isoler atterrirait dans votre base de développement. `rebase dev --docker` vous offre un véritable serveur sur lequel les branches fonctionnent.
 :::

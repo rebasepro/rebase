@@ -1,5 +1,5 @@
 ---
-sourceHash: 97486e7c061d503d
+sourceHash: fbe861c484005a2e
 title: Édition de schéma en direct
 description: Créez et modifiez des tables sur un backend en cours d'exécution — la modification est écrite dans backend/schema, d'abord commitée dans votre dépôt, puis appliquée.
 ---
@@ -276,9 +276,10 @@ plutôt que de vous opposer un refus après que vous ayez pris votre décision :
 
 ## Si votre projet conserve des migrations versionnées
 
-Appliquer ici n'écrit **pas** de migration, et ne le peut pas : une migration utilise le format
-d'Atlas avec un fichier d'intégrité, généré par un binaire externe sur une base de données temporaire,
-et un serveur en cours d'exécution ne dispose ni de l'un ni de l'autre.
+Appliquer ici n'écrit **pas** de migration. `rebase db generate` utilise Ptah Compat
+pour comparer le schéma déclaré à l'historique des migrations dans une base de données
+temporaire et met à jour `atlas.sum`. Le serveur en cours d'exécution n'effectue pas ce
+travail.
 
 Ce qu'il commite, en revanche, c'est le fichier de la table, et c'est à partir de celui-ci que
 `rebase db generate` écrit la migration. La migration n'est donc qu'à une seule commande :
@@ -508,8 +509,7 @@ Deux éléments rendent son exécution sûre sur un dépôt dans lequel quelqu'u
 - Modifications additives uniquement. Tout le reste est refusé avec un motif, car le chemin ensure
   est le seul mécanisme qui modifie un schéma et il ne peut qu'ajouter.
 - Aucun fichier de migration n'est écrit. Un projet provisionné par boot-ensure n'en a pas besoin ;
-  un projet provisionné par des migrations doit exécuter `rebase db generate`, qui en génère un via
-  Atlas avec le hachage d'intégrité requis par Atlas.
+  un projet provisionné par des migrations doit exécuter `rebase db generate`, qui écrit une migration avec Ptah Compat et met à jour `atlas.sum`.
 - Postgres uniquement. La capacité est détectée au niveau du pilote, et un pilote qui en est dépourvu
   répond `SCHEMA_EDITING_UNSUPPORTED`.
 - Un déploiement dont les tables sont dérivées de la base de données sert une modification appliquée

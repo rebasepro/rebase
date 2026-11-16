@@ -1,5 +1,5 @@
 ---
-sourceHash: 53d5e75acc2383a2
+sourceHash: c98b73f9a4ab376f
 title: MCP-Tool-Referenz
 sidebar_label: MCP-Tool-Referenz
 description: Alle Tools, die der Rebase-MCP-Server registriert, nach Gruppen – was jedes Tool benötigt und tut, und welche davon das Loopback-Gate bei nicht-lokalen Projekten verweigert.
@@ -31,7 +31,10 @@ Führt die Rebase-CLI im aktiven Projektverzeichnis aus.
 
 ## Schemaplanung (1)
 
-Fragt das Backend über `POST /api/admin/schema/plan`, was eine Änderung bewirken würde. Keine CLI und nichts wird auf die Festplatte geschrieben – es funktioniert auf der verwalteten Entwicklungsdatenbank, was die Atlas-basierten Befehle nicht können.
+Fragt das Backend über `POST /api/admin/schema/plan`, welche Auswirkungen
+eine Änderung hätte. Dafür ist kein CLI-Prozess nötig, und es wird nichts
+auf die Festplatte geschrieben. Es funktioniert auch mit der verwalteten
+Entwicklungsdatenbank.
 
 | Tool | Erforderlich | Beschreibung |
 |---|---|---|

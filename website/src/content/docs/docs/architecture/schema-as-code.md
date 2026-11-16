@@ -41,9 +41,8 @@ This "UI as Code Generator" approach means visual edits produce the same clean T
 
 Your tables are read once and emitted twice — as a Drizzle schema the
 running server queries through, and as SQL that describes the database you meant
-to have. It is the SQL that the database is brought into line with, by
-[Atlas](https://atlasgo.io), which diffs your desired schema against the live one
-and plans the change:
+to have. Ptah Compat plans changes from that SQL. `db push` compares it with
+the live database, while `db generate` compares it with migration history:
 
 ```
                       Tables (backend/schema)
@@ -55,15 +54,16 @@ and plans the change:
             ▼                               .rebase/sql/, which is not committed)
   backend/src/schema.generated.ts                       │
   the Drizzle schema the runtime                        ▼
-  reads and writes rows through             schema.sql              ← Atlas's desired state
-                                            policies.sql            ← RLS, applied separately
-                                            search.sql, vector.sql, ← Atlas cannot manage these
-                                            triggers.sql
+  reads and writes rows through             schema.sql              ← full desired state
+                                            ptah-managed.json       ← owned objects
+                                            policies.sql, search.sql,
+                                            vector.sql, triggers.sql,
+                                            views.sql               ← boot and recovery
                                                         │
                                           ┌─────────────┴─────────────┐
                                           ▼                           ▼
                                    rebase db push              rebase db generate
-                                   Atlas plans the diff        Atlas writes the diff
+                                   Ptah plans the diff         Ptah writes the diff
                                    and applies it now          to drizzle/migrations/
                                           │                           │
                                           │                           ▼
@@ -142,7 +142,7 @@ carries the `.default(true)` you wrote as a **column** default: a literal
 default compiles to a real `DEFAULT`, so a row inserted by the REST API, a seed
 script or `psql` gets it too, not only one typed into the admin panel.
 
-And this SQL, which is what Atlas is handed as the desired state:
+An excerpt of the SQL that Ptah receives as the desired state:
 
 <!-- schema-sample: sql -->
 ```sql
@@ -159,19 +159,27 @@ CREATE TABLE "public"."products" (
 );
 ```
 
-Policies, search columns, vector indexes and `updated_at` triggers are written to
-files of their own and applied by the CLI in their own right — Atlas manages
-none of the four.
+The full desired file also contains declared policies, functions, search and
+vector indexes, `updated_at` triggers, and views. Their separate SQL files
+remain for boot and recovery; `db push` and `db generate` plan them together.
 
 ## Safety & Unmapped Database Objects
 
-When Rebase updates the database schema, it maps the tables you declare to database tables. To ensure that **unmapped database objects (e.g., tables, views, enums) are never dropped or modified**, Rebase implements several layers of safety:
+Rebase limits Ptah's plan to objects it declares. It records their names in
+`drizzle/ptah-managed.json`, including names removed from the current schema.
+A removed declaration can therefore produce a `DROP`; an unrelated table,
+view, function, or extension stays outside the plan.
 
-1. **Unmapped Table Exclusion**: Before every push, the CLI lists every table and view in the database and hands Atlas an `--exclude` for each one that no declared table (or a declared table's junction) maps to, so Atlas never plans a change to it. If the database cannot be read, the push aborts rather than run with a partial list.
-2. **Schemas Rebase Owns**: The `rebase` schema (auth tables, RLS helper functions, Atlas's revision table) and any `auth` schema are excluded whole, so a push can never plan a `DROP SCHEMA … CASCADE`.
-3. **Objects Atlas Cannot Model**: Search columns, vector indexes and triggers are excluded from Atlas too, and applied from their own generated files.
-4. **Destructive-Change Gate**: `rebase db push` dry-runs the plan first. A statement that destroys data — a dropped column or table, a lossy type change — stops the push: in a terminal it asks you to type `yes`, and without one (CI, scripts, agents) it refuses unless you pass `--allow-destructive`.
-5. **Index Ownership by Name**: Indexes are the one object that lives *on* a mapped table, so table filtering cannot protect them — and a push used to plan `DROP INDEX` for any index missing from the desired state, which meant every hand-written one. Rebase now names the indexes it generates `<table>_<columns>_ix_<7 hex>` (`_ux_` when unique), a shape no other namer here produces, and excludes everything else from the diff by name. An index you wrote by hand, or that came in through introspection, is never touched; a declaration you delete still drops, which is the intent. See **[Indexes](/docs/backend/indexes)**.
+Auth provisioning and migration revisions are excluded. Rebase does include
+the helper functions it declares in the `rebase` schema. On selected tables,
+the CLI also protects custom policies, triggers, indexes, CHECK constraints,
+and EXCLUDE constraints by name. It reads the database and migration history
+to identify them; if a required catalog read fails, planning stops.
+
+Before applying a change, `db push` shows the plan and gates destructive
+statements, including `DROP EXTENSION`. Use `--dry-run` to inspect the plan
+without applying it. See [Indexes](/docs/backend/indexes) for how Rebase
+distinguishes declared and custom indexes.
 
 ## Next Steps
 

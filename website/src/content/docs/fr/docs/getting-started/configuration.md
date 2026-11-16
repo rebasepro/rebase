@@ -1,5 +1,5 @@
 ---
-sourceHash: 3e2fc07d941f1427
+sourceHash: cb7cd2cb2b7562c3
 title: Environnement & Configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -29,12 +29,9 @@ Toute la configuration s'effectue via des variables d'environnement dans votre f
 
 > **Sur une base de données gérée, `sslmode=require` peut ne pas signifier ce qu'il indique.**
 >
-> Pour `psql` et tous les outils libpq, `require` signifie « chiffré, certificat non
-> vérifié ». Le pilote Node sur lequel fonctionne Rebase l'interprète comme `verify-full`, de sorte
-> qu'une base de données dont le certificat n'a été signé par aucune autorité publique — fréquent sur Postgres
-> managé — rejette le runtime avec `self-signed certificate`, tandis que `psql`
-> se connecte avec la même URL. Le runtime et les commandes `rebase db` s'arrêtent avec un
-> message indiquant cela.
+> Rebase et le pilote Node l'acceptent — chiffrent, mais ne vérifient pas le
+> certificat. `psql`, `pg_dump`, `pg_restore` ne l'acceptent pas et ne
+> se dégradent pas gracieusement : ils refusent de démarrer avec `invalid sslmode value: "no-verify"`.
 >
 > Choisissez l'une des options suivantes :
 >
@@ -390,16 +387,22 @@ Lu par `rebase`, pas par le serveur. Rien ici n'affecte un déploiement.
 |----------|-------------|------------|
 | `REBASE_BASE_URL` | Emplacement où `rebase api-keys`, `rebase storage` et `rebase auth reset-password` envoient la clé de service, dans le shell ou dans `.env`. Définissez-la lorsque le serveur s'exécute autrement que par `rebase dev` dans ce projet : `rebase start`, un conteneur, un autre hôte. Non définie, ces commandes utilisent le serveur enregistré par `rebase dev` tant qu'il fonctionne, et n'envoient rien s'il est arrêté. | — |
 | `REBASE_SERVICE_KEY` | La clé de service avec laquelle ces commandes s'authentifient, lue depuis `.env` : la même variable que celle lue par le serveur (voir ci-dessus). | — |
-| `SERVICE_KEY` | Un ancien nom pour cette clé. Lorsque `.env` la définit, `rebase api-keys` et `rebase storage` la lisent à la place de `REBASE_SERVICE_KEY`. | — |
-| `REBASE_ENV_FILE_PATH` | Le fichier `.env` lu et écrit par la CLI, lorsqu'il ne s'agit pas de celui du projet. | — |
-| `REBASE_ROOT_RULES` | `0` empêche `rebase init` et `rebase skills install` d'écrire les règles du projet dans les fichiers `CLAUDE.md` et `AGENTS.md` à la racine du dépôt, pour une racine dont vous gérez les fichiers d'agents manuellement. | on |
-| `REBASE_CLOUD_URL` | Le plan de contrôle auquel `rebase cloud` s'adresse. | — |
-| `REBASE_CLOUD_EMAIL` | Le compte avec lequel `rebase cloud login` s'authentifie, au lieu d'afficher une invite de saisie. | — |
-| `REBASE_CLOUD_PASSWORD` | Son mot de passe, permettant à un gestionnaire de secrets de le transmettre sans qu'il n'apparaisse dans l'historique du shell. | — |
-| `REBASE_TOKEN` | Un jeton issu de `rebase cloud tokens create`. S'il est défini, chaque commande `rebase cloud` s'authentifie avec lui au lieu de la session de `rebase cloud login`, et ne lit ni n'écrit jamais la session stockée. Dans un répertoire lié par `rebase cloud init --claim`, il est ignoré au profit du jeton propre à ce projet lorsqu'il ne détient aucune portée (scope) sur ce dernier. La méthode recommandée pour exécuter `rebase cloud` en CI — voir [CI et agents](/docs/deployment/cloud/#ci-and-agents). Le [serveur MCP](/docs/ai/mcp/) le transmet à la CLI générée par ses outils cloud, et ne l'envoie jamais à l'application : définissez `REBASE_API_TOKEN` pour cela. | — |
-| `REBASE_DEBUG` | `1` affiche l'erreur sous-jacente et les détails de la requête au lieu d'un message court. La première variable à définir lorsqu'une commande `rebase cloud` échoue sans fournir d'aide. | — |
-| `REBASE_ATLAS_DEV_URL` | La base de données vide sur laquelle `rebase db push`, `db generate` et `db migrate` planifient leurs modifications, au lieu du `<db>_dev_diff` créé à côté de `DATABASE_URL`. Rebase ne crée ni ne supprime une base de données désignée ici, et refuse une base identique à `DATABASE_URL`. Sur la base de données de développement gérée, la CLI la configure sur une instance PGlite en mémoire éphémère qui lui est propre. À définir là où le privilège `CREATE DATABASE` n'est pas accordé. | `<db>_dev_diff` |
-| `REBASE_DEV_NO_DB` | `rebase dev` ne démarre aucune base de données et ne provisionne rien — vous apportez la vôtre. Identique à `--no-db`. | — |
+| `SERVICE_KEY` | Une ancienne dénomination pour cette clé. Lorsque `.env` la définit, `rebase api-keys` et `rebase storage` la lisent à la place de `REBASE_SERVICE_KEY`. | — |
+| `REBASE_ENV_FILE_PATH` | Le fichier `.env` que le CLI lit et écrit, s'il ne s'agit pas de celui du projet. | — |
+| `REBASE_ROOT_RULES` | `0` empêche `rebase init` et `rebase skills install` d'écrire les règles du projet dans les fichiers `CLAUDE.md` et `AGENTS.md` de la racine du dépôt, pour une racine dont vous gérez les fichiers d'agents manuellement. | on |
+| `REBASE_CLOUD_URL` | Le plan de contrôle (control plane) avec lequel `rebase cloud` communique. | — |
+| `REBASE_CLOUD_EMAIL` | Le compte sous lequel `rebase cloud login` se connecte, au lieu de demander la saisie. | — |
+| `REBASE_CLOUD_PASSWORD` | Son mot de passe, afin qu'un gestionnaire de secrets puisse le transmettre sans qu'il n'atteigne l'historique du shell. | — |
+| `REBASE_TOKEN` | Un jeton issu de `rebase cloud tokens create`. S'il est défini, chaque commande `rebase cloud` s'authentifie avec lui plutôt qu'avec la session de `rebase cloud login`, et ne lit ni n'écrit jamais la session stockée. Dans un répertoire lié par `rebase cloud init --claim`, il est mis de côté au profit du jeton propre à ce projet s'il ne dispose d'aucun scope sur le projet. La méthode recommandée pour exécuter `rebase cloud` en CI — voir [CI et agents](/docs/deployment/cloud/#ci-and-agents). Le [serveur MCP](/docs/ai/mcp/) le transmet au CLI généré par ses outils cloud, et ne l'envoie jamais à l'application : définissez `REBASE_API_TOKEN` pour cela. | — |
+| `REBASE_DEBUG` | `1` affiche l'erreur sous-jacente et le détail de la requête au lieu du message succinct. Le premier réflexe à avoir lorsqu'une commande `rebase cloud` échoue sans donner de détails utiles. | — |
+| `REBASE_ATLAS_DEV_URL` | Base de développement vide pour `db push` et `db generate`. Le nom reste inchangé pour les projets existants. Rebase ne gère pas une base indiquée ici et refuse l’URL cible. PGlite géré reçoit une base éphémère en mémoire. Utilisez ce réglage sans droit `CREATE DATABASE` ; `db migrate` n’en a pas besoin. | `<db>_dev_diff` |
+| `PTAH_TRUST_REPLAY_SQL` | Définissez `1` uniquement si vous faites confiance au SQL des migrations rejoué sur un serveur PostgreSQL de développement partagé. Ce SQL s'exécute avec les privilèges de la connexion de développement. Les rôles créés peuvent rester sur le serveur. | non défini |
+| `PTAH_DEV_SERVER_DISPOSABLE` | Définissez `1` uniquement si l'ensemble du serveur de développement peut être supprimé. Rebase le définit automatiquement pour son serveur de développement PGlite géré. | non défini |
+| `PTAH_ATLAS_ALLOW_UNMATCHED_EXCLUDE` | Rebase le définit pour qu'une même liste d'exclusions fonctionne lorsqu'un objet est absent. Aucun réglage manuel nécessaire. | `1` pendant les commandes de base de données |
+| `PTAH_ATLAS_MIGRATE_DIFF_EXCLUDE` | Rebase le définit à partir des sélecteurs d'objets protégés pendant `db generate`. Aucun réglage manuel nécessaire. | généré |
+| `PTAH_ATLAS_MIGRATE_DIFF_INCLUDE` | Rebase le définit à partir des sélecteurs d'objets déclarés pendant `db generate`. Aucun réglage manuel nécessaire. | généré |
+| `REBASE_PTAH_DEV_PGLITE` | Marqueur interne de la connexion de développement PGlite gérée. Rebase le définit automatiquement. | non défini |
+| `REBASE_DEV_NO_DB` | `rebase dev` ne démarre aucune base de données et ne provisionne rien — vous fournissez la vôtre. Identique à `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Fixe le port du serveur de dev frontend, que `rebase dev` déduit sinon du chemin du projet. | — |
 | `REBASE_DEV_READY_TIMEOUT_MS` | Temps pendant lequel `rebase dev` attend que le backend s'annonce avant d'indiquer qu'il n'a pas démarré. `0` désactive ce rapport. | `30000` |
 | `DATABASE_PASSWORD` | Le mot de passe que `rebase dev --docker` intègre dans la chaîne de connexion déduite de `docker-compose.yml`. | — |

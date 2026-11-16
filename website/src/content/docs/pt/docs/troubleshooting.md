@@ -1,5 +1,5 @@
 ---
-sourceHash: 6403748b3ff6521b
+sourceHash: 37af460ecdc0bd6a
 slug: pt/docs/troubleshooting
 title: Solução de problemas
 description: As falhas que impedem um backend Rebase de iniciar ou responder requisições — um banco de dados inacessível, credenciais incorretas, uma extensão ausente, uma recusa de RLS, desvio de esquema (schema drift), uma porta ocupada, uma função que não carrega — e como cada uma delas se parece.
@@ -176,17 +176,17 @@ de novo.
 
 ```
 Error: EOF
-✗ atlas schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
+✗ ptah-compat schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
 ```
 
 O banco de dados de desenvolvimento gerenciado aceita poucas conexões por vez, e um
-`rebase dev` em execução mantém algumas delas ativas. O Atlas, que planeja o push, abre mais
+`rebase dev` em execução mantém algumas delas ativas. O Ptah, que planeja o push, abre mais
 duas conexões, e uma delas foi fechada inesperadamente. Nada foi aplicado, portanto o comando pode ser
 executado novamente com segurança; o servidor de desenvolvimento fecha conexões ociosas após 30 segundos. Se o erro
 persistir, pare o `rebase dev` enquanto faz o push.
 
 O push fecha suas
-próprias conexões antes que o Atlas inicie, o que normalmente deixa espaço para o Atlas,
+próprias conexões antes que o Ptah inicie, o que normalmente deixa espaço para o Ptah,
 e o erro explica o que aconteceu.
 
 ## A porta já está em uso

@@ -1,5 +1,5 @@
 ---
-sourceHash: 97486e7c061d503d
+sourceHash: fbe861c484005a2e
 title: Edição de schema em tempo real
 description: Crie e altere tabelas em um backend em execução — a edição é gravada em backend/schema, confirmada primeiro em seu repositório e depois aplicada.
 ---
@@ -290,10 +290,9 @@ motivo, em vez de recusar a ação depois que você já tiver decidido:
 
 ## Se o seu projeto mantém migrações versionadas
 
-Aplicar aqui **não** cria uma migration, e nem poderia: uma migration segue o
-formato do Atlas com um arquivo de integridade, gerada por um binário externo
-contra um banco de dados temporário, e um servidor em execução não possui nenhum
-dos dois.
+Aplicar aqui **não** cria uma migration. `rebase db generate` usa o Ptah Compat para
+comparar o schema declarado com o histórico de migrations em um banco de dados
+temporário e atualiza `atlas.sum`. O servidor em execução não realiza esse processo.
 
 O que ele comita é o arquivo da tabela, e é a partir dele que o
 `rebase db generate` cria a migration. Portanto, a migration está a um comando de
@@ -544,8 +543,7 @@ está trabalhando:
   fluxo de ensure é a única coisa que altera um schema e ele só pode adicionar.
 - Nenhum arquivo de migration é gerado. Um projeto provisionado por boot-ensure
   não precisa de nenhum; um projeto provisionado por migrations deve executar
-  `rebase db generate`, que gera uma através do Atlas com o hash de integridade
-  exigido pelo Atlas.
+  `rebase db generate`, que grava uma migration com o Ptah Compat e atualiza `atlas.sum`.
 - Apenas Postgres. O recurso é detectado no driver, e um driver sem ele
   responde com `SCHEMA_EDITING_UNSUPPORTED`.
 - Uma implantação cujas tabelas são derivadas do banco de dados disponibiliza uma

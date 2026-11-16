@@ -1,5 +1,5 @@
 ---
-sourceHash: 6f9ed21db2b9e2a4
+sourceHash: 4fa776203d5e5bb5
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstelle ein neues Rebase-Projekt und führe es lokal in unter 2 Minuten aus.
@@ -24,7 +24,7 @@ Dies richtet ein Projekt mit zwei Packages ein (Scaffolding). Falls Begriffe wie
 
 - **Node.js** 22.22+ – jedes Scaffold, headless eingeschlossen, deklariert `"node": ">=22.22.0"`
 - **pnpm** (empfohlen) oder npm
-- **Unter Windows** lies zuerst [Windows](/docs/getting-started/windows/): ein Werkzeug, Atlas, braucht dort ein eigenes Windows-Binary
+- **Windows:** Siehe die [Windows-Anleitung](/docs/getting-started/windows/).
 
 Keine Datenbankinstallation und kein Docker erforderlich. `rebase dev` führt ein verwaltetes PostgreSQL für das Projekt aus, dessen Daten unter `.rebase/` liegen. Siehe [Variante: Eigene PostgreSQL-Datenbank verwenden](#variante-eigene-postgresql-datenbank-verwenden), wenn du lieber eine eigene bereitstellen möchtest – eine lokale Installation, Neon, Supabase oder den Container, der mit diesem Scaffold mitgeliefert wird.
 
@@ -85,16 +85,20 @@ Starte die Dev-Server anschließend wie oben beschrieben. Eine gesetzte `DATABAS
 angetastet, und URLs, die auf eine andere Maschine verweisen, bleiben völlig
 unberührt.
 
-Die Migrationsbefehle planen Änderungen mit [Atlas](https://atlasgo.io/), der
-Schema-Migrations-Engine, mit der Rebase plant. Diese benötigt eine zweite, leere Datenbank für den
-Abgleich. Bei deiner eigenen Datenbank erstellt Rebase eine zusätzliche Instanz daneben; auf der verwalteten
-Datenbank, die genau eine Datenbank bedient, wird für die Dauer des Befehls eine temporäre PGlite-Instanz
-gestartet.
-So oder so:
+Die Migrationsbefehle verwenden Ptah Compat, um das deklarierte Schema
+zu planen. Dafür ist eine zweite, leere Datenbank nötig. Rebase erstellt
+sie neben Ihrer PostgreSQL-Datenbank; bei der verwalteten Datenbank
+startet es ein temporäres PGlite. Das Schema können Sie in beiden Fällen
+anwenden:
 
 ```bash
 pnpm run db:push
 ```
+
+Wenn `db generate` Migrationen auf einem gemeinsam genutzten PostgreSQL-
+Server wiedergibt, setzen Sie `PTAH_TRUST_REPLAY_SQL=1` nur für SQL,
+dem Sie mit den Rechten der Dev-Verbindung vertrauen. Für das verwaltete
+PGlite ist diese Option nicht nötig.
 
 Beim Booten werden fehlende Tabellen – sowie deren
 [RLS](/docs/collections/security-rules/)-Richtlinien (PostgreSQL Row-Level

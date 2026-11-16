@@ -37,8 +37,9 @@ behind a `where` clause — had no declaration site at all.
 So the only way to have one was to write it by hand. And:
 
 :::caution[If you have hand-written indexes on a Rebase-managed table]
-`rebase db push` is declarative. An index on a managed table that was absent
-from `schema.sql` counted as drift, and Atlas planned `DROP INDEX` for it —
+`rebase db push` is declarative. Before the ownership rule below, an index on
+a managed table that was absent from `schema.sql` counted as drift, and Atlas
+planned `DROP INDEX` for it —
 which is not in the destructive-statement list, so the auto-approved apply took
 it without asking. Every hand-written index on a managed table was living on
 borrowed time.
@@ -171,11 +172,9 @@ naturally-ordered column on an append-only table — tiny, and useless the momen
 rows start arriving out of order. Neither has an ordering, so `direction` and
 `nulls` are unrepresentable on them rather than refused later by Postgres.
 
-There is no `gist` and no `hash`: every interesting gist operator class ships in
-an extension, and hash indexes cannot be unique, composite, or ordered. That
-restriction is what keeps the whole model on the Atlas path — `rebase db push`
-materialises the desired state in a bare scratch database to plan against, and
-`CREATE EXTENSION` cannot go in that file. **Trigram search is
+There is no `gist` and no `hash` in this declaration: hash indexes cannot be
+unique, composite, or ordered, and Rebase exposes extension-backed index
+methods through their features. **Trigram search is
 [`search:`](/docs/backend/search); ANN is a
 [`col.vector()` column](/docs/sdk/aggregates-and-search#the-index).** An index needing
 `gin_trgm_ops` or `vector_cosine_ops` is refused at build time rather than
@@ -270,7 +269,7 @@ Both producers emit them, which matters because not every deployment runs
 `db push`:
 
 - **`rebase db push` / `rebase db generate`** put them in `schema.sql`, on the
-  ordinary Atlas path — so they get migrations, drift detection and rollback
+  ordinary Ptah path — so they get migrations, drift detection and rollback
   like every other object.
 - **`rebase schema generate`** also writes them into `schema.generated.ts`, so
   the Drizzle schema describes the same table the database has. A covering
@@ -372,12 +371,12 @@ build them differently:
   on the same terms as the boot: `CREATE INDEX CONCURRENTLY`, one at a time,
   so reads and writes go on while it runs (about 0.4 s at 1M rows and 6 s at
   10M as a plain build on a laptop SSD, `maintenance_work_mem` 64 MB; a
-  concurrent one takes longer and blocks nothing). Atlas then finds each index
+  concurrent one takes longer and blocks nothing). Ptah then finds each index
   in place and plans nothing for it. An index it could not build first — a
-  table another session held for the whole lock budget — is left to Atlas,
+  table another session held for the whole lock budget — is left to Ptah,
   which builds it inside the push's transaction and so blocks writes to that
   table for the build; the push says which. A foreign-key column the push
-  itself adds gets its index from Atlas along with the column, before anything
+  itself adds gets its index from Ptah along with the column, before anything
   is in it. `--dry-run` builds nothing: it names the indexes a real push would
   build first, and the plan it prints lists them, since they do not exist yet.
 

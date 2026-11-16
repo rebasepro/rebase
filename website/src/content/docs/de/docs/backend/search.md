@@ -1,5 +1,5 @@
 ---
-sourceHash: ceff4ba3bdacfb06
+sourceHash: 85e4a1ff6e52e6b4
 title: Suche
 sidebar_label: Suche
 description: Wie sich .search() standardmäßig verhält und wie eine Tabelle die gerankte Volltextsuche über von Ihnen benannte Spalten aktiviert – einschließlich JSONB- und Array-Inhalten.
@@ -97,19 +97,14 @@ Postgres berechnet die Spalte bei jedem Schreibvorgang in ein Quellfeld neu und 
 Versuch, direkt hineinzuschreiben, sodass der Index nicht von der Zeile abweichen kann. Die Spalte
 wird niemals von der API zurückgegeben.
 
-Sie werden in `.rebase/sql/search.sql` neben `schema.sql` und
-`policies.sql` generiert, und `rebase db push` wendet sie für Sie an – es muss nichts Zusätzliches
-ausgeführt werden. Sie erhalten eine eigene Datei, da eine generierte `tsvector`-Spalte voraussetzt, dass zuerst eine
-`IMMUTABLE`-Hilfsfunktion existiert (`unaccent` ist nur `STABLE`, und
-das Reduzieren eines `jsonb`-Dokuments erfordert eine Set-Returning-Funktion), und Atlas – die
-Engine hinter `db push` – in seiner kostenlosen Version keine Funktionen verwalten kann.
+Sie werden in `.rebase/sql/search.sql` neben `schema.sql` und `policies.sql` generiert.
+`rebase db push` wendet sie ohne zusätzlichen Schritt an. Für eine generierte
+`tsvector`-Spalte muss zuerst eine `IMMUTABLE`-Hilfsfunktion existieren (`unaccent` ist
+nur `STABLE`). Ptah Compat erhält die Funktion, Spalte und den Index gemeinsam in
+`schema.sql`. Die separate `search.sql` bleibt für Boot und Recovery.
 
-Eine beachtenswerte Konsequenz, wenn Sie per Migration statt per Push deployen:
-Das Hinzufügen eines `search`-Blocks allein erzeugt keine Migration, da sich das Schema, das
-Atlas vergleicht, nicht geändert hat. `rebase db generate` weist darauf hin, wenn dies geschieht.
-Der Block wird weiterhin durch `rebase db push` und durch das Überprüfen des Schemas beim Start
-angewendet; um ihn explizit in eine Migration aufzunehmen, hängen Sie `.rebase/sql/search.sql`,
-die von `rebase db generate` frisch geschrieben wurde, an eine Migration an.
+Auch wenn sich nur ein `search`-Block ändert, erstellt `rebase db generate` eine
+Migration. Dieselbe Änderung erscheint im normalen Plan von `rebase db push --dry-run`.
 
 ### Den Block später ändern
 

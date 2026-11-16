@@ -1,5 +1,5 @@
 ---
-sourceHash: 535fb9801df93ad9
+sourceHash: 1823d98cb985e205
 title: Datenbankbefehle
 sidebar_label: Datenbankbefehle
 description: Die rebase db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, Abrufen einer Kopie, der Verbindungs-String, die verwaltete Entwicklungsdatenbank und Branches.
@@ -328,12 +328,12 @@ Schreibt die Zeilen, die ein Branch eingefügt, geändert und gelöscht hat, in 
 
 :::note[Auf der verwalteten Entwicklungsdatenbank]
 `push`, `generate` und `migrate` funktionieren hier wie auf jeder Datenbank.
-`push` und `generate` planen ihre Änderungen mit Atlas, das eine zweite
+`push` und `generate` planen ihre Änderungen mit Ptah Compat, das eine zweite
 leere Datenbank zum Vergleichen benötigt — und das verwaltete PGlite stellt genau eine bereit. Daher
 startet jeder dieser Befehle auf der verwalteten Datenbank ein zweites, temporäres PGlite im Arbeitsspeicher
-für Atlas und stoppt es, sobald der Befehl beendet ist. Auf diese Weise wird dort eine Spalte gelöscht,
+für Ptah Compat und stoppt es, sobald der Befehl beendet ist. Auf diese Weise wird dort eine Spalte gelöscht,
 umbenannt oder eingeschränkt: `rebase dev` fügt immer nur hinzu. Die Schutzschranke für destruktive Änderungen ist dieselbe
-wie überall. Um Atlas stattdessen gegen eine eigene leere Datenbank planen zu lassen,
+wie überall. Um Ptah Compat stattdessen gegen eine eigene leere Datenbank planen zu lassen,
 setze `REBASE_ATLAS_DEV_URL` darauf; Rebase erstellt oder löscht keine
 so benannte Datenbank.
 

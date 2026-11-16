@@ -1,5 +1,5 @@
 ---
-sourceHash: 535fb9801df93ad9
+sourceHash: 1823d98cb985e205
 title: Comandos de Banco de Dados
 sidebar_label: Comandos de Banco de Dados
 description: Os comandos rebase db — push, generate e migrate, backups e restaurações, extração de cópia, a string de conexão, o banco de dados de desenvolvimento gerenciado e branches.
@@ -328,12 +328,12 @@ Escreve as linhas que um branch inseriu, atualizou e apagou no banco de dados a 
 
 :::note[No banco de dados de desenvolvimento gerenciado]
 `push`, `generate` e `migrate` funcionam aqui como em qualquer outro banco de dados.
-O `push` e o `generate` planejam seu trabalho com o Atlas, que precisa de um segundo
+O `push` e o `generate` planejam seu trabalho com o Ptah Compat, que precisa de um segundo
 banco de dados vazio para comparação — e o PGlite gerenciado atende a exatamente um. Portanto,
 no banco de dados gerenciado, cada um deles inicia um segundo PGlite descartável na memória
-para o Atlas e o interrompe quando o comando termina. É assim que uma coluna é removida,
+para o Ptah Compat e o interrompe quando o comando termina. É assim que uma coluna é removida,
 renomeada ou restrita ali: o `rebase dev` apenas adiciona. A proteção contra operações destrutivas é a
-mesma de qualquer outro lugar. Para que o Atlas faça o planejamento contra um banco de dados vazio
+mesma de qualquer outro lugar. Para que o Ptah Compat faça o planejamento contra um banco de dados vazio
 próprio, defina `REBASE_ATLAS_DEV_URL` para ele; o Rebase não cria nem remove um
 banco de dados indicado dessa forma.
 

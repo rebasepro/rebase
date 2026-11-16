@@ -1,5 +1,5 @@
 ---
-sourceHash: 97486e7c061d503d
+sourceHash: fbe861c484005a2e
 title: Modifica live dello schema
 description: Crea e modifica tabelle su un backend in esecuzione — la modifica viene scritta in backend/schema, prima committata nel tuo repository, poi applicata.
 ---
@@ -277,9 +277,10 @@ rifiutare l'operazione dopo che hai deciso:
 
 ## Se il tuo progetto gestisce migrazioni con versionamento
 
-L'applicazione in questo contesto **non** scrive una migrazione, e non può farlo: una migrazione è nel
-formato di Atlas con un file di integrità, generato da un binario esterno su un database
-temporaneo, ed entrambi non sono presenti su un server in esecuzione.
+L'applicazione in questo contesto **non** scrive una migrazione. `rebase db generate`
+usa Ptah Compat per confrontare lo schema dichiarato con la cronologia delle migrazioni
+in un database temporaneo e aggiorna `atlas.sum`. Il server in esecuzione non svolge
+questo processo.
 
 Ciò di cui viene effettuato il commit è il file della tabella, ed è a partire da quello che `rebase db generate`
 scrive la migrazione. Quindi la migrazione è a portata di un solo comando:
@@ -518,7 +519,7 @@ Due aspetti garantiscono la sicurezza dell'operazione su un repository su cui st
   percorso ensure è l'unico meccanismo che altera uno schema e può solamente aggiungere elementi.
 - Non viene scritto alcun file di migrazione. Un progetto configurato tramite boot-ensure non ne ha bisogno;
   un progetto configurato tramite migrazioni dovrebbe eseguire `rebase db generate`, che ne
-  crea una tramite Atlas con l'hash di integrità richiesto da Atlas.
+  che scrive una migrazione tramite Ptah Compat e aggiorna `atlas.sum`.
 - Solo Postgres. La funzionalità viene rilevata a livello di driver, e un driver
   privo di tale supporto risponde con `SCHEMA_EDITING_UNSUPPORTED`.
 - Una distribuzione le cui tabelle sono derivate dal database renderà disponibile la modifica

@@ -1,5 +1,5 @@
 ---
-sourceHash: f9ad18cf03580c13
+sourceHash: cc7b9aa6ef9d67c5
 title: Branching de Banco de Dados
 sidebar_label: Branching
 description: Crie branches de banco de dados isoladas para desenvolvimento, homologação e testes usando o CREATE DATABASE ... TEMPLATE do PostgreSQL — cópias instantâneas e de total fidelidade sem tempo de inatividade.
@@ -304,7 +304,7 @@ rebase db branch prune --older-than 2w      # and anything older than two weeks
 
 Nada expira a menos que você solicite: uma branch pode ser a única cópia do trabalho de uma tarde inteira, portanto, o `--older-than` é opcional e as idades são arredondadas para baixo, e o comando exibe seu plano e pede confirmação antes de remover qualquer coisa, a menos que você passe `--yes`.
 
-O prune também encontra as duas formas pelas quais as branches divergem de seus metadados — uma entrada cujo banco de dados foi excluído com SQL comum (o que o `list` continuaria exibindo indefinidamente) e um banco de dados de branch cuja entrada nunca foi gravada (uma falha entre as duas instruções executadas pelo `create`). Os bancos de dados temporários `<db>_dev_diff` do Atlas são reportados em conjunto, mas removidos apenas com `--include-dev-diff`: eles não são branches e um deles pode pertencer a um `db push` em execução no momento.
+O prune também encontra as duas formas pelas quais as branches divergem de seus metadados — uma entrada cujo banco de dados foi excluído com SQL comum (o que o `list` continuaria exibindo indefinidamente) e um banco de dados de branch cuja entrada nunca foi gravada (uma falha entre as duas instruções executadas pelo `create`). Os bancos de dados temporários `<db>_dev_diff` são reportados em conjunto, mas removidos apenas com `--include-dev-diff`: eles não são branches e um deles pode pertencer a um `db push` em execução no momento.
 
 ### Compatibilidade com pgBouncer
 Ao fazer o deploy atrás do pgBouncer ou de poolers de conexão, certifique-se de que o pooler suporte operações administrativas de banco de dados. A criação e exclusão de bancos de dados contornam os pools padrão em nível de transação e exigem conexões diretas com o servidor Postgres (usando privilégios elevados de usuário) por meio da configuração `adminConnectionString`.

@@ -1,8 +1,8 @@
 ---
-sourceHash: 53d5e75acc2383a2
-title: Riferimento strumenti MCP
-sidebar_label: Riferimento strumenti MCP
-description: Tutti gli strumenti registrati dal server MCP di Rebase, divisi per gruppo — cosa richiede ed esegue ciascuno, e quali vengono rifiutati dal loopback gate su progetti non locali.
+sourceHash: c98b73f9a4ab376f
+title: Riferimento degli strumenti MCP
+sidebar_label: Riferimento degli strumenti MCP
+description: Tutti gli strumenti registrati dal server MCP di Rebase, divisi per gruppo — cosa richiede ed esegue ciascuno di essi, e quali vengono rifiutati dal loopback gate per i progetti non locali.
 ---
 
 Gli strumenti che [`@rebasepro/mcp`](/docs/ai/mcp) offre a un assistente. Il modo in cui si connette,
@@ -34,9 +34,9 @@ Esegue la CLI di Rebase nella directory del progetto attivo.
 
 ## Pianificazione dello schema (1)
 
-Chiede al backend cosa comporterebbe una modifica, tramite `POST /api/admin/schema/plan`. Nessuna
-CLI e niente scritto su disco — funziona sul database di sviluppo gestito,
-cosa che i comandi basati su Atlas non possono fare.
+Chiede al backend cosa comporterebbe una modifica tramite
+`POST /api/admin/schema/plan`. Non richiede un processo CLI e non scrive nulla
+su disco. Funziona anche sul database di sviluppo gestito.
 
 | Strumento | Obbligatorio | Descrizione |
 |---|---|---|

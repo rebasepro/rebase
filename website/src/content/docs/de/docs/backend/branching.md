@@ -1,5 +1,5 @@
 ---
-sourceHash: f9ad18cf03580c13
+sourceHash: cc7b9aa6ef9d67c5
 title: Datenbank-Branching
 sidebar_label: Branching
 description: Erstellen Sie isolierte Datenbank-Branches für Entwicklung, Staging und Tests mithilfe von PostgreSQLs CREATE DATABASE ... TEMPLATE – sofortige, originalgetreue Kopien ohne Ausfallzeiten.
@@ -304,7 +304,7 @@ rebase db branch prune --older-than 2w      # and anything older than two weeks
 
 Nichts läuft automatisch ab, es sei denn, Sie fordern es an: Ein Branch kann die einzige Kopie der Arbeit eines ganzen Nachmittags sein. Daher ist `--older-than` ein Opt-in, Altersangaben werden abgerundet, und der Befehl zeigt seinen Ausführungsplan an und fragt nach, bevor etwas entfernt wird – es sei denn, Sie übergeben `--yes`.
 
-Prune erkennt auch die beiden Fälle, in denen Branches von ihren Metadaten abweichen: ein Eintrag, dessen Datenbank mit einfachem SQL gelöscht wurde (was `list` sonst dauerhaft melden würde), und eine Branch-Datenbank, deren Eintrag nie geschrieben wurde (ein Absturz zwischen den beiden Statements, die `create` ausführt). Die Scratch-Datenbanken `<db>_dev_diff` von Atlas werden ebenfalls gemeldet, jedoch nur mit `--include-dev-diff` entfernt: Sie sind keine Branches, und eine davon könnte zu einem gerade laufenden `db push` gehören.
+Prune erkennt auch die beiden Fälle, in denen Branches von ihren Metadaten abweichen: ein Eintrag, dessen Datenbank mit einfachem SQL gelöscht wurde (was `list` sonst dauerhaft melden würde), und eine Branch-Datenbank, deren Eintrag nie geschrieben wurde (ein Absturz zwischen den beiden Statements, die `create` ausführt). Die Scratch-Datenbanken `<db>_dev_diff` werden ebenfalls gemeldet, jedoch nur mit `--include-dev-diff` entfernt: Sie sind keine Branches, und eine davon könnte zu einem gerade laufenden `db push` gehören.
 
 ### pgBouncer-Kompatibilität
 Stellen Sie beim Einsatz hinter pgBouncer oder Verbindungspoolern sicher, dass der Pooler administrative Datenbankoperationen unterstützt. Das Erstellen und Löschen von Datenbanken umgeht Standard-Pools auf Transaktionsebene und erfordert direkte Verbindungen zum Postgres-Server (unter Verwendung erweiterter Benutzerrechte) über die Konfiguration `adminConnectionString`.

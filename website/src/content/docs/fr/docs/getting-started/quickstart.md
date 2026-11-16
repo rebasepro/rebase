@@ -1,5 +1,5 @@
 ---
-sourceHash: 6f9ed21db2b9e2a4
+sourceHash: 4fa776203d5e5bb5
 title: Démarrage rapide
 sidebar_label: Démarrage rapide
 description: Créez un nouveau projet Rebase et lancez-le localement en moins de 2 minutes.
@@ -24,7 +24,7 @@ la page [Structure du projet](/docs/getting-started/project-structure/) les déf
 
 - **Node.js** 22.22+ — chaque modèle généré, y compris headless, déclare `"node": ">=22.22.0"`
 - **pnpm** (recommandé) ou npm
-- **Sous Windows**, lisez d'abord [Windows](/docs/getting-started/windows/) : un outil, Atlas, a besoin de son propre binaire Windows
+- **Windows :** consultez le [guide Windows](/docs/getting-started/windows/).
 
 Aucune base de données à installer, et aucun Docker requis. `rebase dev` exécute un PostgreSQL managé pour le projet, avec ses données stockées sous `.rebase/`. Consultez [Variante : utiliser votre propre PostgreSQL](#variante--utiliser-votre-propre-postgresql) si vous préférez en fournir une — une installation locale, Neon, Supabase, ou le conteneur fourni avec ce modèle.
 
@@ -85,16 +85,19 @@ Puis démarrez les serveurs de développement comme ci-dessus. Une variable `DAT
 modifiée, et si elle pointe ailleurs que sur cette machine, elle est laissée
 totalement intacte.
 
-Les commandes de migration planifient les modifications avec [Atlas](https://atlasgo.io/), le
-moteur de migration de schéma utilisé par Rebase, qui nécessite une seconde base de données vide pour
-effectuer la comparaison. Sur votre propre base de données, Rebase en crée une à côté ; sur la base
-managée, qui ne dessert qu'une seule base de données, il démarre une instance temporaire PGlite pour la
-durée de la commande.
-Dans les deux cas :
+Les commandes de migration utilisent Ptah Compat pour planifier le
+schéma déclaré. Il leur faut une seconde base de données vide. Rebase
+la crée à côté de votre base PostgreSQL ; pour la base gérée, il
+démarre un PGlite temporaire. Vous pouvez appliquer le schéma aux deux :
 
 ```bash
 pnpm run db:push
 ```
+
+Si `db generate` rejoue des migrations sur un serveur PostgreSQL
+partagé, définissez `PTAH_TRUST_REPLAY_SQL=1` uniquement si vous faites
+confiance à ce SQL exécuté avec les droits de la connexion de
+développement. Le PGlite géré n’en a pas besoin.
 
 Le démarrage crée déjà les tables manquantes — ainsi que leurs
 politiques [RLS](/docs/collections/security-rules/) (sécurité au niveau des lignes de PostgreSQL,

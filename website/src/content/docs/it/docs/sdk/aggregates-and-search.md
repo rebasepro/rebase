@@ -1,5 +1,5 @@
 ---
-sourceHash: 1974d7d32fb837b2
+sourceHash: aad5108f9251319e
 title: Aggregazioni e ricerca
 sidebar_label: Aggregazioni e ricerca
 description: "Esegui conteggi, somme e raggruppamenti con l'SDK, filtra all'interno delle colonne JSON ed esegui ricerche full-text e vettoriali dal client."
@@ -326,17 +326,11 @@ per ogni riga della tabella. Per la paginazione, usa `meta.hasMore`, che rimane 
   `type "vector" does not exist` su un database che non dispone di nessuna delle due opzioni,
   indicando entrambe le vie d'uscita.
 
-La colonna, il suo indice ANN e tale `CREATE EXTENSION` vengono generati in
-`.rebase/sql/vector.sql`, accanto a `schema.sql` e `policies.sql`, e `rebase db
-push` li applica per te. Hanno un file dedicato perché Atlas — il
-motore alla base di `db push` — calcola le differenze materializzando `schema.sql` in un
-database temporaneo azzerato all'inizio di ogni esecuzione, quindi un `VECTOR(n)` al suo
-interno verrebbe risolto rispetto a un database che non può mai avere pgvector.
-
-`rebase db generate` accoda quel file alla migrazione che scrive, cosicché una
-migrazione rieseguita su un database vuoto crea anche la colonna. Una modifica alla sola
-proprietà vettoriale non produce alcuna migrazione, poiché lo schema confrontato da Atlas
-rimane invariato — `db generate` lo segnala quando si verifica.
+La colonna, il suo indice ANN e `CREATE EXTENSION` fanno parte dello `schema.sql`
+desiderato che Ptah Compat usa per pianificare `rebase db push` e `db generate`. Rebase
+scrive anche `.rebase/sql/vector.sql` per avvio e ripristino. Il normale piano di
+migrazione include le modifiche alla proprietà vettoriale o al suo indice, anche quando
+non cambia nient’altro nella tabella.
 
 ### L'indice
 

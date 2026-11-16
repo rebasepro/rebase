@@ -1,5 +1,5 @@
 ---
-sourceHash: f957d9b26ce4636f
+sourceHash: 48b7860d4b5eff97
 title: Indizes
 sidebar_label: Indizes
 description: Deklarieren Sie gewöhnliche Postgres-Indizes für eine Tabelle – btree, GIN und BRIN, partiell, zusammengesetzt, abdeckend und eindeutig – und warum manuell erstellte früher verschwanden.
@@ -34,7 +34,11 @@ Der DDL-Generator hat schon immer Index-Anweisungen für genau zwei Dinge ausgeg
 Die einzige Möglichkeit, einen zu haben, bestand also darin, ihn manuell zu schreiben. Und:
 
 :::caution[Wenn Sie manuell geschriebene Indizes auf einer von Rebase verwalteten Tabelle haben]
-`rebase db push` ist deklarativ. Ein Index auf einer verwalteten Tabelle, der in `schema.sql` fehlte, zählte als Drift, und Atlas plante dafür ein `DROP INDEX` – was nicht in der Liste der destruktiven Anweisungen steht, sodass die automatisch genehmigte Anwendung es ohne Nachfrage ausführte. Jeder manuell geschriebene Index auf einer verwalteten Tabelle lebte auf geborgter Zeit.
+`rebase db push` ist deklarativ. Vor der unten beschriebenen Besitzregel: Ein Index auf
+einer verwalteten Tabelle, der in `schema.sql` fehlte, zählte als Drift, und Atlas
+plante dafür ein `DROP INDEX` – was nicht in der Liste der destruktiven Anweisungen
+steht, sodass die automatisch genehmigte Anwendung es ohne Nachfrage ausführte. Jeder
+manuell geschriebene Index auf einer verwalteten Tabelle lebte auf geborgter Zeit.
 
 Dies wird durch die unten stehende Eigentumsregel behoben: Ein Index, den Rebase nicht erstellt hat, wird nun anhand des Namens aus dem Diff ausgeschlossen und niemals angetastet. Das Deklarieren Ihrer manuell geschriebenen Indizes ist immer noch der bessere Endzustand – ein deklarierter Index wird auf einer frischen Datenbank und auf jedem Mandanten erstellt, ein manuell geschriebener nicht –, aber in der Zwischenzeit werden sie durch nichts mehr gelöscht.
 :::
@@ -132,7 +136,13 @@ indexes: [{ columns: ["status"], include: ["title"], reason: "the status sidebar
 
 `gin` dient der Enthaltensein-Prüfung (Containment) über einer Array- oder `jsonb`-Spalte. `brin` ist für eine natürlich geordnete Spalte auf einer Append-only-Tabelle gedacht – winzig und nutzlos in dem Moment, in dem Zeilen in ungeordneter Reihenfolge eintreffen. Keiner von beiden besitzt eine Sortierung, daher sind `direction` und `nulls` bei ihnen nicht darstellbar, anstatt später von Postgres abgelehnt zu werden.
 
-Es gibt kein `gist` und kein `hash`: Jede interessante Gist-Operatorklasse wird in einer Extension mitgeliefert, und Hash-Indizes können weder eindeutig, zusammengesetzt noch sortiert sein. Diese Einschränkung hält das gesamte Modell auf dem Atlas-Pfad – `rebase db push` materialisiert den Soll-Zustand in einer leeren Scratch-Datenbank, um dagegen zu planen, und `CREATE EXTENSION` kann nicht in dieser Datei stehen. **Trigramm-Suche ist [`search:`](/docs/backend/search); ANN ist eine [`col.vector()`-Spalte](/docs/sdk/aggregates-and-search#the-index).** Ein Index, der `gin_trgm_ops` oder `vector_cosine_ops` benötigt, wird zur Build-Zeit abgelehnt, anstatt ausgegeben zu werden, um später an einer Datenbank zu scheitern, die Sie noch nie gesehen haben.
+Es gibt kein `gist` und kein `hash` in dieser Deklaration: Hash-Indizes können weder
+eindeutig, zusammengesetzt noch sortiert sein, und Rebase stellt Erweiterungs-basierte
+Indexmethoden über ihre Funktionen bereit. **Trigramm-Suche ist
+[`search:`](/docs/backend/search); ANN ist eine
+[`col.vector()`-Spalte](/docs/sdk/aggregates-and-search#the-index).** Ein Index, der
+`gin_trgm_ops` oder `vector_cosine_ops` benötigt, wird zur Build-Zeit abgelehnt, statt
+später an der Datenbank zu scheitern.
 
 ### `reason`
 
@@ -181,13 +191,15 @@ Diese Teile müssen alle übereinstimmen:
 
 Rebase lässt einen bestehenden Index unberührt und erstellt den deklarierten daneben, wenn sich dieser Index in einem dieser Teile unterscheidet. Es lässt ihn auch unberührt, wenn ein Schlüssel ein Ausdruck ist, ein Schlüssel eine nicht standardmäßige Operatorklasse oder Sortierreihenfolge (Collation) verwendet, der Index ein Constraint absichert, der Index `INVALID` ist oder er bereits einen Rebase-Namen hat.
 
-`rebase db generate` schreibt jeden deklarierten Index als `CREATE INDEX IF NOT EXISTS` in die Migration, sodass die Anweisung erfolgreich ist, wenn `rebase db migrate` gerade einen vorhandenen Index auf diesen Namen umbenannt hat.
+`rebase db generate` schreibt jeden deklarierten Index als `CREATE INDEX IF NOT EXISTS`
+in die Migration, sodass die Anweisung erfolgreich ist, wenn `rebase db migrate` gerade
+einen vorhandenen Index auf diesen Namen umbenannt hat.
 
 ## Wann sie erstellt werden
 
 Beide Producer geben sie aus, was wichtig ist, da nicht jedes Deployment `db push` ausführt:
 
-- **`rebase db push` / `rebase db generate`** legen sie in `schema.sql` auf dem gewöhnlichen Atlas-Pfad ab – so erhalten sie Migrationen, Drift-Erkennung und Rollbacks wie jedes andere Objekt.
+- **`rebase db push` / `rebase db generate`** legen sie in `schema.sql` auf dem gewöhnlichen Ptah-Pfad ab – so erhalten sie Migrationen, Drift-Erkennung und Rollbacks wie jedes andere Objekt.
 - **`rebase schema generate`** schreibt sie auch in `schema.generated.ts`, sodass das Drizzle-Schema dieselbe Tabelle beschreibt, die die Datenbank besitzt. Die `INCLUDE`-Spalten eines abdeckenden Index sind die einzige Ausnahme: Drizzle kann diese nicht ausdrücken, und die generierte Zeile enthält einen entsprechenden Kommentar, der auf `schema.sql` verweist, wo dies möglich ist.
 - **Schema Ensure beim Booten** erstellt sie ebenfalls, zu denselben Bedingungen wie die daneben liegenden Such- und ANN-Indizes. Ein Managed-Runtime-Mandant wird beim Booten bereitgestellt und führt niemals `db push` aus; ohne diesen Schritt würde er ohne seine deklarierten Indizes starten, ohne dass dies gemeldet würde. Eine Tabelle, die beim Booten erstellt wird, erhält ihre Indizes zusammen mit der Tabelle. Bei einer bereits vorhandenen Tabelle erstellt der Boot-Vorgang einen fehlenden Index im Hintergrund, nachdem der Server Anfragen bedient – genau so, wie er die [Fremdschlüssel-Indizes](#was-ein-upgrade-mit-einer-bestehenden-datenbank-macht) erstellt. Er verwendet `CREATE INDEX CONCURRENTLY` auf einer eigenen Verbindung, sodass das 30-Sekunden-`statement_timeout` des Pools einen langen Build-Vorgang nicht abbrechen kann. Ein Index, der durch einen unterbrochenen Build unter seinem Namen als `INVALID` zurückgelassen wurde, wird gelöscht und erneut erstellt. `IF NOT EXISTS` gleicht über den Namen ab, repariert also niemals einen solchen Index. Ein `unique`-Index wird auf dieselbe Weise erstellt, jedoch bevor der Server Anfragen bedient, und das Booten schlägt fehl, wenn er nicht erstellt werden kann. Anfragen ohne ihn zu bedienen, würde Duplikate in den Zeilen zulassen.
 
@@ -230,7 +242,7 @@ Rebase liest ausschließlich Ihre Tabellen, um dies zu entscheiden, niemals die 
 Die Indizes sind neue Objekte auf Tabellen, die bereits Daten enthalten, und die beiden Wege bauen sie unterschiedlich auf:
 
 - **Der Boot-Vorgang wartet nicht auf sie.** Auf einer Tabelle, die bereits existiert, lässt das Schema-Ensure die fehlenden Fremdschlüssel-Indizes beim Booten außen vor und baut sie nacheinander im Hintergrund auf, nachdem der Server bereits Anfragen bedient – mittels `CREATE INDEX CONCURRENTLY` auf einer eigenen Verbindung (das 30-Sekunden-`statement_timeout` des Pools gilt dafür nicht). Dies erfordert keine Sperren, auf die Lese- oder Schreibvorgänge warten müssten. Eine Tabelle, die von einer anderen Sitzung blockiert wird – der Build einer anderen Instanz, ein `ALTER TABLE` –, wird innerhalb des Sperr-Budgets des Boot-Vorgangs aufgegeben und beim nächsten Booten erneut versucht. Ein Index, der durch einen unterbrochenen Build als `INVALID` zurückgelassen wurde (ein Deployment, das den Prozess mitten im Build ersetzt hat, oder zwei Instanzen, die um denselben Namen konkurrieren), wird gelöscht und erneut gebaut. Jeder Index wird protokolliert, wenn er beginnt und abgeschlossen ist; ein Fehler ist eine Warnung, niemals ein Boot-Fehler. Eine Tabelle, die durch diesen Boot-Vorgang erstellt wird, erhält ihre Indizes zusammen mit der Tabelle, bevor irgendetwas darauf schreiben kann. Unter `REBASE_PROVISION_ONLY` laufen die Builds, bevor der Prozess beendet wird, da danach nichts mehr da wäre, um sie auszuführen.
-- **`rebase db push` baut sie auf, bevor es plant**, mit demselben Builder und zu denselben Bedingungen wie der Boot-Vorgang: `CREATE INDEX CONCURRENTLY`, nacheinander, sodass Lese- und Schreibvorgänge während der Ausführung fortgesetzt werden können (etwa 0,4 s bei 1 Mio. Zeilen und 6 s bei 10 Mio. Zeilen als einfacher Build auf einer Laptop-SSD, `maintenance_work_mem` 64 MB; ein nebenläufiger Build dauert länger, blockiert jedoch nichts). Atlas findet dann jeden Index an Ort und Stelle vor und plant nichts dafür. Ein Index, der nicht vorab gebaut werden konnte – weil eine Tabelle für das gesamte Sperr-Budget von einer anderen Sitzung gehalten wurde –, wird Atlas überlassen, das ihn innerhalb der Push-Transaktion aufbaut und somit Schreibvorgänge auf diese Tabelle für die Dauer des Builds blockiert; der Push gibt an, welche betroffen sind. Eine Fremdschlüsselspalte, die der Push selbst hinzufügt, erhält ihren Index von Atlas zusammen mit der Spalte, bevor irgendwelche Daten darin sind. `--dry-run` baut nichts: Es benennt die Indizes, die ein echter Push vorab bauen würde, und der ausgegebene Plan listet sie auf, da sie noch nicht existieren.
+- **`rebase db push` baut sie auf, bevor es plant**, mit demselben Builder und zu denselben Bedingungen wie der Boot-Vorgang: `CREATE INDEX CONCURRENTLY`, nacheinander, sodass Lese- und Schreibvorgänge während der Ausführung fortgesetzt werden können (etwa 0,4 s bei 1 Mio. Zeilen und 6 s bei 10 Mio. Zeilen als einfacher Build auf einer Laptop-SSD, `maintenance_work_mem` 64 MB; ein nebenläufiger Build dauert länger, blockiert jedoch nichts). Ptah findet dann jeden Index an Ort und Stelle vor und plant nichts dafür. Ein Index, der nicht vorab gebaut werden konnte – weil eine Tabelle für das gesamte Sperr-Budget von einer anderen Sitzung gehalten wurde –, wird Ptah überlassen, das ihn innerhalb der Push-Transaktion aufbaut und somit Schreibvorgänge auf diese Tabelle für die Dauer des Builds blockiert; der Push gibt an, welche betroffen sind. Eine Fremdschlüsselspalte, die der Push selbst hinzufügt, erhält ihren Index von Ptah zusammen mit der Spalte, bevor irgendwelche Daten darin sind. `--dry-run` baut nichts: Es benennt die Indizes, die ein echter Push vorab bauen würde, und der ausgegebene Plan listet sie auf, da sie noch nicht existieren.
 
 ## Was abgelehnt wird und wann
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3e2fc07d941f1427
+sourceHash: cb7cd2cb2b7562c3
 title: Entorno y Configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos Rebase.
@@ -29,12 +29,9 @@ Toda la configuración se realiza mediante variables de entorno en su archivo `.
 
 > **En una base de datos administrada, `sslmode=require` puede no significar lo que parece.**
 >
-> Para `psql` y cualquier herramienta de libpq, `require` significa "cifrado, certificado no
-> verificado". El controlador de Node sobre el que se ejecuta Rebase lo interpreta como `verify-full`, por lo que una
-> base de datos cuyo certificado no haya sido firmado por una autoridad pública —algo habitual en Postgres
-> administrado— rechaza el runtime con el error `self-signed certificate`, mientras que `psql`
-> se conecta usando la misma URL. El runtime y los comandos de `rebase db` se detienen mostrando un
-> mensaje que advierte de esto.
+> Rebase y el controlador de Node la aceptan: cifra, pero no verifica el
+> certificado. `psql`, `pg_dump`, `pg_restore` no lo hacen, y no se
+> degradan: se niegan a iniciar con `invalid sslmode value: "no-verify"`.
 >
 > Elija una opción:
 >
@@ -388,26 +385,32 @@ la variable exacta que está leyendo y si se encuentra definida.
 
 Variables leídas por el comando `rebase`, no por el servidor. Ninguna de estas variables afecta a un despliegue en ejecución.
 
-| Variable | Descripción | Valor por defecto |
-|----------|-------------|-------------------|
-| `REBASE_BASE_URL` | Destino al que `rebase api-keys`, `rebase storage` y `rebase auth reset-password` envían la service key, ya sea en la shell o en el archivo `.env`. Defínala si el servidor corre de otra manera que no sea `rebase dev` en este proyecto: `rebase start`, un contenedor, otro host. Si no se define, usarán el servidor registrado por `rebase dev` mientras esté en ejecución, y no enviarán nada cuando no lo esté. | — |
-| `REBASE_SERVICE_KEY` | La service key con la que se autentican dichos comandos, leída desde `.env`: la misma variable que lee el servidor (consulte arriba). | — |
-| `SERVICE_KEY` | Nombre heredado para la misma clave. Si está presente en `.env`, `rebase api-keys` y `rebase storage` la leerán en sustitución de `REBASE_SERVICE_KEY`. | — |
-| `REBASE_ENV_FILE_PATH` | Ruta al archivo `.env` específico que la CLI leerá y modificará si difiere del correspondiente al proyecto. | — |
-| `REBASE_ROOT_RULES` | `0` impide que `rebase init` y `rebase skills install` escriban las reglas del proyecto en los archivos `CLAUDE.md` y `AGENTS.md` de la raíz del repositorio, útil si mantiene dichos archivos manualmente. | on |
-| `REBASE_CLOUD_URL` | Plano de control con el que se comunica `rebase cloud`. | — |
-| `REBASE_CLOUD_EMAIL` | Cuenta con la que `rebase cloud login` inicia sesión directamente, omitiendo la solicitud interactiva. | — |
-| `REBASE_CLOUD_PASSWORD` | Contraseña correspondiente, permitiendo a un gestor de secretos proporcionarla sin que pase al historial de la shell. | — |
-| `REBASE_TOKEN` | Token generado con `rebase cloud tokens create`. Si está definido, todos los comandos de `rebase cloud` se autenticarán con él omitiendo la sesión de `rebase cloud login`, sin leer ni escribir la sesión local. En un directorio vinculado mediante `rebase cloud init --claim`, se sustituye por el token propio del proyecto si este no cuenta con permisos suficientes sobre él. Es el método idóneo para ejecutar `rebase cloud` en CI — consulte [CI y agentes](/docs/deployment/cloud/#ci-and-agents). El [servidor MCP](/docs/ai/mcp/) lo transfiere a la CLI instanciada por sus herramientas cloud y nunca lo envía a la aplicación: utilice `REBASE_API_TOKEN` para ese fin. | — |
-| `REBASE_DEBUG` | `1` imprime el error subyacente y los detalles de la petición en lugar del mensaje resumido. Lo primero a configurar si un comando de `rebase cloud` falla sin suficiente información. | — |
-| `REBASE_ATLAS_DEV_URL` | Base de datos vacía sobre la cual `rebase db push`, `db generate` y `db migrate` proyectan los cambios, en lugar de utilizar la base `<db>_dev_diff` creada junto a `DATABASE_URL`. Rebase no creará ni eliminará una base de datos indicada aquí, y rechazará una idéntica a `DATABASE_URL`. Con la base de desarrollo administrada, la CLI utiliza una instancia efímera de PGlite en memoria propia. Configúrela si no dispone de privilegios `CREATE DATABASE`. | `<db>_dev_diff` |
-| `REBASE_DEV_NO_DB` | `rebase dev` no iniciará ninguna base de datos ni aprovisionará recursos —deberá suministrarla usted. Equivale a `--no-db`. | — |
-| `REBASE_FRONTEND_PORT` | Fija el puerto del servidor de desarrollo del frontend, que de otro modo `rebase dev` deduce a partir de la ruta del proyecto. | — |
-| `REBASE_DEV_READY_TIMEOUT_MS` | Tiempo en ms que `rebase dev` espera a que el backend confirme su disponibilidad antes de notificar que no ha iniciado. `0` desactiva la notificación. | `30000` |
-| `DATABASE_PASSWORD` | Contraseña que `rebase dev --docker` inserta en la cadena de conexión generada a partir de `docker-compose.yml`. | — |
-| `DO_NOT_TRACK` | Convención estándar entre herramientas. Con cualquier valor distinto de `0`, la CLI no enviará telemetría. | — |
-| `REBASE_TELEMETRY_DISABLED` | Lo mismo, específico para Rebase. No requiere de ningún archivo, siendo la opción indicada para entornos de CI y contenedores. | — |
-| `REBASE_TELEMETRY_ENDPOINT` | Destino al que se envía la telemetría si utiliza un recolector autoalojado. | — |
+| Variable | Descripción | Por defecto |
+|----------|-------------|-------------|
+| `REBASE_BASE_URL` | A dónde envían `rebase api-keys`, `rebase storage` y `rebase auth reset-password` la clave de servicio, en la shell o en `.env`. Configúralo cuando el servidor se ejecute de otra manera que no sea `rebase dev` en este proyecto: `rebase start`, un contenedor, otro host. Si no se define, usan el servidor que `rebase dev` registró mientras ese servidor está en ejecución, y no envían nada cuando no lo está. | — |
+| `REBASE_SERVICE_KEY` | La clave de servicio con la que se autentican esos comandos, leída desde `.env`: la misma variable que lee el servidor (ver arriba). | — |
+| `SERVICE_KEY` | Un nombre anterior para esa clave. Cuando `.env` la establece, `rebase api-keys` y `rebase storage` la leen en lugar de `REBASE_SERVICE_KEY`. | — |
+| `REBASE_ENV_FILE_PATH` | Qué archivo `.env` lee y escribe la CLI cuando no es el del proyecto. | — |
+| `REBASE_ROOT_RULES` | `0` impide que `rebase init` y `rebase skills install` escriban las reglas del proyecto en `CLAUDE.md` y `AGENTS.md` de la raíz del repositorio, para una raíz cuyos archivos de agentes mantienes manualmente. | on |
+| `REBASE_CLOUD_URL` | El plano de control con el que se comunica `rebase cloud`. | — |
+| `REBASE_CLOUD_EMAIL` | La cuenta con la que inicia sesión `rebase cloud login`, en lugar de solicitarla interactivamente. | — |
+| `REBASE_CLOUD_PASSWORD` | Su contraseña, para que un almacén de secretos pueda proporcionarla sin que llegue al historial de la shell. | — |
+| `REBASE_TOKEN` | Un token generado desde `rebase cloud tokens create`. Configurado, cada comando de `rebase cloud` se autentica con él en lugar de la sesión de `rebase cloud login`, y nunca lee ni escribe la sesión almacenada. En un directorio vinculado mediante `rebase cloud init --claim`, se reserva para el token propio de ese proyecto cuando no tiene alcance sobre el proyecto. La forma de ejecutar `rebase cloud` en CI; consulta [CI y agentes](/docs/deployment/cloud/#ci-and-agents). El [servidor MCP](/docs/ai/mcp/) lo pasa a la CLI que generan sus herramientas en la nube y nunca lo envía a la aplicación: usa `REBASE_API_TOKEN` para eso. | — |
+| `REBASE_DEBUG` | `1` imprime el error subyacente y los detalles de la solicitud en lugar del mensaje breve. Lo primero que se debe configurar cuando un comando de `rebase cloud` falla sin dar información útil. | — |
+| `REBASE_ATLAS_DEV_URL` | Base de datos de desarrollo vacía para `db push` y `db generate`. El nombre se conserva para proyectos existentes. Rebase no administra una base indicada aquí y rechaza la URL de destino. PGlite administrado recibe una base desechable en memoria. Úsala si no tienes `CREATE DATABASE`; `db migrate` no la necesita. | `<db>_dev_diff` |
+| `PTAH_TRUST_REPLAY_SQL` | Establécelo en `1` solo si confías en el SQL de las migraciones que se ejecuta en un servidor PostgreSQL de desarrollo compartido. Se ejecuta con los privilegios de la conexión de desarrollo. Los roles creados pueden permanecer en el servidor. | sin configurar |
+| `PTAH_DEV_SERVER_DISPOSABLE` | Establécelo en `1` solo si todo el servidor de desarrollo es desechable. Rebase lo configura automáticamente para su servidor PGlite de desarrollo administrado. | sin configurar |
+| `PTAH_ATLAS_ALLOW_UNMATCHED_EXCLUDE` | Rebase lo configura para que una lista de exclusiones funcione aunque falte un objeto. No hace falta configurarlo manualmente. | `1` durante los comandos de base de datos |
+| `PTAH_ATLAS_MIGRATE_DIFF_EXCLUDE` | Rebase lo configura a partir de los selectores de objetos protegidos durante `db generate`. No hace falta configurarlo manualmente. | generado |
+| `PTAH_ATLAS_MIGRATE_DIFF_INCLUDE` | Rebase lo configura a partir de los selectores de objetos declarados durante `db generate`. No hace falta configurarlo manualmente. | generado |
+| `REBASE_PTAH_DEV_PGLITE` | Indicador interno de la conexión de desarrollo PGlite administrada. Rebase lo configura automáticamente. | sin configurar |
+| `REBASE_DEV_NO_DB` | `rebase dev` no inicia ninguna base de datos ni aprovisiona nada; tú aportas la tuya. Equivalente a `--no-db`. | — |
+| `REBASE_FRONTEND_PORT` | Fija el puerto del servidor de desarrollo frontend, que de otro modo `rebase dev` deriva de la ruta del proyecto. | — |
+| `REBASE_DEV_READY_TIMEOUT_MS` | Cuánto tiempo espera `rebase dev` a que el backend se anuncie antes de indicar que no se ha iniciado. `0` desactiva el informe. | `30000` |
+| `DATABASE_PASSWORD` | La contraseña que `rebase dev --docker` coloca en la cadena de conexión que deriva de `docker-compose.yml`. | — |
+| `DO_NOT_TRACK` | La convención estándar entre herramientas. Si se establece en cualquier valor que no sea `0`, la CLI no envía telemetría. | — |
+| `REBASE_TELEMETRY_DISABLED` | Lo mismo, específicamente para Rebase. No necesita ningún archivo, razón por la cual es la indicada para usar en CI y en una imagen. | — |
+| `REBASE_TELEMETRY_ENDPOINT` | A dónde se envía la telemetría, para un colector autoalojado. | — |
 
 ## Secretos en desarrollo
 

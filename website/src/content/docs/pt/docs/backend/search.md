@@ -1,5 +1,5 @@
 ---
-sourceHash: ceff4ba3bdacfb06
+sourceHash: 85e4a1ff6e52e6b4
 title: Busca
 sidebar_label: Busca
 description: Como o .search() se comporta por padrão e como uma tabela adota a busca de texto completo ranqueada sobre as colunas que você especificar — incluindo conteúdo JSONB e de arrays.
@@ -97,19 +97,14 @@ O Postgres recalcula a coluna a cada gravação de um campo de origem e recusa q
 tentativa de escrevê-la diretamente, garantindo que o índice não fique desalinhado da linha. A coluna
 nunca é retornada pela API.
 
-Eles são gerados em `.rebase/sql/search.sql`, junto de `schema.sql` e
-`policies.sql`, e o `rebase db push` os aplica para você — nada a mais para
-executar. Eles recebem um arquivo próprio porque uma coluna `tsvector` gerada precisa que uma
-função auxiliar `IMMUTABLE` exista previamente (`unaccent` é apenas `STABLE`, e
-achatar um documento `jsonb` requer uma função que retorna conjuntos de dados), e o Atlas — o
-motor por trás do `db push` — não gerencia funções em seu plano gratuito.
+Eles são gerados em `.rebase/sql/search.sql`, ao lado de `schema.sql` e `policies.sql`.
+`rebase db push` os aplica sem etapas adicionais. Uma coluna `tsvector` gerada precisa
+primeiro de uma função auxiliar `IMMUTABLE` (`unaccent` é apenas `STABLE`). O Ptah
+Compat recebe a função, a coluna e o índice juntos em `schema.sql`. O arquivo
+`search.sql` permanece para inicialização e recuperação.
 
-Uma consequência importante caso você faça deploy por migração em vez de push:
-adicionar um bloco `search` isoladamente não gera nenhuma migração, pois o esquema
-que o Atlas compara não mudou. O `rebase db generate` avisa quando isso acontece.
-O bloco ainda é aplicado pelo `rebase db push` e pela verificação do esquema na inicialização;
-para incluí-lo explicitamente em uma migração, anexe o `.rebase/sql/search.sql`,
-que o `rebase db generate` acabou de gravar, a ela.
+Alterar apenas um bloco `search` agora cria uma migração com `rebase db generate`. A
+mesma mudança aparece no plano normal de `rebase db push --dry-run`.
 
 ### Alterando o bloco posteriormente
 

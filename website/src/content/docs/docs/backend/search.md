@@ -98,17 +98,14 @@ is never returned by the API.
 
 They are generated into `.rebase/sql/search.sql`, next to `schema.sql` and
 `policies.sql`, and `rebase db push` applies them for you — nothing extra to
-run. They get their own file because a generated `tsvector` column needs an
-`IMMUTABLE` helper function to exist first (`unaccent` is only `STABLE`, and
-flattening a `jsonb` document needs a set-returning function), and Atlas — the
-engine behind `db push` — cannot manage functions on its free tier.
+run. A generated `tsvector` column needs its `IMMUTABLE` helper function first
+(`unaccent` is only `STABLE`, and flattening a `jsonb` document needs a
+set-returning function). Ptah Compat receives the function, column, and index
+together in `schema.sql`. The separate `search.sql` remains for boot and
+recovery.
 
-One consequence worth knowing if you deploy by migration rather than by push:
-adding a `search` block on its own produces no migration, because the schema
-Atlas compares has not changed. `rebase db generate` says so when it happens.
-The block is still applied by `rebase db push` and by the boot-time schema
-ensure; to put it in a migration explicitly, append `.rebase/sql/search.sql`,
-which `rebase db generate` has just written, to one.
+Changing only a `search` block now creates a migration with `rebase db generate`.
+The same change appears in the ordinary `rebase db push --dry-run` plan.
 
 ### Changing the block later
 

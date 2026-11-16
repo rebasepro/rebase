@@ -1,5 +1,5 @@
 ---
-sourceHash: ceff4ba3bdacfb06
+sourceHash: 85e4a1ff6e52e6b4
 title: Recherche
 sidebar_label: Recherche
 description: Comment .search() se comporte par défaut, et comment une table active la recherche plein texte classée sur les colonnes spécifiées — y compris le contenu JSONB et de tableaux.
@@ -97,19 +97,15 @@ Postgres recalcule la colonne à chaque écriture sur un champ source et refuse 
 tentative d'écriture directe, de sorte que l'index ne peut pas diverger de la ligne. La colonne
 n'est jamais retournée par l'API.
 
-Ils sont générés dans `.rebase/sql/search.sql`, aux côtés de `schema.sql` et
-`policies.sql`, et `rebase db push` les applique pour vous — rien d'autre à
-exécuter. Ils disposent de leur propre fichier car une colonne `tsvector` générée nécessite au préalable
-l'existence d'une fonction utilitaire `IMMUTABLE` (`unaccent` n'étant que `STABLE`, et
-l'aplatissement d'un document `jsonb` nécessitant une fonction renvoyant un ensemble), et Atlas — le
-moteur derrière `db push` — ne peut pas gérer les fonctions dans son offre gratuite.
+Ils sont générés dans `.rebase/sql/search.sql`, à côté de `schema.sql` et
+`policies.sql`. `rebase db push` les applique sans étape supplémentaire. Une colonne
+`tsvector` générée requiert d'abord une fonction utilitaire `IMMUTABLE` (`unaccent`
+n'étant que `STABLE`). Ptah Compat reçoit la fonction, la colonne et l’index ensemble
+dans `schema.sql`. Le fichier `search.sql` reste disponible pour le démarrage et la
+restauration.
 
-Une conséquence importante à connaître si vous déployez par migration plutôt que par push :
-l'ajout d'un bloc `search` seul ne produit aucune migration, car le schéma
-comparé par Atlas n'a pas changé. `rebase db generate` le signale lorsque cela se produit.
-Le bloc est toujours appliqué par `rebase db push` et par la vérification du schéma
-au démarrage ; pour l'inclure explicitement dans une migration, ajoutez `.rebase/sql/search.sql`,
-que `rebase db generate` vient d'écrire, à celle-ci.
+Une modification portant uniquement sur un bloc `search` crée une migration avec `rebase
+db generate`. Elle figure également dans le plan habituel de `rebase db push --dry-run`.
 
 ### Modifier le bloc ultérieurement
 

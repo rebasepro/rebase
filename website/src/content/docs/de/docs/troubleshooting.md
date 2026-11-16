@@ -1,5 +1,5 @@
 ---
-sourceHash: 6403748b3ff6521b
+sourceHash: 37af460ecdc0bd6a
 slug: de/docs/troubleshooting
 title: Fehlerbehebung
 description: Fehler, die das Starten oder Ausliefern eines Rebase-Backends verhindern – eine nicht erreichbare Datenbank, falsche Anmeldedaten, eine fehlende Erweiterung, RLS-Verweigerung, Schema-Drift, ein belegter Port, eine nicht ladbare Funktion – und wie die einzelnen Fehler aussehen.
@@ -121,12 +121,12 @@ Wenn eine Tabelle existiert, eine Spalte jedoch nicht, ist die Ursache meist ein
 
 ```
 Error: EOF
-✗ atlas schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
+✗ ptah-compat schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
 ```
 
-Die verwaltete Entwicklungsdatenbank akzeptiert nur wenige Verbindungen gleichzeitig, und ein laufendes `rebase dev` belegt einige davon. Atlas, das den Push plant, öffnet zwei weitere, wovon eine unterbrochen wurde. Es wurde nichts angewendet, daher kann der Befehl bedenkenlos erneut ausgeführt werden; der Dev-Server schließt ungenutzte Verbindungen nach 30 Sekunden. Wenn der Fehler weiterhin auftritt, stoppen Sie `rebase dev` während des Pushs.
+Die verwaltete Entwicklungsdatenbank akzeptiert nur wenige Verbindungen gleichzeitig, und ein laufendes `rebase dev` belegt einige davon. Ptah, das den Push plant, öffnet zwei weitere, wovon eine unterbrochen wurde. Es wurde nichts angewendet, daher kann der Befehl bedenkenlos erneut ausgeführt werden; der Dev-Server schließt ungenutzte Verbindungen nach 30 Sekunden. Wenn der Fehler weiterhin auftritt, stoppen Sie `rebase dev` während des Pushs.
 
-Der Push schließt seine eigenen Verbindungen, bevor Atlas startet, was Atlas im Normalfall genügend Spielraum lässt, und der Fehler beschreibt, was geschehen ist.
+Der Push schließt seine eigenen Verbindungen, bevor Ptah startet, was Ptah im Normalfall genügend Spielraum lässt, und der Fehler beschreibt, was geschehen ist.
 
 ## Der Port wird bereits verwendet
 

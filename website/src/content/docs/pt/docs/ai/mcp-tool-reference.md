@@ -1,8 +1,8 @@
 ---
-sourceHash: 53d5e75acc2383a2
-title: Referência de ferramentas MCP
-sidebar_label: Referência de ferramentas MCP
-description: Todas as ferramentas registradas pelo servidor MCP do Rebase, por grupo — o que cada uma precisa e faz, e quais o loopback gate recusa em um projeto não local.
+sourceHash: c98b73f9a4ab376f
+title: Referência das ferramentas MCP
+sidebar_label: Referência das ferramentas MCP
+description: Todas as ferramentas que o servidor MCP do Rebase registra, por grupo — o que cada uma precisa e faz, e quais o loopback gate recusa em projetos não locais.
 ---
 
 As ferramentas que o [`@rebasepro/mcp`](/docs/ai/mcp) oferece a um assistente. Como ele se conecta, qual credencial possui e como o [loopback gate](/docs/ai/mcp#the-loopback-gate) decide o que ⚠ significa estão na página do [servidor MCP](/docs/ai/mcp).
@@ -31,7 +31,9 @@ Executa a CLI do Rebase no diretório do projeto ativo.
 
 ## Planejamento de schema (1)
 
-Pergunta ao backend o que uma alteração faria, via `POST /api/admin/schema/plan`. Sem CLI e nada escrito no disco — funciona no banco de dados de desenvolvimento gerenciado, o que os comandos suportados pelo Atlas não conseguem fazer.
+Pergunta ao backend o que uma alteração faria via
+`POST /api/admin/schema/plan`. Não requer um processo CLI nem grava nada em
+disco. Também funciona no banco de dados de desenvolvimento gerenciado.
 
 | Ferramenta | Obrigatório | Descrição |
 |---|---|---|
