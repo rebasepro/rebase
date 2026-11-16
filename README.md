@@ -28,6 +28,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/rebasepro/rebase/stargazers"><img src="https://img.shields.io/github/stars/rebasepro/rebase?style=flat-square&logo=github&label=Stars&color=yellow" alt="GitHub stars" /></a>
   <a href="https://github.com/rebasepro/rebase/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rebasepro/rebase/ci.yml?branch=main&style=flat-square&label=CI" alt="CI" /></a>
   <a href="https://www.npmjs.com/package/@rebasepro/app"><img src="https://img.shields.io/npm/v/@rebasepro/app.svg?style=flat-square&color=orange" alt="NPM Version" /></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-purple.svg?style=flat-square" alt="License: MIT" /></a>
@@ -40,6 +41,8 @@
 <p align="center">
   <img src="website/public/img/demo_products.png" width="800px" alt="The Rebase admin panel: a products table over Postgres" />
 </p>
+
+> ⭐ **If Rebase saves you time, please [star this repo](https://github.com/rebasepro/rebase)** — it helps other developers find it.
 
 ---
 

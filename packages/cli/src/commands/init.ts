@@ -19,6 +19,7 @@ import { resolveCloudUrl, writeLink } from "./cloud/context";
 import type { PackageManager, PMCommands } from "../utils/package-manager";
 import { promptForConsent } from "../telemetry/consent";
 import { durationBucket, recordEvent } from "../telemetry";
+import { hasSeenStarNudge, initRepoLine, markStarNudgeSeen } from "../star-nudge";
 import { parseEnvBoolean } from "@rebasepro/types";
 import { AGENT_KEYS, AGENTS, type AgentKey, reportRootPointers, resolveAgentNames } from "./skills";
 import { writeRootPointers } from "../utils/root-pointer";
@@ -1158,7 +1159,9 @@ async function createProject(options: InitOptions) {
     for (const line of nextSteps) console.log(line);
     console.log("");
     console.log(chalk.gray("Docs: https://rebase.pro/docs"));
-    console.log(chalk.gray("GitHub: https://github.com/rebasepro/rebase"));
+    const repo = initRepoLine(hasSeenStarNudge(), { isTTY: Boolean(process.stdout.isTTY), env: process.env });
+    console.log(repo.nudge ? repo.line : chalk.gray(repo.line));
+    if (repo.nudge) markStarNudgeSeen();
     console.log("");
     console.log(chalk.bold("🤖 AI Agent Skills"));
     console.log("");
