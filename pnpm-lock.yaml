@@ -2160,6 +2160,9 @@ importers:
 
   saas/frontend:
     dependencies:
+      '@firecms/neat':
+        specifier: 1.1.0
+        version: 1.1.0
       '@rebasepro/app':
         specifier: workspace:*
         version: link:../../packages/app

@@ -111,7 +111,10 @@ label: "Widget" });
 label: "Widget" });
         expect(realtimeService.notifyUpdate).toHaveBeenCalledWith(
             "sku_items", "ABC-1", { sku: "ABC-1",
-label: "Widget" }, undefined
+label: "Widget" }, undefined, true, "app",
+            // A create: no row before, the stored row after — what decides
+            // which list subscriptions are asked to refetch.
+            { before: null, after: { sku: "ABC-1", label: "Widget" } }
         );
     });
 
@@ -127,7 +130,7 @@ role: "admin" });
         });
 
         expect(realtimeService.notifyUpdate).toHaveBeenCalledWith(
-            "memberships", "1:::2", expect.anything(), undefined
+            "memberships", "1:::2", expect.anything(), undefined, true, "app", expect.anything()
         );
     });
 

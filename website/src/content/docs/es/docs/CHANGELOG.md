@@ -11,6 +11,12 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+### Changed
+
+- **A write only refetches the realtime lists it can reach.** A list filtered with `==` or `in` on a column (`listen({ where: { owner: ["==", me] } })`) is asked to look again only when the changed row matched its filter before the write or matches it after; 5,000 users each watching their own rows now cost one RLS-scoped read per write instead of 5,000 (measured: fan-out done ~305 ms after the write, from 3.3 s). Every list that is asked still reads under its own subscriber's scope, and a change it cannot judge (an external `UPDATE` without `REPLICA IDENTITY FULL`, a capture-trigger change to a non-key column, a delete through the API, other operators, `include`, `afterRead`) asks every list, as before. A list narrowed only by RLS still costs one read per distinct user. See [What a write costs, and the limits](https://rebase.pro/docs/backend/realtime/#what-a-write-costs-and-the-limits).
+
+## [0.32.0] - 2026-11-16
+
 The CLI reaches a running app's whole API: rows, users, cron, files, functions, logs and the RLS simulator, on the local `rebase dev`, a server named with `--url`, or a Rebase Cloud project with `--project`. See [A running app](https://rebase.pro/docs/cli/project/).
 
 ### Added

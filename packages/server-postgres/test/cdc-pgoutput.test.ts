@@ -61,6 +61,15 @@ function eventsOf(messages: Buffer[], identity: Record<string, string[]> = {}) {
     return messages.flatMap((m) => changes.apply(parsePgoutputMessage(m)));
 }
 
+/**
+ * The events without `values` — the in-process image the WAL streams for
+ * pre-filtering, which never leaves this server. What these tests pin is the
+ * address: the key, and nothing else.
+ */
+function addressesOf(events: ReturnType<typeof eventsOf>) {
+    return events.map(({ values: _values, ...address }) => address);
+}
+
 const POSTS: Col[] = [{ name: "id", key: true, oid: 20 }, { name: "title" }, { name: "body" }];
 
 // ── Tests ──────────────────────────────────────────────────────────────
@@ -142,12 +151,37 @@ describe("pgoutput → change events", () => {
             del(1, "K", ["7", null, null]),
             commit(1n, 2n)
         ]);
-        expect(events).toEqual([
+        expect(addressesOf(events)).toEqual([
             { schema: "public", table: "posts", op: "INSERT", row: { id: "7" }, truncated: false },
             { schema: "public", table: "posts", op: "UPDATE", row: { id: "7" }, truncated: false },
             { schema: "public", table: "posts", op: "DELETE", row: { id: "7" }, truncated: false }
         ]);
-        expect(JSON.stringify(events)).not.toMatch(/secret|changed/);
+        expect(JSON.stringify(addressesOf(events))).not.toMatch(/secret|changed/);
+    });
+
+    it("carries the row's two versions in process, as far as the stream knows them", () => {
+        const events = eventsOf([
+            relation(1, "public", "posts", POSTS),
+            begin(1n, 1),
+            insert(1, ["7", "secret title", "secret body"]),
+            update(1, ["7", "changed", "UNCHANGED"]),
+            del(1, "K", ["7", null, null]),
+            commit(1n, 2n)
+        ]);
+        expect(events.map((e) => e.values)).toEqual([
+            // Nothing before an insert; the whole new tuple after it.
+            { before: null, after: { id: "7", title: "secret title", body: "secret body" } },
+            // No old tuple: the key did not change, and is all that is known
+            // of the old version. An unchanged TOASTed value is left out — unknown.
+            { before: { id: "7" }, after: { id: "7", title: "changed" } },
+            // A key-only old tuple names the key alone, never its nulls.
+            { before: { id: "7" }, after: null }
+        ]);
+    });
+
+    it("leaves a long value out of the image rather than hold it", () => {
+        const events = eventsOf([relation(1, "public", "posts", POSTS), insert(1, ["7", "t", "x".repeat(300)])]);
+        expect(events[0].values?.after).toEqual({ id: "7", title: "t" });
     });
 
     it("adds the columns provisioning asked for to the primary key, as the trigger does", () => {
@@ -170,7 +204,7 @@ describe("pgoutput → change events", () => {
     it("names a junction row by its two ids", () => {
         const cols: Col[] = [{ name: "post_id", key: true, oid: 23 }, { name: "tag_id", key: true, oid: 23 }];
         const events = eventsOf([relation(3, "public", "posts_tags", cols), del(3, "K", ["1", "5"])], { "public.posts_tags": ["post_id", "tag_id"] });
-        expect(events).toEqual([{ schema: "public", table: "posts_tags", op: "DELETE", row: { post_id: "1", tag_id: "5" }, truncated: false }]);
+        expect(addressesOf(events)).toEqual([{ schema: "public", table: "posts_tags", op: "DELETE", row: { post_id: "1", tag_id: "5" }, truncated: false }]);
     });
 
     it("falls back to the replica identity when an old key-only tuple cannot supply the wanted columns", () => {
@@ -186,7 +220,7 @@ describe("pgoutput → change events", () => {
         // No key at all, and an unchanged (unsent) value where one was wanted.
         const cols: Col[] = [{ name: "a" }, { name: "b" }];
         const events = eventsOf([relation(5, "public", "keyless", cols), update(5, ["UNCHANGED", "2"])], { "public.keyless": ["a"] });
-        expect(events).toEqual([{ schema: "public", table: "keyless", op: "UPDATE", row: {}, truncated: true }]);
+        expect(addressesOf(events)).toEqual([{ schema: "public", table: "keyless", op: "UPDATE", row: {}, truncated: true }]);
     });
 
     it("announces both addresses when an update changes the key", () => {

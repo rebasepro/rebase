@@ -1,5 +1,5 @@
 ---
-sourceHash: 79cc7825b045bc4d
+sourceHash: 535fb9801df93ad9
 title: Commandes de base de données
 sidebar_label: Commandes de base de données
 description: Les commandes rebase db — push, generate et migrate, sauvegardes et restaurations, extraction d'une copie, chaîne de connexion, base de données de développement gérée et branches.
@@ -175,8 +175,6 @@ Chaque branche est une copie complète sur le disque, il est donc nécessaire de
 `switch` enregistre la branche dans `.rebase/branch.json` et ne modifie jamais `.env`. Elle prévaut sur `DATABASE_URL` dans `.env` et cède le pas face à `--database-url` ou à un `DATABASE_URL` dans le shell ; ainsi, une option sur la ligne de commande a toujours la priorité sur un switch précédent. `delete` refuse de supprimer la branche sur laquelle vous vous trouvez, puisque chaque commande dans le checkout, suppression comprise, pointe vers elle : faites d'abord `switch --off`, puis supprimez-la. L'ensemble du workflow est détaillé dans [Database Branching](/docs/backend/branching/).
 
 #### `rebase db branch merge`
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 ```bash
 rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]

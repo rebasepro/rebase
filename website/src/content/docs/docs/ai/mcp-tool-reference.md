@@ -137,15 +137,15 @@ them is gated.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_cloud_provision` | — | A live backend with no account (`rebase cloud init --claim`): the live URL, the admin URL and a claim URL (`name`, `deploy`) |
+| `rebase_cloud_provision` | — | A live backend with no account (`rebase cloud init --claim`): the live URL, the admin URL and a claim URL (`name`, `deploy`, `confirm`). Without `confirm: true` it only says what it would do |
 | `rebase_cloud_status` | — | The linked project's URL, status, last deploy, runtime, database, storage, and its claim URL while unclaimed |
-| `rebase_cloud_deploy` | — | Deploy and follow it to the end (`app`, `bundle`, `message`, `wait`, `timeoutSeconds`, `preview`, `previewName`) |
+| `rebase_cloud_deploy` | — | Deploy and follow it to the end (`app`, `bundle`, `message`, `wait`, `timeoutSeconds`, `preview`, `previewName`, `confirm`). A production deploy without `confirm: true` only says what it would do |
 | `rebase_cloud_logs` | — | One snapshot of the runtime log, or the latest build log (`source`, `since`, `tail`, `grep`, `level`, `previous`, `preview`). Never follows |
 | `rebase_cloud_env_list` | — | Variable keys, never values (`preview`) |
-| `rebase_cloud_env_set` | `key`, `value` | Set one variable; the value goes through stdin and is never returned (`secret`, `preview`) |
+| `rebase_cloud_env_set` | `key`, `value` | Set one variable; the value goes through stdin and is never returned (`secret`, `preview`, `confirm`). In production, without `confirm: true` it only says what it would do |
 | `rebase_cloud_deployments_list` | — | Recent deployments, and which ones can be rolled back to (`limit`) |
 | `rebase_cloud_projects_list` | — | Every project the signed-in account can reach, across all its organizations |
-| `rebase_cloud_rollback` | — | Put a previous successful deployment back into service (`deploymentId`) |
+| `rebase_cloud_rollback` | — | Put a previous successful deployment back into service (`deploymentId`, `confirm`). Without `confirm: true` it only says what it would do |
 
 `rebase_cloud_provision` creates a project and links this directory. It never
 reads the active project's `baseUrl`, so the gate does not check it; the CLI

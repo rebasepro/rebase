@@ -387,7 +387,8 @@ does.
 > other — fails *every* statement it guards with `infinite recursion detected
 > in policy for relation "team_members"` (42P17), for signed-in users, the
 > service key and `dataAsAdmin` alike. `rebase verify` reports each such rule
-> as an error. Move the read into a `SECURITY DEFINER` function with
+> as `rls-policy-recursion` (an error; a warning when it cannot be certain),
+> naming the table it reads. Move the read into a `SECURITY DEFINER` function with
 > `SET search_path = ''` (Postgres does not expand it), create it with your own
 > SQL, and call it from the rule: `using: "public.is_team_manager({team_id})"`.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: d92634b4d2c8413c
+sourceHash: 70204f908d35bb64
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud è lo stesso Rebase, gestito per te. Di cosa si tratta, come collegare e distribuire un progetto e cosa la beta privata non include ancora.
@@ -475,11 +475,11 @@ ad eccezione di quelle che comportano il riavvio del database, le quali attendon
 | `init`, `claim` | Con `--claim`: un backend attivo senza account e un link per riscattarlo; `claim` stampa nuovamente tale link. Vedi [Un backend senza account](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
 | `projects` | Creazione, visualizzazione elenco, ispezione ed eliminazione dei progetti |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Distribuzione e monitoraggio |
-| `deploy-hooks` | URL segreti che un host git o una CI chiama per distribuire il progetto: elencare, creare (l'URL viene mostrato una volta), revocare. <span class="since-badge" data-since="0.32">Since 0.32</span> |
+| `deploy-hooks` | URL segreti che un host git o una CI chiama per distribuire il progetto: elencare, creare (l'URL viene mostrato una volta), revocare. |
 | `previews` | Build servite a un indirizzo dedicato tramite `deploy --preview`, e relativa eliminazione. Vedi [Anteprima di una modifica](#anteprima-di-una-modifica) |
 | `start`, `stop`, `restart` | Mettere in pausa un progetto e ripristinarlo. Un progetto arrestato mantiene la sottoscrizione attiva, a meno che la piattaforma non fatturi per i progetti fermati solo lo storage e la quota di piattaforma; la riga **Billing** della console lo specifica quando applicabile |
 | `status`, `metrics`, `debug` | Stato di esecuzione e cause di eventuali problemi |
-| `alerts` | Gli incidenti aperti del progetto, e riconoscerne o posticiparne uno. <span class="since-badge" data-since="0.32">Since 0.32</span> |
+| `alerts` | Gli incidenti aperti del progetto, e riconoscerne o posticiparne uno. |
 | `cron` | I cron job dell'app distribuita e le loro esecuzioni registrate, letti con il tuo account `rebase cloud`. Sola lettura |
 | `env` | Variabili d'ambiente. `list` non stampa mai i valori; `--secret` è in sola scrittura |
 | `app-key` | La chiave scritta da `init --claim` in `.env` come `REBASE_API_TOKEN`, trasferita al momento del riscatto; `rotate` la sostituisce revocando la precedente. Solo proprietari e admin |

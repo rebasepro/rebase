@@ -1,5 +1,5 @@
 ---
-sourceHash: 79cc7825b045bc4d
+sourceHash: 535fb9801df93ad9
 title: Comandi del database
 sidebar_label: Comandi del database
 description: I comandi rebase db — push, generate e migrate, backup e ripristini, estrazione di una copia, stringa di connessione, database di sviluppo gestito e branch.
@@ -317,8 +317,6 @@ nel checkout, inclusa l'eliminazione stessa, punta a esso: esegui prima `switch 
 quindi procedi con l'eliminazione. L'intero flusso di lavoro è illustrato in [Database Branching](/docs/backend/branching/).
 
 #### `rebase db branch merge`
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 ```bash
 rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]

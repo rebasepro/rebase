@@ -479,8 +479,12 @@ the CLI's `DATABASE_URL`; these tools use neither. After `rebase_cloud_provision
 the very deploy the journey needs. Provisioning itself only creates: it touches
 no existing app or database, and the CLI still refuses it in a directory that
 is already linked. A deploy, a variable and a rollback each
-change production. What stands in front of them is the credential above and
-your MCP client's tool approval. To keep an assistant from changing a cloud
+change production. What stands in front of them is the credential above, your
+MCP client's tool approval, and `confirm: true`: `rebase_cloud_deploy` to
+production, `rebase_cloud_env_set` in production, `rebase_cloud_rollback` and
+`rebase_cloud_provision` answer what they would do and do nothing until a call
+repeats the same arguments with `confirm: true`, which the assistant sends only
+after the user agrees. A preview deploy and a preview variable need none. To keep an assistant from changing a cloud
 project, set `REBASE_TOKEN` in the server's environment to a token without the
 `deploy` and `env` capabilities.
 
@@ -508,8 +512,8 @@ Each tool is a snapshot:
   It never ejects a project from the managed runtime, deploys an older framework
   release, or skips the build checks: those are the user's decisions, and a
   refusal that needs one says so.
-- `rebase_cloud_rollback` passes `--yes`. The tool call is the confirmation, since
-  there is no terminal to ask at.
+- `rebase_cloud_rollback` passes `--yes` once the call carries `confirm: true`
+  (below), since there is no terminal to ask at.
 
 `rebase_cloud_env_set` writes the value to the CLI's standard input, so it is
 never on a command line where `ps` would show it, and the value is cut out of

@@ -61,7 +61,7 @@ The three ratings mean:
 | Auth — MFA (TOTP) | Beta | Enrolment, verification and recovery work and are tested. Key rotation is implemented for the encryption key; there is no admin surface for resetting a locked-out user's factor |
 | Row-level security | Stable | The wedge of the product. `pnpm rls:check` audits a live database against fifteen checks, and the RLS e2e suite runs on every push |
 | Storage | Stable | Local, S3 and GCS. Default-deny in production since 0.17.0, and the scaffold ships an authorize hook |
-| Realtime | **Beta** | Subscriptions are matched by table path only, so N subscribers on one table cost N RLS-scoped refetches per write. That caps a deployment at low hundreds of concurrent subscribers. Correct at any scale; expensive past that one |
+| Realtime | **Beta** | Every frame is a read under its subscriber's own RLS scope. Sockets of one user on one list share that read, and a list filtered on a column of the row (`where owner == me`) is only asked when a write can reach it: 5,000 users each watching their own rows cost **one** read per write, ~305 ms to deliver (measured, `tooling/scripts/bench-realtime-fanout.mts`). The limit is a list that RLS alone narrows: one read per distinct user per write, so 5,000 users on the same unfiltered list is 5,000 reads and ~2.6 s for the fan-out to finish. Correct at any scale; filter on the column the policy reads to stay at one read |
 | Vector search (pgvector) | Beta | Every vector column gets an HNSW index for cosine distance by default, tunable per column through `col.vector({ dimensions, index })` (method, distances, build parameters) or turned off, which leaves an exact scan. pgvector cannot index a column wider than 2,000 dimensions, so those are left unindexed and scan |
 | Offline sync | Beta | Mutations carry idempotency keys the server honours, and the data-loss defects found in the July audit are fixed. The conflict model is last-write-wins with no per-field merge |
 | Entity history | Stable | Snapshot-based, gated by its own suite |
@@ -75,8 +75,9 @@ The three ratings mean:
 | Rebase Cloud | **Private beta** | Live, running real tenants, opened in batches. Not self-serve |
 
 Two entries above are the honest cost of publishing this table at all: the
-realtime refetch and the data table's accessibility are open defects, not
-roadmap items, and both are listed rather than left for a reader to discover.
+realtime fan-out for lists narrowed only by RLS and the data table's
+accessibility are open limits, not roadmap items, and both are listed rather
+than left for a reader to discover.
 
 This table is what exists. What does not yet is on the
 [roadmap](https://rebase.pro/roadmap), one entry per GitHub issue, with the

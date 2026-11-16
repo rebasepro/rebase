@@ -20,6 +20,18 @@ export interface CdcChangeEvent {
     row: Record<string, unknown>;
     /** True when even the key was too large to notify, so `row` is empty. */
     truncated?: boolean;
+    /**
+     * The row's column values by SQL name, before and after the change, as
+     * far as the source knows them — only ever from the WAL stream, which this
+     * server reads on its own replication connection, and never from a
+     * NOTIFY payload (see `row`). `null` is "no such version" (before an
+     * insert, after a delete); an absent version or column is unknown. Decides
+     * which list subscriptions refetch; never delivered to any of them.
+     */
+    values?: {
+        before?: Record<string, string | null> | null;
+        after?: Record<string, string | null> | null;
+    };
 }
 
 /**

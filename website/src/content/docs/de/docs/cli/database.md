@@ -1,5 +1,5 @@
 ---
-sourceHash: 79cc7825b045bc4d
+sourceHash: 535fb9801df93ad9
 title: Datenbankbefehle
 sidebar_label: Datenbankbefehle
 description: Die rebase db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, Abrufen einer Kopie, der Verbindungs-String, die verwaltete Entwicklungsdatenbank und Branches.
@@ -319,8 +319,6 @@ im Checkout (einschließlich des Löschens) darauf ausgerichtet ist: Führe zuer
 und lösche ihn dann. Der gesamte Workflow ist unter [Database Branching](/docs/backend/branching/) beschrieben.
 
 #### `rebase db branch merge`
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 ```bash
 rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]

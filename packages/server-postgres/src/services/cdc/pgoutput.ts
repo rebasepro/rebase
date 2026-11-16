@@ -17,6 +17,7 @@
  * (protocol version 1, the only one this asks for).
  */
 import type { CdcChangeEvent } from "./CdcListener";
+import { MAX_IMAGE_VALUE_LENGTH } from "../realtime-prefilter";
 
 /** Microseconds between the Unix epoch and Postgres's, 2000-01-01. */
 const PG_EPOCH_OFFSET_US = 946_684_800_000_000n;
@@ -324,6 +325,25 @@ function identityOf(
 }
 
 /**
+ * A tuple's values by column name, as text. A column the tuple does not carry
+ * (an unchanged TOASTed value, a non-key column of a key-only tuple) is left
+ * out — unknown, not null — and so is a value longer than
+ * `MAX_IMAGE_VALUE_LENGTH`: nothing compares one, and a backlog of changes
+ * should not hold every large column of every row.
+ */
+function tupleValues(relation: PgoutputRelation, tuple: TupleValue[], keyOnly: boolean): Record<string, string | null> {
+    const values: Record<string, string | null> = {};
+    relation.columns.forEach((column, i) => {
+        if (keyOnly && !column.isKey) return;
+        const value = tuple[i];
+        if (value === undefined) return;
+        if (value !== null && value.length > MAX_IMAGE_VALUE_LENGTH) return;
+        values[column.name] = value;
+    });
+    return values;
+}
+
+/**
  * Turns a `pgoutput` stream into the change events the trigger listener emits,
  * so `RealtimeService` cannot tell which one it is reading.
  *
@@ -347,9 +367,17 @@ export class PgoutputChanges {
                 this.relations.set(message.relation.id, message.relation);
                 return [];
             case "insert":
-                return this.change("INSERT", message.relationId, message.newTuple, false);
+                return this.withValues(this.change("INSERT", message.relationId, message.newTuple, false), message.relationId, null, message.newTuple, false);
             case "update": {
-                const events = this.change("UPDATE", message.relationId, message.newTuple, false);
+                // Without an old tuple the replica identity did not change, so
+                // the new tuple's key columns are the old ones too.
+                const events = this.withValues(
+                    this.change("UPDATE", message.relationId, message.newTuple, false),
+                    message.relationId,
+                    message.oldTuple ?? message.newTuple,
+                    message.newTuple,
+                    message.oldTuple ? message.oldIsKeyOnly === true : true
+                );
                 // The key changed: whoever watches the old address needs to
                 // hear the row left it. The trigger, seeing NEW only, missed this.
                 if (message.oldTuple) {
@@ -359,7 +387,7 @@ export class PgoutputChanges {
                 return events;
             }
             case "delete":
-                return this.change("DELETE", message.relationId, message.oldTuple, message.oldIsKeyOnly);
+                return this.withValues(this.change("DELETE", message.relationId, message.oldTuple, message.oldIsKeyOnly), message.relationId, message.oldTuple, null, message.oldIsKeyOnly);
             case "truncate":
                 return message.relationIds.flatMap((id) => {
                     const relation = this.relations.get(id);
@@ -368,6 +396,30 @@ export class PgoutputChanges {
             default:
                 return [];
         }
+    }
+
+    /**
+     * Put the column values of the row's two versions on the first event: see
+     * `CdcChangeEvent.values`. `before` is read for its key columns alone when
+     * `beforeKeyOnly`, which is all a default replica identity sends.
+     */
+    private withValues(
+        events: CdcChangeEvent[],
+        relationId: number,
+        before: TupleValue[] | null,
+        after: TupleValue[] | null,
+        beforeKeyOnly: boolean
+    ): CdcChangeEvent[] {
+        const relation = this.relations.get(relationId);
+        if (!relation || events.length === 0) return events;
+        events[0] = {
+            ...events[0],
+            values: {
+                before: before === null ? null : tupleValues(relation, before, beforeKeyOnly),
+                after: after === null ? null : tupleValues(relation, after, false)
+            }
+        };
+        return events;
     }
 
     private change(op: "INSERT" | "UPDATE" | "DELETE", relationId: number, tuple: TupleValue[], keyOnly: boolean): CdcChangeEvent[] {

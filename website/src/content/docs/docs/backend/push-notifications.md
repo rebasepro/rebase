@@ -6,8 +6,6 @@ description: Web Push to your users' browsers — Chrome, Firefox, Edge and Safa
 
 ## Overview
 
-<span class="since-badge" data-since="0.32">Since 0.32</span>
-
 Web Push puts a notification on a user's lock screen or desktop while your app
 is closed. Rebase takes care of the server side: it stores each browser's
 subscription, signs messages with your VAPID keys, encrypts them so only that
@@ -48,8 +46,6 @@ That creates the `rebase.push_subscriptions` table at boot and mounts the
 routes under `/api/push`.
 
 ### Keys
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 A browser subscribes with your server's public key and only accepts messages
 signed with the matching private key. Set the pair, and a contact address the

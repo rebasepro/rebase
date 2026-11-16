@@ -1,5 +1,5 @@
 ---
-sourceHash: 6ada998b1c8e4cc0
+sourceHash: b24523130d4c79bc
 title: Déployer Rebase sur Railway
 description: Déployez Rebase sur Railway à partir de l'image de runtime publiée et du bundle de votre projet. Maintenez la conformité UE.
 sidebar_label: Railway
@@ -34,7 +34,7 @@ rebase build
 Commitez un `Dockerfile` de trois lignes à la racine du dépôt, afin que l'étape de build de Railway soit une copie plutôt qu'une compilation :
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.31.0
+FROM rebasepro/server:0.32.0
 COPY dist-bundle /bundle
 ```
 

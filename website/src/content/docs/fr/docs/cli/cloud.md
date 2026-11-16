@@ -1,5 +1,5 @@
 ---
-sourceHash: bd97024430acdcb1
+sourceHash: 2013be9a84189071
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Les groupes de commandes pour Rebase Cloud dans la CLI — auth, liaison de projet, déploiements, notifications, configuration, organisations, bases de données, ressources, calcul, stockage, clusters, facturation et utilisation.
@@ -414,8 +414,6 @@ les facture pas encore). La réponse d'un projet avec autoscaling comporte égal
 `extraPodSeconds` au-dessus du plancher, `amountEur` selon ses tarifs, et `charged`.
 
 ## Hooks de déploiement, alertes et autres
-
-<span class="since-badge" data-since="0.32">Depuis 0.32</span>
 
 ```bash
 rebase cloud deploy-hooks [list] | create [--name <name>] [--branch <branch>] | revoke <id>   # secret URLs a git host or CI calls to deploy
