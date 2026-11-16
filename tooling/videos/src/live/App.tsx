@@ -180,8 +180,10 @@ export const App: React.FC = () => {
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
     const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
-    const [camera, setCamera] = useState<string | undefined>(() => remember("live.camera"));
-    const [mic, setMic] = useState<string | undefined>(() => remember("live.mic"));
+    const [camera, setCamera] = useState<string | undefined>(() => remember("live.camera") || undefined);
+    const [mic, setMic] = useState<string | undefined>(() => remember("live.mic") || undefined);
+    /** Bumped by "Try again": opens the camera and microphone afresh. */
+    const [retry, setRetry] = useState(0);
     const [liveTiming, setLiveTiming] = useState<Timing | null>(null);
     const [position, setPosition] = useState({ line: 0, word: 0 });
     const [status, setStatus] = useState({ recognition: "idle", transcript: "", level: -100, threshold: -58, speaking: false });
@@ -281,15 +283,39 @@ export const App: React.FC = () => {
                 setMics(devices.filter((d) => d.kind === "audioinput"));
                 setPhase((p) => (p === "setup" || p === "error" ? "ready" : p));
             })
-            .catch((err: unknown) => {
-                setError(`Camera or microphone unavailable: ${String(err)}. Allow both for this page in the address bar, then reload.`);
+            .catch(async (err: unknown) => {
+                if (cancelled) return;
+                const name = err instanceof DOMException ? err.name : "";
+                /* A camera or microphone remembered from an earlier session
+                   that is not here now (unplugged, or the browser reset its
+                   device ids): forget it and open the default instead. */
+                if ((name === "OverconstrainedError" || name === "NotFoundError") && (camera || mic)) {
+                    remember("live.camera", "");
+                    remember("live.mic", "");
+                    setCamera(undefined);
+                    setMic(undefined);
+                    setNotice("The camera or microphone from last time isn't connected, so the default ones are open. Pick others below if you like.");
+                    return;
+                }
+                const devices = await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[]);
+                setCameras(devices.filter((d) => d.kind === "videoinput"));
+                setMics(devices.filter((d) => d.kind === "audioinput"));
+                setError(
+                    name === "NotAllowedError"
+                        ? "The browser blocked the camera or microphone for this page. Click the camera icon in the address bar, allow both, then press Try again."
+                        : name === "NotReadableError"
+                          ? "Another app is using the camera or microphone (a video call, Photo Booth…). Close it, then press Try again."
+                          : name === "NotFoundError"
+                            ? "No camera or microphone found. Plug one in, then press Try again."
+                            : `The camera or microphone would not open (${name || String(err)}). Pick others below, or press Try again.`,
+                );
                 setPhase("error");
             });
         return () => {
             cancelled = true;
             opened?.getTracks().forEach((t) => t.stop());
         };
-    }, [camera, mic]);
+    }, [camera, mic, retry]);
 
     /* A meter before the take starts, so the level can be checked. */
     useEffect(() => {
@@ -1098,7 +1124,11 @@ export const App: React.FC = () => {
                             ? "▶ playing back"
                             : SIMULATE
                               ? `dry run, ${SIMULATE} wpm`
-                              : "ready"}
+                              : phase === "error"
+                                ? "camera not open"
+                                : phase === "setup"
+                                  ? "opening the camera…"
+                                  : "ready"}
                 </span>
                 <span>
                     {talking
@@ -1199,11 +1229,28 @@ export const App: React.FC = () => {
                         </label>
                         {!SIMULATE && (
                             <>
-                                <Select label="Camera" value={camera} options={cameras} onChange={(v) => { setCamera(v); remember("live.camera", v); }} />
-                                <Select label="Microphone" value={mic} options={mics} onChange={(v) => { setMic(v); remember("live.mic", v); }} />
+                                <Select label="Camera" value={camera} options={cameras} onChange={(v) => { setCamera(v || undefined); remember("live.camera", v); }} />
+                                <Select label="Microphone" value={mic} options={mics} onChange={(v) => { setMic(v || undefined); remember("live.mic", v); }} />
                             </>
                         )}
                         <span>{mode === "talk" ? "↑↓ chapter to start from · → moves on while talking" : "↑↓ chapter · N next to record · click a line to start there · Tab cut · Esc stop"}</span>
+                    </>
+                ) : phase === "error" && !SIMULATE ? (
+                    <>
+                        <button
+                            style={button}
+                            onClick={() => {
+                                setError(null);
+                                setRetry((n) => n + 1);
+                            }}
+                        >
+                            Try again
+                        </button>
+                        <Select label="Camera" value={camera} options={cameras} onChange={(v) => { setError(null); setCamera(v || undefined); remember("live.camera", v); }} />
+                        <Select label="Microphone" value={mic} options={mics} onChange={(v) => { setError(null); setMic(v || undefined); remember("live.mic", v); }} />
+                        <span>
+                            Or try it without a camera: <a href={`?film=${FILM.id}&simulate`} style={{ color: "#36CCD6" }}>dry run</a>
+                        </span>
                     </>
                 ) : phase === "recording" && talking ? (
                     <span>Talk about the chapter in your own words, as if to a colleague. → or a clicker: next chapter · Space or Esc: stop and save the transcript</span>
@@ -1748,7 +1795,7 @@ const Select: React.FC<{ label: string; value: string | undefined; options: Medi
     <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
         {label}
         <select value={value ?? ""} onChange={(e) => onChange(e.target.value)} style={select}>
-            {!value && <option value="">default</option>}
+            <option value="">default</option>
             {options.map((o) => (
                 <option key={o.deviceId} value={o.deviceId}>
                     {o.label || o.deviceId.slice(0, 8)}
