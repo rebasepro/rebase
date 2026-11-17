@@ -1,5 +1,5 @@
 ---
-sourceHash: b0872afec9f3746b
+sourceHash: a3181de226fdd131
 title: Rebase auf Fly.io bereitstellen
 description: Erfahren Sie, wie Sie Rebase mit Fly.io weltweit bereitstellen oder auf europäische Rechenzentren beschränken.
 sidebar_label: Fly.io
@@ -38,7 +38,7 @@ rebase build
 Committed Sie ein dreizeiliges `Dockerfile` im Projekt-Root:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.33.0
+FROM rebasepro/server:0.33.1
 COPY dist-bundle /bundle
 ```
 

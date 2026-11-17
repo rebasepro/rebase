@@ -1,5 +1,5 @@
 ---
-sourceHash: a10e28117e18ac2f
+sourceHash: 3d004fee73d1cb65
 title: Aufteilung in mehrere Prozesse
 sidebar_label: Aufgeteilte Prozesse
 description: Führen Sie ein Bundle als mehrere kooperierende Prozesse aus – eine API, eine Functions-Ebene, ein Worker – aus demselben veröffentlichten Runtime-Image, sodass eine ressourcenintensive benutzerdefinierte Funktion nicht mehr mit der Daten-API konkurriert.
@@ -271,7 +271,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.33.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.33.1"     # this unit only; the rest stay on the release-wide tag
 ```
 
 In der Regel lohnt es sich nur, das Tag festzulegen: Das Repository wird übernommen, es handelt sich also um

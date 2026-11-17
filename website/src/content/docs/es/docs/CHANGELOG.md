@@ -11,6 +11,8 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-11-17
+
 ### Added
 
 - **A table whose access the app enforces can be served without row-level security.** Since 0.31 a boot that provisions nothing withholds a declared table the database does not protect (`503 TABLE_WITHHELD`), which left a database another tool owns (Alembic, Prisma, a DBA) with nothing served and no way to say so. `defineTable(…, { rlsRequired: false })` serves that table anyway, and `database({ rls: { required: false } })` does it for every table of a database, a table's `rlsRequired: true` keeping it required. The boot names the tables it serves this way; a provisioning boot still enables row-level security and writes their policies. See [Another tool owns the schema](https://rebase.pro/docs/deployment/existing-database/#another-tool-owns-the-schema-and-the-app-enforces-access).

@@ -1,5 +1,5 @@
 ---
-sourceHash: 921b74604aabbb72
+sourceHash: 7c23def0d193729a
 title: Desplegar Rebase en AWS
 description: Despliegue su instancia de Rebase de forma segura en Amazon Web Services utilizando RDS y AWS App Runner con un fuerte enfoque europeo.
 sidebar_label: AWS
@@ -35,7 +35,7 @@ rebase build
 Para App Runner, que extrae imágenes desde un registro, integre el bundle en una imagen derivada. Son solo tres líneas y fija con exactitud lo que se ejecuta:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.33.0
+FROM rebasepro/server:0.33.1
 COPY dist-bundle /bundle
 ```
 

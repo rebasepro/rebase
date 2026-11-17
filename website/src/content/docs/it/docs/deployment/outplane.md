@@ -1,5 +1,5 @@
 ---
-sourceHash: 362e13a392efef9b
+sourceHash: 094e14e4d6fed30b
 title: Deploy di Rebase su Out Plane
 description: Distribuisci un progetto rebase init su Out Plane — un'app compilata dal tuo repository, il PostgreSQL gestito di Out Plane e il caricamento di file in un bucket Out Plane.
 sidebar_label: Out Plane
@@ -82,7 +82,7 @@ COPY . .
 RUN npx -y pnpm@11 install --frozen-lockfile && npx -y pnpm@11 run build
 
 # The published runtime, with nothing added but the bundle
-FROM rebasepro/server:0.33.0
+FROM rebasepro/server:0.33.1
 COPY --from=build --chown=node:node /app/dist-bundle /bundle
 ```
 

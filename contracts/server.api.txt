@@ -320,7 +320,7 @@ interface AuthHooks { afterLogout, afterUserCreate, afterUserDelete, beforeEmail
 interface AuthLimiters { default, named, recipientEmail, strict, verificationEmail }
 interface AuthMiddlewareOptions { apiKeyStore, driver, requireAuth, resolveDriver, serviceKey, validator }
 interface AuthRepository { applyPendingEmailChange, assignDefaultRole, claimMfaFactorCounter, createMagicLinkToken, createMfaChallenge, createMfaFactor, createPasswordResetToken, createRecoveryCodes, createRefreshToken, createUser, deleteAllMagicLinkTokensForUser, deleteAllPasswordResetTokensForUser, deleteAllRecoveryCodes, deleteAllRefreshTokensForUser, deleteExpiredTokens, deleteGuest, deleteMfaFactor, deleteRefreshToken, deleteRefreshTokenById, deleteUser, findPendingEmailChange, findRefreshTokenByHash, findValidMagicLinkToken, findValidPasswordResetToken, firstUserIds, getAccountAccessState, getMfaChallengeById, getMfaFactorById, getMfaFactors, getPendingEmailChange, getTokensValidAfter, getUnusedRecoveryCodeCount, getUserByEmail, getUserById, getUserByIdentity, getUserByVerificationToken, getUserIdentities, getUserRoleIds, getUserWithRoles, hasVerifiedMfaFactors, linkUserIdentity, listGuests, listRefreshTokensForUser, listUsers, listUsersPaginated, markMagicLinkTokenUsed, markPasswordResetTokenUsed, markRefreshTokenRotated, pruneRefreshTokens, recordMfaChallengeAttempt, revokeRefreshTokenSession, setEmailVerified, setPendingEmailChange, setTokensValidAfter, setUserDisabled, setUserRoles, setVerificationToken, unlinkUserIdentity, updateMfaFactorSecret, updatePassword, updateUser, useRecoveryCode, verifyMfaChallenge, verifyMfaFactor }
-interface AuthTableConfig { auth, columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, schema, search, slug, softDelete, strictWrites, table, tenant }
+interface AuthTableConfig { auth, columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, rlsRequired, schema, search, slug, softDelete, strictWrites, table, tenant }
 interface AuthTableOptions { onCreateUser, onResetPassword, personalKeys, roles, scopes }
 interface BaasOptions { unprotectedTables }
 interface BackendConfig { connection, schema, type }
@@ -449,7 +449,7 @@ interface RestTables { descriptors, served }
 interface RlsAudit { runNow, start, status, stop }
 interface RlsAuditConfig { connectionString, enabled, intervalMs, runOnBoot, scan, schemas, statementTimeoutMs, warnAtSeverity }
 interface RlsAuditStatus { enabled, lastError, lastRunAt, reason, result }
-interface RlsDescriptor { declaredDefaultPolicies, defaultPolicies, inherited, junctions, policies, posture, rules }
+interface RlsDescriptor { declaredDefaultPolicies, defaultPolicies, inherited, junctions, policies, posture, required, rules }
 interface RlsScanFinding { id, severity, target, title }
 interface RlsScanResult { database, findings, scannedAt, stats }
 interface S3StorageConfig { accessKeyId, allowedMimeTypes, bucket, endpoint, forcePathStyle, maxFileSize, region, secretAccessKey, type }
@@ -477,7 +477,7 @@ interface TableAfterSaveErrorProps { context, error, id, path, previousValues, s
 interface TableAfterSaveProps { context, id, path, previousValues, status, table, values }
 interface TableBeforeQueryProps { context, operation, path, query, table }
 interface TableBeforeSaveProps { context, id, path, previousValues, status, table, values }
-interface TableConfig { columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, schema, search, slug, softDelete, strictWrites, table, tenant }
+interface TableConfig { columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, rlsRequired, schema, search, slug, softDelete, strictWrites, table, tenant }
 interface TableDef { auth, brand, config, name }
 interface TableDeleteProps { context, id, path, table, values }
 interface TableDescriptor { auth, columns, database, description, history, hooks, indexes, kind, metadata, name, primaryKey, relations, rls, schema, search, slug, softDelete, strictWrites, table, tenant, view }
@@ -839,7 +839,7 @@ interface AuthCreateUserData { displayName, email, emailVerified, metadata, pass
 interface AuthResponsePayload { tokens, user }
 interface AuthRolesPolicyOperand { kind }
 interface AuthSchemaHealth { databaseVersion, healthy, problems, runtimeVersion }
-interface AuthTableConfig { auth, columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, schema, search, slug, softDelete, strictWrites, table, tenant }
+interface AuthTableConfig { auth, columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, rlsRequired, schema, search, slug, softDelete, strictWrites, table, tenant }
 interface AuthTableDescriptor { hooks, personalKeys, roles, scopes }
 interface AuthTableOptions { onCreateUser, onResetPassword, personalKeys, roles, scopes }
 interface AuthTokens { accessToken, accessTokenExpiresAt, refreshToken }
@@ -944,7 +944,7 @@ interface DatabaseConnection { close, isConnected, type }
 interface DatabaseHealthSample { connections, maxConnections, replicaLagSeconds, sizeBytes }
 interface DatabaseOptions { databaseId, engine, extensions, label, migrations, rls, transport }
 interface DatabasePoolStats { idle, pool, total, waiting }
-interface DatabaseRlsOptions { adminPolicies, defaultPolicies, grants, identity, inheritRoles, policyTarget, provisionRole, requestRole, sharedRole }
+interface DatabaseRlsOptions { adminPolicies, defaultPolicies, grants, identity, inheritRoles, policyTarget, provisionRole, requestRole, required, sharedRole }
 interface DateConfig { mode }
 interface DateValidation { max, min, requiredMessage }
 interface DeclareOptions { engine, label, transport }
@@ -1000,7 +1000,7 @@ interface ManyToManyOptions { access, onDelete, pivot, private, sourceKey, targe
 interface MountableRouter { fetch, routes }
 interface MoveColumnPatch { before, key, op, table }
 interface NativeDependency { name, reason }
-interface NewTable { columns, defaultPolicies, description, history, indexes, metadata, name, relations, rls, schema, search, slug, softDelete, strictWrites, table, tenant }
+interface NewTable { columns, defaultPolicies, description, history, indexes, metadata, name, relations, rls, rlsRequired, schema, search, slug, softDelete, strictWrites, table, tenant }
 interface NotPolicyExpression { kind, operand }
 interface NumberValidation { integer, lessThan, max, min, moreThan, negative, positive, requiredMessage }
 interface NumericConfig { mode, precision, scale }
@@ -1083,7 +1083,7 @@ interface ResourceHandle { engine, key, kind, label, options, toString, transpor
 interface ResourceKindSpec { defaultEngine, engines, envBases, envBasesByEngine, implicitDefault, kind, optionKeys, revision }
 interface RestFetchService { aggregate, cursorFor, fetchCollectionForRest, fetchOneForRest }
 interface RestoreOptions { field, idempotencyKey, ifMatch, returning }
-interface RlsDescriptor { declaredDefaultPolicies, defaultPolicies, inherited, junctions, policies, posture, rules }
+interface RlsDescriptor { declaredDefaultPolicies, defaultPolicies, inherited, junctions, policies, posture, required, rules }
 interface RoleDefinition { description, name, scopes }
 interface RoleSummary { builtIn, description, id, name, scopes }
 interface RolesContainPolicyExpression { kind, roles }
@@ -1149,7 +1149,7 @@ interface TableAfterSaveProps { context, id, path, previousValues, status, table
 interface TableBeforeQueryProps { context, operation, path, query, table }
 interface TableBeforeSaveProps { context, id, path, previousValues, status, table, values }
 interface TableColumnInfo { character_maximum_length, column_default, column_name, data_type, enum_values, is_nullable, udt_name }
-interface TableConfig { columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, schema, search, slug, softDelete, strictWrites, table, tenant }
+interface TableConfig { columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, rlsRequired, schema, search, slug, softDelete, strictWrites, table, tenant }
 interface TableDef { auth, brand, config, name }
 interface TableDeleteProps { context, id, path, table, values }
 interface TableDescriptor { auth, columns, database, description, history, hooks, indexes, kind, metadata, name, primaryKey, relations, rls, schema, search, slug, softDelete, strictWrites, table, tenant, view }
@@ -1161,7 +1161,7 @@ interface TableIndex { columns, include, reason, unique, using, where }
 interface TableIndexKey { column, direction, nulls }
 interface TableJunctionInfo { junction_table_name, source_column_name, target_column_name, target_table_name }
 interface TableMetadata { columns, foreignKeys, junctions, policies }
-interface TableOptionValues { defaultPolicies, description, history, indexes, metadata, search, softDelete, strictWrites, tenant }
+interface TableOptionValues { defaultPolicies, description, history, indexes, metadata, rlsRequired, search, softDelete, strictWrites, tenant }
 interface TablePatchProblem { index, key, message, table }
 interface TablePolicyInfo { cmd, permissive, policy_name, qual, roles, with_check }
 interface TableRegistryInterface { getTable, setGlobalHooks, setTableHooks }
@@ -2007,21 +2007,21 @@ function pgEnum
 function sql
 interface AnyTableDef { auth, brand, config, name }
 interface AnyViewDef { brand, config, name }
-interface AuthTableConfig { auth, columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, schema, search, slug, softDelete, strictWrites, table, tenant }
+interface AuthTableConfig { auth, columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, rlsRequired, schema, search, slug, softDelete, strictWrites, table, tenant }
 interface AuthTableOptions { onCreateUser, onResetPassword, personalKeys, roles, scopes }
 interface ColumnAfterReadProps { context, path, table, value, values }
 interface ColumnBeforeSaveProps { context, id, path, previousValue, previousValues, status, table, value, values }
 interface ColumnDescriptor { access, column, default, derived, description, element, foreignKeyOf, generated, json, key, nullable, oneOf, primaryKey, private, readOnly, semantic, stamp, storage, transforms, type, unique, validate, vectorIndex }
 interface ColumnTransform { afterRead, beforeSave }
 interface PgEnum { enumName, enumValues }
-interface RlsDescriptor { declaredDefaultPolicies, defaultPolicies, inherited, junctions, policies, posture, rules }
+interface RlsDescriptor { declaredDefaultPolicies, defaultPolicies, inherited, junctions, policies, posture, required, rules }
 interface SqlTemplate { brand, text }
 interface TableAfterReadProps { context, path, table, values }
 interface TableAfterSaveErrorProps { context, error, id, path, previousValues, status, table, values }
 interface TableAfterSaveProps { context, id, path, previousValues, status, table, values }
 interface TableBeforeQueryProps { context, operation, path, query, table }
 interface TableBeforeSaveProps { context, id, path, previousValues, status, table, values }
-interface TableConfig { columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, schema, search, slug, softDelete, strictWrites, table, tenant }
+interface TableConfig { columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, rlsRequired, schema, search, slug, softDelete, strictWrites, table, tenant }
 interface TableDef { auth, brand, config, name }
 interface TableDeleteProps { context, id, path, table, values }
 interface TableDescriptor { auth, columns, database, description, history, hooks, indexes, kind, metadata, name, primaryKey, relations, rls, schema, search, slug, softDelete, strictWrites, table, tenant, view }
