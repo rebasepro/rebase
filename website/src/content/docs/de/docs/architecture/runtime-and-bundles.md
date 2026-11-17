@@ -1,5 +1,5 @@
 ---
-sourceHash: 689722b519a5354a
+sourceHash: a2a2414aaf9397ce
 title: Runtime und Bundles
 sidebar_label: Runtime & Bundles
 description: Wie ein Rebase-Projekt in ein Projekt-Bundle und eine versionierte Runtime aufgeteilt wird und warum diese Trennung Upgrades, Multi-Repo-Apps und Managed Hosting ermöglicht.
@@ -47,7 +47,7 @@ Es lohnt sich, das Manifest zu verstehen, denn es ist genau das, was eine Runtim
 ```jsonc
 {
   "bundleFormat": 3,
-  "runtime": { "range": "^1", "builtAgainst": "0.33.1", "contract": 2 },
+  "runtime": { "range": "^1", "builtAgainst": "0.33.2", "contract": 2 },
   "schemaVersion": "v2:3f0c9a1e7d2b5c48",
   "kind": "backend",
   "entry": {
@@ -88,7 +88,7 @@ Zwei Versionsnummern bestimmen, ob ein Bundle und eine Runtime zusammenarbeiten 
 Aus diesem Grund ist ein Upgrade von Rebase in einem selbst gehosteten Deployment lediglich eine Änderung des Tags:
 
 ```yaml
-image: rebasepro/server:0.33.1   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.33.2   # a newer tag — your bundle is untouched
 ```
 
 ## Die Entwicklung nutzt denselben Pfad

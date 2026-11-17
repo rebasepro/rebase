@@ -130,7 +130,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.33.1
+FROM rebasepro/server:0.33.2
 COPY dist-bundle /bundle
 ```
 
@@ -336,7 +336,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.33.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.33.2 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -591,7 +591,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ## Upgrading
 
 ```yaml
-image: rebasepro/server:0.33.1
+image: rebasepro/server:0.33.2
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that

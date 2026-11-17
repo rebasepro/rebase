@@ -1,5 +1,5 @@
 ---
-sourceHash: a78183a30dfb0aff
+sourceHash: 763840214257d1d5
 title: Aplicaciones y repositorios
 sidebar_label: Apps y repositorios
 description: Un proyecto es un backend más las aplicaciones que se comunican con él, las cuales pueden residir cada una en su propio repositorio.
@@ -286,7 +286,7 @@ Y cada proyecto publica el suyo actual, sin autenticación, porque una marca de 
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.33.1","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.33.2","contract":1}}
 ```
 
 Comparar los dos en CI convierte una discrepancia silenciosa en una comprobación fallida. La marca cambia cuando los tipos generados podrían cambiar (una nueva propiedad, una relación modificada) y deliberadamente *no* cuando cambia un hook, una regla de seguridad o un icono, para no dar falsas alarmas.

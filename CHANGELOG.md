@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.33.2] - 2026-11-17
+
 ### Fixed
 
 - **A backend with its own auth adapter answers `/api/auth/scopes` and the API-key routes.** `GET /api/auth/scopes`, `/api/auth/keys` and `/api/admin/api-keys` checked the caller with the framework's own tokens, which a backend signing users in through its own `AuthAdapter` never configures: they answered 500 ("JWT secret not configured"), so the admin panel could not tell which scopes the signed-in user holds and hid the actions that need one. They now sign the caller in through the adapter, as `/api/data` does; a backend on the built-in auth is unchanged.
