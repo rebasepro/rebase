@@ -5,6 +5,7 @@ import { authoredTiming, LIVE_HORIZON, type Script, type SpokenLine, type Timing
 import { assemble, serves, type Chapter, type Edit, type TakeInfo } from "../spoken/production";
 import { Follower } from "./follow";
 import { canRecognize, Recognizer, TakeRecorder, VoiceDetector } from "./listen";
+import { PhoneLink, type PhoneState, type SyncResult, type TakeVideo } from "./phoneLink";
 import { simulateRead } from "./simulate";
 import { diffWords, heardPerLine, sameWords, suggestLine, TranscriptLog, type DiffPart, type HeardWord } from "./transcript";
 
@@ -37,6 +38,14 @@ import { diffWords, heardPerLine, sameWords, suggestLine, TranscriptLog, type Di
  *                     workflow can be tried. Simulated takes are only used
  *                     in simulate mode.
  *   ?lang=en-GB       the recogniser's language (default en-US).
+ *
+ * THE PHONE AS A CAMERA: pick "Phone (wireless)" as the camera and scan the
+ * QR code with the phone (same Wi-Fi). Its camera arrives over WebRTC
+ * (src/live/phone.ts, src/live/phoneLink.ts, scripts/phone.mjs); the voice
+ * is still this Mac's microphone, and each take records how late the
+ * picture arrived so take.mjs can line it up with the sound. Run the "Sync
+ * check" once per phone camera (the phone filming this screen while it
+ * flashes): it measures the camera's own delay, which no statistic shows.
  */
 
 const FPS = 30;
@@ -54,6 +63,10 @@ const PREVIEW_GAP = 10;
 const REVIEW_LEAD = 30;
 
 type Phase = "setup" | "ready" | "recording" | "saving" | "error";
+
+/** The camera choice that means the phone (it is not a device id). */
+const PHONE = "phone";
+const PHONE_OPTION = { deviceId: PHONE, label: "Phone (wireless)" };
 
 interface MicTest {
     state: "listening" | "playing" | "done";
@@ -82,6 +95,8 @@ interface Session {
     offset: number;
     t0: number;
     recorder: TakeRecorder | null;
+    /** Recording from the phone: ends the take's delay measurement. */
+    phoneTake: (() => TakeVideo) | null;
     recognizer: Recognizer | null;
     voice: VoiceDetector | null;
     stopSim: (() => void) | null;
@@ -184,6 +199,22 @@ export const App: React.FC = () => {
     const [mic, setMic] = useState<string | undefined>(() => remember("live.mic") || undefined);
     /** Bumped by "Try again": opens the camera and microphone afresh. */
     const [retry, setRetry] = useState(0);
+    /* The phone camera: always listening, so a phone can join any time. */
+    const phoneLink = useMemo(() => (SIMULATE ? null : new PhoneLink()), []);
+    const [phone, setPhone] = useState<PhoneState | null>(null);
+    useEffect(() => {
+        if (!phoneLink) return;
+        phoneLink.start();
+        const off = phoneLink.subscribe(setPhone);
+        return () => {
+            off();
+            phoneLink.stop();
+        };
+    }, [phoneLink]);
+    const phoneTrack = camera === PHONE ? (phone?.track ?? null) : null;
+    const [syncing, setSyncing] = useState(false);
+    const syncingRef = useRef(false);
+    syncingRef.current = syncing;
     const [liveTiming, setLiveTiming] = useState<Timing | null>(null);
     const [position, setPosition] = useState({ line: 0, word: 0 });
     const [status, setStatus] = useState({ recognition: "idle", transcript: "", level: -100, threshold: -58, speaking: false });
@@ -269,7 +300,9 @@ export const App: React.FC = () => {
         let opened: MediaStream | null = null;
         navigator.mediaDevices
             .getUserMedia({
-                video: { deviceId: camera ? { exact: camera } : undefined, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+                /* The phone's picture comes over the network: only the
+                   microphone is opened here. */
+                video: camera === PHONE ? false : { deviceId: camera ? { exact: camera } : undefined, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
                 /* The voice as it is: no gain riding, no noise gate, no echo
                    cancellation — the take is the film's soundtrack. */
                 audio: { deviceId: mic ? { exact: mic } : undefined, autoGainControl: false, noiseSuppression: false, echoCancellation: false },
@@ -277,11 +310,13 @@ export const App: React.FC = () => {
             .then(async (s) => {
                 if (cancelled) return s.getTracks().forEach((t) => t.stop());
                 opened = s;
-                setStream(s);
+                /* The phone's track belongs to the link: never stopped here. */
+                const waiting = camera === PHONE && !phoneTrack;
+                setStream(camera !== PHONE ? s : phoneTrack ? new MediaStream([phoneTrack, ...s.getAudioTracks()]) : null);
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 setCameras(devices.filter((d) => d.kind === "videoinput"));
                 setMics(devices.filter((d) => d.kind === "audioinput"));
-                setPhase((p) => (p === "setup" || p === "error" ? "ready" : p));
+                setPhase((p) => (waiting ? (p === "ready" || p === "error" ? "setup" : p) : p === "setup" || p === "error" ? "ready" : p));
             })
             .catch(async (err: unknown) => {
                 if (cancelled) return;
@@ -289,10 +324,12 @@ export const App: React.FC = () => {
                 /* A camera or microphone remembered from an earlier session
                    that is not here now (unplugged, or the browser reset its
                    device ids): forget it and open the default instead. */
-                if ((name === "OverconstrainedError" || name === "NotFoundError") && (camera || mic)) {
-                    remember("live.camera", "");
+                if ((name === "OverconstrainedError" || name === "NotFoundError") && ((camera && camera !== PHONE) || mic)) {
+                    if (camera !== PHONE) {
+                        remember("live.camera", "");
+                        setCamera(undefined);
+                    }
                     remember("live.mic", "");
-                    setCamera(undefined);
                     setMic(undefined);
                     setNotice("The camera or microphone from last time isn't connected, so the default ones are open. Pick others below if you like.");
                     return;
@@ -315,7 +352,7 @@ export const App: React.FC = () => {
             cancelled = true;
             opened?.getTracks().forEach((t) => t.stop());
         };
-    }, [camera, mic, retry]);
+    }, [camera, mic, retry, phoneTrack]);
 
     /* A meter before the take starts, so the level can be checked. */
     useEffect(() => {
@@ -415,6 +452,7 @@ export const App: React.FC = () => {
             offset: offsetIn(cut, rangeScript[0].id),
             t0: 0,
             recorder: null,
+            phoneTake: null,
             recognizer: null,
             voice: null,
             stopSim: null,
@@ -443,6 +481,7 @@ export const App: React.FC = () => {
                         await post(`/api/takes/${id}/chunk?ext=${recorder.extension}`, chunk);
                     });
                     s.recorder = recorder;
+                    if (phoneLink && stream.getVideoTracks()[0] === phoneLink.current.track) s.phoneTake = phoneLink.mark();
                     await recorder.start();
                     s.t0 = recorder.startedAt;
                 } else s.t0 = performance.now();
@@ -484,7 +523,7 @@ export const App: React.FC = () => {
             player.current?.play();
         });
         s.raf = requestAnimationFrame(loop);
-    }, [phase, stream, loop, range, rangeScript, recordCut, offsetIn, mode]);
+    }, [phase, stream, loop, range, rangeScript, recordCut, offsetIn, mode, phoneLink]);
 
     const stop = useCallback(
         async (discard = false) => {
@@ -499,6 +538,10 @@ export const App: React.FC = () => {
             setPhase("saving");
             try {
                 await s.recorder?.stop();
+                /* How late the phone's picture arrived: take.mjs moves it
+                   back by this, so the picture meets the sound. */
+                const video = s.phoneTake?.() ?? null;
+                s.phoneTake = null;
                 const f = s.follower;
                 const log = {
                     id: s.id,
@@ -515,6 +558,7 @@ export const App: React.FC = () => {
                     recordedAt: new Date().toISOString(),
                     durationFrames: Math.round(((performance.now() - s.t0) * FPS) / 1000),
                     container: s.recorder?.extension ?? null,
+                    video,
                     latency: f.latency,
                     perWord: f.perWord,
                     lines: f.script.map((l, k) => ({
@@ -923,6 +967,8 @@ export const App: React.FC = () => {
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLSelectElement || (e.target instanceof HTMLInputElement && e.target.type !== "checkbox")) return;
+            /* The sync check has the screen: no take starts under it. */
+            if (syncingRef.current) return;
             const s = session.current;
             if (talk.current) {
                 if (e.code === "Escape" || e.code === "Space") {
@@ -1127,7 +1173,9 @@ export const App: React.FC = () => {
                               : phase === "error"
                                 ? "camera not open"
                                 : phase === "setup"
-                                  ? "opening the camera…"
+                                  ? camera === PHONE
+                                      ? "waiting for the phone…"
+                                      : "opening the camera…"
                                   : "ready"}
                 </span>
                 <span>
@@ -1138,6 +1186,7 @@ export const App: React.FC = () => {
                           : `lines ${range.from + 1}–${range.to + 1} of ${SCRIPT.length}`}
                 </span>
                 <Meter level={status.level} threshold={status.threshold} speaking={status.speaking} />
+                {phoneLink && phone && phoneTrack && <PhoneBadge link={phoneLink} state={phone} onSync={recording ? null : () => setSyncing(true)} />}
                 <span style={{ color: "rgba(255,255,255,0.45)" }}>{canRecognize() || SIMULATE ? status.recognition : "no speech recognition — use Chrome"}</span>
                 <span style={{ flex: 1, fontFamily: "JetBrains Mono, monospace", fontSize: 13, color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "right" }}>
                     {status.transcript}
@@ -1229,7 +1278,7 @@ export const App: React.FC = () => {
                         </label>
                         {!SIMULATE && (
                             <>
-                                <Select label="Camera" value={camera} options={cameras} onChange={(v) => { setCamera(v || undefined); remember("live.camera", v); }} />
+                                <Select label="Camera" value={camera} options={[...cameras, PHONE_OPTION]} onChange={(v) => { setCamera(v || undefined); remember("live.camera", v); }} />
                                 <Select label="Microphone" value={mic} options={mics} onChange={(v) => { setMic(v || undefined); remember("live.mic", v); }} />
                             </>
                         )}
@@ -1246,7 +1295,7 @@ export const App: React.FC = () => {
                         >
                             Try again
                         </button>
-                        <Select label="Camera" value={camera} options={cameras} onChange={(v) => { setError(null); setCamera(v || undefined); remember("live.camera", v); }} />
+                        <Select label="Camera" value={camera} options={[...cameras, PHONE_OPTION]} onChange={(v) => { setError(null); setCamera(v || undefined); remember("live.camera", v); }} />
                         <Select label="Microphone" value={mic} options={mics} onChange={(v) => { setError(null); setMic(v || undefined); remember("live.mic", v); }} />
                         <span>
                             Or try it without a camera: <a href={`?film=${FILM.id}&simulate`} style={{ color: "#36CCD6" }}>dry run</a>
@@ -1287,6 +1336,30 @@ export const App: React.FC = () => {
                 </div>
             )}
             {notice && !error && <Toast text={notice} onDone={() => setNotice(null)} />}
+            {syncing && phoneLink && phoneTrack && (
+                <SyncCheck
+                    link={phoneLink}
+                    track={phoneTrack}
+                    onDone={(result) => {
+                        setSyncing(false);
+                        if (!result) return;
+                        setNotice(
+                            result.ok
+                                ? `Synced: the phone's picture arrives ${result.totalMs} ms after the sound (${result.cameraMs} ms of it in the camera). Every take is lined up by it.`
+                                : result.reason,
+                        );
+                    }}
+                />
+            )}
+            {!SIMULATE && camera === PHONE && !phoneTrack && !recording && (
+                <PhonePairing
+                    state={phone}
+                    onCancel={() => {
+                        setCamera(undefined);
+                        remember("live.camera", "");
+                    }}
+                />
+            )}
             {rehearsal && !recording && <RehearsalPanel rows={rehearsal.rows} onClose={() => setRehearsal(null)} />}
             {transcript && !recording && (
                 <div style={{ ...sheet }}>
@@ -1791,7 +1864,7 @@ const Meter: React.FC<{ level: number; threshold: number; speaking: boolean }> =
     );
 };
 
-const Select: React.FC<{ label: string; value: string | undefined; options: MediaDeviceInfo[]; onChange: (v: string) => void }> = ({ label, value, options, onChange }) => (
+const Select: React.FC<{ label: string; value: string | undefined; options: ReadonlyArray<{ deviceId: string; label: string }>; onChange: (v: string) => void }> = ({ label, value, options, onChange }) => (
     <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
         {label}
         <select value={value ?? ""} onChange={(e) => onChange(e.target.value)} style={select}>
@@ -1804,6 +1877,146 @@ const Select: React.FC<{ label: string; value: string | undefined; options: Medi
         </select>
     </label>
 );
+
+/** Pairing the phone: the QR code to scan, and what happens next. */
+const PhonePairing: React.FC<{ state: PhoneState | null; onCancel: () => void }> = ({ state, onCancel }) => {
+    const [url, setUrl] = useState<string | null | undefined>(undefined);
+    useEffect(() => {
+        let live = true;
+        fetch("/api/phone")
+            .then((r) => r.json())
+            .then((v: unknown) => live && setUrl(typeof v === "object" && v !== null && "url" in v && typeof v.url === "string" ? v.url : null))
+            .catch(() => live && setUrl(null));
+        return () => {
+            live = false;
+        };
+    }, []);
+    return (
+        <div style={{ ...sheet, display: "flex", gap: 28, alignItems: "center" }}>
+            {url && <img src="/api/phone/qr.svg" alt="" width={220} height={220} style={{ borderRadius: 8, background: "#fff", flex: "none" }} />}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+                <span style={{ fontWeight: 600, fontSize: 18 }}>{state?.status === "connecting" ? "The phone is connecting…" : "Scan this with the phone"}</span>
+                {url === null ? (
+                    <span>This Mac has no address on a network. Connect it to Wi-Fi and restart pnpm live.</span>
+                ) : (
+                    <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.7, color: "rgba(255,255,255,0.75)" }}>
+                        <li>Phone on the same Wi-Fi as this Mac; open the code's link in Chrome.</li>
+                        <li>The first time, Chrome warns about the certificate: Advanced → Proceed.</li>
+                        <li>Allow the camera. The picture appears here; the sound stays this Mac's microphone.</li>
+                        <li>Hold the phone sideways for the 16:9 film. Then press Sync check, once per phone camera.</li>
+                    </ol>
+                )}
+                {url && <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, color: "rgba(255,255,255,0.45)", userSelect: "all", wordBreak: "break-all" }}>{url}</span>}
+                <span>
+                    <button style={ghost} onClick={onCancel}>
+                        Use this Mac's camera instead
+                    </button>
+                </span>
+            </div>
+        </div>
+    );
+};
+
+/** The phone in the status bar: its live picture, size, rate and delay. */
+const PhoneBadge: React.FC<{ link: PhoneLink; state: PhoneState; onSync: (() => void) | null }> = ({ link, state, onSync }) => {
+    const host = useRef<HTMLSpanElement>(null);
+    useEffect(() => {
+        const el = host.current;
+        if (!el) return;
+        const video = link.video;
+        Object.assign(video.style, { width: "64px", height: "36px", objectFit: "cover", borderRadius: "4px", background: "#000", display: "block" });
+        el.appendChild(video);
+        /* A video element taken out of the page pauses: play it again. */
+        void video.play().catch(() => undefined);
+        return () => {
+            if (video.parentNode === el) el.removeChild(video);
+        };
+    }, [link]);
+    const r = state.received;
+    const synced = state.cameraMs !== null;
+    const how = synced
+        ? `the link's delay now plus the camera's ${state.cameraMs} ms from the sync check`
+        : "the link's delay only — the camera's own is unknown until a sync check";
+    return (
+        <span style={{ display: "flex", alignItems: "center", gap: 8, color: "rgba(255,255,255,0.6)", fontSize: 13 }} title={`${state.camera?.label ?? "phone"} — the picture lags the sound by ${how}. Each take is lined up by it.`}>
+            <span ref={host} />
+            {`phone${r?.width ? ` · ${r.width}×${r.height} · ${r.fps} fps` : ""}${state.latencyMs !== null ? ` · ${state.latencyMs} ms` : ""}`}
+            {onSync && (
+                <button style={{ ...mini, ...(synced ? null : { borderColor: "#F5B83D", color: "#F5B83D" }) }} onClick={onSync} title="Flashes this screen while the phone films it, to measure the camera's own delay">
+                    {synced ? "synced · check again" : "Sync check"}
+                </button>
+            )}
+        </span>
+    );
+};
+
+/**
+ * The sync check: the phone films this screen while it flashes. Full screen
+ * and drawn directly (not through React), so each flash reaches the display
+ * on the frame it was timed for.
+ */
+const SyncCheck: React.FC<{ link: PhoneLink; track: MediaStreamTrack; onDone: (result: SyncResult | null) => void }> = ({ link, track, onDone }) => {
+    const screen = useRef<HTMLDivElement>(null);
+    const preview = useRef<HTMLVideoElement>(null);
+    const [progress, setProgress] = useState<{ done: number; of: number } | null>(null);
+    useEffect(() => {
+        const v = preview.current;
+        if (!v) return;
+        v.srcObject = new MediaStream([track]);
+        void v.play().catch(() => undefined);
+        return () => {
+            v.srcObject = null;
+        };
+    }, [track]);
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.code === "Escape" && !progress) onDone(null);
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [onDone, progress]);
+    const run = async () => {
+        const el = screen.current;
+        const v = preview.current;
+        if (!el || !v) return;
+        setProgress({ done: 0, of: 1 });
+        const result = await link.syncCheck(
+            v,
+            (white) => {
+                el.style.background = white ? "#FFFFFF" : "#000000";
+            },
+            (done, of) => setProgress({ done, of }),
+        );
+        onDone(result);
+    };
+    return (
+        <div ref={screen} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "#000", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <video ref={preview} muted playsInline autoPlay style={{ position: "absolute", right: 24, bottom: 24, width: 240, borderRadius: 8, background: "#111" }} />
+            {progress ? (
+                <span style={{ position: "absolute", left: 24, bottom: 24, color: "#777", fontSize: 13 }}>
+                    flash {progress.done}/{progress.of}
+                </span>
+            ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 520, color: "rgba(255,255,255,0.8)", lineHeight: 1.6 }}>
+                    <span style={{ fontWeight: 600, fontSize: 20, color: "#fff" }}>Sync check</span>
+                    <span>
+                        Point the phone at this screen, close enough that the screen fills most of its picture (the preview, bottom right), and hold it still. The screen will flash white
+                        about ten times over eight seconds.
+                    </span>
+                    <span>It measures how late the phone's picture arrives after the sound, camera included, so every take can be lined up exactly. Once per phone camera.</span>
+                    <span style={{ display: "flex", gap: 10 }}>
+                        <button style={button} onClick={() => void run()}>
+                            Start — flashes the screen
+                        </button>
+                        <button style={ghost} onClick={() => onDone(null)}>
+                            Cancel
+                        </button>
+                    </span>
+                </div>
+            )}
+        </div>
+    );
+};
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 

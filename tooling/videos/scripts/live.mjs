@@ -23,6 +23,8 @@
  *   POST /api/rehearsals/<film>            what a rehearsal heard, per line
  *   POST /api/script/<film>                change one line of the script in
  *                                          its source file (and the docs)
+ *   /api/phone…                            the phone as a wireless camera
+ *                                          (scripts/phone.mjs, on :3501)
  *
  * Localhost only, and only take ids the page mints. Open the page in
  * Chrome: its speech recognition is what hears the words.
@@ -34,6 +36,7 @@ import { appendFile, mkdir, readdir, readFile, rename, stat, writeFile } from "n
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { startPhone } from "./phone.mjs";
 import { processTake } from "./take.mjs";
 import { listTakes } from "./takes.mjs";
 
@@ -44,9 +47,11 @@ const TAKES = path.join(ROOT, "takes");
 const EDITS = path.join(TAKES, "edits");
 const RENDERS = path.join(ROOT, "out");
 const PORT = Number(process.env.PORT ?? 3500);
+/** Where a phone on the same Wi-Fi reaches the page (HTTPS, network-wide). */
+const PHONE_PORT = Number(process.env.PHONE_PORT ?? PORT + 1);
 
 const ctx = await context({
-    entryPoints: [path.join(ROOT, "src", "live", "main.tsx")],
+    entryPoints: [path.join(ROOT, "src", "live", "main.tsx"), path.join(ROOT, "src", "live", "phone.ts")],
     outdir: OUT,
     bundle: true,
     format: "esm",
@@ -240,9 +245,12 @@ function startRender(key, compositions, propsFile) {
     next();
 }
 
+const phone = await startPhone({ port: PHONE_PORT, root: ROOT, bundleDir: OUT, serveFile });
+
 const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     try {
+        if (url.pathname.startsWith("/api/phone") && (await phone.handle(req, res, url.pathname)) !== false) return;
         const api = /^\/api\/takes\/(take-\d{8}-\d{6})\/(chunk|log|process|discard)$/.exec(url.pathname);
         if (api && req.method === "POST") {
             const [, id, action] = api;
@@ -369,4 +377,5 @@ server.listen(PORT, "127.0.0.1", () => {
     console.log(`  plays back each one in place, and each cut (long, short) is assembled from`);
     console.log(`  the takes you choose. Render from the page, or: pnpm assemble <film> --render`);
     console.log(`\n  A dry run with no camera:  http://localhost:${PORT}/?film=view-side-door&simulate\n`);
+    phone.banner();
 });
