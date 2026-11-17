@@ -253,6 +253,12 @@ export interface RlsDescriptor {
      */
     declaredDefaultPolicies?: true;
     /**
+     * The table wrote `rlsRequired`: whether the server refuses to serve it
+     * when the database does not enforce its policies. Absent, its database's
+     * `rls.required` decides (required unless that says `false`).
+     */
+    required?: boolean;
+    /**
      * The policies Postgres holds for the table, when the server includes them
      * (admins and `schema:read` holders): the Studio's RLS editor reads these.
      */

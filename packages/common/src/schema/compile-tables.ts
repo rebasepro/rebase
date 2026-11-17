@@ -727,7 +727,7 @@ function compileOne(
     if (!rls.ok) {
         refuse(rls.message);
     } else {
-        descriptor.rls = rls.rls;
+        descriptor.rls = typeof tableConfig.rlsRequired === "boolean" ? { ...rls.rls, required: tableConfig.rlsRequired } : rls.rls;
         problems.push(...checkRules(name, rls.rls, allColumns, relations, auth));
     }
 

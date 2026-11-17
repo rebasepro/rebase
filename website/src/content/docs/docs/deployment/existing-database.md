@@ -99,6 +99,7 @@ code, such as the role name when staging and production share a cluster.
 | `policyTarget` | `REBASE_RLS_POLICY_TARGET` | `"public"` | `"requestRole"`: permissive policies apply only to the request role(s). Restrictive policies still apply to everyone. |
 | `adminPolicies` | `REBASE_RLS_ADMIN_POLICIES` | `"adminRole"`: policies only the server context or an admin can pass (the baseline, `roles: ["admin"]`) are written `TO rebase_admin`, and admin requests run as `<request role>_admin` | `"public"`: those policies are `TO public` and admins run as the request role, as before this setting existed. |
 | `defaultPolicies` | `REBASE_RLS_DEFAULT_POLICIES` | `true` | `false`: no table gets the server-or-admin baseline. A table's own `defaultPolicies: false` still decides for it. |
+| `required` | none | `true`: a declared table the database does not protect (row-level security off, its declared policies missing) is not served when the boot provisions nothing | `false`: serve this database's tables anyway, and name them at boot. For a schema another tool owns and an app that enforces access itself; see "Another tool owns the schema" below. A table's own `rlsRequired` decides for it. |
 | `inheritRoles` | none | `[]` | Roles granted to the request role `WITH INHERIT TRUE`, so policies written `TO` them apply. With an `{ anonymous, signedIn }` request role, only the signed-in one gets them; with a function, the setting is refused. PostgreSQL 16 and newer; refused on 15 and older. |
 | `identity` | `REBASE_RLS_IDENTITY` (named forms) | `"rebase"`: `app.uid`, `app.user_roles`, `app.is_anonymous`, `app.jwt` | `"supabase"`: also `request.jwt.claims`, `request.jwt.claim.sub` and `request.jwt.claim.role`, so `auth.uid()` and `auth.jwt()` see the caller. In the driver's code, a function returning extra settings. The `app.*` settings are always set. |
 | `sharedRole` | `REBASE_RLS_SHARED_ROLE` | `"warn"` when another login can switch into the request role | `"refuse"`: fail the boot. `"ignore"`: say nothing. |
@@ -192,6 +193,43 @@ to the anonymous one.
 Supabase's stock default privileges have granted tables created in `public` to
 `anon` and `authenticated`; check your project's. Run `rebase doctor --database`
 and `rls-check` after the first boot to see what those roles can reach.
+
+### Another tool owns the schema, and the app enforces access
+
+Some databases are not Rebase's to secure. Alembic, Prisma or a DBA owns the
+tables, nothing there enables row-level security, and the app decides who sees
+what itself: only staff can sign in, hooks check each write, a scope gates each
+route. A boot that provisions nothing (`REBASE_PROVISION=false`,
+`REBASE_MIGRATE_ON_BOOT=none`) withholds every such table by default
+(`503 TABLE_WITHHELD`), because Postgres would hand every row to every signed-in
+caller.
+
+Say that the app enforces access instead, for the whole database:
+
+```ts
+// backend/resources.ts
+export const main = database({ rls: { required: false } });
+```
+
+or for one table:
+
+```ts
+export const invoices = defineTable("invoices", {
+    columns: { /* … */ },
+    rls: "admin-only",
+    rlsRequired: false
+});
+```
+
+The tables are then served whatever the catalogue says, and the boot names
+them in one warning. A table's `rlsRequired: true` keeps it required under a
+database that says `required: false`. Nothing changes in the database: a boot
+that does provision still enables row-level security and writes the declared
+policies, and `rebase doctor` still reports the tables as unprotected.
+
+With row-level security off, the declared `rls` is not enforced by Postgres:
+`"admin-only"` does not stop a signed-in non-admin. Keep sign-in, roles and
+hooks doing that job.
 
 ### A database administrator creates the roles
 

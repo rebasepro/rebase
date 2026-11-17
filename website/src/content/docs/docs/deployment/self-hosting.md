@@ -203,8 +203,8 @@ is there instead:
   way: one the database does not protect withholds the tables whose relations
   use it, and `TABLE_WITHHELD` names the junction. A table whose `via` relation
   passes through a withheld table is withheld too, and the message names the
-  relation. This holds with `REBASE_MIGRATE_ON_BOOT=none`
-  too, and on a live schema refresh.
+  relation. This holds with `REBASE_MIGRATE_ON_BOOT=none` too, and on a live schema refresh.
+  A table whose access the app enforces itself says `rlsRequired: false` to be served anyway ([how](/docs/deployment/existing-database/#another-tool-owns-the-schema-and-the-app-enforces-access)).
 
 Rows still change, as they would on any database: sign-ins, sessions, API key
 usage, idempotency keys, cron claims. The first admin account

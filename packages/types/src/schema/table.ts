@@ -65,6 +65,18 @@ export interface TableConfig<
      */
     defaultPolicies?: boolean;
     /**
+     * `false` serves the table even when the database does not enforce its
+     * `rls`: row-level security off, or its declared policies missing. For a
+     * table whose schema something else owns (Alembic, Prisma, a DBA) and
+     * whose access the app enforces itself. The boot names every table it
+     * serves this way. A boot that provisions still writes the declared
+     * policies; this only stops a boot that provisions nothing from refusing
+     * the table. `true` requires it even when the table's database says
+     * `database({ rls: { required: false } })`. Absent, the database's
+     * declaration decides (required by default).
+     */
+    rlsRequired?: boolean;
+    /**
      * Scope every row to a tenant: a column key, or a `belongsTo` relation's
      * name, which stands for its foreign-key column (as the compiler reads it).
      */

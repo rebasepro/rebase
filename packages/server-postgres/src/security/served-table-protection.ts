@@ -46,7 +46,8 @@
  *
  * @module
  */
-import type { CompiledTable } from "@rebasepro/types";
+import type { CompiledTable, TableDescriptor } from "@rebasepro/types";
+import { DEFAULT_DATA_SOURCE_KEY, declaredDatabaseRls } from "@rebasepro/types";
 import { viaJoinTableNames } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 import { planTablePolicies, quoteSqlLiteral } from "../schema/generate-postgres-ddl-logic";
@@ -95,6 +96,22 @@ export interface NarrowedServedTable {
 export interface ServedTableProtection {
     unprotected: UnprotectedServedTable[];
     narrowed: NarrowedServedTable[];
+    /**
+     * Tables the database does not protect that are served anyway, because
+     * their declaration does not require it (`rlsRequired: false`, or their
+     * database's `rls: { required: false }`): what the boot names, not withholds.
+     */
+    servedUnprotected: UnprotectedServedTable[];
+}
+
+/**
+ * Whether the server refuses to serve this table when the database does not
+ * enforce its `rls`: the table's `rlsRequired`, else its database's
+ * `rls.required`, else yes.
+ */
+export function rlsRequiredFor(descriptor: Pick<TableDescriptor, "rls" | "database">): boolean {
+    if (typeof descriptor.rls?.required === "boolean") return descriptor.rls.required;
+    return declaredDatabaseRls(descriptor.database ?? DEFAULT_DATA_SOURCE_KEY).required !== false;
 }
 
 /** What {@link findUnprotectedServedTables} renders the policies with — the boot's admin switch. */
@@ -129,7 +146,10 @@ export async function findServedTableProtection(
     options: ServedTableProtectionOptions = {}
 ): Promise<ServedTableProtection> {
     const served = tables.filter(table => table.descriptor.kind === "table");
-    if (served.length === 0) return { unprotected: [], narrowed: [] };
+    if (served.length === 0) return { unprotected: [], narrowed: [], servedUnprotected: [] };
+    // The tables whose declaration does not require the database to protect
+    // them: served whatever the catalogue says, and named.
+    const optedOut = new Set(served.filter(({ descriptor }) => !rlsRequiredFor(descriptor)).map(({ descriptor }) => descriptor.slug));
     const planned = planTablePolicies(served, options);
     const plans = new Map(planned.map(plan => [plan.qualified, plan]));
     const wanted = served.map(({ descriptor }) => ({
@@ -236,9 +256,28 @@ export async function findServedTableProtection(
         }
     }
     const tableOf = new Map(served.map(({ descriptor }) => [descriptor.slug, `${descriptor.schema}.${descriptor.table}`]));
+    // A table that opted out fails nothing: neither for itself nor for the
+    // tables reading through it. An implicit junction (no slug of its own)
+    // opted out when every table reading or writing through it did.
+    const usersOf = new Map<string, Set<string>>();
+    for (const [qualified, set] of owners) usersOf.set(qualified, new Set(set));
+    for (const step of viaSteps) {
+        const set = usersOf.get(step.through) ?? new Set<string>();
+        set.add(step.owner);
+        usersOf.set(step.through, set);
+    }
+    const isOptedOut = (table: UnprotectedServedTable): boolean => table.slug !== ""
+        ? optedOut.has(table.slug)
+        : [...(usersOf.get(table.qualified) ?? [])].every(slug => optedOut.has(slug)) && (usersOf.get(table.qualified)?.size ?? 0) > 0;
+    const failing = unprotected.filter(table => !isOptedOut(table));
+    const withheld = withViaOwners(failing, withJunctionOwners(failing, owners), viaSteps, tableOf);
     return {
-        unprotected: withViaOwners(unprotected, withJunctionOwners(unprotected, owners), viaSteps, tableOf),
-        narrowed: narrowed.filter(table => table.slug !== "")
+        // An owner that opted out is served even through a junction or a `via` that fails.
+        unprotected: withheld.filter(table => !optedOut.has(table.slug)),
+        narrowed: narrowed.filter(table => table.slug !== "" && !optedOut.has(table.slug)),
+        // What the rule would have withheld, for the boot to name.
+        servedUnprotected: withViaOwners(unprotected, withJunctionOwners(unprotected, owners), viaSteps, tableOf)
+            .filter(table => optedOut.has(table.slug))
     };
 }
 
@@ -377,6 +416,20 @@ export function withholdUnprotectedTables(
             table.remediationSql.split("\n").map(line => `      ${line}`).join("\n")
         );
     }
+}
+
+/**
+ * Say, in one line, which tables are served although the database does not
+ * protect them, because their declaration does not require it.
+ */
+export function warnServedUnprotectedTables(found: readonly UnprotectedServedTable[]): void {
+    if (found.length === 0) return;
+    const slugs = [...new Set(found.map(table => table.slug))];
+    logger.warn(
+        `🔓 [rls] Serving ${slugs.length} declared table(s) the database does not protect with row-level security as declared: ` +
+        `${slugs.join(", ")}. Their declaration says so (\`rlsRequired: false\`, or their database's ` +
+        "`rls: { required: false }`): who reads and writes their rows is the app's to enforce (hooks, scopes, who may sign in)."
+    );
 }
 
 /**

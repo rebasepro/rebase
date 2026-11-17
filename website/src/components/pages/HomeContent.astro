@@ -136,7 +136,15 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             >
                                 <span class="select-none text-surface-500">$</span>
                                 <span><span class="text-emerald-400">{INSTALL_RUNNER}</span> <span class="text-primary-light">{INSTALL_PACKAGE}</span> <span class="text-white">{INSTALL_VERB}</span></span>
-                                <span data-copy-label class="ml-2 rounded-md border border-white/10 bg-white/[0.06] px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.14em] text-surface-400">{t("copy.command")}</span>
+                                {/* Both words share one grid cell, so the chip is
+                                    always as wide as the longer of the two.
+                                    Without the invisible twin, "Copy" →
+                                    "Copied" widened the button and the row
+                                    wrapped it onto a second line mid-click. */}
+                                <span class="ml-2 grid rounded-md border border-white/10 bg-white/[0.06] px-2 py-0.5 text-center font-mono text-2xs uppercase tracking-[0.14em] text-surface-400">
+                                    <span data-copy-label class="col-start-1 row-start-1">{t("copy.command")}</span>
+                                    <span aria-hidden="true" class="invisible col-start-1 row-start-1">{t("copy.command.done")}</span>
+                                </span>
                             </button>
                         </div>
                     </div>

@@ -47,7 +47,7 @@ import { introspectTables } from "./schema/introspect-tables";
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
-import { findServedTableProtection, warnNarrowedTables, withholdUnprotectedTables } from "./security/served-table-protection";
+import { findServedTableProtection, warnNarrowedTables, warnServedUnprotectedTables, withholdUnprotectedTables } from "./security/served-table-protection";
 import { assertAppRoleRestricted, assertRecordedRequestRoles, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, ensureConnectionInheritsAdminRole, findExposedInternalTables, findOtherRoleMembers, findUngrantableTables, proveRoleSwitch, readRecordedRequestRoles, recordRequestRoles, revokeUserRoleSql, roleHoldsTableGrants, settleAdminSwitch, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type ManagedTable, type RawSqlRunner } from "./security/rls-enforcement";
 import { resolveRlsSettings, rlsConfigFromEnv, rlsHandoverNotes, type PostgresRlsConfig, type RlsSettings } from "./security/rls-settings";
 import { provisionTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
@@ -967,6 +967,7 @@ export async function openPostgresDriver(
         });
         withholdUnprotectedTables(target, protection.unprotected);
         warnNarrowedTables(protection.narrowed);
+        warnServedUnprotectedTables(protection.servedUnprotected);
     };
 
     // Create services

@@ -144,6 +144,7 @@ The pipeline from declaration to database is described in
 | `database` | A non-default Postgres database, declared in `backend/resources.ts`. See [Multiple sources](/docs/backend/multiple-sources/). |
 | `description` | What the table holds. Shown in OpenAPI and in the MCP tool descriptions. |
 | `defaultPolicies` | `false` generates only your rules, without the admin baseline policies. Refused with `rls: "admin-only"`. `true` keeps the baseline when the table's database switches it off for every table (`database({ rls: { defaultPolicies: false } })`). Left out, the database's setting decides. |
+| `rlsRequired` | `false` serves the table even when the database does not enforce its `rls` (row-level security off, declared policies missing), for a schema another tool owns and an app that enforces access itself. `true` requires it under a database that says `database({ rls: { required: false } })`. Left out, the database's setting decides, and a table the database does not protect is not served by a boot that provisions nothing. See [Another tool owns the schema](/docs/deployment/existing-database/#another-tool-owns-the-schema-and-the-app-enforces-access). |
 | `tenant` | Scope every row to a tenant. See [Tenancy](/docs/collections/tenancy/). |
 | `softDelete` | `true` or `{ field }`: a delete stamps a timestamp instead of removing the row. See [Soft delete](/docs/collections/soft-delete/). |
 | `history` | `true` records every write in the history table. See [Entity history](/docs/backend/history/). |

@@ -65,7 +65,7 @@ export const DEFAULT_SCHEMA_SPECIFIER = "@rebasepro/server/schema";
  */
 export const TABLE_KEY_ORDER = [
     "slug", "table", "schema", "database", "description", "columns", "relations", "rls", "defaultPolicies",
-    "tenant", "softDelete", "history", "search", "indexes", "hooks", "strictWrites", "metadata", "auth"
+    "rlsRequired", "tenant", "softDelete", "history", "search", "indexes", "hooks", "strictWrites", "metadata", "auth"
 ] as const;
 
 /**
@@ -656,6 +656,7 @@ function definitionDoc(def: AnyTableDef | AnyViewDef, state: TableState, options
     relations();
     entries.push(["rls", rlsDoc(table.rls, `${state.label}.rls`)]);
     put("defaultPolicies", table.defaultPolicies);
+    put("rlsRequired", table.rlsRequired);
     put("tenant", table.tenant);
     put("softDelete", table.softDelete);
     put("history", table.history);
@@ -719,6 +720,7 @@ function descriptorDoc(descriptor: TableDescriptor, state: TableState, options: 
     entries.push(["rls", rlsOfDescriptor(descriptor.rls, `${state.label}.rls`)]);
     if (!descriptor.rls.defaultPolicies && descriptor.rls.posture === "rules") put("defaultPolicies", false);
     else if (descriptor.rls.declaredDefaultPolicies) put("defaultPolicies", true);
+    if (descriptor.rls.required !== undefined) put("rlsRequired", descriptor.rls.required);
     put("tenant", descriptor.tenant);
     put("softDelete", descriptor.softDelete);
     put("history", descriptor.history);

@@ -13,10 +13,10 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { RebaseApiError, col, defineTable, rel } from "@rebasepro/types";
+import { RebaseApiError, col, database, defineTable, rel, resetDeclaredResources } from "@rebasepro/types";
 import { compileSchema } from "@rebasepro/common";
 
-import { findServedTableProtection, findUnprotectedServedTables, withheldTableMessage } from "../src/security/served-table-protection";
+import { findServedTableProtection, findUnprotectedServedTables, rlsRequiredFor, withheldTableMessage } from "../src/security/served-table-protection";
 import { planTablePolicies } from "../src/schema/generate-postgres-ddl-logic";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 
@@ -215,5 +215,55 @@ describe("a withheld table in the registry", () => {
         r.replaceWith(next);
         expect(r.getTable("open_notes")).toBeUndefined();
         expect([...r.withheld().keys()]).toEqual(["open_notes"]);
+    });
+});
+
+/**
+ * `rlsRequired: false` (or `database({ rls: { required: false } })`): a table
+ * whose access the app enforces — its schema owned by Alembic, Prisma, a DBA —
+ * is served whatever the catalogue says, and named, not withheld. A table that
+ * reads through it is not withheld for it either.
+ */
+describe("rlsRequired: false", () => {
+    const appOpen = defineTable("open_notes", { columns: { id: col.serial().primaryKey() }, rls: "admin-only", rlsRequired: false });
+    const appBare = defineTable("bare", { columns: { id: col.serial().primaryKey() }, rls: [{ operation: "select", access: "public" }], rlsRequired: false });
+    const appTagged = defineTable("tagged", {
+        columns: { id: col.serial().primaryKey() },
+        relations: { labels: rel.manyToMany(() => labels) },
+        rls: [{ operation: "select", access: "public" }],
+        rlsRequired: false
+    });
+    const OPTED = compileSchema([stray, appOpen, appBare, full, appTagged, labels, narrow]);
+
+    it("compiles onto the descriptor, and only when written", () => {
+        expect(OPTED.find(table => table.descriptor.slug === "open_notes")?.descriptor.rls.required).toBe(false);
+        expect(OPTED.find(table => table.descriptor.slug === "complete")?.descriptor.rls.required).toBeUndefined();
+    });
+
+    it("serves the opted-out tables, names them, and still withholds the rest", async () => {
+        const { unprotected, servedUnprotected } = await findServedTableProtection(run, OPTED);
+        expect(unprotected.map(table => table.slug).sort()).toEqual(["locked"]);
+        expect([...new Set(servedUnprotected.map(table => table.slug))].sort()).toEqual(["bare", "open_notes", "tagged"]);
+    });
+
+    it("a table the database does protect is unaffected by the switch", async () => {
+        const { unprotected, servedUnprotected } = await findServedTableProtection(run, OPTED);
+        expect([...unprotected, ...servedUnprotected].map(table => table.slug)).not.toContain("complete");
+    });
+
+    it("a database's `rls: { required: false }` opts its tables out; a table's `rlsRequired: true` opts back in", () => {
+        resetDeclaredResources();
+        try {
+            database({ rls: { required: false } });
+            const [plain, strict] = compileSchema([
+                defineTable("plain", { columns: { id: col.serial().primaryKey() }, rls: "admin-only" }),
+                defineTable("strict", { columns: { id: col.serial().primaryKey() }, rls: "admin-only", rlsRequired: true })
+            ]);
+            expect(rlsRequiredFor(plain.descriptor)).toBe(false);
+            expect(rlsRequiredFor(strict.descriptor)).toBe(true);
+        } finally {
+            resetDeclaredResources();
+        }
+        expect(rlsRequiredFor(COMPILED[0].descriptor)).toBe(true);
     });
 });

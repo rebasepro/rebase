@@ -141,6 +141,14 @@ export interface DatabaseRlsOptions {
     policyTarget?: "public" | "requestRole";
     adminPolicies?: "adminRole" | "public";
     defaultPolicies?: boolean;
+    /**
+     * `false` serves this database's declared tables even when it does not
+     * enforce their `rls` (row-level security off, declared policies
+     * missing): for a database whose schema something else owns and whose
+     * access the app enforces. A table's own `rlsRequired` wins. Default
+     * `true`: such a table is withheld (503 TABLE_WITHHELD).
+     */
+    required?: boolean;
     inheritRoles?: string[];
     identity?: "rebase" | "supabase";
     sharedRole?: "warn" | "refuse" | "ignore";

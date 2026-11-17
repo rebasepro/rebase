@@ -107,7 +107,12 @@ class ConversionProblem extends Error {
  * A descriptor's row-level security as a definition's `rls` (and
  * `defaultPolicies`), or a problem when no definition can say it.
  */
-function rlsOf(descriptor: TableDescriptor, rls: RlsDescriptor): { rls: RlsPosture; defaultPolicies?: boolean } {
+function rlsOf(descriptor: TableDescriptor, rls: RlsDescriptor): { rls: RlsPosture; defaultPolicies?: boolean; rlsRequired?: boolean } {
+    const posture = rlsPostureOf(descriptor, rls);
+    return rls.required === undefined ? posture : { ...posture, rlsRequired: rls.required };
+}
+
+function rlsPostureOf(descriptor: TableDescriptor, rls: RlsDescriptor): { rls: RlsPosture; defaultPolicies?: boolean } {
     const rules = rls.rules;
     const declared = rls.declaredDefaultPolicies ? { defaultPolicies: true } : {};
     if (rls.posture === "admin-only") return { rls: "admin-only", ...declared };

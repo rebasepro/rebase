@@ -96,6 +96,7 @@ export interface TableOptionValues {
     indexes: readonly TableIndex[];
     strictWrites: false;
     defaultPolicies: boolean;
+    rlsRequired: boolean;
     metadata: Record<string, unknown>;
 }
 
@@ -108,7 +109,7 @@ export type TableOptionKey = keyof TableOptionValues;
 
 /** The keys of {@link TableOptionValues}, in the order a table prints them. */
 export const TABLE_OPTION_KEYS: readonly TableOptionKey[] = [
-    "description", "defaultPolicies", "tenant", "softDelete", "history", "search", "indexes", "strictWrites", "metadata"
+    "description", "defaultPolicies", "rlsRequired", "tenant", "softDelete", "history", "search", "indexes", "strictWrites", "metadata"
 ];
 
 /**
@@ -483,6 +484,7 @@ function optionProblems(option: TableOptionKey, value: unknown, where: string): 
         case "history":
             return typeof value === "boolean" ? [] : [`${where} must be a boolean.`];
         case "defaultPolicies":
+        case "rlsRequired":
             return typeof value === "boolean" ? [] : [`${where} must be a boolean (or \`null\` to remove it).`];
         case "strictWrites":
             return value === false ? [] : [`${where} can only be \`false\` (or \`null\` to remove it).`];

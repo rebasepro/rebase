@@ -84,13 +84,13 @@ describe("a declared table the database does not protect is withheld (E2E)", () 
     const editor = { uid: "", token: "" };
     const originalProvision = process.env.REBASE_PROVISION;
 
-    async function boot(provisionSchema: boolean) {
+    async function boot(provisionSchema: boolean, tables = TABLES) {
         const app = new Hono<HonoEnv>();
         const server = createServer();
         const connection = createPostgresDatabaseConnection(container.connectionString);
         const backend = await initializeRebaseBackend({
             app, server,
-            tables: TABLES,
+            tables,
             provisionSchema,
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString }),
             auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY }
@@ -203,6 +203,32 @@ describe("a declared table the database does not protect is withheld (E2E)", () 
             if (originalProvision === undefined) delete process.env.REBASE_PROVISION;
             else process.env.REBASE_PROVISION = originalProvision;
         }
+    });
+
+    it("rlsRequired: false serves a table the database does not protect — the app enforces its access — and withholds the rest", async () => {
+        // A schema Alembic, Prisma or a DBA owns, and an app that decides access itself.
+        const appNotes = defineTable("notes", {
+            columns: { id: col.serial().primaryKey(), body: col.text() },
+            rls: "admin-only",
+            rlsRequired: false
+        });
+        const appFine = defineTable("fine", {
+            columns: { id: col.serial().primaryKey(), body: col.text() },
+            relations: { note: rel.belongsTo(() => appNotes) },
+            rls: [{ operation: "select", access: "public" }]
+        });
+        const fourth = await boot(false, [appNotes, shared, appFine, gated, labels, tagged]);
+        try {
+            const served = await fourth.get("/notes");
+            expect(served.status, served.text).toBe(200);
+            expect(served.text).toContain(SECRET);
+            expectWithheld(await fourth.get("/shared"), "shared");
+        } finally {
+            await fourth.stop();
+        }
+        // Serving it changed nothing in the database.
+        const { rows } = await admin.query<{ relrowsecurity: boolean }>("SELECT relrowsecurity FROM pg_class WHERE relname = 'notes'");
+        expect(rows[0]?.relrowsecurity).toBe(false);
     });
 
     it("a live refresh withholds a table it starts serving that has RLS off, and keeps it withheld", async () => {
