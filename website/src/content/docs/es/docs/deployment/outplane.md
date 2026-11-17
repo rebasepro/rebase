@@ -1,5 +1,5 @@
 ---
-sourceHash: 06bf2de209273552
+sourceHash: c2b849bb2b75d3c4
 title: Desplegar Rebase en Out Plane
 description: Despliega un proyecto de rebase init en Out Plane — una app creada a partir de tu repositorio, PostgreSQL administrado de Out Plane y subida de archivos en un bucket de Out Plane.
 sidebar_label: Out Plane

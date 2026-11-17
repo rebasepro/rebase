@@ -1,5 +1,5 @@
 ---
-sourceHash: 06bf2de209273552
+sourceHash: c2b849bb2b75d3c4
 title: Implantando o Rebase no Out Plane
 description: Faça o deploy de um projeto rebase init no Out Plane — um app compilado a partir do seu repositório, PostgreSQL gerenciado do Out Plane e uploads de arquivos em um bucket do Out Plane.
 sidebar_label: Out Plane
