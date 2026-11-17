@@ -14,6 +14,24 @@ import { getCollection } from "astro:content";
  * an indexable page that really is in that language.
  */
 
+/**
+ * Whether real translations of the docs are offered to search engines.
+ *
+ * Off since 2026-11-17. Search Console showed Google indexing 101 of
+ * rebase.pro's ~1,200 sitemap URLs and the count falling (153 on 11/08), with
+ * 894 more "Discovered - currently not indexed" that it would not even fetch.
+ * 715 of those URLs were translations of the 252 English docs pages. On a
+ * domain with no reputation yet, every URL competes for the same small crawl
+ * and trust allowance, and five copies of each page spent it on the copies.
+ *
+ * So every translated docs page is `noindex, follow`, which also takes it out
+ * of the sitemap (see `astro.config.mjs`), and no docs page offers a language
+ * alternate, because hreflang may only point at an indexable page. The pages
+ * stay built and linked from the language picker for readers. Flip this back
+ * once the English docs are indexed.
+ */
+const TRANSLATIONS_INDEXED = false;
+
 let docIds: Promise<Set<string>> | undefined;
 
 /** Every docs entry id, which is also the path it is served at. */
@@ -43,8 +61,15 @@ export const onRequest = defineRouteMiddleware(async (context) => {
         return;
     }
 
+    if (!TRANSLATIONS_INDEXED && route.locale !== undefined) {
+        route.head = route.head.filter(({ attrs }) => !isAlternate(attrs));
+        route.head.push({ tag: "meta", attrs: { name: "robots", content: "noindex, follow" } });
+        return;
+    }
+
     route.head = route.head.filter(({ attrs }) => {
         if (!isAlternate(attrs)) return true;
+        if (!TRANSLATIONS_INDEXED) return false;
         const path = new URL(String(attrs?.href)).pathname.replace(/^\/|\/$/g, "");
         return existing.has(path);
     });
