@@ -186,6 +186,7 @@ TypeScript that the frontend can `import type` from.
 | `search` | Ranked full-text search. See [Search](#search). |
 | `indexes` | Indexes, each with the query it serves. See [Indexes](#indexes). |
 | `hooks` | Server-side lifecycle hooks. See [Table hooks](#table-hooks). |
+| `rlsRequired` | `false` serves the table even when the database does not protect it (RLS off, its policies missing) and the boot provisions nothing — for a schema another tool owns, with access enforced by the app. Without it such a table answers `503 TABLE_WITHHELD`. `true` keeps it required under a database that says `rls: { required: false }`. Changes nothing in the database. |
 | `strictWrites` | `false` accepts a write naming a column the table does not declare (one filled by a trigger, say). A 400 otherwise. |
 | `metadata` | Any data you want served with the table's descriptor. |
 

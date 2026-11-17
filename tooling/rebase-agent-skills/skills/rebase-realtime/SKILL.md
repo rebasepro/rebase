@@ -208,6 +208,14 @@ Every update a subscriber receives is a **debounced refetch under the subscriber
 
 There used to be an instant row patch (`collection_patch`) ahead of the refetch. Nothing sends it any more: it carried the row as the *writer* had read it, which a subscriber the row's RLS hides could see. The type is still declared; do not wait for the frame.
 
+### What a write costs
+
+A write costs **one read per distinct question asked by a distinct principal** on the table it touched, not one per socket: subscriptions with the same query held by the same user share a refetch, and different users never share one (that is what keeps a frame from carrying a row its reader may not see).
+
+- **Filter each user's list on a column with `==` or `in`.** Such a list is asked to refetch only when the changed row matched its filter before the write or matches it after, so `listen({ where: { owner: ["==", me] } })` held by 5,000 users costs one read per write, not 5,000. It decides only *who* refetches; every list still reads under its own subscriber's scope.
+- **A list narrowed only by RLS** (the same unfiltered `listen()` watched by a thousand signed-in users) is a thousand reads on every write to it. Put the owner filter in the query too.
+- The pre-filter judges `==` / `in` on text, varchar, uuid, enum, integer and boolean columns. Anything it cannot judge asks every list, as before: other operators, `include`, a table with an `afterRead` hook or a field-level hook, a delete through the API, and an external `UPDATE` / `DELETE` read from the WAL on a table without `REPLICA IDENTITY FULL` (the trigger capture sends only the key, so it rules out only lists filtered on the key).
+
 ## Subscription Deduplication and Caching
 
 The client SDK automatically deduplicates subscriptions:

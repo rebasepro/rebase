@@ -126,6 +126,16 @@ docker compose up -d db
 > answers with `type "vector" does not exist` — a boot failure whose cause is an
 > image.
 
+> **A managed database (Neon, Supabase, RDS, Cloud SQL…) that answers
+> `self-signed certificate`.** Rebase's Node driver reads `sslmode=require` as
+> "verify the certificate", where `psql` reads it as "encrypt only", so a URL
+> `psql` accepts stops boot and `rebase db push`. Use `sslmode=no-verify`
+> (encrypted, unverified; Rebase passes it to Atlas, `pg_dump` and `psql` as
+> `require`), or `sslmode=verify-full&sslrootcert=/path/to/ca.pem` with the
+> provider's CA. `uselibpqcompat=true&sslmode=require` also works; Rebase drops
+> `uselibpqcompat` before handing the URL to libpq tools. Changing `.env` is the
+> user's call: propose the URL, do not write it unasked.
+
 `rebase dev --docker` uses that container instead of the managed database;
 `rebase dev --no-db` starts neither and expects you to set `DATABASE_URL`.
 
@@ -154,7 +164,16 @@ From the project root:
 pnpm install
 ```
 
-That installs the workspace: `frontend`, `backend` and `config`.
+That installs the workspace: `frontend` and `backend`.
+
+**On Windows**, `@ariga/atlas` has no Windows build, so the scaffold declares
+it under `optionalDependencies` and the install skips it. Everything runs
+except `rebase db push`, `db generate` and `db migrate`, which need Atlas's own
+`atlas.exe` on `PATH` (the CLI and `rebase doctor` say so, and link to the
+[Windows guide](https://rebase.pro/docs/getting-started/windows/)). A project
+scaffolded before 0.33 declares it under `dependencies`, and `pnpm install`
+fails with `ELIFECYCLE`: move it to `optionalDependencies` in
+`backend/package.json`, then install again. WSL2 avoids all of it.
 
 ## 6. Start the development server
 

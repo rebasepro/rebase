@@ -526,9 +526,22 @@ rebase cloud domains list
 rebase cloud domains add app.example.com     # prints the DNS records to create
 rebase cloud domains verify app.example.com  # once DNS has propagated
 rebase cloud domains remove app.example.com
+rebase cloud domains primary example.com          # the canonical one links are built from
+rebase cloud domains redirect www.example.com     # answer it with a 308 to the primary
+rebase cloud domains redirect www.example.com --off
 ```
 
 TLS is issued automatically once verification passes.
+
+Every verified domain serves the project as itself, and two domains are two
+origins: Google sign-in (`origin_mismatch`), cookies and passkeys each work on
+one and fail on the other. When a project answers on both an apex and `www.`,
+make one `primary` and `redirect` the other — a permanent redirect (308) that
+keeps the path and the query. It is per domain and off by default, so an `api.`
+host beside the site keeps serving; it takes effect while the domain is
+verified and another one is primary, and never applies to a domain an app is
+served on. Like `domains add`, it changes the hosted platform: only when the
+user asked.
 
 A deploy also registers every hostname `rebase.json` gives a static app as its
 `path`, and verifies it when the records are already there — see
@@ -687,7 +700,7 @@ out.
 | `rebase cloud start` / `stop` / `restart` / `status` / `metrics` / `debug` | Operate; `metrics --runtime` is requests, errors and latency per surface, `--history` over time |
 | `rebase cloud cron` | The deployed app's cron jobs and their runs. Read-only |
 | `rebase cloud env list` / `set` / `unset` / `reset` / `reveal` / `pull` | Configuration |
-| `rebase cloud domains list` / `add` / `verify` / `remove` / `primary <domain>` | Custom domains; `primary` makes a verified one canonical |
+| `rebase cloud domains list` / `add` / `verify` / `remove` / `primary <domain>` / `redirect <domain> [--off]` | Custom domains; `primary` makes a verified one canonical, `redirect` answers another with a 308 to it |
 | `rebase cloud extensions list` / `enable` / `disable` | Postgres extensions |
 | `rebase cloud settings show` / `set` | Name, branch, repo, subdomain, `--studio on\|off` (Studio access, which `--project` commands and `cloud guests` go through) |
 | `rebase cloud compute` / `compute set` | What it reserves, and what it costs |

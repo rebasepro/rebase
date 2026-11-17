@@ -401,6 +401,16 @@ names the SQL that protects it (or `rebase db push`); the other tables are
 served. A junction the database does not protect withholds the tables whose
 relations use it.
 
+When another tool owns the schema (Alembic, Prisma, a DBA) and the app
+enforces access itself, say so: `database({ rls: { required: false } })` in
+`backend/resources.ts` for every table of that database, or
+`rlsRequired: false` on one table (`rlsRequired: true` keeps a table required
+under such a database). Those tables are served whatever the catalogue says and
+the boot names them in one warning. Postgres then enforces none of the declared
+`rls` — `"admin-only"` does not stop a signed-in non-admin — so sign-in, roles
+and hooks carry it. **Never add it to make a `TABLE_WITHHELD` go away**: the
+fix for an unprotected table Rebase owns is `rebase db push`.
+
 ### Rule forms
 
 A rule is one of these. Mixing two in one rule is a type error **and** a
