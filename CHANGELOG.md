@@ -14,6 +14,10 @@
 
 - **A table whose access the app enforces can be served without row-level security.** Since 0.31 a boot that provisions nothing withholds a declared table the database does not protect (`503 TABLE_WITHHELD`), which left a database another tool owns (Alembic, Prisma, a DBA) with nothing served and no way to say so. `defineTable(…, { rlsRequired: false })` serves that table anyway, and `database({ rls: { required: false } })` does it for every table of a database, a table's `rlsRequired: true` keeping it required. The boot names the tables it serves this way; a provisioning boot still enables row-level security and writes their policies. See [Another tool owns the schema](https://rebase.pro/docs/deployment/existing-database/#another-tool-owns-the-schema-and-the-app-enforces-access).
 
+### Fixed
+
+- **The admin panel lists tables in the order the project declares, not alphabetically.** The server collects tables from the `backend/schema/index` module, and a module lists its exports sorted by name, so after the move to `backend/schema` the home page and drawer listed tables, and their groups, by export name. A group landed wherever its first table fell in the alphabet ("System" came second). The panel now follows the order of `<RebaseCMS tableCustomizations>`, the array the collections-to-tables codemod writes in the panel's order, with tables that have no customization after them. `navigationGroupMappings` still takes precedence when given. `GET /api/schema/tables` still serves tables sorted by name.
+
 ## [0.33.0] - 2026-11-16
 
 ### Added
