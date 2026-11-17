@@ -130,7 +130,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 data-track-copy="hero-command"
                                 data-command={INSTALL_COMMAND}
                                 data-copy-done-label={t("copy.command.done")}
-                                class="copy-btn group inline-flex items-center gap-3 rounded-lg border border-white/12 bg-white/[0.03] px-5 min-h-(--control-large) font-mono text-sm text-surface-200 transition-colors hover:border-white/25 hover:bg-white/[0.06] data-copied:border-emerald-400/60 data-copied:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                class="copy-btn group inline-flex items-center gap-3 rounded-lg border border-white/12 bg-white/[0.03] px-4 min-h-(--control-large) font-mono text-sm text-surface-200 transition-colors hover:border-white/25 hover:bg-white/[0.06] data-copied:border-emerald-400/60 data-copied:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                                 aria-label={`Copy "${INSTALL_COMMAND}" to the clipboard`}
                                 title="Copy to clipboard"
                             >
@@ -140,8 +140,12 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                     always as wide as the longer of the two.
                                     Without the invisible twin, "Copy" →
                                     "Copied" widened the button and the row
-                                    wrapped it onto a second line mid-click. */}
-                                <span class="ml-2 grid rounded-md border border-white/10 bg-white/[0.06] px-2 py-0.5 text-center font-mono text-2xs uppercase tracking-[0.14em] text-surface-400">
+                                    wrapped it onto a second line mid-click.
+                                    The reserved width is paid for by the
+                                    tighter padding here and on the button:
+                                    at ~1400px the row had 3px to spare, so a
+                                    button any wider sits on line two for good. */}
+                                <span class="grid rounded-md border border-white/10 bg-white/[0.06] px-1.5 py-0.5 text-center font-mono text-2xs uppercase tracking-[0.14em] text-surface-400">
                                     <span data-copy-label class="col-start-1 row-start-1">{t("copy.command")}</span>
                                     <span aria-hidden="true" class="invisible col-start-1 row-start-1">{t("copy.command.done")}</span>
                                 </span>
