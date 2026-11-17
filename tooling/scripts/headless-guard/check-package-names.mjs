@@ -232,6 +232,18 @@ function trackedFiles() {
 }
 
 const hits = [];
+/**
+ * The line without the URLs of other people's sites. `mcp-server` in
+ * `https://www.sanity.io/docs/ai/mcp-server` is Sanity's page, not the package
+ * this repo renamed: a blog post citing its sources failed this check four
+ * times. A URL into Rebase's own repository, site or npm scope is kept: a link
+ * to `packages/mcp-server/` there is the stale reference this check exists for.
+ */
+function withoutForeignUrls(line) {
+    return line.replace(/https?:\/\/[^\s)\]>"'`]+/g, url =>
+        /^https?:\/\/(?:[\w-]+\.)*(?:rebase\.pro|rebase\.website)(?:[/:?#]|$)|^https?:\/\/github\.com\/rebasepro\/|^https?:\/\/(?:www\.)?npmjs\.com\/package\/@rebasepro\//.test(url) ? url : "");
+}
+
 for (const rel of trackedFiles()) {
     const file = path.join(repoRoot, rel);
     let text;
@@ -250,7 +262,7 @@ for (const rel of trackedFiles()) {
             // four stale names, and reporting one at a time meant each fix
             // revealed the next. Nothing here is expensive enough to ration.
             lines.forEach((l, i) => {
-                if (pattern.test(l)) hits.push({ file: rel, line: i + 1, pattern: old, replacement });
+                if (pattern.test(withoutForeignUrls(l))) hits.push({ file: rel, line: i + 1, pattern: old, replacement });
             });
         }
     }
