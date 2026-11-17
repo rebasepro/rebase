@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { createServer } from "node:http";
 import {
     col,
@@ -13,6 +13,8 @@ import type { HonoEnv } from "../src/api/types";
 import { initializeRebaseBackend } from "../src/init";
 import { createCustomAuthAdapter } from "../src/auth/custom-auth-adapter";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { createApiKeyRoutes, createPersonalKeyRoutes } from "../src/auth/api-keys/api-key-routes";
+import { fakeApiKeyStore } from "./helpers/server-a-g1-fakes";
 
 /**
  * A backend that authenticates through its own `AuthAdapter` — no `jwtSecret`,
@@ -95,7 +97,7 @@ describe("a backend with its own auth adapter", () => {
 
     it("answers 401 — never 500 — to a caller the adapter does not recognise, and to nobody", async () => {
         const app = await boot();
-        for (const path of ["/api/schema/tables", "/api/docs", "/api/admin/ui-config"]) {
+        for (const path of ["/api/schema/tables", "/api/docs", "/api/admin/ui-config", "/api/auth/scopes"]) {
             const unknown = await app.request(path, bearer("not-an-account"));
             expect([path, unknown.status]).toEqual([path, 401]);
             const nobody = await app.request(path);
@@ -126,4 +128,38 @@ describe("a backend with its own auth adapter", () => {
         const app = await boot();
         expect((await app.request("/api/admin/ui-config", bearer("adapter-member"))).status).toBe(200);
     });
+
+    it("answers GET /api/auth/scopes with the scopes the adapter's roles hold — it answered 500, \"JWT secret not configured\"", async () => {
+        const app = await boot();
+        const member = await app.request("/api/auth/scopes", bearer("adapter-member"));
+        expect(member.status).toBe(200);
+        const memberBody = await member.json() as { scopes: unknown[]; held: string[] };
+        expect(memberBody.scopes.length).toBeGreaterThan(0);
+
+        const admin = await app.request("/api/auth/scopes", bearer("adapter-admin"));
+        expect(admin.status).toBe(200);
+        const adminBody = await admin.json() as { held: string[] };
+        expect(adminBody.held.length).toBeGreaterThan(memberBody.held.length);
+    });
 });
+
+/**
+ * The key routes sign their caller in through `require` when the backend
+ * passes one (its adapter's resolution), and through the framework's token
+ * check only when it does not.
+ */
+describe("the key routes' caller check", () => {
+    const store = fakeApiKeyStore();
+    const teapot: MiddlewareHandler<HonoEnv> = async (c) => c.json({ asked: "require" }, 418);
+
+    it("project keys and personal keys answer through `require`", async () => {
+        for (const router of [
+            createApiKeyRoutes({ store, require: teapot }),
+            createPersonalKeyRoutes({ store, enabled: true, require: teapot })
+        ]) {
+            const response = await router.request("/", bearer("adapter-admin"));
+            expect(response.status).toBe(418);
+        }
+    });
+});
+

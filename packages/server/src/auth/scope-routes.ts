@@ -22,6 +22,13 @@ export interface ScopeRouteOptions {
     serviceKey?: string;
     resolveRoles?: (uid: string) => Promise<string[]>;
     revocationRepo?: AccessJudgeRepository;
+    /**
+     * How a caller is signed in, in place of the framework's own token check:
+     * the auth adapter's resolution (`createAdapterCallerResolution`), so a
+     * backend with its own adapter is answered here as on `/data`. Unset, the
+     * service key, then the framework's JWT, revocation and live roles.
+     */
+    require?: MiddlewareHandler<HonoEnv>;
     /** Authenticates `rk_` keys first, so a key can read what it holds. */
     apiKeyPreAuth?: MiddlewareHandler<HonoEnv>;
 }
@@ -30,7 +37,7 @@ export function createScopeRoutes(options: ScopeRouteOptions): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
     if (options.apiKeyPreAuth) router.use("/*", options.apiKeyPreAuth);
-    router.use("/*", createRequireAuth({
+    router.use("/*", options.require ?? createRequireAuth({
         serviceKey: options.serviceKey,
         resolveRoles: options.resolveRoles,
         revocationRepo: options.revocationRepo

@@ -1344,6 +1344,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         });
     }
 
+    // How the auth surfaces below sign a caller in when the app brought its
+    // own auth adapter (`config.auth`): through it, as `/data` does. The
+    // framework's JWT check answered such a backend "JWT secret not
+    // configured" (500). The built-in adapter is created further down; until
+    // then `authAdapter` is only ever the app's, and the framework's check is
+    // the built-in judgement these routes always made.
+    const requireCaller = authAdapter ? { require: createAdapterCallerResolution(authAdapter).require } : {};
+
     const apiKeyRouter = apiKeyStore && surfaces.admin
         ? createApiKeyRoutes({
             store: apiKeyStore,
@@ -1351,7 +1359,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             targets: keyTargets,
             // A key minted here may outlive the session that minted it, so this
             // is the single most valuable thing a stale token can reach.
-            ...adminGateIdentity
+            ...adminGateIdentity,
+            ...requireCaller
         })
         : undefined;
 
@@ -1366,13 +1375,15 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             enabled: personalKeysEnabled,
             serviceKey: internalServiceKey,
             targets: keyTargets,
-            ...adminGateIdentity
+            ...adminGateIdentity,
+            ...requireCaller
         }));
     }
     const scopeRouter = createScopeRoutes({
         serviceKey: internalServiceKey,
         apiKeyPreAuth,
-        ...adminGateIdentity
+        ...adminGateIdentity,
+        ...requireCaller
     });
 
     // One rate-limit store shared by the data, functions and storage limiters:

@@ -54,6 +54,13 @@ export interface ApiKeyRouteOptions {
      * backend answering the request.
      */
     accessModel?: () => AccessModel;
+    /**
+     * How a caller is signed in, in place of the framework's own token check:
+     * the auth adapter's resolution (`createAdapterCallerResolution`), so a
+     * backend with its own adapter is answered here as on `/data`. Unset, the
+     * service key, then the framework's JWT, revocation and live roles.
+     */
+    require?: MiddlewareHandler<HonoEnv>;
 }
 
 /**
@@ -118,12 +125,13 @@ async function readBody(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): Promise<R
  */
 export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
     const { store, serviceKey, resolveRoles, revocationRepo, targets } = options;
+    const requireCaller = options.require ?? createRequireAuth({ serviceKey, resolveRoles, revocationRepo });
     const model = (c: Context<HonoEnv>): AccessModel => options.accessModel?.() ?? accessOf(c).model;
     const router = new Hono<HonoEnv>();
 
     router.onError(errorHandler);
 
-    router.use("/*", createRequireAuth({ serviceKey, resolveRoles, revocationRepo }));
+    router.use("/*", requireCaller);
     // Before the scope check, so a key gets the reason it was refused rather
     // than a missing scope that implies a wider key would work.
     router.use("/*", rejectApiKeyAuth);
@@ -228,6 +236,8 @@ export interface PersonalKeyRouteOptions {
     revocationRepo?: import("../token-revocation").AccessJudgeRepository;
     targets?: KeyTargets;
     accessModel?: () => AccessModel;
+    /** See {@link ApiKeyRouteOptions.require}. */
+    require?: MiddlewareHandler<HonoEnv>;
 }
 
 /**
@@ -239,6 +249,7 @@ export interface PersonalKeyRouteOptions {
  */
 export function createPersonalKeyRoutes(options: PersonalKeyRouteOptions): Hono<HonoEnv> {
     const { store, enabled, serviceKey, resolveRoles, revocationRepo, targets } = options;
+    const requireCaller = options.require ?? createRequireAuth({ serviceKey, resolveRoles, revocationRepo });
     const model = (c: Context<HonoEnv>): AccessModel => options.accessModel?.() ?? accessOf(c).model;
     const router = new Hono<HonoEnv>();
 
@@ -255,7 +266,7 @@ export function createPersonalKeyRoutes(options: PersonalKeyRouteOptions): Hono<
         return router;
     }
 
-    router.use("/*", createRequireAuth({ serviceKey, resolveRoles, revocationRepo }));
+    router.use("/*", requireCaller);
     router.use("/*", rejectApiKeyAuth);
     router.use("/*", async (c, next) => {
         const me = caller(c);
