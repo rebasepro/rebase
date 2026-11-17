@@ -1,5 +1,5 @@
 ---
-sourceHash: 5bab946153902c64
+sourceHash: 61a4474d68248a58
 title: Executando em um banco de dados existente ou compartilhado
 sidebar_label: Banco de dados existente ou compartilhado
 description: Execute o Rebase em um banco de dados PostgreSQL que ele não possui — um cluster compartilhado com outros aplicativos, um segundo projeto Rebase, Supabase ou um banco de dados bloqueado por um DBA — com as configurações de rls, rebase doctor --database e rebase db request-role migrate.
@@ -217,7 +217,7 @@ ou para uma tabela:
 
 ```ts
 export const invoices = defineTable("invoices", {
-    columns: { /* … */ },
+    columns: { id: col.uuid().primaryKey().defaultRandom(), total: col.numeric() },
     rls: "admin-only",
     rlsRequired: false
 });

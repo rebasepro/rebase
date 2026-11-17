@@ -215,7 +215,7 @@ or for one table:
 
 ```ts
 export const invoices = defineTable("invoices", {
-    columns: { /* … */ },
+    columns: { id: col.uuid().primaryKey().defaultRandom(), total: col.numeric() },
     rls: "admin-only",
     rlsRequired: false
 });

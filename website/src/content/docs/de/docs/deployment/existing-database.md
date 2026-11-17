@@ -1,5 +1,5 @@
 ---
-sourceHash: 5bab946153902c64
+sourceHash: 61a4474d68248a58
 title: Ausführen auf einer bestehenden oder gemeinsam genutzten Datenbank
 sidebar_label: Bestehende oder geteilte Datenbank
 description: Führen Sie Rebase auf einer PostgreSQL-Datenbank aus, die es nicht selbst besitzt – einem mit anderen Apps geteilten Cluster, einem zweiten Rebase-Projekt, Supabase oder einer von einem DBA gesperrten Datenbank – mit den rls-Einstellungen, rebase doctor --database und rebase db request-role migrate.
@@ -209,7 +209,7 @@ oder für eine einzelne Tabelle:
 
 ```ts
 export const invoices = defineTable("invoices", {
-    columns: { /* … */ },
+    columns: { id: col.uuid().primaryKey().defaultRandom(), total: col.numeric() },
     rls: "admin-only",
     rlsRequired: false
 });

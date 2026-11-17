@@ -1,5 +1,5 @@
 ---
-sourceHash: 5bab946153902c64
+sourceHash: 61a4474d68248a58
 title: Ejecución en una base de datos existente o compartida
 sidebar_label: Base de datos existente o compartida
 description: Ejecuta Rebase en una base de datos PostgreSQL de la que no es propietario (un clúster compartido con otras aplicaciones, un segundo proyecto de Rebase, Supabase o una base de datos bloqueada por un DBA) con las configuraciones de rls, rebase doctor --database y rebase db request-role migrate.
@@ -228,7 +228,7 @@ o para una sola tabla:
 
 ```ts
 export const invoices = defineTable("invoices", {
-    columns: { /* … */ },
+    columns: { id: col.uuid().primaryKey().defaultRandom(), total: col.numeric() },
     rls: "admin-only",
     rlsRequired: false
 });
