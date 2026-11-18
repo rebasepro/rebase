@@ -163,7 +163,7 @@ import { CASE_STUDIES as cases } from "../data/case-studies";
                             {c.logo && (
                                 <img src={c.logo} alt={c.logoIsMark ? "" : t(`showcase.${c.key}.title`)}
                                      aria-hidden={c.logoIsMark ? "true" : undefined}
-                                     class={`${c.logoClass} w-auto`} loading="lazy"/>
+                                     class={`logo-ink ${c.logoClass} w-auto`} loading="lazy"/>
                             )}
                             {(!c.logo || c.logoIsMark) && (
                                 <span class="text-2xl font-semibold text-tone-max tracking-tight">

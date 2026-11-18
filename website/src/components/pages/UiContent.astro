@@ -69,7 +69,9 @@ import HeroBackdrop from "../HeroBackdrop.astro";
         <p class="text-tone-400 text-sm" set:html={t("ui.06")}></p>
       </div>
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
-        <div class="dark rounded-lg border border-tone-800 bg-tone-900" data-theme="dark">
+        <!-- Follows the page theme. Forced dark, the kit's chips (which pick
+             their ink in JS from <html>) drew light-mode ink on the dark panel. -->
+        <div class="rounded-lg border border-tone-800 bg-surface-frame">
           <UIReferenceView client:only="react" />
         </div>
       </div>

@@ -1888,6 +1888,25 @@ html.banner-dismissed-instant #manifesto-banner {
 
 /* The theme switch shows the mode a click goes TO. */
 .theme-toggle .theme-icon-moon { display: none; }
+/* Logos on a LIGHT page. The wall mixes white artwork (drawn for the dark site)
+   with dark artwork; on the light ground the white marks vanished. Every logo
+   becomes an even dark silhouette, the way the dark site shows them all as one
+   grey. `.logo-ink` marks a third-party logo; every file has an alpha channel,
+   so none turns into a black box. Dark regions keep the artwork as drawn. */
+[data-theme="light"] .logo-ink:not(:is(.island-dark, .ground-chroma) *) {
+    filter: grayscale(1) brightness(0);
+}
+
+/* Shadows on a LIGHT page. The frames' arbitrary shadows were tuned for a near-
+   black page (black at 45-80%, 50-120px blur), which on the light ground read as
+   a dark smear under every demo. In light mode each of them is one soft frame
+   shadow instead. The selector matches the arbitrary black shadows by their
+   class text, so a new one written the same way is covered too. */
+[data-theme="light"] :is([class*="shadow-[0_"][class*="rgba(0,0,0"], [class*="shadow-black/"]) {
+    --tw-shadow-color: rgb(15 17 20 / 0.12);
+    box-shadow: 0 1px 2px rgb(15 17 20 / 0.06), 0 16px 40px -16px rgb(15 17 20 / 0.22);
+}
+
 [data-theme="light"] .theme-toggle .theme-icon-sun { display: none; }
 [data-theme="light"] .theme-toggle .theme-icon-moon { display: block; }
 

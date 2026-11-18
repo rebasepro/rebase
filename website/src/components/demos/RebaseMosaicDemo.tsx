@@ -278,8 +278,10 @@ export default function RebaseMosaicDemo() {
             <div className="absolute inset-0 pointer-events-none -z-10" aria-hidden="true"
                  style={{ background: "radial-gradient(ellipse 60% 40% at 50% 50%, rgba(0, 112, 244, 0.08) 0%, rgba(0, 80, 200, 0.03) 50%, transparent 100%)" }}/>
 
-            {/* Main Grid Layout - 3 Columns responsive */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full text-neutral-200">
+            {/* Main Grid Layout - 3 Columns responsive. A dark collage on either
+                page theme: `island-dark` keeps its tones and `dark:` utilities
+                dark, and `data-theme` gives the kit's chips their dark ink. */}
+            <div className="island-dark grid grid-cols-1 lg:grid-cols-3 gap-6 w-full text-neutral-200" data-theme="dark">
 
                 {/* ========================================================
             COLUMN 1: E-COMMERCE & RICH TEXT EDITOR
