@@ -1,5 +1,5 @@
 ---
-sourceHash: fc0bdfb0ae7ceb1b
+sourceHash: b13d6bddec0b3b48
 title: Tablas en el CMS
 sidebar_label: Tablas en el CMS
 description: "Cómo muestra el CMS cada tabla de Postgres sin configuración en el frontend: etiquetas, el widget que recibe cada tipo de columna, campos obligatorios y de solo lectura, relaciones, display slots y controles de Crear, Editar y Eliminar que respetan la seguridad a nivel de fila (RLS) de la tabla."
@@ -230,7 +230,7 @@ sesión, y lo necesario para abrir una colección (la tabla, las vistas de
 registro, el formulario) se carga únicamente en ese momento. Un esquema grande
 ralentiza más a `rebase db push` que al panel: con 400 o más tablas, un push
 tarda decenas de segundos; consulta
-[cuánto tarda un push](/docs/cli/schema#rebase-db-push).
+[qué cambios planifica un push](/docs/cli/schema#rebase-db-push).
 
 ## Próximos pasos
 

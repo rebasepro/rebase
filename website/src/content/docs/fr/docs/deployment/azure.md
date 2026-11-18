@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a596a2dd06884d4
+sourceHash: 757ca7b6dd5e5533
 title: Déployer Rebase sur Microsoft Azure
 description: Déployez votre instance Rebase en toute sécurité sur Azure à l'aide d'Azure Database pour PostgreSQL et d'Azure Container Apps.
 sidebar_label: Azure
@@ -23,6 +23,9 @@ Rien sur cette page n'est spécifique à Azure concernant votre projet. Un dépl
    `postgresql://your_admin:YOUR_PASSWORD@your-server-name.postgres.database.azure.com:5432/postgres`
 
 Si vos tables déclarent une colonne `col.vector()`, activez l'extension une seule fois : Azure la restreint via le paramètre de serveur `azure.extensions`, puis exécutez `CREATE EXTENSION vector;`.
+Déclarez `database({ extensions: ["vector"] })` dans `backend/resources.ts` pour
+que Ptah puisse planifier les colonnes vectorielles, même si l’extension existe
+déjà dans la base cible.
 
 ## 2. Compiler le bundle et l'intégrer dans une image
 

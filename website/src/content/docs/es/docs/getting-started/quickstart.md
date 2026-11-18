@@ -1,5 +1,5 @@
 ---
-sourceHash: 4fa776203d5e5bb5
+sourceHash: bcc5fd36cede5412
 title: Inicio rápido
 sidebar_label: Inicio rápido
 description: Crea un nuevo proyecto de Rebase y ponlo en marcha localmente en menos de 2 minutos.
@@ -94,10 +94,13 @@ inicia un PGlite temporal. Puedes aplicar el esquema en ambas:
 pnpm run db:push
 ```
 
-Si `db generate` reproduce migraciones en un servidor PostgreSQL
-compartido, configura `PTAH_TRUST_REPLAY_SQL=1` solo si confías en
-ejecutar ese SQL con los permisos de la conexión de desarrollo.
-PGlite administrado no necesita esta opción.
+Con PostgreSQL externo, incluido un servicio local de Docker Compose, Ptah puede
+reproducir SQL para `db push`, `db push --dry-run` y `db generate`. Usa
+`PTAH_DEV_SERVER_DISPOSABLE=1` solo si puedes desechar todo el servidor de
+desarrollo. En un servidor compartido, `PTAH_TRUST_REPLAY_SQL=1` permite reproducir
+SQL con los permisos de la conexión de desarrollo. Actívalo solo si confías en ese
+SQL. PGlite administrado ya es desechable. Consulta la
+[configuración](/docs/getting-started/configuration/).
 
 El arranque ya crea de forma acumulativa las tablas faltantes —y sus
 políticas de [RLS](/docs/collections/security-rules/), la seguridad a nivel de fila de PostgreSQL,

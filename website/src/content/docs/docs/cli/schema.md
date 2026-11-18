@@ -199,10 +199,12 @@ Ptah applies the plan, Rebase enables row-level security, provisions its auth
 tables and request roles, and records the schema version. Missing derived
 foreign-key indexes are built concurrently before the apply.
 
-On a shared external PostgreSQL server, migration replay requires the explicit
-`PTAH_TRUST_REPLAY_SQL=1` opt-in described in
-[configuration](/docs/getting-started/configuration/). Managed PGlite uses a
-disposable dev server and needs no trust opt-in.
+Ptah may replay SQL for `db push`, including `--dry-run`, and `db generate` on
+external PostgreSQL, including local Docker Compose. On a shared dev server,
+set `PTAH_TRUST_REPLAY_SQL=1` only if you trust that SQL to run with the dev
+connection's privileges. For a disposable dev server, set
+`PTAH_DEV_SERVER_DISPOSABLE=1`. Rebase sets it for managed PGlite.
+See [configuration](/docs/getting-started/configuration/).
 
 Both `db push` and `db generate` refresh `.rebase/sql/` from the current
 schema. The directory is ignored by Git.
@@ -210,14 +212,15 @@ schema. The directory is ignored by Git.
 | File | Purpose |
 |------|---------|
 | `schema.sql` | Ptah's desired state for declared application objects |
-| `ptah-managed.json` | The objects Rebase allows Ptah to plan |
-| `policies.sql`, `search.sql`, `vector.sql` | Inputs still used by boot and recovery |
-| `triggers.sql`, `views.sql` | Inputs still used by boot and recovery |
+| `search.sql` | Search SQL used to restore generated columns after a failed apply |
+| `policies.sql`, `vector.sql`, `triggers.sql`, `views.sql` | Separate excerpts of the generated DDL |
 
-The sidecar files are not appended to new migrations or applied as a second
-part of `db push`. Ptah plans their declared objects through `schema.sql`.
-A project that committed generated SQL copies to `drizzle/` under an earlier
-release can delete those copies; `drizzle/migrations/` stays intact.
+Ptah plans the declared objects through `schema.sql`. The CLI removes old
+generated SQL copies from `drizzle/` and keeps `drizzle/migrations/` intact.
+
+Commit `backend/drizzle/ptah-managed.json` with the migrations. Rebase uses
+the saved object names to plan the removal of declarations that are gone in
+the current checkout.
 
 A policy whose name Rebase generated is removed when its rule is superseded.
 A custom-named policy stays in force. Use `rebase doctor --policies` to audit
@@ -245,13 +248,14 @@ does not own. A column already added by boot or `db push` therefore still
 appears in the generated migration.
 
 The command writes the migration to `backend/drizzle/migrations/`, warns about
-destructive statements, and names the next `db migrate` command. It also names
-`--baseline <version>` when a database has already been provisioned by boot
-or `db push`. A run with no diff writes no migration.
+destructive statements, and names the next `db migrate` command. For the first migration, it prints a
+`--baseline <version>` example for an already provisioned database. Verify
+that the database matches that version before using it. A run with no diff writes no migration.
 
-Review each generated file before applying it. Rebase cannot infer ownership
-from arbitrary SQL added to a migration that the live database has not
-applied.
+Review each generated file before applying it. In particular, compare any
+`DROP CONSTRAINT` with hand-written CHECK and EXCLUDE constraints in the
+migration history. The protection list comes from the live database, so a
+constraint that exists only in replayed history can appear as a drop.
 
 ### `rebase db migrate`
 
@@ -271,7 +275,7 @@ rebase db migrate
   one. A migration was written from the tables of its day, so a policy is
   stamped only when it is exactly what its rule makes now: migrate makes it
   again from its rule under another name, in a transaction it rolls back, and
-  compares what Postgres stored, as `db push --dry-run` does. A policy that
+  compares what Postgres stored. A policy that
   differs gets no stamp, and the next boot re-applies its table
 
 `--refuse-destructive`
@@ -291,7 +295,7 @@ without the flag to apply it.
 
 #### Baselining a database Rebase has already booted
 
-Every Rebase boot ensures the schema, and `rebase db push` applies it directly. So a database that has ever run either one already has the tables and types the first migration would create, and `rebase db migrate` stops on `pq: type "posts_status" already exists (42710)`.
+Every Rebase boot ensures the schema, and `rebase db push` applies it directly. So a database that has ever run either one already has the tables and types the first migration would create, and `rebase db migrate` can report that the database already contains objects from the migration.
 
 Nothing is wrong with the migration — the database was provisioned another way. Record where it already is, then migrate normally:
 
@@ -302,7 +306,12 @@ rebase db migrate
 
 The version is the numeric prefix of the migration file that describes what is in the database *now*. That migration and everything before it are recorded as applied; everything after it runs. On a database nothing has ever booted against, no baseline is needed — migrate straight away.
 
-The same happens later in the ordinary loop: edit a table while `rebase dev` runs, and boot adds the column before `rebase db generate` writes the migration that adds it, so `rebase db migrate` stops on `column … already exists (42701)`. Baseline that migration the same way. `--baseline` works on a database that already records migrations: it marks everything up to the version as applied with `ptah-compat migrate set`, and says so, or says there is nothing to record when the history already reaches it. A version no file in `drizzle/migrations` has is refused before anything runs, naming the versions there are.
+For a later migration, baseline only after every pending change through that
+version has been applied and verified, including drops and data updates. An
+existing column proves only that one change is present. Baselining records
+the entire migration as applied and skips every statement it contains.
+On a database with revision history, Rebase records the baseline with
+`ptah-compat migrate set`.
 
 ### `rebase db branch`
 
@@ -448,7 +457,7 @@ change meaning"**, lists every rule whose policy now grants something different
 — a bare `access: "authenticated"` granted nothing and admits every signed-in
 caller now ([the four shapes](/docs/upgrading/0-30-to-0-31/#review-before-deploying-these-rules-change-meaning)).
 Then check against your database: `rebase db push --dry-run` should print "No
-changes: the database already matches these tables.", and
+changes: the database already matches the declared schema.", and
 `rebase doctor --policies` no drift.
 
 ## Development Workflow
@@ -477,8 +486,8 @@ rebase schema generate
 rebase db generate
 
 # 4. Review the generated SQL in backend/drizzle/migrations/
-# 5. Commit the migration to version control
-git add backend/drizzle/migrations/
+# 5. Commit the migration and the record of managed objects
+git add backend/drizzle/migrations/ backend/drizzle/ptah-managed.json
 
 # 6. Apply in production
 #    A database Rebase has already booted needs a baseline the first time —
@@ -495,8 +504,8 @@ rebase db migrate
 | Migration shows unexpected changes | Run `rebase doctor` to identify drift |
 | `db push` fails on production | Use `db generate` + `db migrate` instead |
 | A migration must not drop data in CI or production | `rebase db migrate --refuse-destructive` exits 1 and applies nothing when a pending statement destroys data |
-| `db migrate` fails with `already exists (42710)` | Boot or `db push` already provisioned the schema — record it with `rebase db migrate --baseline <version>` |
-| `db migrate` fails with `column … already exists (42701)` | `rebase dev` added the column at boot — baseline that migration the same way |
+| `db migrate` fails with `already exists (42710)` | Verify all changes through that version before running `rebase db migrate --baseline <version>` |
+| `db migrate` fails with `column … already exists (42701)` | Compare the rest of the migration with the database, including drops and data updates, before recording a baseline |
 
 ## Next Steps
 

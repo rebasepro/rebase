@@ -1,5 +1,5 @@
 ---
-sourceHash: 57827b30798a9e0d
+sourceHash: 28ddba8b909b96aa
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus den Tabellen in backend/schema, erstellen Sie SQL-Migrationen, introspektieren Sie eine bestehende Datenbank in defineTable-Dateien und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -193,17 +193,18 @@ CHECK- und EXCLUDE-Constraints auf einer deklarierten Tabelle.
 Der Befehl zeigt den Plan vor der Anwendung. Eine destruktive Änderung,
 einschließlich `DROP EXTENSION`, erfordert eine Bestätigung oder
 `--allow-destructive`. `--dry-run` zeigt den Plan, ohne die Datenbank zu
-ändern oder eine Migration zu schreiben. Danach aktiviert Rebase Row-Level
+ändern oder eine Migration zu schreiben. Nach der Anwendung durch Ptah aktiviert Rebase Row-Level
 Security, richtet Auth-Tabellen und Request-Rollen ein und speichert die
 Schema-Version. Fehlende abgeleitete Fremdschlüsselindizes werden vorher
 parallel erstellt.
 
-Auf einem gemeinsam genutzten externen PostgreSQL-Server erfordert das
-Wiedergeben von Migrationen die ausdrückliche Option
-`PTAH_TRUST_REPLAY_SQL=1`. Sie ist unter
-[Konfiguration](/docs/getting-started/configuration/) beschrieben. Das
-verwaltete PGlite verwendet einen verwerfbaren Dev-Server und braucht sie
-nicht.
+Bei externem PostgreSQL, auch einem lokalen Docker-Compose-Dienst, kann Ptah für
+`db push`, `db push --dry-run` und `db generate` SQL wiedergeben. Setzen Sie
+`PTAH_DEV_SERVER_DISPOSABLE=1` nur für einen vollständig verwerfbaren Dev-Server.
+Auf einem gemeinsam genutzten Server erlaubt `PTAH_TRUST_REPLAY_SQL=1` die
+Wiedergabe mit den Rechten der Dev-Verbindung. Setzen Sie es nur für SQL, dem Sie
+vertrauen. Verwaltetes PGlite ist bereits verwerfbar. Siehe
+[Konfiguration](/docs/getting-started/configuration/).
 
 `db push` und `db generate` aktualisieren `.rebase/sql/` aus dem aktuellen
 Schema. Git ignoriert dieses Verzeichnis.
@@ -211,14 +212,13 @@ Schema. Git ignoriert dieses Verzeichnis.
 | Datei | Zweck |
 |-------|-------|
 | `schema.sql` | Gewünschter Ptah-Zustand der deklarierten Anwendungsobjekte |
-| `ptah-managed.json` | Objekte, die Rebase von Ptah planen lässt |
-| `policies.sql`, `search.sql`, `vector.sql` | Weiterhin für Boot und Recovery verwendete Eingaben |
-| `triggers.sql`, `views.sql` | Weiterhin für Boot und Recovery verwendete Eingaben |
+| `search.sql` | Stellt generierte Suchspalten nach einem Fehler wieder her |
+| `policies.sql`, `vector.sql`, `triggers.sql`, `views.sql` | Separate Auszüge aus dem generierten SQL |
 
-Die zusätzlichen SQL-Dateien werden neuen Migrationen nicht angehängt und
-nicht als zweiter Teil von `db push` angewendet. Ptah plant ihre deklarierten
-Objekte über `schema.sql`. Früher nach `drizzle/` kopierte generierte Dateien
-können gelöscht werden; `drizzle/migrations/` bleibt bestehen.
+Die CLI entfernt alte generierte SQL-Kopien aus `drizzle/` und behält `drizzle/migrations/`.
+
+Committen Sie `backend/drizzle/ptah-managed.json` zusammen mit den Migrationen. Die
+gespeicherten Namen erlauben es Rebase, auch entfernte Deklarationen einzuplanen.
 
 Eine von Rebase benannte Policy wird entfernt, wenn eine neue Regel sie
 ersetzt. Eine Policy mit eigenem Namen bleibt erhalten. Mit
@@ -245,13 +245,15 @@ Historie, nicht bei der Live-Datenbank. Rebase liest die Live-Datenbank
 dennoch, um fremde Objekte zu erkennen. Eine Spalte, die Boot oder `db push`
 bereits hinzugefügt hat, erscheint daher weiterhin in der Migration.
 
-Der Befehl schreibt die Migration nach `backend/drizzle/migrations/`, warnt
-vor destruktiven Anweisungen und nennt den nächsten `db migrate`-Befehl. Bei
-einer bereits provisionierten Datenbank nennt er auch
-`--baseline <version>`. Ohne Diff entsteht keine Migration.
+Der Befehl schreibt die Migration nach `backend/drizzle/migrations/` und warnt vor
+destruktiven Anweisungen. Ohne Änderungen schreibt er keine Migration.
 
-Prüfen Sie jede generierte Datei vor der Anwendung. Rebase kann den Besitzer
-von beliebigem SQL in einer noch nicht angewendeten Migration nicht erkennen.
+Bei der ersten Migration zeigt der Befehl ein Beispiel für `--baseline <version>`.
+Prüfen Sie vorher, ob die Datenbank bereits diesem Stand entspricht.
+
+Prüfen Sie jede Migration auf `DROP CONSTRAINT`. Manuelle CHECK- und
+EXCLUDE-Constraints, die nur in der wiedergegebenen Historie vorkommen, können im
+Plan zum Löschen erscheinen.
 
 ### `rebase db migrate`
 
@@ -270,7 +272,7 @@ rebase db migrate
   Migration wurde auf Basis des damaligen Tabellenstands geschrieben; eine Policy erhält daher nur dann einen
   Stempel, wenn sie exakt dem entspricht, was ihre Regel heute erzeugt: Migrate erstellt sie testweise aus ihrer
   Regel unter einem anderen Namen in einer Transaktion, die zurückgerollt wird, und vergleicht das von Postgres
-  Gespeicherte – genau wie `db push --dry-run`. Eine Policy, die abweicht, erhält keinen Stempel, und der nächste
+  Gespeicherte. Eine Policy, die abweicht, erhält keinen Stempel, und der nächste
   Boot wendet ihre Tabelle neu an
 
 `--refuse-destructive`
@@ -290,7 +292,7 @@ ablehnt. Prüfen Sie die ausgegebene Liste und führen Sie `rebase db migrate` d
 
 Jeder Boot-Vorgang von Rebase stellt das Schema sicher, und `rebase db push` wendet es direkt an. Eine Datenbank,
 auf der jemals eines von beiden ausgeführt wurde, enthält daher bereits die Tabellen und Typen, die die erste
-Migration erstellen würde, und `rebase db migrate` stoppt mit `pq: type "posts_status" already exists (42710)`.
+Migration erstellen würde, und `rebase db migrate` stoppt mit `type "posts_status" already exists (42710)`.
 
 Mit der Migration ist alles in Ordnung – die Datenbank wurde lediglich auf anderem Wege bereitgestellt. Erfassen
 Sie den aktuellen Stand und migrieren Sie anschließend normal weiter:
@@ -305,13 +307,10 @@ Datenbank befindet. Diese Migration und alle davorliegenden werden als angewende
 ausgeführt. Bei einer Datenbank, gegen die noch nie gebootet wurde, ist keine Baseline erforderlich – migrieren
 Sie direkt.
 
-Dasselbe geschieht später im normalen Entwicklungszyklus: Bearbeiten Sie eine Tabelle, während `rebase dev` läuft,
-fügt der Boot-Vorgang die Spalte hinzu, bevor `rebase db generate` die Migration schreibt, die sie hinzufügt.
-`rebase db migrate` stoppt dann mit `column … already exists (42701)`. Setzen Sie für diese Migration auf dieselbe
-Weise eine Baseline. `--baseline` funktioniert auch auf einer Datenbank, die bereits Migrationen aufzeichnet: Es
-markiert alles bis zu dieser Version mittels `ptah-compat migrate set` als angewendet und bestätigt dies, bzw. meldet,
-dass nichts aufzuzeichnen ist, wenn die Historie diesen Stand bereits erreicht hat. Eine Version, die in keiner
-Datei in `drizzle/migrations` vorkommt, wird vor der Ausführung abgelehnt, unter Nennung der vorhandenen Versionen.
+Verwenden Sie bei einer späteren Migration eine Baseline erst, wenn alle
+ausstehenden Änderungen bis zu dieser Version angewendet und geprüft wurden,
+einschließlich Löschungen und Datenänderungen. Eine bereits vorhandene Spalte
+reicht dafür nicht aus.
 
 ### `rebase db branch`
 
@@ -475,7 +474,7 @@ change meaning"**, listet jede Regel auf, deren Policy nun andere Berechtigungen
 – ein einfaches `access: "authenticated"` gewährte früher nichts und lässt jetzt jeden angemeldeten
 Aufrufer zu ([die vier Ausprägungen](/docs/upgrading/0-30-to-0-31/#review-before-deploying-these-rules-change-meaning)).
 Prüfen Sie anschließend gegen Ihre Datenbank: `rebase db push --dry-run` sollte "No
-changes: the database already matches these tables." ausgeben und
+changes: the database already matches the declared schema." ausgeben und
 `rebase doctor --policies` keinerlei Drift melden.
 
 ## Entwicklungs-Workflow
@@ -505,7 +504,7 @@ rebase db generate
 
 # 4. Generiertes SQL in backend/drizzle/migrations/ prüfen
 # 5. Migration in die Versionsverwaltung committen
-git add backend/drizzle/migrations/
+git add backend/drizzle/migrations/ backend/drizzle/ptah-managed.json
 
 # 6. In Produktion anwenden
 #    Eine Datenbank, die Rebase bereits gebootet hat, benötigt beim ersten Mal eine Baseline –
@@ -522,8 +521,8 @@ rebase db migrate
 | Migration zeigt unerwartete Änderungen | Führen Sie `rebase doctor` aus, um Drift zu identifizieren |
 | `db push` schlägt in der Produktion fehl | Verwenden Sie stattdessen `db generate` + `db migrate` |
 | Eine Migration darf in CI oder Produktion keine Daten löschen | `rebase db migrate --refuse-destructive` beendet mit Exit-Code 1 und wendet nichts an, wenn ein ausstehendes Statement Daten zerstört |
-| `db migrate` schlägt mit `already exists (42710)` fehl | Der Boot-Vorgang oder `db push` hat das Schema bereits bereitgestellt – zeichnen Sie dies mit `rebase db migrate --baseline <version>` auf |
-| `db migrate` schlägt mit `column … already exists (42701)` fehl | `rebase dev` hat die Spalte beim Booten hinzugefügt – setzen Sie für diese Migration auf dieselbe Weise eine Baseline |
+| `db migrate` schlägt mit `already exists (42710)` fehl | Prüfen Sie vor der Baseline alle Änderungen bis zu dieser Version, einschließlich Löschungen und Datenänderungen. |
+| `db migrate` schlägt mit `column … already exists (42701)` fehl | Prüfen Sie vor der Baseline alle Änderungen bis zu dieser Version, einschließlich Löschungen und Datenänderungen. |
 
 ## Nächste Schritte
 

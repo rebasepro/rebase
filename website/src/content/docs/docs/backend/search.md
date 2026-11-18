@@ -96,37 +96,24 @@ Postgres recomputes the column on every write of a source field and refuses any
 attempt to write it directly, so the index cannot drift from the row. The column
 is never returned by the API.
 
-They are generated into `.rebase/sql/search.sql`, next to `schema.sql` and
-`policies.sql`, and `rebase db push` applies them for you — nothing extra to
-run. A generated `tsvector` column needs its `IMMUTABLE` helper function first
+A generated `tsvector` column needs its `IMMUTABLE` helper function first
 (`unaccent` is only `STABLE`, and flattening a `jsonb` document needs a
 set-returning function). Ptah Compat receives the function, column, and index
-together in `schema.sql`. The separate `search.sql` remains for boot and
-recovery.
-
-Changing only a `search` block now creates a migration with `rebase db generate`.
-The same change appears in the ordinary `rebase db push --dry-run` plan.
+together in `schema.sql`. The CLI can use `search.sql` to restore a generated
+column after a failed push.
 
 ### Changing the block later
 
-A generated column carries its expression, and Postgres cannot alter that
-expression in place — so adding a field, moving a weight, changing the language
-or turning `unaccent` on is **not** something `ADD COLUMN IF NOT EXISTS` can
-apply to a column that already exists.
+On PostgreSQL 17 and later, Ptah Compat can change an existing stored
+expression with `ALTER COLUMN ... SET EXPRESSION`. Review the plan with
+`rebase db push --dry-run` or generate a migration. Changing an existing
+stored expression rewrites the table and can block other traffic while it runs.
+Schedule it for a maintenance window on a busy database.
 
-Rebase records a fingerprint of the expression on the column when it creates it,
-and compares it on every boot and every `db push`. A change is refused, loudly,
-with the two statements that apply it — a `DROP COLUMN` and an `ADD COLUMN`,
-which rewrite the table and rebuild the GIN index. Run them at a time you
-choose; nothing rewrites a live table on your behalf.
-
-Two changes are exempt. Turning `fuzzy` on is additive — a second column — and
-applies without any of this. Setting [`mode`](#mode) changes the query rather
-than the column, so it applies with a deploy.
-
-Boot refuses rather than serving, because the alternative is what this check
-replaced: a column that keeps indexing the previous field set, and a search that
-returns nothing for content plainly in the row.
+On PostgreSQL 16 and earlier, use a reviewed SQL migration that rebuilds the
+generated column and its dependent objects. Check the column expression and
+indexes after applying it. Adding `fuzzy` creates a new column. Changing
+[`mode`](#mode) only changes the query.
 
 ## What you can name in `fields`
 

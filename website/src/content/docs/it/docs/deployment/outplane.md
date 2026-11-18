@@ -1,5 +1,5 @@
 ---
-sourceHash: c2b849bb2b75d3c4
+sourceHash: bb4abe3d1684f8d2
 title: Deploy di Rebase su Out Plane
 description: Distribuisci un progetto rebase init su Out Plane — un'app compilata dal tuo repository, il PostgreSQL gestito di Out Plane e il caricamento di file in un bucket Out Plane.
 sidebar_label: Out Plane
@@ -45,7 +45,7 @@ Dal pannello **Connection** del database, copia la stringa di connessione (nel f
 postgresql://<user>:<password>@<host>:5432/<database>?sslmode=no-verify
 ```
 
-**Usa `no-verify`, non `require`.** Entrambi cifrano la connessione. Per `psql`, `require` significa anche "non verificare il certificato rispetto a un'autorità pubblica", ma il driver Postgres su cui gira Rebase lo interpreta come "verificalo", e un certificato del database non firmato pubblicamente fallisce quindi alla prima connessione con `self-signed certificate`. `no-verify` è il modo in cui il driver esprime ciò che `require` significa ovunque. La guida ufficiale di Node.js di Out Plane disattiva la verifica per lo stesso motivo. Lo stesso URL funziona per `rebase db push` dalla tua macchina: la CLI lo passa all'engine di schema Atlas come `sslmode=require`.
+**Usa `no-verify`, non `require`.** Entrambi cifrano la connessione. Per `psql`, `require` significa anche "non verificare il certificato rispetto a un'autorità pubblica", ma il driver Postgres su cui gira Rebase lo interpreta come "verificalo", e un certificato del database non firmato pubblicamente fallisce quindi alla prima connessione con `self-signed certificate`. `no-verify` è il modo in cui il driver esprime ciò che `require` significa ovunque. La guida ufficiale di Node.js di Out Plane disattiva la verifica per lo stesso motivo. Lo stesso URL funziona per `rebase db push` dalla tua macchina: la CLI lo passa all'engine di schema Ptah Compat come `sslmode=require`.
 
 ### Il ruolo a cui Rebase passa
 
@@ -54,6 +54,9 @@ Rebase applica la row-level security passando ciascuna richiesta autenticata a u
 Se il primo avvio si interrompe con un errore `AppRoleSetupError` che menziona `rebase_user`, il ruolo specificato nella stringa di connessione non ha i permessi per creare ruoli o per assegnarsi il cambio di ruolo. L'errore mostrerà l'istruzione SQL da eseguire: eseguila una volta sola con un ruolo del database autorizzato a creare ruoli, quindi effettua nuovamente il deploy.
 
 Se le tue tabelle dichiarano una colonna `col.vector()`, il database richiede l'estensione pgvector. Lo scaffold iniziale non ne dichiara alcuna.
+Dichiara `database({ extensions: ["vector"] })` in `backend/resources.ts` affinché
+Ptah possa pianificare le colonne vettoriali, anche se l’estensione è già presente
+nel database di destinazione.
 
 ## 3. Crea un bucket
 
@@ -88,7 +91,6 @@ COPY --from=build --chown=node:node /app/dist-bundle /bundle
 
 Tre dettagli sono importanti:
 
-- **`node:22`, non `node:22-slim`.** L'installazione della CLI scarica l'engine di schema Atlas, che richiede `curl` e i certificati CA. L'immagine slim è priva di entrambi e l'installazione fallisce.
 - **`--chown=node:node`.** Il runtime viene eseguito come utente `node` e collega i propri pacchetti nel bundle all'avvio. Un bundle di proprietà di root viene comunque servito, ma registra un avviso per ogni pacchetto che non è riuscito a collegare.
 - **Nessun sorgente nell'immagine finale.** Contiene solo il runtime e il bundle compilato, e `dist-bundle/` rimane nel gitignore.
 

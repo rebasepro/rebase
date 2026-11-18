@@ -78,7 +78,7 @@ the live database, while `db generate` compares it with migration history:
 reviewable one, and the one to use in production. Both go through the same
 generated SQL, so they cannot disagree about what your tables mean, and
 both write it afresh from the tables before reading it, so there is no copy
-in your repository to fall behind. The migrations are what you commit. See
+in your repository to fall behind. Commit the migrations and `backend/drizzle/ptah-managed.json`. See
 [Schema Generation](/docs/cli/schema) for every flag.
 
 ### Example
@@ -160,21 +160,24 @@ CREATE TABLE "public"."products" (
 ```
 
 The full desired file also contains declared policies, functions, search and
-vector indexes, `updated_at` triggers, and views. Their separate SQL files
-remain for boot and recovery; `db push` and `db generate` plan them together.
+vector indexes, `updated_at` triggers, and views. `db push` and `db generate`
+plan them together.
 
 ## Safety & Unmapped Database Objects
 
 Rebase limits Ptah's plan to objects it declares. It records their names in
-`drizzle/ptah-managed.json`, including names removed from the current schema.
+`backend/drizzle/ptah-managed.json`. Commit the file so the next checkout
+can plan removals using the previously managed names.
 A removed declaration can therefore produce a `DROP`; an unrelated table,
 view, function, or extension stays outside the plan.
 
 Auth provisioning and migration revisions are excluded. Rebase does include
 the helper functions it declares in the `rebase` schema. On selected tables,
 the CLI also protects custom policies, triggers, indexes, CHECK constraints,
-and EXCLUDE constraints by name. It reads the database and migration history
-to identify them; if a required catalog read fails, planning stops.
+and EXCLUDE constraints by name. Rebase reads the live catalog for all five.
+It also reads migration files for policy, trigger, and index names. See the
+[migration review step](/docs/cli/schema/#rebase-db-generate) for constraints
+that exist only in history. A failed catalog read stops planning.
 
 Before applying a change, `db push` shows the plan and gates destructive
 statements, including `DROP EXTENSION`. Use `--dry-run` to inspect the plan

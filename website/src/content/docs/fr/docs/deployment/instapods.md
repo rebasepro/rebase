@@ -1,5 +1,5 @@
 ---
-sourceHash: 1cb8519ab1fea20d
+sourceHash: 19d0fd4e361fadb4
 title: Déployer Rebase sur InstaPods
 description: Passez d'un nouveau projet rebase init à une URL HTTPS en ligne sur un seul pod InstaPods — Node, PostgreSQL et téléversements de fichiers sur la même machine, sans Docker.
 sidebar_label: InstaPods
@@ -170,6 +170,9 @@ Lisez le SQL affiché par la simulation (dry run), puis réexécutez la commande
 Pour les migrations versionnées, commitez les fichiers de migration avec `rebase db generate` et renseignez `node_modules/.bin/rebase db migrate` dans le champ **Release**, qu'InstaPods exécute à chaque déploiement.
 
 Si vos tables déclarent une colonne `col.vector()`, le Postgres du pod nécessite l'extension pgvector : installée sur le pod, puis créée par le superutilisateur avec `sudo -u postgres psql -d instapod -c "CREATE EXTENSION vector;"`. Le squelette de base n'en déclare aucune.
+Déclarez `database({ extensions: ["vector"] })` dans `backend/resources.ts` pour
+que Ptah puisse planifier les colonnes vectorielles, même si l’extension existe
+déjà dans la base cible.
 
 ## Prochaines étapes
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: aad5108f9251319e
+sourceHash: 823c16191069602b
 title: Agrégats et recherche
 sidebar_label: Agrégats & recherche
 description: "Comptez, additionnez et groupez avec le SDK, filtrez dans les colonnes JSON, et exécutez des recherches textuelles et vectorielles depuis le client."
@@ -232,16 +232,16 @@ Avec un `threshold`, le résultat ne comporte pas de `meta.total` — compter le
 
 ### Ce que vous devez fournir
 
-- **pgvector.** Une propriété `vector` est compilée en une colonne `VECTOR(n)`, et ce type provient de l'extension `vector`. Rebase l'installera pour vous, mais seulement si vous l'y autorisez :
+- **pgvector.** Déclarez l’extension `vector` pour toute colonne vectorielle :
 
   ```ts
   // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 
-  Cette ligne constitue une permission plutôt qu'une demande — Rebase n'exécute `CREATE EXTENSION IF NOT EXISTS vector` que lorsque votre schéma le nécessite. Il s'agit d'une option volontaire (opt-in) car l'installation d'une extension dépend d'éléments que Rebase ne peut pas voir depuis la connexion : l'image doit inclure la bibliothèque (ce qui est le cas de `pgvector/pgvector:pg18` du scaffold, mais pas d'un `postgres:18` standard), le rôle doit être autorisé à l'installer, et un fournisseur géré doit l'avoir inscrite sur liste blanche.
-
-  Si vous ne spécifiez rien, Rebase n'installe rien — installez-la alors une fois manuellement. Dans les deux cas, la colonne est créée, et Postgres la refusera avec `type "vector" does not exist` sur une base de données qui n'a ni l'un ni l'autre, en indiquant les deux solutions possibles.
+  Déclarez `database({ extensions: ["vector"] })` dans `backend/resources.ts` pour
+  que Ptah puisse planifier les colonnes vectorielles, même si l’extension existe
+  déjà dans la base cible.
 
 La colonne, son index ANN et `CREATE EXTENSION` font partie du `schema.sql` souhaité que
 Ptah Compat utilise pour planifier `rebase db push` et `db generate`. Rebase écrit

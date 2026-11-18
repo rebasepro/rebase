@@ -1,5 +1,5 @@
 ---
-sourceHash: aad5108f9251319e
+sourceHash: 823c16191069602b
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
 description: "Zählen, summieren und gruppieren mit dem SDK, innerhalb von JSON-Spalten filtern sowie Volltext- und Vektorsuche vom Client aus ausführen."
@@ -232,16 +232,16 @@ Mit einem `threshold` enthält das Ergebnis kein `meta.total` – das Zählen de
 
 ### Was Sie bereitstellen müssen
 
-- **pgvector.** Eine `vector`-Eigenschaft wird zu einer `VECTOR(n)`-Spalte kompiliert, und dieser Typ stammt aus der `vector`-Extension. Rebase installiert sie für Sie, jedoch nur dort, wo Sie es ausdrücklich erlauben:
+- **pgvector.** Deklarieren Sie die Erweiterung `vector` für jede Vektorspalte:
 
   ```ts
   // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 
-  Diese Zeile ist eher eine Berechtigung als eine Anforderung – Rebase führt `CREATE EXTENSION IF NOT EXISTS vector` nur dann aus, wenn etwas in Ihrem Schema dies benötigt. Dies ist Opt-in, da die Installation einer Extension von Voraussetzungen abhängt, die Rebase aus der Verbindung heraus nicht einsehen kann: Das Image muss die Bibliothek enthalten (das `pgvector/pgvector:pg18` des Scaffolds tut dies, ein Standard-`postgres:18` nicht), die Rolle muss die Berechtigung zur Installation haben und ein Managed Provider muss sie auf einer Allowlist führen.
-
-  Geben Sie nichts an, installiert Rebase auch nichts – installieren Sie sie stattdessen einmal manuell. In beiden Fällen wird die Spalte erstellt, und Postgres lehnt sie auf einer Datenbank, die keines von beiden hat, mit `type "vector" does not exist` ab, wobei beide Lösungswege genannt werden.
+  Deklarieren Sie `database({ extensions: ["vector"] })` in `backend/resources.ts`,
+  damit Ptah Vektorspalten planen kann. Das gilt auch, wenn die Erweiterung im Ziel
+  bereits vorhanden ist.
 
 Die Spalte, ihr ANN-Index und `CREATE EXTENSION` gehören zum gewünschten `schema.sql`.
 Ptah Compat plant damit `rebase db push` und `db generate`. Rebase schreibt

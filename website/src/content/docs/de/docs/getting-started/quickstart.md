@@ -1,5 +1,5 @@
 ---
-sourceHash: 4fa776203d5e5bb5
+sourceHash: bcc5fd36cede5412
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstelle ein neues Rebase-Projekt und führe es lokal in unter 2 Minuten aus.
@@ -95,10 +95,13 @@ anwenden:
 pnpm run db:push
 ```
 
-Wenn `db generate` Migrationen auf einem gemeinsam genutzten PostgreSQL-
-Server wiedergibt, setzen Sie `PTAH_TRUST_REPLAY_SQL=1` nur für SQL,
-dem Sie mit den Rechten der Dev-Verbindung vertrauen. Für das verwaltete
-PGlite ist diese Option nicht nötig.
+Bei externem PostgreSQL, auch einem lokalen Docker-Compose-Dienst, kann Ptah für
+`db push`, `db push --dry-run` und `db generate` SQL wiedergeben. Setzen Sie
+`PTAH_DEV_SERVER_DISPOSABLE=1` nur für einen vollständig verwerfbaren Dev-Server.
+Auf einem gemeinsam genutzten Server erlaubt `PTAH_TRUST_REPLAY_SQL=1` die
+Wiedergabe mit den Rechten der Dev-Verbindung. Setzen Sie es nur für SQL, dem Sie
+vertrauen. Verwaltetes PGlite ist bereits verwerfbar. Siehe
+[Konfiguration](/docs/getting-started/configuration/).
 
 Beim Booten werden fehlende Tabellen – sowie deren
 [RLS](/docs/collections/security-rules/)-Richtlinien (PostgreSQL Row-Level

@@ -1,5 +1,5 @@
 ---
-sourceHash: d836b152792dc3ff
+sourceHash: 0309acf690d3fb3f
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -27,26 +27,13 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 | `DATABASE_URL` | PostgreSQL-Verbindungszeichenfolge. **In der Entwicklung optional** – wenn nicht gesetzt, führt `rebase dev` ein verwaltetes PostgreSQL für das Projekt aus, dessen Daten unter `.rebase/` liegen. Überall sonst erforderlich. | `postgresql://user:pass@localhost:5432/mydb` |
 | `JWT_SECRET` | Geheimschlüssel zum Signieren von JWT-Tokens. Verwenden Sie eine starke Zufallszeichenfolge (mind. 32 Zeichen). **In der Produktion erforderlich** (in der Entwicklung automatisch generiert). | `a1b2c3d4e5...` |
 
-> **Bei einer verwalteten Datenbank bedeutet `sslmode=require` möglicherweise nicht das, was es besagt.**
->
-> Rebase und der Node-Treiber akzeptieren dies – verschlüsseln, aber das
-> Zertifikat nicht prüfen. `psql`, `pg_dump`, `pg_restore` tun dies nicht
-> und stufen nicht herab: Sie verweigern den Start mit `invalid sslmode value: "no-verify"`.
->
-> Wählen Sie eine der folgenden Optionen:
->
-> - **`sslmode=no-verify`** – verschlüsselt, nicht geprüft: was `require` für
->   libpq bedeutet. Dies ist eine Schreibweise von node-postgres, die libpq fehlt, sodass `psql`, `pg_dump`
->   und Ptah Compat dies mit `invalid sslmode value: "no-verify"` ablehnen. Die eigenen Befehle von Rebase
->   (`rebase db push`, `rebase db backup`, `rebase db restore`) übergeben es an diese
->   als `sslmode=require`, sodass sie mit der konfigurierten URL funktionieren; für
->   manuelles `psql` tauschen Sie es gegen `sslmode=require` aus.
-> - **`sslmode=verify-full&sslrootcert=/path/to/ca.pem`** – geprüft anhand des
->   CA-Zertifikats des Anbieters. Für jedes Tool identisch.
->
-> `uselibpqcompat=true&sslmode=require`, was die eigene Warnung des Node-Treibers
-> vorschlägt, funktioniert auch für die Runtime; die Befehle von Rebase entfernen `uselibpqcompat`,
-> bevor sie die URL an libpq-Tools übergeben, die dies ablehnen würden.
+> Standardmäßig prüft node-postgres bei `sslmode=require` das Zertifikat. Libpq-Tools
+> wie `psql` unterstützen `require` mit schwächerer Prüfung und weisen `no-verify`
+> zurück. Verwenden Sie `sslmode=verify-full&sslrootcert=/path/to/ca.pem` zur Prüfung
+> der CA und des Hostnamens. Soll nur verschlüsselt werden, geben Sie Rebase
+> `sslmode=no-verify`. Rebase reicht `sslmode=require` an Ptah Compat sowie die
+> PostgreSQL-Werkzeuge für Sicherung und Wiederherstellung weiter. Verwenden Sie für
+> direkte libpq-Aufrufe `sslmode=require`.
 
 ### Frontend
 
@@ -402,7 +389,7 @@ Wird von `rebase` gelesen, nicht vom Server. Nichts hier beeinflusst ein Deploym
 | `REBASE_TOKEN` | Ein Token aus `rebase cloud tokens create`. Wenn gesetzt, authentifiziert sich jeder `rebase cloud`-Befehl damit anstelle der `rebase cloud login`-Sitzung und liest oder schreibt niemals die gespeicherte Sitzung. In einem Verzeichnis, das mit `rebase cloud init --claim` verknüpft wurde, wird es für das projekteigene Token zurückgestellt, wenn es keinen Scope für das Projekt besitzt. Die Methode zur Ausführung von `rebase cloud` in der CI – siehe [CI und Agenten](/docs/deployment/cloud/#ci-and-agents). Der [MCP-Server](/docs/ai/mcp/) übergibt es an die CLI, die seine Cloud-Tools starten, und sendet es niemals an die App: Setzen Sie dafür `REBASE_API_TOKEN`. | — |
 | `REBASE_DEBUG` | `1` gibt den zugrunde liegenden Fehler und die Anfragedetails anstelle der kurzen Nachricht aus. Das Erste, was Sie setzen sollten, wenn ein `rebase cloud`-Befehl ohne hilfreiche Meldung fehlschlägt. | — |
 | `REBASE_ATLAS_DEV_URL` | Leere Dev-Datenbank für `db push` und `db generate`. Der Name bleibt für bestehende Projekte erhalten. Rebase verwaltet eine hier angegebene Datenbank nicht und verweigert die Ziel-URL. Verwaltetes PGlite erhält eine flüchtige In-Memory-Datenbank. Verwenden Sie dies ohne `CREATE DATABASE`; `db migrate` braucht sie nicht. | `<db>_dev_diff` |
-| `PTAH_TRUST_REPLAY_SQL` | Nur auf `1` setzen, wenn Sie dem Migrations-SQL vertrauen, das auf einem gemeinsam genutzten PostgreSQL-Entwicklungsserver ausgeführt wird. Es läuft mit den Rechten der Entwicklungsverbindung. Erstellte Rollen können auf dem Server verbleiben. | nicht gesetzt |
+| `PTAH_TRUST_REPLAY_SQL` | Bei externem PostgreSQL, auch einem lokalen Docker-Compose-Dienst, kann Ptah für `db push`, `db push --dry-run` und `db generate` SQL wiedergeben. Setzen Sie `PTAH_DEV_SERVER_DISPOSABLE=1` nur für einen vollständig verwerfbaren Dev-Server. Auf einem gemeinsam genutzten Server erlaubt `PTAH_TRUST_REPLAY_SQL=1` die Wiedergabe mit den Rechten der Dev-Verbindung. Setzen Sie es nur für SQL, dem Sie vertrauen. Verwaltetes PGlite ist bereits verwerfbar. | — |
 | `PTAH_DEV_SERVER_DISPOSABLE` | Nur auf `1` setzen, wenn der gesamte Entwicklungsserver verworfen werden kann. Rebase setzt dies für seinen verwalteten PGlite-Entwicklungsserver automatisch. | nicht gesetzt |
 | `PTAH_ATLAS_ALLOW_UNMATCHED_EXCLUDE` | Rebase setzt dies, damit dieselbe Ausschlussliste auch funktioniert, wenn ein Objekt fehlt. Keine manuelle Einstellung erforderlich. | `1` bei Datenbankbefehlen |
 | `PTAH_ATLAS_MIGRATE_DIFF_EXCLUDE` | Rebase setzt dies bei `db generate` anhand der Selektoren geschützter Objekte. Keine manuelle Einstellung erforderlich. | generiert |

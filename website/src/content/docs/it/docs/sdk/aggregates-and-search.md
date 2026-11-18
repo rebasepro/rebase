@@ -1,5 +1,5 @@
 ---
-sourceHash: aad5108f9251319e
+sourceHash: 823c16191069602b
 title: Aggregazioni e ricerca
 sidebar_label: Aggregazioni e ricerca
 description: "Esegui conteggi, somme e raggruppamenti con l'SDK, filtra all'interno delle colonne JSON ed esegui ricerche full-text e vettoriali dal client."
@@ -304,27 +304,16 @@ per ogni riga della tabella. Per la paginazione, usa `meta.hasMore`, che rimane 
 
 ### Cosa devi fornire
 
-- **pgvector.** Una proprietà `vector` compila in una colonna `VECTOR(n)`, e quel
-  tipo proviene dall'estensione `vector`. Rebase la installerà per te, ma
-  solo dove autorizzato:
+- **pgvector.** Dichiara l’estensione `vector` per ogni colonna vettoriale:
 
   ```ts
   // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 
-  Quella riga rappresenta un'autorizzazione più che una richiesta: Rebase esegue
-  `CREATE EXTENSION IF NOT EXISTS vector` solo quando qualcosa nel tuo schema
-  lo richiede. È opt-in perché l'installazione di un'estensione dipende da fattori
-  che Rebase non può verificare dall'interno della connessione: l'immagine deve includere
-  la libreria (l'immagine di scaffolding `pgvector/pgvector:pg18` la include, un `postgres:18`
-  standard no), il ruolo deve avere i permessi per installarla e un provider gestito
-  deve averla inclusa in una allow-list.
-
-  Se non specifichi nulla, Rebase non installerà nulla: potrai invece installarla manualmente una sola volta.
-  In entrambi i casi la colonna viene creata, e Postgres la rifiuta con
-  `type "vector" does not exist` su un database che non dispone di nessuna delle due opzioni,
-  indicando entrambe le vie d'uscita.
+  Dichiara `database({ extensions: ["vector"] })` in `backend/resources.ts` affinché
+  Ptah possa pianificare le colonne vettoriali, anche se l’estensione è già presente
+  nel database di destinazione.
 
 La colonna, il suo indice ANN e `CREATE EXTENSION` fanno parte dello `schema.sql`
 desiderato che Ptah Compat usa per pianificare `rebase db push` e `db generate`. Rebase

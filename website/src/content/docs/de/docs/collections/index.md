@@ -1,5 +1,5 @@
 ---
-sourceHash: fc0bdfb0ae7ceb1b
+sourceHash: b13d6bddec0b3b48
 title: Tabellen im CMS
 sidebar_label: Tabellen im CMS
 description: "Wie das CMS jede Postgres-Tabelle ohne Frontend-Konfiguration anzeigt: Labels, das Widget für jeden Spaltentyp, Pflicht- und schreibgeschützte Felder, Relationen, Anzeige-Slots sowie Steuerelemente zum Erstellen, Bearbeiten und Löschen gemäß der Row-Level-Security der Tabelle."
@@ -144,7 +144,7 @@ Anpassungen, die eine Tabelle benennen, die dem Aufrufer nicht bereitgestellt wi
 
 ## Viele Tabellen
 
-Die Anzahl der Tabellen ist nicht begrenzt. Das Panel benötigt jede Collection, um die Navigation darzustellen, daher werden die Deskriptoren nach der Anmeldung abgerufen; was das Öffnen einer Collection erfordert (die Tabelle, die Datensatzansichten, das Formular), lädt erst dann. Ein großes Schema verlangsamt `rebase db push` mehr als das Panel: Bei 400 oder mehr Tabellen dauert ein Push mehrere zehn Sekunden; siehe [Wie lange ein Push dauert](/docs/cli/schema#rebase-db-push).
+Die Anzahl der Tabellen ist nicht begrenzt. Das Panel benötigt jede Collection, um die Navigation darzustellen, daher werden die Deskriptoren nach der Anmeldung abgerufen; was das Öffnen einer Collection erfordert (die Tabelle, die Datensatzansichten, das Formular), lädt erst dann. Ein großes Schema verlangsamt `rebase db push` mehr als das Panel: Bei 400 oder mehr Tabellen dauert ein Push mehrere zehn Sekunden; siehe [welche Änderungen ein Push plant](/docs/cli/schema#rebase-db-push).
 
 ## Nächste Schritte
 

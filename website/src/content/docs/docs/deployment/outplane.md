@@ -61,6 +61,8 @@ Rebase enforces row-level security by switching each signed-in request to a rest
 If the first start stops with an `AppRoleSetupError` naming `rebase_user`, the role in your connection string is not allowed to create roles or to grant itself the switch. The error prints the SQL to run instead: run it once, as a role on the database that may create roles, then redeploy.
 
 If your tables declare a `col.vector()` column, the database needs the pgvector extension. The scaffold declares none.
+Declare `database({ extensions: ["vector"] })` in `backend/resources.ts`
+so Ptah can plan the column, even if the extension is already installed.
 
 ## 3. Create a bucket
 

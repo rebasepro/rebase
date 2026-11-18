@@ -1,5 +1,5 @@
 ---
-sourceHash: 4fa776203d5e5bb5
+sourceHash: bcc5fd36cede5412
 title: Guida rapida
 sidebar_label: Guida rapida
 description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 minuti.
@@ -94,10 +94,13 @@ temporaneo. Puoi applicare lo schema in entrambi i casi:
 pnpm run db:push
 ```
 
-Se `db generate` riproduce migrazioni su un server PostgreSQL
-condiviso, imposta `PTAH_TRUST_REPLAY_SQL=1` solo se ritieni sicuro
-eseguire quell’SQL con i privilegi della connessione di sviluppo.
-Il PGlite gestito non richiede questa opzione.
+Con PostgreSQL esterno, incluso un servizio Docker Compose locale, Ptah può
+rieseguire SQL per `db push`, `db push --dry-run` e `db generate`. Usa
+`PTAH_DEV_SERVER_DISPOSABLE=1` solo se puoi eliminare tutto il server di sviluppo.
+Su un server condiviso, `PTAH_TRUST_REPLAY_SQL=1` autorizza l’esecuzione con i
+privilegi della connessione di sviluppo. Attivalo solo se ti fidi di quel SQL.
+PGlite gestito è già temporaneo. Vedi la
+[configurazione](/docs/getting-started/configuration/).
 
 L'avvio crea già le tabelle mancanti — e le relative
 politiche [RLS](/docs/collections/security-rules/), la sicurezza a livello di riga di PostgreSQL,

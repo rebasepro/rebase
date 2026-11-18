@@ -169,6 +169,8 @@ Read the SQL the dry run prints, then run it again without `--dry-run`. A change
 For versioned migrations, commit migration files with `rebase db generate` and put `node_modules/.bin/rebase db migrate` in the **Release** field, which InstaPods runs on every deploy.
 
 If your tables declare a `col.vector()` column, the pod's Postgres needs the pgvector extension: installed on the pod, then created by the superuser with `sudo -u postgres psql -d instapod -c "CREATE EXTENSION vector;"`. The scaffold declares none.
+Declare `database({ extensions: ["vector"] })` in `backend/resources.ts`
+so Ptah can plan the column, even if the extension is already installed.
 
 ## Next steps
 

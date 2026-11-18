@@ -93,9 +93,12 @@ push the schema on either database:
 pnpm run db:push
 ```
 
-When `db generate` replays migrations on a shared PostgreSQL server, set
-`PTAH_TRUST_REPLAY_SQL=1` only if you trust that SQL to run with the dev
-connection's privileges. Managed PGlite does not need this setting.
+With external PostgreSQL, including a local Docker Compose service, Ptah may
+replay SQL during `db push`, `db push --dry-run`, and `db generate`. Set
+`PTAH_DEV_SERVER_DISPOSABLE=1` only for a dev server you can discard entirely.
+For a shared dev server, set `PTAH_TRUST_REPLAY_SQL=1` only if you trust that SQL
+to run with the dev connection's privileges. Managed PGlite is already disposable.
+See [database configuration](/docs/getting-started/configuration/).
 
 Boot already creates missing tables — and their
 [RLS](/docs/collections/security-rules/) policies, PostgreSQL's row-level

@@ -1,5 +1,5 @@
 ---
-sourceHash: b3cc5438452bcb34
+sourceHash: 43a87c4d887325f8
 title: Implantando o Rebase no Fly.io
 description: Saiba como implantar o Rebase globalmente ou restringi-lo a data centers europeus usando o Fly.io.
 sidebar_label: Fly.io
@@ -26,6 +26,9 @@ fly launch --no-deploy
 `--no-deploy` porque os secrets e o bundle precisam estar configurados primeiro.
 
 Se suas tabelas declararem uma coluna `col.vector()`, habilite a extensão uma vez nesse banco de dados: `CREATE EXTENSION vector;`.
+Declare `database({ extensions: ["vector"] })` em `backend/resources.ts` para o
+Ptah planejar as colunas vetoriais, mesmo quando o banco de destino já tiver a
+extensão.
 
 ## 2. Gere o bundle e aponte o fly.toml para a imagem de runtime
 

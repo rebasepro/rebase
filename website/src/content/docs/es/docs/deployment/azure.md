@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a596a2dd06884d4
+sourceHash: 757ca7b6dd5e5533
 title: Desplegar Rebase en Microsoft Azure
 description: Despliega tu instancia de Rebase de forma segura en Azure usando Azure Database for PostgreSQL y Azure Container Apps.
 sidebar_label: Azure
@@ -23,6 +23,9 @@ Nada en esta página es específico de Azure con respecto a tu proyecto. Un desp
    `postgresql://your_admin:YOUR_PASSWORD@your-server-name.postgres.database.azure.com:5432/postgres`
 
 Si tus tablas declaran una columna `col.vector()`, habilita la extensión una sola vez: Azure la restringe tras el parámetro de servidor `azure.extensions`, y luego ejecuta `CREATE EXTENSION vector;`.
+Declara `database({ extensions: ["vector"] })` en `backend/resources.ts` para que
+Ptah pueda planificar columnas vectoriales, incluso si el destino ya tiene la
+extensión.
 
 ## 2. Compilar el bundle e incorporarlo en una imagen
 

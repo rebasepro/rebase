@@ -80,12 +80,10 @@ It is already documented, in two places rather than one:
 Three things to know before designing around it. **Rebase stores and searches
 embeddings; it does not compute them** — there is no embedding provider, model
 setting or API key anywhere in Rebase, so producing the vectors is your job.
-**pgvector is a prerequisite, and installing it is opt-in.**
-`database({ extensions: ["vector"] })` in `backend/resources.ts` lets `rebase db
-push` and the boot schema-ensure run `CREATE EXTENSION IF NOT EXISTS vector` for
-you; without it they create the column and leave the extension to you. Either
-way the server needs an image carrying the library and a role allowed to install
-it. And **every vector column gets an HNSW index for
+Declare `database({ extensions: ["vector"] })` in `backend/resources.ts`.
+Ptah requires that declaration for vector columns, including when the target
+already has the extension. PostgreSQL needs the pgvector library and a role
+that can create the extension. **Every vector column gets an HNSW index for
 cosine distance**, because cosine is what `vectorSearch` measures with unless
 you pass `distance` — an index serves exactly one operator. Tune it, or turn it
 off, on the property: see [The index](/docs/sdk/aggregates-and-search#the-index).

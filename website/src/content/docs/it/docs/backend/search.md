@@ -1,5 +1,5 @@
 ---
-sourceHash: 85e4a1ff6e52e6b4
+sourceHash: 15088538cf79c53c
 title: Ricerca
 sidebar_label: Ricerca
 description: Come si comporta .search() per impostazione predefinita e come una tabella può abilitare la ricerca full-text con ranking sulle colonne specificate — inclusi contenuti JSONB e array.
@@ -97,35 +97,19 @@ Postgres ricalcola la colonna a ogni scrittura di un campo di origine e rifiuta 
 tentativo di scriverla direttamente, evitando così disallineamenti tra l'indice e la riga. La colonna
 non viene mai restituita dall'API.
 
-Vengono generati in `.rebase/sql/search.sql`, accanto a `schema.sql` e `policies.sql`.
-`rebase db push` li applica senza passaggi aggiuntivi. Una colonna `tsvector` generata
-richiede prima una funzione helper `IMMUTABLE` (`unaccent` è solo `STABLE`). Ptah Compat
-riceve insieme la funzione, la colonna e l’indice in `schema.sql`. Il file separato
-`search.sql` rimane per avvio e ripristino.
-
-Una modifica al solo blocco `search` crea una migrazione con `rebase db generate`. La
-stessa modifica compare nel normale piano di `rebase db push --dry-run`.
+Ptah Compat riceve la funzione ausiliaria, la colonna e l’indice in `schema.sql`.
+`rebase db push` può usare `search.sql` per il ripristino dopo un errore.
 
 ### Modificare il blocco in seguito
 
-Una colonna generata porta con sé la propria espressione e Postgres non può modificare tale
-espressione sul posto — perciò aggiungere un campo, cambiare un peso, modificare la lingua
-o abilitare `unaccent` **non** è un'operazione che `ADD COLUMN IF NOT EXISTS` può
-applicare a una colonna già esistente.
+Da PostgreSQL 17, Ptah Compat può modificare l’espressione memorizzata con `ALTER
+COLUMN ... SET EXPRESSION`. Esamina il piano con `rebase db push --dry-run` o
+genera una migrazione. La modifica riscrive la tabella e può bloccare gli accessi.
 
-Rebase memorizza un'impronta (fingerprint) dell'espressione sulla colonna al momento della creazione
-e la confronta a ogni avvio e a ogni `db push`. Una modifica viene esplicitamente rifiutata,
-fornendo le due istruzioni necessarie per applicarla — un `DROP COLUMN` e un `ADD COLUMN`,
-che riscrivono la tabella e ricostruiscono l'indice GIN. Puoi eseguirle nel momento che
-preferisci; nulla riscriverà una tabella in produzione al tuo posto.
-
-Due modifiche fanno eccezione. Abilitare `fuzzy` è un'operazione additiva — comporta una seconda colonna — e
-si applica senza richiedere questa procedura. L'impostazione di [`mode`](#mode) modifica la query anziché
-la colonna, quindi viene applicata semplicemente tramite un deploy.
-
-L'avvio si blocca con un errore anziché servire le richieste, perché l'alternativa coinciderebbe con la situazione che questo controllo
-vuole evitare: una colonna che continua a indicizzare il vecchio insieme di campi e una ricerca che
-non restituisce nulla per contenuti chiaramente presenti nella riga.
+Con PostgreSQL 16 e precedenti usa una migrazione SQL revisionata che ricrea la
+colonna generata e gli oggetti dipendenti. Poi controlla l’espressione e gli
+indici. `fuzzy` aggiunge una colonna. [`mode`](#mode) cambia solo la query di
+ricerca.
 
 ## Cosa è possibile indicare in `fields`
 

@@ -303,26 +303,18 @@ for every row of the table. Page with `meta.hasMore`, which stays exact.
 ### What you have to provide
 
 - **pgvector.** A `vector` property compiles to a `VECTOR(n)` column, and that
-  type comes from the `vector` extension. Rebase will install it for you, but
-  only where you say it may:
+  type comes from the `vector` extension. Declare it in the database resource for
+  Ptah to plan vector columns:
 
   ```ts
   // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 
-  That line is a permission rather than a request — Rebase runs
-  `CREATE EXTENSION IF NOT EXISTS vector` only when something in your schema
-  needs it. It is opt-in because installing an extension depends on things
-  Rebase cannot see from inside the connection: the image has to ship the
-  library (the scaffold's `pgvector/pgvector:pg18` does, a stock `postgres:18`
-  does not), the role has to be allowed to install it, and a managed provider
-  has to have it on an allow-list.
-
-  Say nothing and Rebase installs nothing — install it once by hand instead.
-  Either way the column is created, and Postgres refuses it with
-  `type "vector" does not exist` on a database that has neither, naming both
-  ways out.
+  The target and planning servers need the pgvector library and permission
+  to create the extension. A hosted provider can require the extension on
+  its allow-list. Keep the declaration if an administrator already created
+  the extension in the target database.
 
 The column, its ANN index, and `CREATE EXTENSION` are part of the desired
 `schema.sql` that Ptah Compat plans for `rebase db push` and `db generate`.
