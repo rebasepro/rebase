@@ -13,12 +13,17 @@ import {
     ensureMetricsHistory,
     adoptExistingMetricsHistory,
     recordSamples,
+    recordRequestDeltas,
     readSeries,
+    readSeriesBatch,
     sampleSelf,
     SAMPLE_INTERVAL_MS,
+    type DeltaCursor,
     type Exec,
+    type HistoryBucket,
     type MetricSeries,
-    type SeriesPoint
+    type SeriesPoint,
+    type SurfaceTotals
 } from "./history-store.js";
 
 export interface MetricsHistory {
@@ -28,6 +33,15 @@ export interface MetricsHistory {
     start(): () => void;
     /** Read one series, for the route and for anything else that asks. */
     read(series: MetricSeries, sinceMinutes: number): Promise<SeriesPoint[]>;
+    /** Read several series at once, bucketed — the `/metrics/history/batch` route. */
+    readBatch(series: MetricSeries[], minutes: number, bucket: HistoryBucket): Promise<Record<string, SeriesPoint[]>>;
+    /**
+     * Where the sampler reads request and error counts from: the request
+     * middleware's registry, which this half does not own. Until it is set the
+     * sampler records no request history — a backend booted without metrics
+     * middleware has no counts to record.
+     */
+    countRequestsFrom(read: () => SurfaceTotals): void;
 }
 
 /** The driver's SQL executor, when its admin can run SQL at all. */
@@ -57,7 +71,13 @@ export function createMetricsHistory(
         return undefined;
     }
 
+    let readTotals: (() => SurfaceTotals) | undefined;
+
     return {
+        countRequestsFrom(read) {
+            readTotals = read;
+        },
+        readBatch: (series, minutes, bucket) => readSeriesBatch(exec, series, minutes, bucket),
         ensure: () => options.provision === false ? adoptExistingMetricsHistory(exec) : ensureMetricsHistory(exec),
         read: (series, sinceMinutes) => readSeries(exec, series, sinceMinutes),
         start(): () => void {
@@ -70,6 +90,9 @@ export function createMetricsHistory(
             // Docker; the pid fallback keeps two local processes distinct.
             const instance = process.env.HOSTNAME?.trim() || `pid-${process.pid}`;
             let cursor: { cpu: NodeJS.CpuUsage; at: number } | null = null;
+            // The previous cumulative request count per delta series. Empty at
+            // boot, so the first tick writes the count since boot.
+            let deltaCursor: DeltaCursor = {};
             let stopped = false;
 
             // Event-loop delay: how long a callback waited past its schedule.
@@ -106,6 +129,20 @@ export function createMetricsHistory(
                     // pod over a chart would be a far worse trade than a gap in
                     // one. The gap is visible in the data; a restart loop is not.
                     logger.debug("[metrics] could not record a sample", { err });
+                }
+                if (readTotals) {
+                    // Its own try: the gauges above and the deltas here fail
+                    // independently, and a delta whose write failed is carried
+                    // into the next tick rather than lost.
+                    try {
+                        const written = await recordRequestDeltas(exec, readTotals(), deltaCursor, instance);
+                        deltaCursor = written.cursor;
+                        if (written.failed.length > 0) {
+                            logger.debug("[metrics] could not record request history; carried to the next minute", { err: written.failed[0] });
+                        }
+                    } catch (err) {
+                        logger.debug("[metrics] could not read request counts", { err });
+                    }
                 }
             };
 

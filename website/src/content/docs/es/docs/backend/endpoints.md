@@ -1,5 +1,5 @@
 ---
-sourceHash: 7fea9b51c30a3c41
+sourceHash: 94ae1d0452d97c4b
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase (datos, autenticación, almacenamiento, administración, metadatos), junto con el control de acceso (gate) de cada una y la página que la explica.
@@ -296,6 +296,7 @@ inventario de endpoints personalizados de un despliegue no es público.
 | `GET` | `/api/meta/contract` | `schema:read` | `{ schemaVersion, runtime: { version, contract }, tables }` — cada tabla tal como la ve un administrador, la entrada de `rebase generate-sdk --from`. `404` cuando no hay autenticación configurada |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` cuando esté configurado | Métricas de Prometheus, cuando `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` cuando esté configurado | Las series registradas detrás de los gráficos de Studio. `501` en un runtime sin backend |
+| `GET` | `/metrics/history/batch` | `REBASE_METRICS_TOKEN` cuando esté configurado | Hasta 16 series registradas a la vez, `?series=<a>,<b>&minutes=<n>&bucket=<1\|5\|30\|180>`, agrupadas por intervalo. Incluye peticiones y errores por minuto y superficie. `501` en un runtime sin backend |
 
 Las conexiones WebSocket llegan como una actualización HTTP (HTTP upgrade) en el mismo servidor en lugar de en
 una ruta propia; consulta [Tiempo real](/docs/backend/realtime/).

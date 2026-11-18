@@ -1,5 +1,5 @@
 ---
-sourceHash: 7fea9b51c30a3c41
+sourceHash: 94ae1d0452d97c4b
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend bereitstellt – Daten, Auth, Storage, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -299,6 +299,7 @@ Eine Übersicht über die benutzerdefinierten Endpunkte eines Deployments ist ni
 | `GET` | `/api/meta/contract` | `schema:read` | `{ schemaVersion, runtime: { version, contract }, tables }` – jede Tabelle, wie ein Administrator sie sieht, die Eingabe für `rebase generate-sdk --from`. `404`, wenn keine Authentifizierung konfiguriert ist |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN`, wenn gesetzt | Prometheus-Metriken, wenn `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN`, wenn gesetzt | Die aufgezeichneten Zeitreihen hinter den Studio-Diagrammen. `501` auf einer Runtime ohne Backend |
+| `GET` | `/metrics/history/batch` | `REBASE_METRICS_TOKEN`, wenn gesetzt | Bis zu 16 aufgezeichnete Zeitreihen auf einmal, `?series=<a>,<b>&minutes=<n>&bucket=<1\|5\|30\|180>`, in Intervalle zusammengefasst. Enthält Anfragen und Fehler pro Minute je Bereich. `501` auf einer Runtime ohne Backend |
 
 WebSocket-Verbindungen erfolgen als HTTP-Upgrade auf demselben Server und nicht über
 einen eigenen Pfad – siehe [Echtzeit](/docs/backend/realtime/).

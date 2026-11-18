@@ -76,20 +76,70 @@ export const SAMPLE_INTERVAL_MS = 60_000;
  * one signal here that says whether the process is *healthy* rather than how
  * much it is using, and it has no counter semantics to get wrong.
  *
- * `requests_total` and `errors_total` were dropped rather than wired up. The
- * registry does hold them, but they reset on restart, and a resetting counter
- * summed across replicas is not monotonic — a rolling deploy would draw a
- * cliff that looks like traffic collapsing. That needs a deliberate decision
- * about deltas and resets, not a line added at 2am. Adding either back means
- * adding its sampler in the same commit.
+ * Requests and errors are NOT the registry's cumulative counters, which reset
+ * on restart and are not monotonic when summed across replicas — a rolling
+ * deploy would draw a cliff that looks like traffic collapsing. They are
+ * per-minute deltas per surface, written by `recordRequestDeltas`; see
+ * {@link REQUEST_DELTA_SERIES}. Every name here has a writer: `sampleSelf` for
+ * the first three, `recordRequestDeltas` for the rest.
  */
 export const METRIC_SERIES = [
     "cpu_millicores",
     "memory_bytes",
-    "event_loop_delay_ms"
+    "event_loop_delay_ms",
+    // Requests and errors per surface, as PER-MINUTE DELTAS — see
+    // `REQUEST_DELTA_SERIES` below for why deltas and not the counters.
+    "requests_data", "errors_data",
+    "requests_auth", "errors_auth",
+    "requests_storage", "errors_storage",
+    "requests_functions", "errors_functions",
+    "requests_app", "errors_app"
 ] as const;
 
 export type MetricSeries = (typeof METRIC_SERIES)[number];
+
+/**
+ * The surfaces whose requests are recorded over time.
+ *
+ * `admin`, `meta` and `other` are left out on purpose: they are the console and
+ * tooling reading the backend, and on a quiet project they are most of the
+ * traffic — a chart of them would be a chart of somebody looking at the chart.
+ */
+export const RECORDED_SURFACES = ["data", "auth", "storage", "functions", "app"] as const;
+
+export type RecordedSurface = (typeof RECORDED_SURFACES)[number];
+
+/**
+ * The delta series: "requests this instance handled in this minute".
+ *
+ * ## Why deltas and not the counters
+ *
+ * The registry's request counters are cumulative and reset when the process
+ * does, and a resetting counter summed across replicas is not monotonic: a
+ * rolling deploy draws a cliff that looks like traffic collapsing. A delta has
+ * none of that. It never goes backwards, a restart is simply a new process
+ * whose first delta is its own count since boot, and the sum of deltas across
+ * replicas is the deployment's true figure for the minute.
+ *
+ * A delta of zero is NOT written — a quiet project would otherwise write ten
+ * zero rows a minute per instance for nothing — so a read fills zeros back in,
+ * but only for minutes some instance was alive (see {@link readSeriesBatch}).
+ */
+export const REQUEST_DELTA_SERIES: readonly MetricSeries[] = RECORDED_SURFACES.flatMap(surface => [
+    `requests_${surface}` as const,
+    `errors_${surface}` as const
+]);
+
+/** Whether a series is a per-minute delta, zero-filled on read. */
+export function isDeltaSeries(series: MetricSeries): boolean {
+    return REQUEST_DELTA_SERIES.includes(series);
+}
+
+/**
+ * The series every live instance writes every tick, and so the one a read uses
+ * to tell "running and quiet" (a zero) from "not running" (a gap).
+ */
+export const LIVENESS_SERIES: MetricSeries = "memory_bytes";
 
 export interface MetricSample {
     at: Date;
@@ -268,8 +318,25 @@ export async function recordSamples(
 const COMBINE: Record<MetricSeries, "sum" | "avg"> = {
     cpu_millicores: "sum",
     memory_bytes: "sum",
-    event_loop_delay_ms: "avg"
+    event_loop_delay_ms: "avg",
+    // Each replica's delta is its own share of the minute's traffic, so the
+    // deployment's figure is their sum.
+    requests_data: "sum",
+    errors_data: "sum",
+    requests_auth: "sum",
+    errors_auth: "sum",
+    requests_storage: "sum",
+    errors_storage: "sum",
+    requests_functions: "sum",
+    errors_functions: "sum",
+    requests_app: "sum",
+    errors_app: "sum"
 };
+
+/** How a series combines across replicas. Exported for the route's tests. */
+export function combineOf(series: MetricSeries): "sum" | "avg" {
+    return COMBINE[series];
+}
 
 export interface SeriesPoint {
     at: string;
@@ -297,6 +364,12 @@ export async function readSeries(
     series: MetricSeries,
     sinceMinutes: number
 ): Promise<SeriesPoint[]> {
+    // A delta series is zero-filled against liveness, which only the batch
+    // read knows how to do. One minute per bucket is the same resolution.
+    if (isDeltaSeries(series)) {
+        const batch = await readSeriesBatch(exec, [series], sinceMinutes, 1);
+        return batch[series] ?? [];
+    }
     const combine = COMBINE[series] === "avg" ? "avg" : "sum";
     // The current minute is EXCLUDED, and that is not tidiness.
     //
@@ -332,3 +405,187 @@ export async function readSeries(
 }
 
 interface RawPoint { at: Date | string; value: number; instances?: number | string }
+
+/** Cumulative requests and errors per recorded surface, as the registry holds them. */
+export type SurfaceTotals = Partial<Record<RecordedSurface, { requests: number; errors: number }>>;
+
+/** The previous cumulative count per delta series — the recorder's cursor. */
+export type DeltaCursor = Partial<Record<MetricSeries, number>>;
+
+/**
+ * Turn the registry's cumulative counts into this minute's deltas.
+ *
+ * Pure: the cursor is passed in and the caller decides when to advance it. A
+ * series with no previous reading — the first tick after boot — contributes its
+ * whole count since boot. A count LOWER than the cursor can only mean the
+ * counter restarted, and the honest delta is then the new count itself, never a
+ * negative. Zero deltas are left out: nothing is written for them.
+ */
+export function requestDeltas(
+    totals: SurfaceTotals,
+    cursor: DeltaCursor
+): { series: MetricSeries; value: number; cumulative: number }[] {
+    const deltas: { series: MetricSeries; value: number; cumulative: number }[] = [];
+    for (const surface of RECORDED_SURFACES) {
+        const counts = totals[surface] ?? { requests: 0, errors: 0 };
+        const pairs: [MetricSeries, number][] = [
+            [`requests_${surface}`, counts.requests],
+            [`errors_${surface}`, counts.errors]
+        ];
+        for (const [series, cumulative] of pairs) {
+            const previous = cursor[series] ?? 0;
+            const value = cumulative >= previous ? cumulative - previous : cumulative;
+            if (value > 0 && Number.isFinite(value)) deltas.push({ series, value, cumulative });
+        }
+    }
+    return deltas;
+}
+
+/**
+ * Write this tick's request deltas and return the advanced cursor.
+ *
+ * Each series' cursor moves only when ITS row was written. A failed write
+ * leaves it where it was, so the next tick's delta covers both minutes: nothing
+ * is lost and nothing is counted twice. Per series rather than per tick,
+ * because the rows are separate statements and a failure halfway through must
+ * not re-count the half that landed.
+ *
+ * The upsert ADDS rather than replaces. Two writes for one minute from one
+ * instance — two ticks drifting into the same minute, or a container restart
+ * that keeps its hostname — are both real traffic, and replacing would drop
+ * the first.
+ */
+export async function recordRequestDeltas(
+    exec: Exec,
+    totals: SurfaceTotals,
+    cursor: DeltaCursor,
+    instance: string,
+    at: Date = new Date()
+): Promise<{ cursor: DeltaCursor; failed: unknown[] }> {
+    const bucket = new Date(Math.floor(at.getTime() / 60_000) * 60_000);
+    const next: DeltaCursor = { ...cursor };
+    const failed: unknown[] = [];
+    for (const { series, value, cumulative } of requestDeltas(totals, cursor)) {
+        try {
+            await exec(
+                `INSERT INTO ${METRICS_HISTORY_TABLE} (at, series, instance, value)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (series, instance, at) DO UPDATE SET value = ${METRICS_HISTORY_TABLE}.value + EXCLUDED.value`,
+                [bucket, series, instance, value]
+            );
+            next[series] = cumulative;
+        } catch (err) {
+            failed.push(err);
+        }
+    }
+    return { cursor: next, failed };
+}
+
+/** The bucket sizes the batch read accepts, in minutes. */
+export const HISTORY_BUCKETS = [1, 5, 30, 180] as const;
+
+export type HistoryBucket = (typeof HISTORY_BUCKETS)[number];
+
+/** The widest window a read may ask for, in minutes: the retention. */
+export const MAX_HISTORY_MINUTES = 20_160;
+
+/** How many series one batch read may name. */
+export const MAX_BATCH_SERIES = 16;
+
+/**
+ * Read several series over a window, bucketed, oldest first.
+ *
+ * ## The window
+ *
+ * Buckets are aligned to the epoch and the window ends at the start of the
+ * CURRENT bucket, which is excluded for the same reason {@link readSeries}
+ * excludes the current minute: it is still being written. The window then
+ * reaches back `minutes`, so a 60-minute read at one-minute buckets is at most
+ * sixty complete points, and a day at thirty is at most forty-eight.
+ *
+ * ## Gaps and zeros
+ *
+ * A delta series stores no zeros, so its read fills them in — but only for a
+ * minute in which some instance was alive, which is a minute with a
+ * {@link LIVENESS_SERIES} row. A minute nobody was running is absent: a gap on
+ * a chart, not a zero, because "the app was down" and "the app was quiet" are
+ * different answers. `instances` on a delta point is the number of live
+ * instances.
+ *
+ * ## Within a bucket
+ *
+ * - a delta series is summed over its minutes: requests in the bucket;
+ * - an `avg` series (event-loop delay) is the mean of its per-minute combined
+ *   values;
+ * - a `sum` gauge (CPU, memory) is ALSO the mean of its per-minute combined
+ *   values. Summing thirty minutes of memory would report thirty times the
+ *   memory; a gauge is a level, not an amount that accumulates.
+ *
+ * `instances` is the maximum over the bucket. A bucket with no live minute is
+ * absent. Every requested series is a key in the result, an empty array when
+ * nothing was recorded in the window.
+ */
+export async function readSeriesBatch(
+    exec: Exec,
+    series: readonly MetricSeries[],
+    minutes: number,
+    bucket: HistoryBucket
+): Promise<Record<string, SeriesPoint[]>> {
+    const requested = [...new Set(series)];
+    const deltas = requested.filter(isDeltaSeries);
+    const averaged = requested.filter(s => COMBINE[s] === "avg");
+    const bucketSeconds = bucket * 60;
+
+    const result = await exec(
+        `WITH win AS (
+             SELECT hi - make_interval(mins => $2::int) AS lo, hi
+               FROM (SELECT to_timestamp(floor(extract(epoch FROM now()) / $3::int) * $3::int) AS hi) h
+         ),
+         live AS (
+             SELECT s.at, count(*) AS instances
+               FROM ${METRICS_HISTORY_TABLE} s, win
+              WHERE s.series = '${LIVENESS_SERIES}' AND s.at >= win.lo AND s.at < win.hi
+              GROUP BY s.at
+         ),
+         per_minute AS (
+             SELECT s.series, s.at, sum(s.value) AS total, avg(s.value) AS mean, count(*) AS instances
+               FROM ${METRICS_HISTORY_TABLE} s, win
+              WHERE s.series = ANY($1::text[]) AND s.at >= win.lo AND s.at < win.hi
+              GROUP BY s.series, s.at
+         ),
+         minutes AS (
+             SELECT d.series, l.at, coalesce(p.total, 0) AS value, l.instances, true AS is_delta
+               FROM unnest($4::text[]) AS d(series)
+               CROSS JOIN live l
+               LEFT JOIN per_minute p ON p.series = d.series AND p.at = l.at
+             UNION ALL
+             SELECT p.series, p.at,
+                    CASE WHEN p.series = ANY($5::text[]) THEN p.mean ELSE p.total END,
+                    p.instances, false
+               FROM per_minute p
+              WHERE NOT (p.series = ANY($4::text[]))
+         )
+         SELECT series,
+                to_timestamp(floor(extract(epoch FROM at) / $3::int) * $3::int) AS at,
+                CASE WHEN bool_or(is_delta) THEN sum(value) ELSE avg(value) END AS value,
+                max(instances) AS instances
+           FROM minutes
+          GROUP BY 1, 2
+          ORDER BY 1, 2`,
+        [requested, minutes, bucketSeconds, deltas, averaged]
+    );
+
+    const out: Record<string, SeriesPoint[]> = Object.fromEntries(requested.map(s => [s, [] as SeriesPoint[]]));
+    for (const r of sqlRows<RawBatchPoint>(result)) {
+        const list = out[r.series];
+        if (!list) continue;
+        list.push({
+            at: r.at instanceof Date ? r.at.toISOString() : new Date(String(r.at)).toISOString(),
+            value: Number(r.value),
+            instances: Number(r.instances ?? 1)
+        });
+    }
+    return out;
+}
+
+interface RawBatchPoint { series: string; at: Date | string; value: number | string; instances?: number | string }

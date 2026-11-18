@@ -3,6 +3,7 @@ import {
     recordSamples,
     readSeries,
     sampleSelf,
+    requestDeltas,
     RETENTION_DAYS,
     METRICS_HISTORY_TABLE,
     METRIC_SERIES
@@ -236,9 +237,13 @@ describe("metrics history — the declared list and the written one", () => {
         // 400 beside it exists to prevent. A declared-but-unwritten series is
         // worse than an absent one: the 400 tells you the name is wrong, and
         // the empty array tells you the app was idle.
+        // Two writers: `sampleSelf` for the gauges, `requestDeltas` for the
+        // per-surface request and error deltas.
         const first = sampleSelf(null, 1_000, 3.5);
         const second = sampleSelf(first.cursor, 2_000, 3.5);
-        const written = new Set([...first.samples, ...second.samples].map(s => s.series));
+        const busy = { requests: 3, errors: 1 };
+        const deltas = requestDeltas({ data: busy, auth: busy, storage: busy, functions: busy, app: busy }, {});
+        const written = new Set([...first.samples, ...second.samples, ...deltas].map(s => s.series));
         expect([...written].sort()).toEqual([...METRIC_SERIES].sort());
     });
 
