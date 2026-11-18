@@ -65,9 +65,36 @@ describe("StatTile", () => {
 
     it("top-aligns its content, so tiles in a row share their label and value lines", () => {
         render(<StatTile icon={<svg/>} label="Compute" value="1" detail="1 of 1 ready" onClick={() => undefined}/>);
-        const button = screen.getByRole("button", { name: /Compute/ });
-        expect(button).toHaveClass("items-start");
-        expect(button).not.toHaveClass("items-center");
+        const content = screen.getByText("Compute").closest("div");
+        expect(content).toHaveClass("items-start");
+        expect(content).not.toHaveClass("items-center");
+    });
+
+    it("names its stretched button by the label, value and detail it covers", () => {
+        render(<StatTile icon={<svg/>} label="Backup" value="None" detail="No manual backup yet" onClick={() => undefined}/>);
+        expect(screen.getByRole("button", { name: "Backup None No manual backup yet" })).toBeInTheDocument();
+    });
+
+    it("draws a valueAction right after the value, outside the tile's button", () => {
+        const onClick = jest.fn();
+        const onChevron = jest.fn();
+        render(<StatTile icon={<svg/>} label="Status" value="Stopped" onClick={onClick}
+            valueAction={<button type="button" onClick={onChevron}>Details</button>}/>);
+        const chevron = screen.getByRole("button", { name: "Details" });
+        expect(chevron.parentElement?.previousElementSibling).toHaveTextContent("Stopped");
+        expect(chevron.parentElement?.parentElement).toHaveClass("gap-1.5");
+        expect(screen.getByRole("button", { name: /Status/ })).not.toContainElement(chevron);
+        fireEvent.click(chevron);
+        expect(onChevron).toHaveBeenCalledTimes(1);
+        expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it("never truncates: the label, value and detail wrap", () => {
+        render(<StatTile icon={<svg/>} label="Last backup" value="A value far longer than its tile" detail="and a detail too"/>);
+        for (const text of ["Last backup", "A value far longer than its tile", "and a detail too"]) {
+            expect(screen.getByText(text)).not.toHaveClass("truncate");
+            expect(screen.getByText(text)).toHaveClass("break-words");
+        }
     });
 
     it("is not a button when nothing opens", () => {

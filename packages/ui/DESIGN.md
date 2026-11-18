@@ -311,7 +311,11 @@ products, so they moved into the kit.
   on a hero without becoming boxes inside boxes. They share the label voice and
   the figure face. Its content is top-aligned (changed the same day: centred,
   a tile with a detail line sat higher than its neighbour without one), so the
-  tiles in a row share a label line and a value line. There is no general-purpose `Stat`; an earlier one was
+  tiles in a row share a label line and a value line. Nothing in it truncates:
+  label, value and detail wrap, because a fact cut short is a different fact
+  ("No manual back…"). A `valueAction` (a chevron about the value) sits 6px
+  after the value; the tile's button is stretched over the content rather than
+  wrapped round it, so that control is never nested inside the button. There is no general-purpose `Stat`; an earlier one was
   removed at Francesco's request, and this tile is scoped to the fact above.
 - **`TimeBars`** is a measure over time as one bar per bucket, with an optional
   secondary share (errors of requests) as a red segment at the top of each bar.
