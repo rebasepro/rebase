@@ -75,6 +75,22 @@ export function resolveEmailLinkBase(
 }
 
 /**
+ * The magic link an email carries for `token`.
+ *
+ * `magicLinkUrl` with `{token}` in it is the whole link, the token put where
+ * the placeholder is (`https://app.example.com/app.html#ml={token}`), for a
+ * frontend that does not serve `/auth/magic-link`. Otherwise the link is the
+ * magic-link base with `/auth/magic-link?token=` appended, as it always was.
+ */
+export function magicLinkHref(config: EmailConfig | undefined, token: string): string {
+    const template = config?.magicLinkUrl;
+    if (typeof template === "string" && template.includes("{token}") && isAbsoluteHttpUrl(template.replace(/\{token\}/g, "x"))) {
+        return template.replace(/\{token\}/g, encodeURIComponent(token));
+    }
+    return `${resolveEmailLinkBase(config, "magicLink")}/auth/magic-link?token=${token}`;
+}
+
+/**
  * Throw when an email configuration cannot produce a followable link of every
  * kind it sends.
  *

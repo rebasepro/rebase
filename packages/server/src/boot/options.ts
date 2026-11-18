@@ -56,7 +56,8 @@ export function resolveEmailOptions(env: RebaseBootEnv): EmailConfig | undefined
             sendEmail: registerDevEmailSink(createDevEmailSink()).sendEmail,
             appName: env.APP_NAME,
             logoUrl: env.EMAIL_LOGO_URL,
-            resetPasswordUrl: env.FRONTEND_URL
+            resetPasswordUrl: env.FRONTEND_URL,
+            ...(env.MAGIC_LINK_URL ? { magicLinkUrl: env.MAGIC_LINK_URL } : {})
         };
     }
 
@@ -74,7 +75,8 @@ pass: env.SMTP_PASS ?? "" }
         },
         appName: env.APP_NAME,
         logoUrl: env.EMAIL_LOGO_URL,
-        resetPasswordUrl: env.FRONTEND_URL
+        resetPasswordUrl: env.FRONTEND_URL,
+        ...(env.MAGIC_LINK_URL ? { magicLinkUrl: env.MAGIC_LINK_URL } : {})
     };
 }
 

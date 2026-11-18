@@ -211,6 +211,7 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `SMTP_NAME` | Display name on the sender address |
 | `APP_NAME` | Product name used in email subjects and bodies (default: `Rebase`) |
 | `EMAIL_LOGO_URL` | Logo shown atop the default email templates. Absolute `http(s)` PNG or JPG — clients strip SVG and block `data:` URIs. Unset, an app still named `Rebase` gets the Rebase mark and a renamed one gets none |
+| `MAGIC_LINK_URL` | Where an emailed magic link points. A base gets `/auth/magic-link?token=…` appended; a URL containing `{token}` is the whole link (`https://app.example.com/app.html#ml={token}`), for a frontend that does not serve `/auth/magic-link`. Unset, the base is `FRONTEND_URL` |
 
 ### Database connection pool
 
