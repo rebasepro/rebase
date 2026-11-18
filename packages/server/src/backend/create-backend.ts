@@ -1474,7 +1474,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const capabilities = await authAdapter!.getCapabilities();
         return c.json({
             ...capabilities,
-            storage: Boolean(storageRegistry || storageController)
+            storage: Boolean(storageRegistry || storageController),
+            // Only where the door is mounted: the built-in adapter, with the
+            // platform's key set.
+            ...(platformTokens && authAdapter?.id === "rebase-builtin"
+                ? { platformSignIn: platformTokens.signInUrl ? { url: platformTokens.signInUrl } : {} }
+                : {})
         } satisfies AuthConfigDocument);
     };
 
@@ -1620,7 +1625,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 requireEmailVerification: safeAuthConfig.requireEmailVerification ?? false,
                 refreshTokenReuseIntervalSeconds: safeAuthConfig.refreshTokenReuseIntervalSeconds,
                 refreshTokenReuse: safeAuthConfig.refreshTokenReuse,
-                magicLinkCreatesUsers: safeAuthConfig.magicLinkCreatesUsers ?? false
+                magicLinkCreatesUsers: safeAuthConfig.magicLinkCreatesUsers ?? false,
+                // The platform's sign-in door, on whenever the platform set
+                // its key (`auth/platform-signin-routes.ts`). A spent token is
+                // remembered where this backend counts its rate limits —
+                // across replicas when that store is shared.
+                platformSignIn: platformTokens ? { tokens: platformTokens, usedTokens: rateLimitStore } : undefined
             });
 
             // A requirement nobody can meet is a backend nobody can sign in

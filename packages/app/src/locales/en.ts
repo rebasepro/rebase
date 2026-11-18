@@ -765,6 +765,8 @@ export const en: RebaseTranslations = {
     auth_email_change_continue: "Continue",
     auth_email_change_unavailable: "Changing an email address is not available on this backend.",
     auth_signing_in_with_link: "Signing you in…",
+    auth_continue_with_platform: "Continue with Rebase Cloud",
+    auth_platform_signin_hint: "This project runs on Rebase Cloud. Its owners sign in from the project's page in the console, with no password to set.",
     auth_magic_link_failed_title: "Sign-in link not accepted",
     auth_magic_link_unavailable: "Sign-in links are not available on this backend.",
     reset_mfa_title: "Reset two-step verification",

@@ -170,6 +170,29 @@ describe("LoginView Component", () => {
         });
     });
 
+    describe("a project whose platform signs its owners in", () => {
+        it("offers Continue with Rebase Cloud, going to the console", () => {
+            mockAuthController.platformSignIn = { url: "https://app.rebase.pro/projects/p1?open=admin" };
+            render(<LoginView authController={mockAuthController}/>);
+            const link = screen.getByRole("link", { name: "auth_continue_with_platform" });
+            expect(link).toHaveAttribute("href", "https://app.rebase.pro/projects/p1?open=admin");
+            expect(screen.getByText("auth_platform_signin_hint")).toBeInTheDocument();
+        });
+
+        it("shows only the explanation when the platform gave no address", () => {
+            mockAuthController.platformSignIn = {};
+            render(<LoginView authController={mockAuthController}/>);
+            expect(screen.queryByRole("link", { name: "auth_continue_with_platform" })).not.toBeInTheDocument();
+            expect(screen.getByText("auth_platform_signin_hint")).toBeInTheDocument();
+        });
+
+        it("shows neither on a self-hosted backend", () => {
+            render(<LoginView authController={mockAuthController}/>);
+            expect(screen.queryByRole("link", { name: "auth_continue_with_platform" })).not.toBeInTheDocument();
+            expect(screen.queryByText("auth_platform_signin_hint")).not.toBeInTheDocument();
+        });
+    });
+
     describe("OAuth buttons need both halves configured", () => {
         const GOOGLE_ID = "test-client-id.apps.googleusercontent.com";
 

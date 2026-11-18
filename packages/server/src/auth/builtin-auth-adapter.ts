@@ -124,6 +124,8 @@ export interface BuiltinAuthAdapterConfig {
     refreshTokenReuse?: import("./routes").RefreshTokenReusePolicy;
     /** A magic-link or email-code request for an unknown address creates its account, while registration is open. */
     magicLinkCreatesUsers?: boolean;
+    /** The platform's sign-in door; see `AuthModuleConfig.platformSignIn`. */
+    platformSignIn?: import("./platform-signin-routes").PlatformSignInConfig;
 }
 
 /**
@@ -391,7 +393,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 requireEmailVerification,
                 refreshTokenReuseIntervalSeconds,
                 refreshTokenReuse,
-                magicLinkCreatesUsers
+                magicLinkCreatesUsers,
+                platformSignIn: config.platformSignIn
             });
         },
 

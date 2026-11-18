@@ -1417,6 +1417,28 @@ refreshToken: session.refreshToken };
     }
 
     /**
+     * Sign in with a token the platform hosting the backend minted for a
+     * project's owner (`POST /auth/platform-signin`). The admin panel reads it
+     * from its address, where the platform's console put it; see
+     * `@rebasepro/app`'s `platform-signin.ts`.
+     */
+    async function signInWithPlatformToken(token: string) {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/platform-signin"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token }),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        const session = handleAuthResponse(body, "SIGNED_IN");
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
+    }
+
+    /**
      * Ask for a six-digit sign-in code by email.
      *
      * Answers the same thing whether or not the address has an account — do not
@@ -1927,6 +1949,7 @@ refreshToken: session.refreshToken };
         confirmEmailChange,
         sendMagicLink,
         verifyMagicLink,
+        signInWithPlatformToken,
         sendEmailOtp,
         verifyEmailOtp,
         startDeviceLogin,
