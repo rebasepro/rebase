@@ -1,19 +1,16 @@
 import { platformSignInFromAddress, resetPlatformSignInForTests, takePlatformSignInToken } from "../../src/auth/platform-signin";
 
-function fakeWindow(href: string) {
+/** A real jsdom window, moved to `href` first; `replaceState` is spied on. */
+function fakeWindow(href: string): Pick<Window, "location" | "history"> {
     const url = new URL(href);
-    const location = { pathname: url.pathname, search: url.search, hash: url.hash };
-    const replaceState = jest.fn((_state: unknown, _title: string, next: string) => {
-        const moved = new URL(next, url.origin);
-        location.pathname = moved.pathname;
-        location.search = moved.search;
-        location.hash = moved.hash;
-    });
-    return { location, history: { state: null, replaceState } } as unknown as Pick<Window, "location" | "history">;
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    jest.spyOn(window.history, "replaceState");
+    return window;
 }
 
 describe("the platform's sign-in token in the address", () => {
-    beforeEach(() => resetPlatformSignInForTests());
+    beforeEach(() => { resetPlatformSignInForTests(); });
+    afterEach(() => { jest.restoreAllMocks(); });
 
     it("is taken out of the address before anything spends it", () => {
         const win = fakeWindow("https://palp.example/admin?x=1#rebase_platform_signin=rpt_abc");
