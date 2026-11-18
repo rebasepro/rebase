@@ -205,9 +205,29 @@ function moduleScopeEnvReads(source: string): number[] {
     const hits: number[] = [];
     lines.forEach((line, index) => {
         if (/^\s/.test(line) || line.trim() === "") return;
-        if (/\bprocess\.env\b/.test(line)) hits.push(index + 1);
+        if (hasUnguardedEnvRead(line)) hits.push(index + 1);
     });
     return hits;
+}
+
+/**
+ * Whether a line reads `process.env.X` with nothing to fall back on.
+ *
+ * `process.env.X ?? ""` and `process.env.X || "default"` cannot fail an
+ * import: the variable being unset is the case they handle. Flagging them
+ * printed 25 warnings for one ported project, each saying its file "fails to
+ * import if unset", none of which could. Exported for testing.
+ */
+export function hasUnguardedEnvRead(line: string): boolean {
+    const read = /\bprocess\.env(?:\.[A-Za-z_$][\w$]*|\[[^\]]*\])?/g;
+    let match: RegExpExecArray | null;
+    while ((match = read.exec(line)) !== null) {
+        const rest = line.slice(match.index + match[0].length);
+        // `?.trim()` and friends before the fallback still fall back.
+        if (/^\s*(?:\?\.[\w$]+(?:\([^)]*\))?)*\s*(?:\?\?|\|\|)/.test(rest)) continue;
+        return true;
+    }
+    return false;
 }
 
 function packageOf(specifier: string): string {
@@ -268,13 +288,17 @@ export function analyseFunctionSource(source: string, name: string, file: string
         }
     }
 
-    for (const line of moduleScopeEnvReads(code)) {
+    // One finding per file, naming every line: the advice is the same for
+    // each, and one line per read pushed a deploy's own result off the screen.
+    const envLines = moduleScopeEnvReads(code);
+    if (envLines.length > 0) {
         issues.push({
             kind: "module-scope-env",
-            line,
-            message: "reads process.env at module scope. If the variable is unset the whole file "
-                + "fails to import, and the loader reports that as a skipped function — read it "
-                + "inside the handler instead (`requireEnv(c, \"NAME\")`, or `lazyResource`).",
+            line: envLines[0],
+            message: `reads process.env at module scope with no fallback (line${envLines.length > 1 ? "s" : ""} ${envLines.join(", ")}). `
+                + "If the variable is unset the whole file fails to import, and the loader reports that as a "
+                + "skipped function — read it inside the handler (`requireEnv(c, \"NAME\")`, or `lazyResource`), "
+                + "or give it a fallback (`process.env.NAME ?? \"\"`).",
             actionable: true
         });
     }
