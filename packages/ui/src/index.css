@@ -32,6 +32,24 @@ html.dark {
     scrollbar-width: none; /* Firefox */
 }
 
+/* Lucide icons draw at a 1.5 stroke, not the library's 2.
+
+   At the 14–16px the product uses, stroke 2 reads heavy against Inter at
+   400–500, and it is the most recognisable "default kit" tell; the references
+   draw at 1.5. A stylesheet rule outranks the SVG presentation attribute
+   Lucide writes, so no call site changes.
+
+   Two things keep their stroke:
+   - icons drawn at 12px and under (Lucide writes `width` = the size), where
+     1.5 breaks the glyph up;
+   - an icon given `stroke-keep`, for a stroke chosen on purpose: the
+     checkbox's check and minus marks, an empty-state glyph drawn at 1.
+   Only `svg.lucide` is selected, so charts, the logo, React Flow and any
+   hand-drawn SVG are untouched. */
+svg.lucide:not(.stroke-keep):not([width="8"]):not([width="9"]):not([width="10"]):not([width="11"]):not([width="12"]) {
+    stroke-width: 1.5;
+}
+
 /* Optical ladder: weight comes down as size comes down, tracking tightens as
    size goes up. Seven consecutive levels of semibold was a Rubik-era setting,
    and holding 600 all the way down to text-sm made every heading shout equally
