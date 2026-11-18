@@ -24,8 +24,13 @@ export interface RebaseShellProps {
     autoOpenDrawer?: boolean;
     /** Start with the drawer expanded instead of collapsed to icons. Ignored on small layouts. */
     defaultDrawerOpen?: boolean;
-    /** Path to the logo shown in the drawer and top bar. Falls back to the Rebase mark. */
+    /** Path to the logo shown in the drawer, the top bar and the sign-in screen. Falls back to the Rebase mark. */
     logo?: string;
+    /**
+     * The logo for the dark theme, for a logo drawn in dark ink that would
+     * disappear on the dark admin. Falls back to `logo`.
+     */
+    logoDark?: string;
     children?: React.ReactNode;
 }
 
@@ -53,6 +58,7 @@ export function RebaseShell(props: RebaseShellProps) {
         autoOpenDrawer = true,
         defaultDrawerOpen = false,
         logo,
+        logoDark,
         children
     } = props;
 
@@ -80,7 +86,7 @@ export function RebaseShell(props: RebaseShellProps) {
     }
 
     return (
-        <RebaseAuthGate>
+        <RebaseAuthGate logo={logo} logoDark={logoDark}>
             <RebaseNavigation>
                 <ErrorBoundary fullPage>
                     <RebaseRouteDefs
@@ -92,6 +98,7 @@ export function RebaseShell(props: RebaseShellProps) {
                                 autoOpenDrawer={autoOpenDrawer}
                                 defaultDrawerOpen={defaultDrawerOpen}
                                 logo={logo}
+                                logoDark={logoDark}
                                 devViews={devViews}
                             />
                         }

@@ -68,7 +68,7 @@ export const TextButtons = () => {
                         <item.icon
                             className={cls({
                                 "text-inherit": !item.isActive(state),
-                                "text-blue-500": item.isActive(state)
+                                "text-primary": item.isActive(state)
                             })}
                         />
                     </Button>

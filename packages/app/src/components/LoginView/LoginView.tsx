@@ -70,6 +70,12 @@ export interface LoginViewProps {
     logo?: string;
 
     /**
+     * The logo for the dark theme, for a logo drawn in dark ink that would
+     * disappear on the dark sign-in screen. Falls back to `logo`.
+     */
+    logoDark?: string;
+
+    /**
      * Enable the skip login button
      */
     allowSkipLogin?: boolean;
@@ -278,6 +284,7 @@ function signInRefusal(authController: AuthControllerExtended): unknown {
  */
 export function LoginView({
     logo,
+    logoDark,
     authController,
     noUserComponent,
     disableSignupScreen = false,
@@ -477,13 +484,19 @@ export function LoginView({
 
     let logoComponent;
     if (logo) {
-        logoComponent = <img src={logo}
-            style={{
-                height: "100%",
-                width: "100%",
-                objectFit: "cover"
-            }}
-            alt={"Logo"}/>;
+        const logoStyle = {
+            height: "100%",
+            width: "100%",
+            objectFit: "cover"
+        } as const;
+        // Both are in the DOM and the `dark` class on <html> picks one, so the
+        // swap follows the theme toggle on this screen too.
+        logoComponent = logoDark
+            ? <>
+                <img src={logo} style={logoStyle} className="dark:hidden" alt={"Logo"}/>
+                <img src={logoDark} style={logoStyle} className="hidden dark:block" alt={"Logo"}/>
+            </>
+            : <img src={logo} style={logoStyle} alt={"Logo"}/>;
     } else {
         logoComponent = <RebaseLogo/>;
     }

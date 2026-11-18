@@ -92,7 +92,7 @@ export const LinkSelector = ({
                 className="gap-2 rounded-none"
                 color={"text"}>
                 <p className={cls("underline decoration-stone-400 underline-offset-4", {
-                    "text-blue-500": isActive
+                    "text-primary": isActive
                 })}>
                     {t("editor_link")}
                 </p>

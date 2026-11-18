@@ -264,7 +264,7 @@ export function LogsExplorer() {
                 {autoScroll && !atBottom && newCount > 0 && (
                     <button
                         onClick={scrollToBottom}
-                        className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-primary text-white text-xs font-medium pl-2.5 pr-3 py-1.5 shadow-md hover:bg-primary-dark transition-colors"
+                        className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-primary text-on-primary text-xs font-medium pl-2.5 pr-3 py-1.5 shadow-md hover:bg-primary-dark transition-colors"
                     >
                         <ArrowDownToLineIcon size={14}/>
                         {newCount} new {newCount === 1 ? "entry" : "entries"}

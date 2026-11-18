@@ -12,7 +12,8 @@ export type AppState = {
     closeDrawer: () => void,
     closeHover: () => void,
     autoOpenDrawer?: boolean,
-    logo?: string
+    logo?: string,
+    logoDark?: string
 }
 
 export const AppContext = React.createContext<AppState>({

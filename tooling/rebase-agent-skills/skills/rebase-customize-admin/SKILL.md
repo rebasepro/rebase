@@ -1,6 +1,6 @@
 ---
 name: rebase-customize-admin
-description: How to customize the Rebase admin panel by writing React components — singletons and settings pages, per-user settings, dashboards, custom pages, master-detail pages, approval queues, bulk actions, toolbar buttons, record buttons and tabs, new collection view modes (calendar, map, gallery), custom fields, replacing the login screen or any built-in part. Use this skill whenever a user asks for something the admin does not do out of the box, before reaching for configuration options.
+description: How to customize the Rebase admin panel by writing React components — singletons and settings pages, per-user settings, dashboards, custom pages, master-detail pages, approval queues, bulk actions, toolbar buttons, record buttons and tabs, new collection view modes (calendar, map, gallery), custom fields, replacing the login screen or any built-in part, and rebranding it (brand colour, fonts, corners, surfaces, logo, light/dark mode). Use this skill whenever a user asks for something the admin does not do out of the box, before reaching for configuration options.
 ---
 
 # Customizing the Rebase admin
@@ -38,6 +38,31 @@ There are three things to know:
    components imported by value — something
    beside a built-in part (`<Rebase slots>`), or a replacement for a built-in
    part (`<Rebase components>`, `wrap: true` to keep the original inside).
+
+## Changing the look is tokens, not components
+
+A request to rebrand the admin (brand colour, fonts, corners, a warmer dark
+theme, the logo) is **not** a component job. Override tokens in
+`frontend/src/index.css`, after the imports:
+
+```css
+@theme {
+    --color-primary: #16a34a;   /* buttons, links, focus, charts, selection */
+    --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+    --font-headers: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+    --radius-lg: 4px;           /* controls, menus */
+    --radius-xl: 6px;           /* cards, dialogs */
+}
+.dark { --surface-frame: #0d0b09; --surface-card: #1b1814; }  /* role surfaces: :root for light, .dark for dark */
+```
+
+`--color-primary-light/-dark/-bg` and `--color-on-primary` (black or white
+ink, whichever reads on the primary) are derived; do not set them unless
+asked. The logo and name are `<RebaseShell title logo logoDark>`; the same
+logo shows on the sign-in screen. Forcing one theme is a `modeController` on
+`<Rebase>` plus `class="dark"` on `<html>`. Never write the brand colour as a
+literal in a component: use `bg-primary` / `text-primary`. Reference:
+`/docs/frontend/theming`.
 
 ## Start from a recipe
 

@@ -34,6 +34,7 @@ import { DrawerNavigationGroup } from "./DrawerNavigationGroup";
 import { DrawerExpansionContext, useDrawerExpansion } from "./drawer_expansion";
 import { LanguageToggle, RebaseLogo, RlsSimulatorBar, useCanSimulateAccess } from "@rebasepro/app";
 import { useApp } from "./app/useApp";
+import { BrandLogo } from "./BrandLogo";
 
 /**
  * Default drawer used in the admin.
@@ -52,6 +53,7 @@ import { useApp } from "./app/useApp";
 export function DefaultDrawer({
     title,
     logo,
+    logoDark,
     logoDestination,
     children,
     footerActions,
@@ -60,6 +62,8 @@ export function DefaultDrawer({
 }: {
     title?: React.ReactNode;
     logo?: string;
+    /** The logo for the dark theme. Falls back to `logo`. */
+    logoDark?: string;
     logoDestination?: string;
     /**
      * Custom navigation content for the drawer.
@@ -84,10 +88,14 @@ export function DefaultDrawer({
         drawerOpen,
         openDrawer,
         closeDrawer,
-        logo: appLogo
+        logo: appLogo,
+        logoDark: appLogoDark
     } = useApp();
 
+    // A drawer given its own `logo` does not borrow the app's dark variant:
+    // that one was drawn for a different image.
     const resolvedLogo = logo ?? appLogo;
+    const resolvedLogoDark = logo ? logoDark : (logoDark ?? appLogoDark);
 
     const scrollRef = React.useRef<HTMLDivElement>(null);
     const [scrolled, setScrolled] = React.useState(false);
@@ -111,6 +119,7 @@ export function DefaultDrawer({
 
             <DrawerLogo
                 logo={resolvedLogo}
+                logoDark={resolvedLogoDark}
                 title={title}
                 logoDestination={logoDestination}
                 drawerOpen={drawerOpen}
@@ -275,12 +284,14 @@ context });
 
 export function DrawerLogo({
     logo,
+    logoDark,
     title,
     logoDestination = "/",
     drawerOpen,
     drawerHovered
 }: {
     logo?: string;
+    logoDark?: string;
     title?: React.ReactNode;
     logoDestination?: string;
     drawerOpen: boolean;
@@ -304,7 +315,7 @@ export function DrawerLogo({
                 aria-label={t("home", { defaultValue: "Home" })}
             >
                 {logo
-                    ? <img src={logo} alt="Logo" className="w-[28px] h-[28px] object-contain"/>
+                    ? <BrandLogo logo={logo} logoDark={logoDark} className="w-[28px] h-[28px] object-contain"/>
                     : <RebaseLogo width="28px" height="28px"/>
                 }
             </Link>

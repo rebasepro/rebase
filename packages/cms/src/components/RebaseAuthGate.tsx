@@ -25,7 +25,17 @@ import type { AuthControllerExtended } from "@rebasepro/cms-types";
  * </RebaseAuthGate>
  * ```
  */
-export function RebaseAuthGate({ children }: { children: React.ReactNode }) {
+export function RebaseAuthGate({
+    children,
+    logo,
+    logoDark
+}: {
+    children: React.ReactNode;
+    /** The logo the built-in sign-in screen shows. `<RebaseShell logo>` passes its own. */
+    logo?: string;
+    /** The sign-in screen's logo in the dark theme. Falls back to `logo`. */
+    logoDark?: string;
+}) {
     const registry = useRebaseRegistry();
     const authController = useAuthController();
     // `<RebaseAuth loginView>` is an element and wins; `"Auth.LoginView"` in
@@ -49,7 +59,9 @@ export function RebaseAuthGate({ children }: { children: React.ReactNode }) {
 
     if (!authController?.user || linkOpensOverSession) {
         const ActiveLoginView = registry.authConfig?.loginView ?? (
-            <ResolvedLoginView authController={authController as AuthControllerExtended}/>
+            <ResolvedLoginView authController={authController as AuthControllerExtended}
+                logo={logo}
+                logoDark={logoDark}/>
         );
         return <>{ActiveLoginView}</>;
     }

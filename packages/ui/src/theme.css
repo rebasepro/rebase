@@ -115,6 +115,20 @@
     --color-primary-bg: oklch(from var(--color-primary) l c h / 0.1);
     --color-secondary-bg: oklch(from var(--color-secondary) l c h / 0.1);
 
+    /* The ink that sits ON a primary or secondary fill: the label of a filled
+       button, the tick in a checked checkbox. Derived, so a project that
+       rebrands with one line (`--color-primary: #EAB308`) does not get white
+       labels on yellow buttons at 1.9:1.
+
+       White below OKLCH lightness 0.6, black at or above it. 0.6 is where the
+       choice flips for real brand colours: #0070F4 (L 0.574) and rose-600
+       (0.586) keep white; violet-500 (0.606), green-600 (0.627), red-500
+       (0.637) and every yellow, orange, lime, cyan and teal get black, which
+       is the higher-contrast ink for each of them. Override it outright when
+       a brand wants something else. */
+    --color-on-primary: oklch(from var(--color-primary) clamp(0, (0.6 - l) * 1000, 1) 0 0);
+    --color-on-secondary: oklch(from var(--color-secondary) clamp(0, (0.6 - l) * 1000, 1) 0 0);
+
     /* GRAPHITE — every neutral in this file, text and surface, sits on ONE hue:
        258°, the brand blue's own, at a chroma low enough (0.002-0.014) that
        nothing reads as blue. Adopted 2026-10-14.

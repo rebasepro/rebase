@@ -500,7 +500,7 @@ const InnerCheckBox = React.memo(function InnerCheckBox({ checked }: { checked: 
                 "border-2 relative transition-colors ease-in-out duration-150",
                 "w-4 h-4 rounded-sm flex items-center justify-center",
                 (checked ? "bg-primary" : "bg-surface-card"),
-                (checked) ? "text-surface-accent-100 dark:text-surface-accent-900" : "",
+                (checked) ? "text-on-primary" : "",
                 (checked ? "border-transparent" : "border-surface-accent-800 dark:border-surface-accent-200")
             )}>
             {checked && <CheckIcon size={iconSize.smallest} className={"absolute"}/>}
