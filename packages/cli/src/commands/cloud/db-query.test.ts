@@ -9,7 +9,7 @@ import { querySql, summarizeResults } from "./db-query";
 function exits(fn: () => unknown): string {
     const errors: string[] = [];
     const err = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { errors.push(args.join(" ")); });
-    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => { throw new Error(`exit ${code}`); }) as never);
+    const exit = vi.spyOn(process, "exit").mockImplementation((code?: string | number | null): never => { throw new Error(`exit ${code}`); });
     try {
         fn();
     } catch (e) {
