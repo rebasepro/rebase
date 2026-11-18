@@ -8,6 +8,7 @@ import type { TableDescriptor } from "@rebasepro/types";
 import { col, defineTable } from "@rebasepro/types";
 import { compileTables } from "@rebasepro/common";
 import { composeCollections } from "../../src/hooks/navigation/compose_collections";
+import { registeredCollection } from "../../src/hooks/navigation/registered_collection";
 import { composeCollectionsInput } from "../../src/hooks/navigation/compose_collections_input";
 import { customizeTable } from "../../src/tables/customize_table";
 import { computeNavigationGroups } from "../../src/hooks/navigation/utils";
@@ -113,12 +114,12 @@ describe("composeCollections: navigation order", () => {
     });
 
     it("puts the groups in that order", () => {
-        const collections = composeCollections({ ...NONE, tables: served, tableCustomizations: declared });
+        const collections = composeCollections({ ...NONE, tables: served, tableCustomizations: declared }).map(registeredCollection);
         expect(computeNavigationGroups({ collections }).map(g => g.name)).toEqual(["Music", "Content", "System", "Views"]);
     });
 
     it("still lets navigationGroupMappings decide the groups", () => {
-        const collections = composeCollections({ ...NONE, tables: served, tableCustomizations: declared });
+        const collections = composeCollections({ ...NONE, tables: served, tableCustomizations: declared }).map(registeredCollection);
         const groups = computeNavigationGroups({
             collections,
             navigationGroupMappings: [{ name: "System", entries: ["audit_log"] }, { name: "Content", entries: ["articles"] }]
