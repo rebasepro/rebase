@@ -9,3 +9,4 @@ export { StatTile } from "./StatTile";
 export type { StatTileProps } from "./StatTile";
 export { TimeBars } from "./TimeBars";
 export type { TimeBucket, TimeBarsMarker } from "./TimeBars";
+export { GRID_CLASSES, TICK_CLASSES } from "./chart_parts";
