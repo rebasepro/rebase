@@ -92,7 +92,7 @@ rebase users roles
 rebase users guests prune --older-than 30d --yes
 ```
 
-`create` emails an invitation, or answers a temporary password once when no mail can be sent. Granting a role, `--disable`, `delete` and `mfa-reset` ask first. No caller may grant a role above its own, or act on an account that outranks it. `rebase auth reset-password` is the older spelling, and still falls back to the database when the server is not running.
+`create` emails an invitation, or answers a temporary password once when no mail can be sent. `--no-invite` creates the account with no password and sends nothing, for an app that signs in by magic link, an email code or a provider (`POST /api/admin/users` with `invite: false`). Granting a role, `--disable`, `delete` and `mfa-reset` ask first. No caller may grant a role above its own, or act on an account that outranks it. `rebase auth reset-password` is the older spelling, and still falls back to the database when the server is not running.
 
 ## `rebase cron`
 
