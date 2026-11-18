@@ -45,7 +45,8 @@ import {
     noteBlank,
     reportError,
     warn,
-    type SessionHolder
+    type SessionHolder,
+    type CloudClient
 } from "./context";
 
 /** Documented in `action-help.ts`, and paired with it by `action-help.test.ts`. */
@@ -113,18 +114,17 @@ export function localDsn(opts: {
     return `postgresql://${auth}@127.0.0.1:${opts.port}/${database}`;
 }
 
-export async function dbConnect(rawArgs: string[]): Promise<void> {
-    const { flags: args } = parseCloudArgs({
-        spec: DB_CONNECT_FLAGS,
-        rawArgs,
-        commandWords: 3, // cloud db connect
-        command: "cloud db connect",
-        maxPositionals: 0
-    });
-    const { client, url } = await requireClient(rawArgs);
-    const projectId = await requireProject(rawArgs, client);
-    const projectRef = displayProjectRef(rawArgs);
-
+/**
+ * What a tunnel needs from the control plane: the database's name and user,
+ * and its password when `reveal` asks for it (owner or admin only, as the
+ * console's SQL console). Refuses, by `fail`, a project with nothing to tunnel.
+ * Shared by `db connect` and `db query`.
+ */
+export async function loadTunnelAccess(
+    client: CloudClient,
+    projectId: string,
+    reveal: boolean
+): Promise<{ info: DbInfoResponse; password?: string }> {
     let info: DbInfoResponse;
     try {
         info = await client.functions.invoke<DbInfoResponse>("db-info", undefined, {
@@ -151,10 +151,8 @@ export async function dbConnect(rawArgs: string[]): Promise<void> {
         );
     }
 
-    // Asked for before the listener opens: a prompt-free failure is better than
-    // a tunnel that works and a URL the caller cannot use.
     let password: string | undefined;
-    if (args["--reveal"]) {
+    if (reveal) {
         if (!info.passwordAvailable) {
             fail(
                 "No password is available to reveal for this database.",
@@ -170,6 +168,22 @@ export async function dbConnect(rawArgs: string[]): Promise<void> {
             return reportError(e, "Failed to reveal the database password");
         }
     }
+    return { info, password };
+}
+
+export async function dbConnect(rawArgs: string[]): Promise<void> {
+    const { flags: args } = parseCloudArgs({
+        spec: DB_CONNECT_FLAGS,
+        rawArgs,
+        commandWords: 3, // cloud db connect
+        command: "cloud db connect",
+        maxPositionals: 0
+    });
+    const { client, url } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
+
+    const { info, password } = await loadTunnelAccess(client, projectId, args["--reveal"] === true);
 
     const requested = args["--port"] ?? DEFAULT_LOCAL_PORT;
     if (!Number.isInteger(requested) || requested < 0 || requested > 65535) {

@@ -539,7 +539,10 @@ Stated plainly, because finding out later is worse:
   resolves to nothing on your machine. `rebase cloud db connect` opens a local
   port that is that database, tunnelled through the control plane, for as long
   as you leave it running — but there is no permanent hostname a third-party
-  service can connect to. That tunnel, and the password behind
+  service can connect to. To run SQL without a local Postgres client,
+  `rebase cloud db query "<sql>"` or `rebase cloud db query -f file.sql` opens the
+  same tunnel for one query, runs the text as one script (stopping at the first
+  error) and prints what each statement answered (`--json` for a script). That tunnel, and the password behind
   `rebase cloud db info --reveal`, both need the organization's owner or admin
   role: the same one Studio's SQL editor asks for, because all three end at a
   session on your production data.

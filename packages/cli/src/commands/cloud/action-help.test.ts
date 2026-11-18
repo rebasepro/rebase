@@ -21,6 +21,7 @@ import { GLOBAL_SPEC_KEYS } from "./context";
 import { CREATE_PROJECT_FLAGS, LIST_PROJECTS_FLAGS } from "./projects";
 import { CREATE_DATABASE_FLAGS } from "./databases";
 import { DB_CONNECT_FLAGS } from "./db-connect";
+import { DB_QUERY_FLAGS } from "./db-query";
 import { DB_ACCESS_FLAGS } from "./db-access";
 import { DEPLOY_FLAGS, LOGS_FLAGS } from "./deploy";
 import { ENV_SET_FLAGS } from "./env";
@@ -67,6 +68,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "resources prune": {},
     "db create": CREATE_DATABASE_FLAGS,
     "db connect": DB_CONNECT_FLAGS,
+    "db query": DB_QUERY_FLAGS,
     "db access": DB_ACCESS_FLAGS,
     "db backup": {},
     "db pitr": { "--target": String },

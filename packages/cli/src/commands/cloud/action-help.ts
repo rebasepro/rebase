@@ -194,6 +194,30 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
+    "db query": {
+        command: "cloud db query",
+        usage: "cloud db query [sql] [-f <file>]",
+        summary:
+            "Run SQL on the project's managed database and print what it answered. It opens the tunnel "
+            + "`db connect` opens, for the length of one query, and connects with the CLI's own Postgres "
+            + "driver, so nothing else needs to be installed. A file of several statements (functions, "
+            + "triggers, DO blocks) runs as one script and stops at the first error.",
+        flags: [
+            ["-f, --file <path>", "Run the statements in a file instead of the argument"]
+        ],
+        examples: [
+            "rebase cloud db query \"select count(*) from rebase.users\"",
+            "rebase cloud db query -f sql/extras.sql --project shop",
+            "rebase cloud db query \"select * from orders limit 5\" --json"
+        ],
+        notes: [
+            "Requires the organization's owner or admin role, as `db connect --reveal` does.",
+            "No transaction is added: wrap the file in BEGIN/COMMIT to make it all-or-nothing.",
+            "`COPY … FROM STDIN` (psql's \\copy) is refused; it needs a client-side stream.",
+            "With --json it prints `{ projectId, results: [{ command, rowCount, rows }] }`, one entry per statement."
+        ]
+    },
+
     "db connect": {
         command: "cloud db connect",
         usage: "cloud db connect [--port <n>] [--reveal]",
