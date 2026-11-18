@@ -1,21 +1,23 @@
 ---
-sourceHash: bbef56d48a3598af
-title: Estilizando UI personalizada
-sidebar_label: Estilizando UI personalizada
-description: Crie visualizações personalizadas, páginas iniciais e ações a partir dos mesmos componentes e tokens de tema do restante do admin, para que pareçam nativos e sigam o tema.
+sourceHash: 8d29618687855b39
+title: Estilizando UI Personalizada
+sidebar_label: Estilizando UI Personalizada
+description: Construa visualizações, páginas iniciais e ações personalizadas a partir dos mesmos componentes e tokens de tema do restante do admin, para que pareçam nativas e sigam o tema.
 ---
 
 ## Visão Geral
 
-Cada mecanismo de extensão nesta seção entrega um componente React e sai do caminho — uma [visualização personalizada](/docs/frontend/extending), uma [página inicial](/docs/frontend/component-overrides), uma [visualização de entidade](/docs/frontend/entity-views), um [slot](/docs/frontend/slots). O que nenhum deles diz é *com o que construí-lo*.
+Cada mecanismo de extensão nesta seção entrega a você um componente React e sai do caminho — uma [visualização personalizada](/docs/frontend/extending), uma [página inicial](/docs/frontend/component-overrides), uma [visualização de entidade](/docs/frontend/entity-views), um [slot](/docs/frontend/slots). O que nenhum deles diz é com o que *construí-lo*.
 
-A resposta é: as mesmas partes a partir das quais o admin é construído. Uma visualização personalizada ainda é uma visualização do admin. Ela fica dentro do mesmo shell, ao lado das mesmas tabelas, sob a mesma alternância de tema — portanto, deve usar os mesmos componentes, a mesma escala tipográfica e os mesmos tokens de cor.
+A resposta é: as mesmas partes a partir das quais o admin é construído. Uma visualização personalizada ainda é uma visualização do admin. Ela fica dentro da mesma estrutura, ao lado das mesmas tabelas, sob o mesmo seletor de tema — portanto, deve usar os mesmos componentes, a mesma escala tipográfica e os mesmos tokens de cor.
 
-A alternativa é inventar uma segunda linguagem de design dentro da mesma aplicação. Essa é a falha mais comum, e ela não parece apenas inconsistente — ela quebra. Um `color: #111` escrito manualmente fica invisível no momento em que alguém alterna para o tema escuro, e nenhum teste detecta isso.
+Esta página é sobre como construir suas próprias visualizações. Para alterar a própria aparência do admin — cor da marca, fontes, cantos, logotipo — consulte [Theming & Branding](/docs/frontend/theming); como suas visualizações usam os mesmos tokens, elas também acompanham essa alteração.
+
+A alternativa é inventar uma segunda linguagem de design dentro da mesma aplicação. Essa é a falha mais comum, e ela não apenas parece inconsistente — ela quebra. Um `color: #111` escrito à mão fica invisível no momento em que alguém alterna para o tema escuro, e nenhum teste detecta isso.
 
 ## A regra
 
-**Importe componentes de `@rebasepro/ui`. Recorra a uma `<div>` simples e uma classe apenas para layout.**
+**Importe componentes de `@rebasepro/ui`. Recorra a uma `<div>` pura e a uma classe apenas para layout.**
 
 ```tsx
 import { Alert, Button, Card, Chip, Typography } from "@rebasepro/ui";
@@ -40,11 +42,11 @@ export function DashboardView() {
 }
 ```
 
-Cada componente no kit está catalogado em [Componentes de UI](/docs/ui/components/card/) com suas props reais, geradas a partir do código-fonte. Verifique lá antes de criar do zero: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` e cerca de setenta outros já existem.
+Cada componente do kit está catalogado em [UI components](/docs/ui/components/card/) com suas props reais, geradas a partir do código-fonte. Consulte lá antes de criar manualmente: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` e cerca de outros setenta já existem.
 
 ## Cor: use tokens, nunca literais
 
-O tema é um conjunto de variáveis CSS expostas como utilitários do Tailwind. Use-os e combine cada valor claro com um `dark:`:
+O tema é um conjunto de variáveis CSS expostas como utilitários do Tailwind. Use-as e combine cada valor claro com um `dark:`:
 
 | Uso | Classe |
 |---|---|
@@ -52,22 +54,23 @@ O tema é um conjunto de variáveis CSS expostas como utilitários do Tailwind. 
 | Texto secundário | `text-surface-600 dark:text-surface-400` — ou apenas `<Typography color="secondary">` |
 | Fundo do painel | `bg-surface-accent-50 dark:bg-surface-800` |
 | Bordas | `border-surface-200 dark:border-surface-700` |
-| Destaque | `text-primary` / `bg-primary` (`#0070F4`) |
+| Destaque | `text-primary` / `bg-primary` (a cor da marca do projeto, `#0070F4` por padrão) |
+| Texto sobre preenchimento de destaque | `text-on-primary` — preto ou branco, o que for legível sobre a cor da marca |
 
-Duas regras derivadas de problemas reais:
+Duas regras que surgiram de problemas reais:
 
-- **Nunca escreva uma cor literal.** `#111`, `rgba(128,128,128,.28)`, `white` — cada uma é correta em exatamente um tema. Uma página cujos números eram `color: var(--fg, #111)` renderizou preto sobre preto para todos os usuários do tema escuro, e parecia perfeita para a pessoa que a escreveu.
+- **Nunca escreva uma cor literal.** `#111`, `rgba(128,128,128,.28)`, `white` — cada uma delas está correta em exatamente um tema. Uma página cujos números eram `color: var(--fg, #111)` foi renderizada preto no preto para todos os usuários do tema escuro, e parecia perfeita para a pessoa que a escreveu.
 - **Nunca defina uma cor que um componente já define.** `<Typography>` escolhe a cor de primeiro plano correta para o tema. Sobrescrevê-la com uma classe é como um título acaba sendo o único elemento na página que ignora o tema.
 
 ## Tipografia: use a escala
 
-`Typography` carrega toda a escala — `h1`–`h6`, `subtitle1`/`subtitle2`, `body1`/`body2`, `lead`, `caption`, `label`, `button`, `stat`, `micro`, `mono`. Use `variant`, não uma classe de tamanho de fonte. A escala já codifica o tracking que cada nível necessita (`--tracking-display` em ≥30px, `--tracking-title` em 20–24px, `--tracking-heading` abaixo disso), o que um `text-[27px]` não faz.
+`Typography` abrange toda a escala — `h1`–`h6`, `subtitle1`/`subtitle2`, `body1`/`body2`, `lead`, `caption`, `label`, `button`, `stat`, `micro`, `mono`. Use `variant`, não uma classe de tamanho de fonte. A escala já codifica o espaçamento entre letras (tracking) que cada nível precisa (`--tracking-display` em ≥30px, `--tracking-title` em 20–24px, `--tracking-heading` abaixo disso), o que um `text-[27px]` não faz.
 
-A UI do produto não vai abaixo de `text-xs`, com uma exceção: a variante `micro`, o rótulo em maiúsculas acima de um valor, usa `text-2xs`. O nível `text-3xs` existe apenas para páginas de marketing.
+A interface do produto não fica abaixo de `text-xs`, com uma exceção: a variante `micro`, o rótulo em maiúsculas acima de um valor, fica em `text-2xs`. O nível `text-3xs` existe apenas para páginas de marketing.
 
 ## Configuração
 
-A UI personalizada precisa do CSS do tema e do Tailwind apontados para os pacotes, caso contrário, as classes utilitárias usadas *dentro* de `@rebasepro/ui` nunca serão geradas:
+A UI personalizada precisa do CSS do tema e do Tailwind apontados para os pacotes, caso contrário, as classes utilitárias usadas *dentro* do `@rebasepro/ui` nunca serão geradas:
 
 ```css
 @import "tailwindcss";
@@ -79,7 +82,7 @@ A UI personalizada precisa do CSS do tema e do Tailwind apontados para os pacote
 @custom-variant dark (&:where(.dark, .dark *));
 ```
 
-O `rebase init` escreve isso para você. Se a sua visualização personalizada for renderizada sem estilos, esta é a primeira coisa a verificar.
+`rebase init` escreve isso para você. Se a sua visualização personalizada for renderizada sem estilos, essa é a primeira coisa a verificar.
 
 ## Checklist
 
@@ -88,5 +91,5 @@ Antes de publicar uma visualização personalizada:
 - Sem cores literais — cada cor é um token ou vem de um componente.
 - Todo `bg-`, `text-` e `border-` tem um equivalente `dark:`.
 - O texto é `<Typography variant=…>`, não uma classe de tamanho de fonte.
-- Contêineres são `Card` / `Paper`, não uma `<div>` com uma borda escrita manualmente.
-- Alterne o tema e olhe para a página. Esse é todo o teste e leva cinco segundos.
+- Contêineres são `Card` / `Paper`, não uma `<div>` com borda escrita à mão.
+- Alterne o tema e olhe para a página. Esse é todo o teste, e leva cinco segundos.

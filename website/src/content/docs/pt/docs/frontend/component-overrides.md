@@ -1,15 +1,17 @@
 ---
-sourceHash: 8a68eb639e8102bb
-title: Substituição de Componentes (Swizzling)
-sidebar_label: Substituição de Componentes
-description: Substitua componentes de UI padrão por implementações personalizadas no nível da aplicação ou da coleção.
+sourceHash: bad5fe6e295033b6
+title: Substituições de Componentes (Swizzling)
+sidebar_label: Substituições de Componentes
+description: Substitua componentes de interface padrão por implementações personalizadas no nível da aplicação ou da coleção.
 ---
 
 ## Visão Geral
 
 O Rebase permite que você substitua componentes de UI padrão por suas próprias implementações personalizadas. Isso implementa um modelo de swizzling de componentes no estilo Docusaurus que suporta dois padrões de personalização:
-- **Modo Eject** (padrão): Seu componente substitui completamente o componente nativo.
-- **Modo Wrap** (`wrap: true`): Seu componente envolve o original. O que ele envolve (geralmente o componente nativo) é passado como a prop `OriginalComponent` para que você possa renderizá-lo dentro do seu layout/lógica personalizada.
+- **Modo Eject** (padrão): Seu componente substitui completamente o componente integrado.
+- **Modo Wrap** (`wrap: true`): Seu componente envolve o original. O que ele envolve (geralmente o componente integrado) é passado como a prop `OriginalComponent` para que você possa renderizá-lo dentro do seu layout/lógica personalizada.
+
+Para alterar apenas a *aparência* do admin — cores, fontes, cantos, logotipo — você não precisa de uma substituição: consulte [Theming & Branding](/docs/frontend/theming).
 
 As substituições de componentes podem ser aplicadas **globalmente** no nível da aplicação (no provedor `<Rebase>`) ou **localmente** no nível da coleção (dentro das definições individuais de coleção).
 
@@ -56,12 +58,9 @@ function App() {
 
 ---
 
-## Substituições de Componentes no Nível de Coleção
+## Substituições de Componentes no Nível da Coleção
 
-Para substituir componentes para apenas uma tabela, passe `components` em seu
-`customizeTable`. Isso é útil para o estado vazio (empty state), os cards ou o formulário de
-uma tabela específica. Cada `Component` é o próprio componente, importado por valor:
-o arquivo é executado apenas no navegador.
+Para substituir componentes de apenas uma tabela, passe `components` em seu `customizeTable`. Isso é útil para o estado vazio (empty state), os cards ou o formulário de uma tabela específica. Cada `Component` é o próprio componente, importado por valor: o arquivo é executado apenas no navegador.
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -80,9 +79,7 @@ export const productsCms = customizeTable<typeof products>("products", {
 });
 ```
 
-Um componente de wrapping recebe o que ele envolve como `OriginalComponent`: o
-componente nativo, a menos que sua aplicação também o substitua (consulte
-[Quando ambos os escopos substituem um componente](#quando-ambos-os-escopos-substituem-um-componente)):
+Um componente wrapper recebe o que ele envolve como `OriginalComponent`: o componente integrado, a menos que sua aplicação também o substitua (consulte [Quando ambos os escopos substituem um componente](#quando-ambos-os-escopos-substituem-um-componente)):
 
 ```tsx
 // frontend/src/components/ProductsEmptyState.tsx
@@ -100,21 +97,20 @@ export function ProductsEmptyState({ OriginalComponent, ...props }: {
 }
 ```
 
-Um caminho em string ou um thunk lazy `() => import(…)` em `Component` lança um erro
-quando o módulo carrega, informando o que deve ser escrito no lugar.
+Um caminho de string ou um thunk lazy `() => import(…)` em `Component` lança um erro quando o módulo é carregado, informando o que escrever em vez disso.
 
 ### Quando ambos os escopos substituem um componente
 
-Os dois escopos se compõem. A substituição no nível da aplicação (`<Rebase components>`) é aplicada primeiro ao componente nativo, e a da tabela (`components` em `customizeTable`) é aplicada ao resultado:
+Os dois escopos se compõem. A substituição no nível da aplicação (`<Rebase components>`) é aplicada primeiro ao componente integrado, e a da tabela (`components` em `customizeTable`) é aplicada ao resultado:
 
-| Nível da aplicação | Nível da coleção | O que renderiza dentro dessa coleção |
+| Nível da aplicação | Nível da coleção | O que é renderizado dentro dessa coleção |
 |---|---|---|
-| qualquer | nenhum | o que renderiza em todos os outros lugares: a substituição no nível da aplicação ou o componente nativo |
-| nenhum | wrap | o wrapper da coleção em torno do componente nativo |
+| qualquer | nenhum | o que é renderizado em qualquer outro lugar: a substituição no nível da aplicação ou o componente integrado |
+| nenhum | wrap | o wrapper da coleção em torno do componente integrado |
 | replace ou wrap | wrap | o wrapper da coleção em torno da substituição no nível da aplicação, passado como `OriginalComponent` |
 | qualquer | replace | somente o componente da coleção; ele substitui ambos |
 
-Assim, uma coleção pode adicionar algo em torno de um componente que sua aplicação já personaliza sem perder essa personalização. Para descartar a versão do nível da aplicação em uma coleção, substitua (replace) em vez de envolver (wrap).
+Dessa forma, uma coleção pode adicionar algo ao redor de um componente que sua aplicação já personaliza sem perder essa personalização. Para descartar a versão no nível da aplicação para uma coleção, substitua em vez de envolver.
 
 ---
 
@@ -122,17 +118,17 @@ Assim, uma coleção pode adicionar algo em torno de um componente que sua aplic
 
 ### Componentes com Escopo de Aplicação (`AppComponentName`)
 
-Esses componentes só podem ser substituídos no nível do provedor raiz `<Rebase>`, pois representam a estrutura no nível de shell.
+Esses componentes só podem ser substituídos no nível do provedor raiz `<Rebase>`, pois representam a estrutura no nível do shell.
 
 | Chave do Componente | Descrição |
 |---|---|
-| `"Shell.AppBar"` | A barra de cabeçalho no topo da página |
-| `"Shell.Drawer"` | A barra lateral retrátil principal de navegação (drawer) |
+| `"Shell.AppBar"` | A barra de cabeçalho na parte superior da página |
+| `"Shell.Drawer"` | O menu lateral principal retrátil de navegação |
 | `"Shell.DrawerNavigationItem"` | Links individuais dentro da barra lateral |
-| `"Shell.DrawerNavigationGroup"` | Cabeçalhos recolhíveis de grupos de navegação na barra lateral |
+| `"Shell.DrawerNavigationGroup"` | Cabeçalhos de grupos de navegação retráteis na barra lateral |
 | `"HomePage"` | A página inicial padrão no modo de conteúdo |
 | `"HomePage.CollectionCard"` | Cards individuais de coleção na página inicial |
-| `"Auth.LoginView"` | O overlay exibido ao solicitar autenticação |
+| `"Auth.LoginView"` | A sobreposição exibida ao solicitar autenticação |
 
 ### Componentes com Escopo de Coleção (`CollectionComponentName`)
 
@@ -140,65 +136,43 @@ Esses componentes podem ser substituídos globalmente (atuando como padrões par
 
 | Chave do Componente | Descrição |
 |---|---|
-| `"Collection.View"` | A página de destino inteira da coleção |
-| `"Collection.Table"` | A visualização tabular padrão estilo planilha |
-| `"Collection.Card"` | O wrapper do item de visualização em card |
+| `"Collection.View"` | A página inicial completa da coleção |
+| `"Collection.Table"` | A visualização tabular padrão em formato de planilha |
+| `"Collection.Card"` | O wrapper de item na visualização em cards |
 | `"Collection.EmptyState"` | Visualização exibida quando uma coleção está vazia |
 | `"Collection.Actions"` | Botões da barra de ferramentas acima da tabela/cards |
-| `"Collection.FilterField"` | Input de filtro personalizado para uma coluna |
+| `"Collection.FilterField"` | Campo de entrada de filtro personalizado para uma coluna |
 | `"Entity.Form"` | O formulário de detalhes para criação/atualização |
-| `"EditView.FormActions"` | Barra de botões de envio/cancelamento do formulário |
+| `"EditView.FormActions"` | Barra de botões para envio/cancelamento de formulário |
 | `"DetailView"` | Visualização de detalhes somente leitura |
-| `"Entity.SidePanel"` | O contêiner de painel lateral para formulário/detalhes |
+| `"Entity.SidePanel"` | O contêiner do painel lateral para formulário/detalhes |
 | `"EntityPreview"` | Pré-visualização inline em chip de referência/relação |
 | `"Entity.MissingReference"` | Renderizado quando uma entidade referenciada está ausente |
 
-:::note[Três chaves fogem do padrão `Entity.`]
-`"DetailView"`, `"EntityPreview"` e `"EditView.FormActions"` não possuem o prefixo
-`Entity.`. `"Entity.DetailView"`, `"Entity.Preview"` e `"Entity.FormActions"` não
-estão na union — geram erro de tipo no TypeScript e, em JavaScript puro, a substituição
-simplesmente nunca é aplicada.
+:::note[Três chaves não seguem o padrão `Entity.`]
+`"DetailView"`, `"EntityPreview"` e `"EditView.FormActions"` não possuem o prefixo `Entity.`. `"Entity.DetailView"`, `"Entity.Preview"` e `"Entity.FormActions"` não fazem parte da união — eles causam erros de tipo e, em JavaScript puro, a substituição simplesmente nunca é aplicada.
 :::
 
-A sua substituição recebe as mesmas props fornecidas ao componente nativo. O
-mapa de substituição não especifica um tipo de props por chave — `ComponentOverride<P>` define
-`P` como `Record<string, unknown>` por padrão —, portanto, tipifique o parâmetro você mesmo,
-ou passe um argumento de tipo, quando desejar a verificação de tipos nas props. Alguns dos
-componentes nativos exportam um tipo de props que você pode importar e reutilizar:
-`CollectionViewProps` (`@rebasepro/ui`); `CollectionEmptyStateProps`, `CollectionActionsProps`,
-`SidePanelBindingProps` e `FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`,
-`EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`,
-`DetailViewBindingProps`, `DrawerNavigationItemProps` e
-`DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps`
-(`@rebasepro/app`). Os demais não têm tipo de props exportado — declare a estrutura
-que você de fato lê.
+Seu substituto recebe as mesmas props que o componente integrado recebeu. O mapa de substituição não nomeia um tipo de props por chave — `ComponentOverride<P>` define `P` por padrão como `Record<string, unknown>` — portanto, tipifique o parâmetro você mesmo ou passe um argumento de tipo quando quiser que as props sejam validadas. Alguns dos componentes integrados exportam um tipo de props que você pode importar e reutilizar: `CollectionViewProps` (`@rebasepro/ui`); `CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` e `FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` e `DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps` (`@rebasepro/app`). Os demais não possuem tipos de props exportados — defina o formato que você de fato lê.
 
 ### O que uma substituição de `Collection.View` deve respeitar
 
-`Collection.View` é o que um `CollectionPanel` renderiza, portanto, as props do painel chegam
-à sua substituição como `CollectionViewBindingProps` (`@rebasepro/cms`), combinadas com as
-da própria coleção. Uma substituição que as ignore quebra todas as páginas que incorporam
-a coleção. Respeite pelo menos estas:
+O `Collection.View` é o que um `CollectionPanel` renderiza, de modo que as props do painel chegam à sua substituição como `CollectionViewBindingProps` (`@rebasepro/cms`), distribuídas sobre as da própria coleção. Uma substituição que as ignore quebra todas as páginas que incorporam a coleção. Respeite pelo menos estas:
 
 | Prop | O que o chamador espera |
 |---|---|
-| `collectionOverrides` | O que o chamador altera sobre a coleção (um filtro fixo, uma ordenação, o modo de visualização), aplicado sobre a coleção registrada |
-| `fields` | Apenas estas propriedades, nesta ordem: as colunas e com o que as linhas da lista e cards são preenchidos |
-| `highlightedIds` | Os IDs das linhas renderizadas como selecionadas; `[]` para nenhum |
+| `collectionOverrides` | O que o chamador altera na coleção (um filtro fixo, uma ordenação, o modo de visualização), aplicado sobre a coleção registrada |
+| `fields` | Apenas estas propriedades, nesta ordem: as colunas e os dados com os quais as linhas da lista e os cards são preenchidos |
+| `highlightedIds` | Os IDs das linhas exibidas como selecionadas; `[]` para nenhuma |
 | `onRowClick` | Chamado com a linha clicada, conforme enviada pelo servidor, e seu ID, em vez de abri-la. O próprio `onRowClick` do painel |
 
-O painel também passa `viewMode` (o modo no qual abrir), `toolbar` (a barra de ferramentas
-a renderizar, `null` para nenhuma) e `title` (`false` para não renderizar título), quando
-definidos pelo chamador. O `CollectionViewBinding` nativo lida com todos eles; uma
-substituição que o envolva (wrap) em vez de substituí-lo pode simplesmente repassá-los diretamente.
+O painel também passa `viewMode` (o modo em que deve abrir), `toolbar` (a barra de ferramentas a ser exibida, `null` para nenhuma) e `title` (`false` para não exibir título), onde o chamador os definiu. O `CollectionViewBinding` integrado lida com todos eles; uma substituição que o envolva em vez de substituí-lo pode simplesmente repassá-los diretamente.
 
-Para começar a partir da parte nativa em vez do zero, copie seu código-fonte para
-o seu projeto e registre a cópia aqui: todas as partes, exceto `Collection.View`,
-`DetailView` e o recurso de arrastar e soltar da página inicial, compilam com as importações do pacote.
-Consulte [Copiando uma parte nativa](/docs/frontend/customizing#copying-a-built-in-part).
+Para começar a partir da parte integrada em vez de começar do zero, copie o código-fonte dela para o seu projeto e registre a cópia aqui: todas as partes, com exceção de `Collection.View`, `DetailView` e o recurso de arrastar e soltar (drag-and-drop) da página inicial, compilam com importações de pacotes. Consulte [Copying a built-in part](/docs/frontend/customizing#copying-a-built-in-part).
 
 ## Relacionados
 
-- [Estendendo o Rebase](/docs/frontend/extending/) — os pontos de extensão que não necessitam de substituição
-- [Campos Personalizados](/docs/frontend/custom-fields/) — substituindo o editor de uma única propriedade em vez de um componente
-- [Slots](/docs/frontend/slots/) — adicionando elementos a um componente em vez de substituí-lo
+- [Theming & Branding](/docs/frontend/theming/) — reestilizando o admin com tokens em vez de componentes
+- [Extending Rebase](/docs/frontend/extending/) — os pontos de extensão que não necessitam de substituição
+- [Custom Fields](/docs/frontend/custom-fields/) — substituindo o editor de uma propriedade em vez de um componente
+- [Slots](/docs/frontend/slots/) — adicionando a um componente em vez de substituí-lo

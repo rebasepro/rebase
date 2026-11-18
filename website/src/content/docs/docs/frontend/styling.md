@@ -10,6 +10,8 @@ Every extension mechanism in this section hands you a React component and gets o
 
 The answer is: the same parts the admin is built from. A custom view is still an admin view. It sits inside the same shell, beside the same tables, under the same theme toggle — so it should use the same components, the same type scale and the same colour tokens.
 
+This page is about building your own views. To change the admin's own look — brand colour, fonts, corners, logo — see [Theming & Branding](/docs/frontend/theming); because your views use the same tokens, they follow that change too.
+
 The alternative is inventing a second design language inside the same app. That is the common failure, and it does not merely look inconsistent — it breaks. A hand-written `color: #111` renders invisible the moment someone switches to the dark theme, and no test catches it.
 
 ## The rule
@@ -51,7 +53,8 @@ The theme is a set of CSS variables exposed as Tailwind utilities. Use them, and
 | Secondary text | `text-surface-600 dark:text-surface-400` — or just `<Typography color="secondary">` |
 | Panel background | `bg-surface-accent-50 dark:bg-surface-800` |
 | Borders | `border-surface-200 dark:border-surface-700` |
-| Accent | `text-primary` / `bg-primary` (`#0070F4`) |
+| Accent | `text-primary` / `bg-primary` (the project's brand colour, `#0070F4` by default) |
+| Text on an accent fill | `text-on-primary` — black or white, whichever reads on the brand colour |
 
 Two rules that come from real breakage:
 

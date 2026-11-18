@@ -10,6 +10,8 @@ Rebase allows you to override default UI components with your own custom impleme
 - **Eject mode** (default): Your component fully replaces the built-in one.
 - **Wrap mode** (`wrap: true`): Your component wraps the original. What it wraps (usually the built-in component) is passed as the `OriginalComponent` prop so you can render it inside your custom layout/logic.
 
+To change only how the admin *looks* — colour, fonts, corners, logo — you do not need an override: see [Theming & Branding](/docs/frontend/theming).
+
 Component overrides can be applied **globally** at the application level (on the `<Rebase>` provider) or **locally** at the collection level (inside individual collection definitions).
 
 ---
@@ -198,6 +200,7 @@ See [Copying a built-in part](/docs/frontend/customizing#copying-a-built-in-part
 
 ## Related
 
+- [Theming & Branding](/docs/frontend/theming/) — restyling the admin with tokens instead of components
 - [Extending Rebase](/docs/frontend/extending/) — the extension points that do not need an override
 - [Custom Fields](/docs/frontend/custom-fields/) — replacing one property's editor rather than a component
 - [Slots](/docs/frontend/slots/) — adding to a component instead of replacing it

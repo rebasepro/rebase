@@ -1639,6 +1639,12 @@ Rebase uses Tailwind CSS v4 with CSS-first configuration:
 - CSS variables for theming
 - Native cascade layers
 
+A project rebrands the whole kit by overriding tokens in `frontend/src/index.css`
+(`@theme { --color-primary: …; --font-sans: …; --radius-lg: … }`, surfaces under
+`:root` / `.dark`); see `rebase-customize-admin` and
+[Theming & Branding](https://rebase.pro/docs/frontend/theming). So components never
+hardcode the brand: `bg-primary` with `text-on-primary` for a filled control.
+
 ## References
 
 - **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)

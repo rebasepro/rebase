@@ -133,11 +133,12 @@ Rebase uses a carefully defined set of CSS custom properties. **Never invent arb
 
 | Token                  | Value        | Usage                                    |
 |------------------------|--------------|------------------------------------------|
-| `--color-primary`      | `#0070F4`    | Primary actions, links, focus rings       |
+| `--color-primary`      | `#0070F4`    | Primary actions, links, focus rings (a project may rebrand it) |
 | `--color-primary-light`| oklch derived| Lighter tint of primary                   |
 | `--color-primary-dark` | oklch derived| Darker shade of primary                   |
 | `--color-secondary`    | `#E11D48`    | Secondary accent (marketing; not a control colour) |
 | `--color-primary-bg`   | primary/0.1  | Subtle primary backgrounds               |
+| `--color-on-primary`   | black or white | Ink on a primary fill (`text-on-primary`): white on the default blue, black on a light brand. `--color-on-secondary` likewise |
 
 #### Role Surfaces (what a background is chosen by)
 
@@ -231,7 +232,14 @@ as the unchecked `Checkbox` border; it paints no background in the kit. Full
    AA, and every accent link in the product sits on exactly that surface. Dark
    mode uses `primary-light` for accent **text** (7.34:1); fills are untouched.
    Do not hand-write `text-primary` on a dark surface.
-6. **Never hardcode chip or badge ink.** `Chip` derives its own foreground from
+6. **Ink on a filled primary is `text-on-primary`, never `text-white`.** A project
+   can rebrand `--color-primary` to yellow or lime with one `@theme` line, and
+   `text-white` on that fill reads at 2:1. `text-on-primary` flips to black on a
+   light brand. Likewise, never write the brand as a literal (`#0070F4`,
+   `text-blue-500`): use `bg-primary` / `text-primary` so a rebrand reaches it.
+   How projects rebrand: `rebase-customize-admin`, or
+   [Theming & Branding](https://rebase.pro/docs/frontend/theming).
+7. **Never hardcode chip or badge ink.** `Chip` derives its own foreground from
    the background it will actually sit on, walking a hue-tinted colour toward
    black or white only as far as it must to clear the contrast floor — and an
    `outlined` chip drops its fill and sits on the *page*, so it uses a separately
