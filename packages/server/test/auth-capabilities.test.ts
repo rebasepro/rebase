@@ -98,6 +98,16 @@ describe("buildBuiltinAuthCapabilities", () => {
         })).toBe(false);
     });
 
+    it("says which switched-on sign-in cannot work for lack of email, and nothing when email is there", () => {
+        // An app whose only sign-in is the magic link, deployed with no SMTP:
+        // live, and nobody can sign in. `rebase cloud status` reads this.
+        const off = buildBuiltinAuthCapabilities({ ...base, enableMagicLink: true, enableEmailOtp: true, emailConfigured: false });
+        expect(off.magicLink).toBe(false);
+        expect(off.unavailable).toEqual({ magicLink: "EMAIL_NOT_CONFIGURED", emailOtp: "EMAIL_NOT_CONFIGURED" });
+        expect("unavailable" in buildBuiltinAuthCapabilities({ ...base, enableMagicLink: true, emailConfigured: true })).toBe(false);
+        expect("unavailable" in buildBuiltinAuthCapabilities({ ...base, emailConfigured: false })).toBe(false);
+    });
+
     it("answers with exactly these keys", () => {
         // The wire contract. A client reads these names; renaming or dropping
         // one is a breaking change and has to fail here first. `AuthConfig` in

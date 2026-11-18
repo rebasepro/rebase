@@ -157,11 +157,40 @@ function bootFailed(logs: string | null | undefined): boolean {
     return typeof logs === "string" && /did not become ready within/i.test(logs);
 }
 
+/**
+ * The live app's public `GET /api/auth/config`, or `undefined` when it does
+ * not answer in time or is not a Rebase backend. Read by `status` for the
+ * sign-in methods the app switched on and cannot offer (`unavailable`).
+ */
+export async function readAuthConfig(
+    appUrl: string,
+    fetchImpl: typeof fetch = fetch
+): Promise<{ unavailable?: { magicLink?: string; emailOtp?: string } } | undefined> {
+    const origin = /^https?:\/\//.test(appUrl) ? appUrl : `https://${appUrl}`;
+    try {
+        const res = await fetchImpl(`${origin.replace(/\/+$/, "")}/api/auth/config`, {
+            headers: { Accept: "application/json" },
+            signal: AbortSignal.timeout(4000)
+        });
+        if (!res.ok) return undefined;
+        const body: unknown = await res.json();
+        if (typeof body !== "object" || body === null) return undefined;
+        const unavailable = (body as { unavailable?: unknown }).unavailable;
+        return typeof unavailable === "object" && unavailable !== null
+            ? { unavailable: unavailable as { magicLink?: string; emailOtp?: string } }
+            : {};
+    } catch {
+        return undefined;
+    }
+}
+
 export function resolveBlockedState(input: {
     projectStatus?: string | null;
     /** The project's database row, or undefined when none is attached. */
     database?: { connectionStatus?: string | null } | undefined;
     lastDeploy?: { status?: string | null; logs?: string | null } | undefined;
+    /** What the live app's `GET /api/auth/config` answered, when it answered. */
+    authConfig?: { unavailable?: { magicLink?: string; emailOtp?: string } } | undefined;
 }): BlockedState {
     // First, because it is the state that never resolves itself. A project
     // with no database cannot deploy, and no amount of waiting attaches one.
@@ -221,6 +250,18 @@ nextAction: "rebase cloud deploy" };
     if (input.database?.connectionStatus === "failed") {
         return { blockedOn: "database_unreachable",
 nextAction: "rebase cloud db test" };
+    }
+
+    // Live, and nobody can sign in: the app switched magic-link (or email
+    // code) sign-in on, and the deployment has no email service, so the route
+    // answers 503. Rebase Cloud sends no mail of its own, and nothing else in
+    // a deploy or a status said so.
+    const unavailable = input.authConfig?.unavailable;
+    if (unavailable?.magicLink === "EMAIL_NOT_CONFIGURED" || unavailable?.emailOtp === "EMAIL_NOT_CONFIGURED") {
+        return {
+            blockedOn: "email_not_configured",
+            nextAction: "rebase cloud env set SMTP_HOST <host> (and SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM), then rebase cloud deploy"
+        };
     }
 
     return { blockedOn: null,
@@ -318,10 +359,12 @@ path: projectId })
         const link = readLink();
         const grant = link?.projectId === projectId ? grantForLink(link) : undefined;
         const appKeyNote = grant && projectDotenvSetsAppKey() ? appKeyExpiryNote(grant.expiresAt) : undefined;
+        const appUrl = projectHost(project, baseDomain);
         const blocked = resolveBlockedState({
             projectStatus: project.status,
             database: db as { connectionStatus?: string | null } | undefined,
-            lastDeploy: deploy as { status?: string | null; logs?: string | null } | undefined
+            lastDeploy: deploy as { status?: string | null; logs?: string | null } | undefined,
+            authConfig: deploy?.status === "success" && appUrl ? await readAuthConfig(appUrl) : undefined
         });
 
         emit(

@@ -374,6 +374,19 @@ export interface AuthAdapterCapabilities {
      * Only applicable for built-in auth.
      */
     needsSetup?: boolean;
+
+    /**
+     * Sign-in methods the backend was told to enable and cannot offer, with
+     * why. `magicLink: "EMAIL_NOT_CONFIGURED"` is `AUTH_MAGIC_LINK=true` on a
+     * backend with no email service: `magicLink` above is `false` and the
+     * route answers 503, which for an app whose only sign-in is the magic
+     * link means nobody can sign in. Absent when nothing is missing, and on
+     * a backend that predates the field.
+     */
+    unavailable?: {
+        magicLink?: "EMAIL_NOT_CONFIGURED";
+        emailOtp?: "EMAIL_NOT_CONFIGURED";
+    };
 }
 
 /**

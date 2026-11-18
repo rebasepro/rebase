@@ -224,6 +224,14 @@ rebase cloud status             # what the platform thinks the project is doing
 platform is genuinely working and polling is the right thing to do; when it names
 something, that something is waiting for you.
 
+One of those is `email_not_configured`: the app switched on magic-link or email
+code sign-in (`AUTH_MAGIC_LINK`, `AUTH_EMAIL_OTP`) and has no email service, so
+the deployment is live and nobody can sign in with it. Rebase Cloud does not send
+mail for your app: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and
+`SMTP_FROM` with `rebase cloud env set`, then deploy. `status` reads it from the
+app's own `GET /api/auth/config` (its `unavailable` field), and `deploy` says the
+same under its live check.
+
 ## Preview a change
 
 ```bash
