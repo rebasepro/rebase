@@ -1,3 +1,4 @@
+import * as dotenv from "dotenv";
 /**
  * Where the project being introspected into keeps what introspection writes.
  *
@@ -73,3 +74,19 @@ export function detectCmsDir(schemaDir: string): string | undefined {
     }
     return undefined;
 }
+
+/**
+ * Whether the project's `.env` names the database this run read, which is when
+ * the next `db push` would write into it. A read from `--database-url`, with
+ * `.env` naming another database or none (the managed one), is not that case.
+ */
+export function projectEnvNames(envFile: string | undefined, databaseUrl: string): boolean {
+    if (!envFile) return false;
+    try {
+        const named = dotenv.parse(fs.readFileSync(envFile, "utf-8")).DATABASE_URL;
+        return named !== undefined && named.trim() === databaseUrl.trim();
+    } catch {
+        return false;
+    }
+}
+

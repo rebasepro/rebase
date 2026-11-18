@@ -14,7 +14,7 @@ import {
     mergeIndexModule,
     safeHostFromUrl
 } from "./introspect-db-logic";
-import { detectCmsDir } from "./introspect-db-project";
+import { detectCmsDir, projectEnvNames } from "./introspect-db-project";
 import { countRowsUpTo, isUsableFileName, quoteRelation, readSchemaMetadata } from "./introspect-db-queries";
 import { classifyTables, lookupCandidates, LOOKUP_MAX_ROWS } from "./introspect-db-structure";
 import { parseCheckConstraints } from "./introspect-db-constraints";
@@ -67,9 +67,11 @@ async function main() {
         path.resolve(process.cwd(), "../../.env")
     ].filter(Boolean) as string[];
 
+    let envFileUsed: string | undefined;
     for (const p of envPaths) {
         if (fs.existsSync(p)) {
             dotenv.config({ path: p, quiet: true });
+            envFileUsed = p;
             break;
         }
     }
@@ -332,7 +334,7 @@ async function main() {
         // The database just read is usually the one being left: a migration's
         // source. DATABASE_URL still names it, so the next `db push` would
         // write the generated tables back into it.
-        if (generatedFiles.length > 0) {
+        if (generatedFiles.length > 0 && projectEnvNames(envFileUsed, databaseUrl)) {
             out(chalk.yellow(`⚠ DATABASE_URL still points at the database this read (${hostPart}).`));
             out(chalk.gray("  If it is the source of a migration, point DATABASE_URL at the new database before `rebase db push`;"));
             out(chalk.gray("  pushing now writes the generated tables back into the one just introspected."));
