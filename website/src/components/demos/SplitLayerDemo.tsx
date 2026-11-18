@@ -26,7 +26,9 @@ export function SplitLayerDemo() {
     const full = mode === "full";
 
     return (
-        <div className="frame w-full overflow-hidden">
+        // Code-first figure (schema, generated SDK, the terminal): it stays a
+        // dark panel on a light page, like every code well (global.css).
+        <div className="frame island-dark w-full overflow-hidden">
 
             {/* Segmented control */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4 border-b border-hairline bg-surface-raised">

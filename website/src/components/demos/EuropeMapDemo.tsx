@@ -226,7 +226,9 @@ export function EuropeMapDemo({ s = {} }: { s?: Record<string, string> }) {
     }, []);
 
     return (
-        <div className="frame overflow-hidden">
+        // A map of glowing pins, drawn for a dark panel: it stays one on a
+        // light page (global.css, "Dark islands").
+        <div className="frame island-dark overflow-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr]">
 
                 {/* ── The map ───────────────────────────────────────── */}

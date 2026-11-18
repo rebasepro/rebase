@@ -440,3 +440,12 @@
         padding-left: 1rem;
     }
 }
+
+/* The cookie tables still carry Termly's inline colours, written for the dark
+   page: #CED1D6 labels, #8B93A7 values, #1A98EB links and #202328 rules. On a
+   light page they read at 1.2-2.8:1. Restated by value for light mode only, so
+   the dark page keeps exactly what it had. */
+[data-theme="light"] .legal-doc :is([style*="#CED1D6" i]) { color: var(--tone-300) !important; }
+[data-theme="light"] .legal-doc :is([style*="#8B93A7" i]) { color: var(--tone-400) !important; }
+[data-theme="light"] .legal-doc :is([style*="#1A98EB" i]) { color: var(--color-primary-light) !important; }
+[data-theme="light"] .legal-doc :is([style*="#202328" i]) { border-color: var(--tone-800) !important; }

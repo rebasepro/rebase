@@ -59,6 +59,7 @@
 :root,
 [data-theme="dark"],
 :is(.island-dark, .ground-chroma),
+:has(> pre):not(.prose),
 html[data-theme="light"]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header {
     --tone-max: #ffffff;
     --tone-50: #f9fafb;
@@ -119,12 +120,15 @@ html[data-theme="light"]:not([data-scrolled], [data-menu-open]):has(.hero-under-
    Regions that stay dark when the page is light: the two chroma slabs (their
    ink is hand-measured against the slab, see "The close, inverted") and
    anything marked `.island-dark` — terminals, editors and figures drawn on a
-   fixed dark fill. The tone block above already lists both; this restates the
+   fixed dark fill — and every code panel (`:has(> pre)`, outside `.prose`):
+   their syntax colours are the -300/-400 stops, written for a dark well, and
+   on a light card they read at 1.5-2:1. The tone block above already lists both; this restates the
    kit's surface roles for them, since those are declared in ui/theme.css
    under `.dark, [data-theme="dark"]`. The same two selectors appear in the
    tone block and the `dark` variant. A `.frame` is NOT an island: it is the
    site's card as well as its product window, and follows the page. */
-:is(.island-dark, .ground-chroma) {
+:is(.island-dark, .ground-chroma),
+:has(> pre):not(.prose) {
     --surface-frame: #090a0c;
     --surface-sheet: #111316;
     --surface-card: #16181c;
@@ -1935,7 +1939,7 @@ html.banner-dismissed-instant #manifesto-banner {
    `text-page-ink`) so un-classed text inside reads exactly as it does on the
    dark site. Layered, so a text utility on the island element itself wins. */
 @layer components {
-    [data-theme="light"] :is(.island-dark, .ground-chroma, [data-theme="dark"]) {
+    [data-theme="light"] :is(.island-dark, .ground-chroma, [data-theme="dark"], :has(> pre):not(.prose)) {
         color: var(--page-ink);
     }
 }
@@ -1979,4 +1983,30 @@ html[data-theme]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .her
 }
 html[data-theme]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header :is(.theme-toggle, .gh-star, [title="Change language"], #mobile-menu-button) svg {
     filter: drop-shadow(0 1px 5px rgb(0 0 0 / 0.3));
+}
+
+/* ── The hero glow on a light page ───────────────────────────────────────────
+   In dark mode the glow fades into a dark ground over most of the hero, and
+   white type reads on all of it. On a light page that same 30%→78% fade put
+   the headline across the transition: its first lines dark on saturated
+   indigo or coral, its copy and CTA on the light ground, with no single ink
+   right for both. So in light mode the field finishes fading before the copy
+   starts: fully saturated behind the bar (whose white ink is drawn for it,
+   see "The bar over the hero"), gone by the headline, so every line of the
+   hero sits on the light ground in the page's own ink. The fade scales with
+   the viewport because the hero's top padding does: 6rem on a phone, 13rem
+   at desktop width. */
+[data-theme="light"] .hero-glow {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 var(--header-h), transparent calc(var(--header-h) + clamp(6rem, 2rem + 12vw, 13rem)));
+    mask-image: linear-gradient(to bottom, #000 0, #000 var(--header-h), transparent calc(var(--header-h) + clamp(6rem, 2rem + 12vw, 13rem)));
+}
+
+/* An island's own lift. `--ground-lift` is resolved where it is declared (the
+   page root, or a section's ground utility), so a `.frame` that is itself an
+   island would paint the LIGHT sheet behind dark ink. Restated against the
+   island's dark ladder. Light mode only: on the dark page the inherited lift is
+   already right, and a frame on a raised ground lifts to the card step. Not on
+   the chroma slabs: they declare their own. */
+[data-theme="light"] :is(.island-dark, :has(> pre):not(.prose)) {
+    --ground-lift: var(--surface-sheet);
 }
