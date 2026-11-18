@@ -19,6 +19,10 @@ const DEBUG_DIR = path.resolve(__dirname, "../src/debug");
 
 /** Exported, but deliberately not rendered on their own in the reference. */
 const NOT_SHOWN: Record<string, string> = {
+    // Class strings, not components: the chart grid and tick voice, exported
+    // so a chart outside the kit can match it.
+    GRID_CLASSES: "a class string for chart gridlines, not a component",
+    TICK_CLASSES: "a class string for chart axis ticks, not a component",
     // Context plumbing, not UI.
     MultiSelectContext: "the context MultiSelect provides to its items",
     VirtualTableSelectionProvider: "selection context VirtualTable mounts itself",
