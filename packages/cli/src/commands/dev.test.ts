@@ -889,6 +889,15 @@ describe("the banner's app lines", () => {
     /** Every value the box would print, so a test can say what must never appear. */
     const values = (lines: Array<[string, string]>): string[] => lines.map(([label, value]) => `${label}${value}`.trim());
 
+    it("names a no-build static app as served by the backend, and never a built one", () => {
+        // A plain HTML site was served by `rebase start` and by nothing in `rebase dev`.
+        const shape = shapeOf({
+            web: { type: "static", root: "web", output: "web", path: "/", spa: false },
+            admin: { type: "static", root: "frontend", output: "frontend/dist", path: "/admin" }
+        });
+        expect(shape.servedByBackend).toEqual([{ appName: "web", path: "/" }]);
+    });
+
     it("prints exactly what it always did for the scaffolded project", () => {
         // One app, at the root, and the whole of it is the CMS: the Admin line
         // is the CMS line, so there is no second one.

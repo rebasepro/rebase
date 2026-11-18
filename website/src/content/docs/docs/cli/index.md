@@ -59,6 +59,11 @@ Starts both frontend and backend with hot reloading, and regenerates the Drizzle
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
 
+A static app in `rebase.json` with no build step (no `build`, and `output` is
+its `root`, such as a plain HTML site) is served by the backend from that
+directory, at its `path`, as `rebase start` serves it from the bundle. An app
+with a build runs in Vite on its own port.
+
 An edit to `.env`
 restarts the backend, which reads the file again, as the admin panel does. What
 `rebase dev` sets itself is kept until you restart it: `PORT`, and

@@ -6,6 +6,7 @@ import {
     LEGACY_LAYOUT_REMEDY,
     RUNTIME_CONTRACT_VERSION,
     isValidAppHost,
+    parseAppAddress,
     parseFrameAncestor,
     reservedPrefixFor,
     validateStaticRoute,
@@ -556,8 +557,53 @@ createdAt: new Date().toISOString() }
         hooksModule: resolveModule(hooks),
         functionsDir: resolve(options.functions),
         cronsDir: resolve(options.crons),
-        staticApps: []
+        staticApps: sourceStaticApps(dir)
     };
+}
+
+/**
+ * The static apps `rebase dev` serves from this process: the ones in
+ * `rebase.json` with no build step (`output` is the directory itself, and no
+ * `build`), straight from their sources. An app with a build is Vite's, which
+ * `rebase dev` runs on its own port.
+ *
+ * A no-build site (plain HTML, a script tag) used to be served by `rebase
+ * build && rebase start` and by nothing in `rebase dev`, which printed only
+ * "No frontend/ directory found": such a site could not be developed against
+ * the dev server at all. Exported for the test.
+ */
+export function sourceStaticApps(projectRoot: string): LoadedStaticApp[] {
+    let manifest: unknown;
+    try {
+        manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, "rebase.json"), "utf-8"));
+    } catch {
+        return [];
+    }
+    const apps = typeof manifest === "object" && manifest !== null ? (manifest as { apps?: unknown }).apps : undefined;
+    if (typeof apps !== "object" || apps === null) return [];
+    const out: LoadedStaticApp[] = [];
+    for (const [name, raw] of Object.entries(apps)) {
+        if (typeof raw !== "object" || raw === null) continue;
+        const app = raw as Record<string, unknown>;
+        if (app.type !== "static" || typeof app.root !== "string" || typeof app.output !== "string") continue;
+        if (typeof app.build === "string" && app.build.trim() !== "") continue;
+        const root = path.resolve(projectRoot, app.root);
+        const output = path.resolve(projectRoot, app.output);
+        if (root !== output || !fs.existsSync(path.join(output, "index.html"))) continue;
+        const address = parseAppAddress(typeof app.path === "string" ? app.path : "/");
+        if (!address.ok) {
+            logger.warn(`Static app "${name}" is not served by the dev server: its path ${address.reason}.`);
+            continue;
+        }
+        if (reservedPrefixFor(address.address.path)) continue;
+        out.push({
+            path: address.address.path,
+            ...(address.address.host ? { host: address.address.host.toLowerCase() } : {}),
+            dir: output,
+            spa: app.spa !== false
+        });
+    }
+    return out.sort(compareStaticApps);
 }
 
 /**

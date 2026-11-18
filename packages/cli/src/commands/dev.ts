@@ -658,6 +658,12 @@ export function databaseEndpoint(url: string | null | undefined): string | null 
  */
 export interface DevStaticShape {
     declaresStaticApp: boolean;
+    /**
+     * The declared apps with no build step (`output` is `root`, no `build`):
+     * the dev backend serves them from their directory, at their path, as
+     * `rebase start` serves them from the bundle.
+     */
+    servedByBackend?: Array<{ appName: string; path: string }>;
     /** The declared app whose `root` is the `frontend/` that `rebase dev` runs, if one is. */
     served?: { appName: string; address: AppAddress };
     /** Where the CMS is, when an app declares one. */
@@ -699,8 +705,12 @@ export function devStaticShape(
     }
 
     const mount = cmsMountOf(manifest);
+    const servedByBackend = statics
+        .filter(([, app]) => !app.build && path.resolve(projectRoot, app.root) === path.resolve(projectRoot, app.output))
+        .map(([appName, app]) => ({ appName, path: app.path ?? "/" }));
     return {
         declaresStaticApp: statics.length > 0,
+        ...(servedByBackend.length > 0 ? { servedByBackend } : {}),
         ...(served ? { served } : {}),
         ...(mount
             ? {
@@ -2367,6 +2377,10 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // Start frontend immediately if backend-only mode or no backend
     if (!backendOnly && frontendDir && (frontendOnly || !backendDir)) {
         startFrontend(null);
+    } else if (!backendOnly && !frontendDir && staticShape.servedByBackend?.length) {
+        for (const app of staticShape.servedByBackend) {
+            console.log(chalk.gray(`  Static app "${app.appName}" has no build step: the backend serves it at ${app.path}.`));
+        }
     } else if (!backendOnly && !frontendDir && declaresStaticApp) {
         console.warn(chalk.yellow("  ⚠ No frontend/ directory found, skipping frontend."));
     }
