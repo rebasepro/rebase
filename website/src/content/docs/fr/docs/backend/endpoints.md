@@ -1,5 +1,5 @@
 ---
-sourceHash: 7fea9b51c30a3c41
+sourceHash: 94ae1d0452d97c4b
 title: Index des endpoints
 sidebar_label: Index des endpoints
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -251,6 +251,7 @@ Une route par fichier sous `backend/functions/`, les chemins proviennent donc de
 | `GET` | `/api/meta/contract` | `schema:read` | `{ schemaVersion, runtime: { version, contract }, tables }` — chaque table telle qu'un administrateur la voit, l'entrée de `rebase generate-sdk --from`. `404` lorsqu'aucune authentification n'est configurée |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` lorsqu'il est défini | Métriques Prometheus, lorsque `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` lorsqu'il est défini | Les séries enregistrées derrière les graphiques de Studio. `501` sur un runtime sans backend |
+| `GET` | `/metrics/history/batch` | `REBASE_METRICS_TOKEN` lorsqu'il est défini | Jusqu'à 16 séries enregistrées à la fois, `?series=<a>,<b>&minutes=<n>&bucket=<1\|5\|30\|180>`, regroupées par intervalle. Inclut les requêtes et les erreurs par minute et par surface. `501` sur un runtime sans backend |
 
 Les connexions WebSocket arrivent sous la forme d'un surclassement HTTP (upgrade) sur le même serveur plutôt que sur un chemin propre — voir [Temps réel](/docs/backend/realtime/).
 
