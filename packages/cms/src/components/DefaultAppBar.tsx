@@ -198,7 +198,10 @@ export const DefaultAppBar = function DefaultAppBar({
                 </Link>
             </div>}
 
-            <div className="mr-8 hidden lg:block">
+            {/* Only when there are breadcrumbs. Rendered empty it still took
+                its `mr-8` and a flex gap, pushing whatever the app put in
+                `startAdornment` 40px right of where a title starts. */}
+            {breadcrumbs.breadcrumbs.length > 0 && <div className="mr-8 hidden lg:block">
                 <nav aria-label="Breadcrumb">
                 <div className={"flex flex-row gap-2 items-center"}>
                     {breadcrumbs.breadcrumbs.map((breadcrumb, index) => {
@@ -223,7 +226,7 @@ export const DefaultAppBar = function DefaultAppBar({
                     })}
                 </div>
                 </nav>
-            </div>
+            </div>}
             {startAdornment}
 
             {globalSearch}

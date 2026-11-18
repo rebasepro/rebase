@@ -12,8 +12,12 @@ export const GRID_CLASSES = "stroke-hairline-strong";
  */
 export const BAR_REST_OPACITY = 0.58;
 
-/** Axis tick text: the secondary text tier, never a series colour. */
-export const TICK_CLASSES = "fill-text-secondary dark:fill-text-secondary-dark text-[11px] tabular-nums";
+/**
+ * Axis tick text: the secondary text tier, never a series colour. Sized by the
+ * `text-2xs` token (11px in the kit) rather than a literal, so an app that
+ * raises the token for a 12px floor raises its chart ticks with it.
+ */
+export const TICK_CLASSES = "fill-text-secondary dark:fill-text-secondary-dark text-2xs tabular-nums";
 
 /**
  * The 14px icon of a card header, in the secondary text tier. A string is a
