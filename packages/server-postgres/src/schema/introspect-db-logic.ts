@@ -7,6 +7,7 @@
  * no process.exit.  It is imported by introspect-db.ts (the CLI entry-point)
  * and consumed directly by tests.
  */
+import type { LeftBehind } from "./introspect-foreign";
 import { columnTypeLabel, type ColumnType, type TableDescriptor } from "@rebasepro/types";
 import { printIndexModule, printTableModule, tableIdentifier } from "@rebasepro/common";
 import { toWireKey } from "@rebasepro/utils";
@@ -88,6 +89,35 @@ export interface ForeignKeyRow {
     ordinal?: number;
     /** `"CASCADE"`, `"RESTRICT"`, `"SET NULL"`, `"SET DEFAULT"`, `"NO ACTION"`. */
     delete_rule?: string;
+    /** The schema the referenced table is in. Absent from rows read before this was asked. */
+    foreign_schema?: string;
+}
+
+/** A plain index: columns only, no expression, as `defineTable`'s `indexes` can declare it. */
+export interface IndexDefinitionRow {
+    table_name: string;
+    index_name: string;
+    /** The index method: `btree`, `gin`, `brin`, …. */
+    method: string;
+    unique: boolean;
+    /** `null` when a key is an expression. */
+    column_names: string[] | null;
+    /** Per key, whether it sorts descending. */
+    descending: boolean[] | null;
+    /** The WHERE of a partial index, or null. */
+    predicate: string | null;
+    /** `pg_get_indexdef`, for the report when it cannot be declared. */
+    definition: string;
+}
+
+/** A database object a table definition does not carry: a function, a trigger, an extension. */
+export interface DatabaseObjectRow {
+    kind: "function" | "trigger" | "extension";
+    name: string;
+    /** The table a trigger is on. */
+    table_name?: string | null;
+    /** The SQL that recreates it, when Postgres can print it. */
+    definition?: string | null;
 }
 
 /** A unique constraint or unique index, as an ordered column list. */
@@ -166,6 +196,16 @@ export interface SchemaMetadata {
      * the caller did not read them, and then no collection is given rules.
      */
     policies?: PolicyRow[];
+    /**
+     * Foreign keys from the introspected tables to tables in another schema
+     * (Supabase's `auth.users`). No relation can hold one; read so they are
+     * reported rather than dropped without a word.
+     */
+    externalFks?: ForeignKeyRow[];
+    /** Every index, with its columns, so the plain ones become `indexes`. */
+    indexDefinitions?: IndexDefinitionRow[];
+    /** Functions, triggers and extensions: what a table definition does not carry, for the report. */
+    objects?: DatabaseObjectRow[];
     /**
      * Row counts for the tables that needed one, capped — see `countRowsUpTo`.
      * Absent for every table introspection never had a reason to count.
@@ -575,6 +615,8 @@ export interface SchemaGeneration {
     failed: { table: string; reason: string }[];
     /** The generated tables whose row-level security is off: the first push switches it on. */
     rlsOff: string[];
+    /** What the files do not carry, each with why and the SQL that recreates it (`describeTables`). */
+    leftBehind: LeftBehind[];
 }
 
 /** The column types a declared key may not have (`defineTable` refuses them). */
@@ -769,7 +811,8 @@ export function generateSchemaModules(input: SchemaGenerationInput): SchemaGener
             })),
             ...[...unkeyable].map(([table, reason]) => ({ table, reason }))
         ],
-        rlsOff: []
+        rlsOff: [],
+        leftBehind: described.leftBehind
     };
     for (const descriptor of described.tables) {
         const meta = tablesMap.get(descriptor.table);

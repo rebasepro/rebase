@@ -141,7 +141,27 @@ rebase schema introspect
   schema is written `rebase.roles()`
 - Turns a CHECK it can read (`total >= 0`) into the column's `.validate()`, and
   leaves the constraint itself in the database, where the push after it keeps
-  it
+  it. Every CHECK is also listed under "Not carried over" with its SQL: a
+  push into a *new* database creates the validation, not the constraint
+- Declares each plain index (columns only, btree, gin or brin, no predicate)
+  in the table's `indexes`. An index on a foreign-key column alone is left to
+  the relation, which creates one
+- Translates Supabase's conventions: a column default of `auth.uid()` becomes
+  `.onCreateUser()` (the server writes the caller's id), a column holding a
+  Supabase user id (that default, or a foreign key to `auth.users`) becomes
+  `col.text().userId()`, as `rebase.users.id` and `rebase.uid()` are text,
+  and a policy `TO authenticated` / `TO anon` loses the role (a Rebase
+  database has neither) and requires a signed-in / signed-out caller instead;
+  a policy only for `service_role` is dropped. Each change is noted at the top
+  of the table's file
+- Ends with what it did **not** carry over: functions, triggers, extensions,
+  CHECKs, indexes `indexes` cannot spell, foreign keys over several columns or
+  into another schema. The SQL that recreates each one Postgres can print is
+  written to `backend/sql/introspected-left-behind.sql`, to review and apply
+  after the first push (`psql "$DATABASE_URL" -f …`, or
+  `rebase cloud db query -f …` on Rebase Cloud)
+- Reminds you that `DATABASE_URL` still names the database it read: in a
+  migration that is the source, and a `db push` now would write into it
 - Puts what it could not state exactly in a comment at the top of the table's
   file and on the terminal — a closed set of strings on a text column, a
   generated column whose expression it did not read, a custom type — with what
@@ -170,6 +190,7 @@ first, then edit the generated tables. A table with row-level security off is
 written like any other, with its `rls`; the push switches RLS on, and the dry
 run says so. A backend that runs with no `backend/schema` at all serves the
 database directly instead — see [Backend only](/docs/getting-started/headless/).
+Leaving Supabase? See [Migrating from Supabase](/docs/recipes/migrate-from-supabase/).
 
 ### `rebase db push`
 

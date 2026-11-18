@@ -20,6 +20,8 @@ import type {
     CheckConstraintRow,
     CommentRow,
     PolicyRow,
+    IndexDefinitionRow,
+    DatabaseObjectRow,
     SchemaMetadata
 } from "./introspect-db-logic";
 
@@ -231,10 +233,12 @@ export const FOREIGN_KEYS_QUERY = `
                WHEN 'c' THEN 'CASCADE'
                WHEN 'n' THEN 'SET NULL'
                WHEN 'd' THEN 'SET DEFAULT'
-           END AS delete_rule
+           END AS delete_rule,
+           tn.nspname AS foreign_schema
     FROM fk
     JOIN pg_class root ON root.oid = fk.root_oid
     JOIN pg_class tgt ON tgt.oid = fk.confrelid
+    JOIN pg_namespace tn ON tn.oid = tgt.relnamespace
     CROSS JOIN LATERAL unnest(fk.conkey) WITH ORDINALITY AS s(attnum, ord)
     JOIN pg_attribute sa ON sa.attrelid = fk.conrelid AND sa.attnum = s.attnum
     CROSS JOIN LATERAL unnest(fk.confkey) WITH ORDINALITY AS f(attnum, ord)
@@ -298,6 +302,63 @@ export const INDEXES_QUERY = `
     WHERE n.nspname = $1
       AND NOT t.relispartition
     ORDER BY t.relname, ic.relname
+`;
+
+/**
+ * Every non-primary index with its keys: the plain ones (columns, no
+ * expression) become a table's `indexes`; the rest are reported.
+ */
+export const INDEX_DEFINITIONS_QUERY = `
+    SELECT t.relname AS table_name,
+           ic.relname AS index_name,
+           am.amname AS method,
+           i.indisunique AS unique,
+           CASE WHEN 0 = ANY (i.indkey::int2[]) THEN NULL ELSE
+               (SELECT array_agg(a.attname::text ORDER BY k.ord)
+                FROM unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord)
+                JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum)
+           END AS column_names,
+           (SELECT array_agg((o.opt & 1) = 1 ORDER BY o.ord)
+            FROM unnest(i.indoption::int2[]) WITH ORDINALITY AS o(opt, ord)) AS descending,
+           pg_get_expr(i.indpred, i.indrelid) AS predicate,
+           pg_get_indexdef(i.indexrelid) AS definition
+    FROM pg_index i
+    JOIN pg_class t ON t.oid = i.indrelid
+    JOIN pg_class ic ON ic.oid = i.indexrelid
+    JOIN pg_am am ON am.oid = ic.relam
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE n.nspname = $1
+      AND NOT i.indisprimary
+      AND NOT t.relispartition
+    ORDER BY t.relname, ic.relname
+`;
+
+/**
+ * The functions and triggers of the schema, and the extensions of the
+ * database: objects a table definition does not carry, read only so the run
+ * can say they were left behind. Functions an extension owns are left out.
+ */
+export const DATABASE_OBJECTS_QUERY = `
+    SELECT 'function' AS kind,
+           p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' AS name,
+           NULL::text AS table_name,
+           pg_get_functiondef(p.oid) AS definition
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = $1
+      AND p.prokind IN ('f', 'p')
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
+    UNION ALL
+    SELECT 'trigger', tg.tgname, c.relname, pg_get_triggerdef(tg.oid)
+    FROM pg_trigger tg
+    JOIN pg_class c ON c.oid = tg.tgrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = $1 AND NOT tg.tgisinternal
+    UNION ALL
+    SELECT 'extension', e.extname, NULL, NULL
+    FROM pg_extension e
+    WHERE e.extname <> 'plpgsql'
+    ORDER BY 1, 2
 `;
 
 /**
@@ -414,6 +475,10 @@ export async function readSchemaMetadata(
     const checks = await client.query<CheckConstraintRow>(CHECK_CONSTRAINTS_QUERY, [schema]);
     const comments = await client.query<CommentRow>(COMMENTS_QUERY, [schema]);
     const policies = await client.query<PolicyRow>(POLICIES_QUERY, [schema]);
+    const indexDefinitions = await client.query<IndexDefinitionRow>(INDEX_DEFINITIONS_QUERY, [schema]);
+    // A role that may not call `pg_get_functiondef` on some function still
+    // gets its tables; the report is the part that goes missing.
+    const objects = await client.query<DatabaseObjectRow>(DATABASE_OBJECTS_QUERY, [schema]).catch(() => ({ rows: [] as DatabaseObjectRow[] }));
 
     // A column list scoped to the schema still names tables this run excludes —
     // views, partitions, the drizzle bookkeeping tables. Narrow every row set to
@@ -431,7 +496,10 @@ export async function readSchemaMetadata(
         // A foreign key pointing *out* of the introspected set (into another
         // schema, or at a view) cannot be turned into a relation: there is no
         // collection on the other end to link to.
-        fks: scoped(fks.rows).filter((fk) => known.has(fk.foreign_table_name)),
+        fks: scoped(fks.rows).filter((fk) => (fk.foreign_schema ?? schema) === schema && known.has(fk.foreign_table_name)),
+        externalFks: scoped(fks.rows).filter((fk) => fk.foreign_schema !== undefined && fk.foreign_schema !== schema),
+        indexDefinitions: scoped(indexDefinitions.rows),
+        objects: objects.rows.filter((o) => o.kind !== "trigger" || (o.table_name !== null && o.table_name !== undefined && known.has(o.table_name))),
         uniques: scoped(uniques.rows),
         indexes: scoped(indexes.rows),
         checks: scoped(checks.rows),

@@ -18,6 +18,7 @@ import { detectCmsDir } from "./introspect-db-project";
 import { countRowsUpTo, isUsableFileName, quoteRelation, readSchemaMetadata } from "./introspect-db-queries";
 import { classifyTables, lookupCandidates, LOOKUP_MAX_ROWS } from "./introspect-db-structure";
 import { parseCheckConstraints } from "./introspect-db-constraints";
+import { renderLeftBehindSql } from "./introspect-foreign";
 import { out, outWarn, outError } from "../cli-output";
 import { promptConfirm } from "../cli-prompt";
 import { diagnoseDbError } from "../cli-errors";
@@ -272,6 +273,31 @@ async function main() {
             out(chalk.green(`  ✓ ${indexPath}`));
         }
 
+        // What the files do not carry, said rather than left to silence: a
+        // run that listed nothing read as "everything came across" while seven
+        // functions and two triggers stayed behind. The SQL that recreates each
+        // one Postgres can print goes to one file, to review and apply after
+        // the first push.
+        if (generation.leftBehind.length > 0) {
+            outWarn("");
+            outWarn(chalk.yellow(`⚠ Not carried over (${generation.leftBehind.length}): these are not part of a table definition.`));
+            for (const item of generation.leftBehind) {
+                outWarn(chalk.gray(`  - ${item.kind} ${item.table ? `${item.table}.` : ""}${item.name}: ${item.why}`));
+            }
+            const withSql = generation.leftBehind.filter((item) => item.sql);
+            if (withSql.length > 0) {
+                const sqlPath = path.join(path.dirname(outDir), "sql", "introspected-left-behind.sql");
+                fs.mkdirSync(path.dirname(sqlPath), { recursive: true });
+                if (!fs.existsSync(sqlPath) || force) {
+                    fs.writeFileSync(sqlPath, renderLeftBehindSql(pgSchema, withSql), "utf-8");
+                    outWarn(chalk.gray(`  The SQL for ${withSql.length} of them is in ${sqlPath}: review it, then apply it after \`rebase db push\``));
+                    outWarn(chalk.gray("  (`psql \"$DATABASE_URL\" -f …`, or `rebase cloud db query -f …` on Rebase Cloud)."));
+                } else {
+                    outWarn(chalk.gray(`  ${sqlPath} exists; pass --force to rewrite it.`));
+                }
+            }
+        }
+
         out("");
         if (skippedFiles.length > 0) {
             out(chalk.yellow(`⚠ Skipped ${skippedFiles.length} existing file(s): ${skippedFiles.join(", ")}`));
@@ -284,6 +310,14 @@ async function main() {
         }
         if (customizations.length > 0 && cmsDir) {
             out(chalk.gray(`  ${customizations.length} panel customization(s) in ${cmsDir}: pass them to <RebaseCMS tableCustomizations={[…]} />.`));
+        }
+        // The database just read is usually the one being left: a migration's
+        // source. DATABASE_URL still names it, so the next `db push` would
+        // write the generated tables back into it.
+        if (generatedFiles.length > 0) {
+            out(chalk.yellow(`⚠ DATABASE_URL still points at the database this read (${hostPart}).`));
+            out(chalk.gray("  If it is the source of a migration, point DATABASE_URL at the new database before `rebase db push`;"));
+            out(chalk.gray("  pushing now writes the generated tables back into the one just introspected."));
         }
         out("");
 

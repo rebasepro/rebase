@@ -384,6 +384,7 @@ export default defineConfig({
                         { label: "Blog CMS", slug: "docs/recipes/blog-cms" },
                         { label: "Editorial publishing", slug: "docs/recipes/editorial-publishing" },
                         { label: "Importing from WordPress", slug: "docs/recipes/import-from-wordpress" },
+                        { label: "Migrating from Supabase", slug: "docs/recipes/migrate-from-supabase" },
                         { label: "Custom Dashboard", slug: "docs/recipes/custom-dashboard" },
                         { label: "Webhook Integration", slug: "docs/recipes/webhooks" }
                     ]
