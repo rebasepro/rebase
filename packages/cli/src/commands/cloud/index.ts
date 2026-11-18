@@ -108,6 +108,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--endpoint": String,
     "--events": String,
     "--expires-in": String,
+    "--file": String,
     "--format": String,
     "--function": String,
     "--grep": String,

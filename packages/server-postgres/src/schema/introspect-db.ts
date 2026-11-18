@@ -18,7 +18,7 @@ import { detectCmsDir } from "./introspect-db-project";
 import { countRowsUpTo, isUsableFileName, quoteRelation, readSchemaMetadata } from "./introspect-db-queries";
 import { classifyTables, lookupCandidates, LOOKUP_MAX_ROWS } from "./introspect-db-structure";
 import { parseCheckConstraints } from "./introspect-db-constraints";
-import { renderLeftBehindSql } from "./introspect-foreign";
+import { looksLikeSupabase, renderLeftBehindSql } from "./introspect-foreign";
 import { out, outWarn, outError } from "../cli-output";
 import { promptConfirm } from "../cli-prompt";
 import { diagnoseDbError } from "../cli-errors";
@@ -39,6 +39,7 @@ async function main() {
             "--schema": String,
             "--data-inference": Boolean,
             "--no-data-inference": Boolean,
+            "--from": String,
             "-f": "--force"
         },
         { permissive: true }
@@ -52,6 +53,11 @@ async function main() {
     const cmsDir = detectCmsDir(outDir);
     const force = args["--force"] || false;
     const pgSchema = args["--schema"] || "public";
+    const from = args["--from"];
+    if (from !== undefined && from !== "supabase") {
+        outError(chalk.red(`✗ --from takes "supabase", not "${from}".`));
+        process.exit(1);
+    }
 
     // Load env
     const envPaths = [
@@ -109,7 +115,7 @@ async function main() {
     out(chalk.gray(`Introspecting schema '${pgSchema}'...`));
 
     try {
-        const metadata = await readSchemaMetadata(client, pgSchema);
+        const metadata = await readSchemaMetadata(client, pgSchema, { forGeneration: true });
         const tablesMap = buildTablesMap(metadata.tables, metadata.columns, metadata.pks, metadata.fks);
 
         // Only tables that could structurally be a code list are counted, and
@@ -195,6 +201,7 @@ async function main() {
             checkFacts,
             samples,
             leaveOut: unusable,
+            ...(from === "supabase" ? { from: "supabase" as const } : {}),
             ...(cmsDir ? { cms: { tableImport: (table: string) => relativeImport(cmsDir, path.join(outDir, `${table}.ts`)) } } : {})
         });
         for (const { table, reason } of generation.failed) {
@@ -273,6 +280,17 @@ async function main() {
             out(chalk.green(`  ✓ ${indexPath}`));
         }
 
+        // Supabase's conventions, seen in a run that was not asked to translate
+        // them: said, because left as they are the first push into a new
+        // database fails (`schema "auth" does not exist`) or keeps policies for
+        // roles it does not have.
+        if (from !== "supabase" && looksLikeSupabase(metadata)) {
+            outWarn("");
+            outWarn(chalk.yellow("⚠ This schema uses Supabase's conventions (auth.uid() defaults, auth.users foreign keys, TO anon / TO authenticated)."));
+            outWarn(chalk.gray("  Leaving Supabase? Run again with --from supabase to translate them for a Rebase database."));
+            outWarn(chalk.gray("  Keep them as they are only if Rebase will run on this same database, beside Supabase."));
+        }
+
         // What the files do not carry, said rather than left to silence: a
         // run that listed nothing read as "everything came across" while seven
         // functions and two triggers stayed behind. The SQL that recreates each
@@ -291,7 +309,7 @@ async function main() {
                 if (!fs.existsSync(sqlPath) || force) {
                     fs.writeFileSync(sqlPath, renderLeftBehindSql(pgSchema, withSql), "utf-8");
                     outWarn(chalk.gray(`  The SQL for ${withSql.length} of them is in ${sqlPath}: review it, then apply it after \`rebase db push\``));
-                    outWarn(chalk.gray("  (`psql \"$DATABASE_URL\" -f …`, or `rebase cloud db query -f …` on Rebase Cloud)."));
+                    outWarn(chalk.gray("  (`psql \"$DATABASE_URL\" -f …`, or `rebase cloud db query --file …` on Rebase Cloud)."));
                 } else {
                     outWarn(chalk.gray(`  ${sqlPath} exists; pass --force to rewrite it.`));
                 }

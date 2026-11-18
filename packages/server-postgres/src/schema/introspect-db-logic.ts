@@ -585,6 +585,8 @@ export interface SchemaGenerationInput {
      * schema module. Absent, no customization is written.
      */
     cms?: { tableImport: (table: string) => string };
+    /** `schema introspect --from supabase`: see `DescribeTablesOptions.from`. */
+    from?: "supabase";
     /** Where the builders are imported from. `@rebasepro/server/schema` when omitted. */
     specifier?: string;
 }
@@ -782,7 +784,8 @@ export function generateSchemaModules(input: SchemaGenerationInput): SchemaGener
         purpose: "generate",
         joinTables,
         leaveOut: new Set([...(input.leaveOut ?? []), ...keyless.map(meta => meta.name), ...leaveOut]),
-        checkFacts: input.checkFacts
+        checkFacts: input.checkFacts,
+        ...(input.from ? { from: input.from } : {})
     });
     // A key column a row cannot be addressed by — an instant, a document, a
     // list, a type Rebase does not create — cannot be declared either; the

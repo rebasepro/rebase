@@ -18,7 +18,7 @@
 import { compilePolicyExpression } from "@rebasepro/common";
 import { policy } from "@rebasepro/types";
 import type { SecurityRule, SecurityRuleBase, TableIndex, TableIndexKey } from "@rebasepro/types";
-import type { DatabaseObjectRow, ForeignKeyRow, IndexDefinitionRow } from "./introspect-db-logic";
+import type { DatabaseObjectRow, ForeignKeyRow, IndexDefinitionRow, SchemaMetadata } from "./introspect-db-logic";
 
 /** A column DEFAULT that is the caller's id: `auth.uid()`, `rebase.uid()`, either inside `(SELECT …)`. */
 export function isCallerIdDefault(raw: string | null | undefined): boolean {
@@ -158,7 +158,7 @@ export function objectsLeftBehind(objects: readonly DatabaseObjectRow[]): LeftBe
         ...(object.table_name ? { table: object.table_name } : {}),
         why: object.kind === "extension"
             ? "an extension of the database; enable it on the new one (`CREATE EXTENSION`) if the app uses it"
-            : `a ${object.kind} is not part of a table definition; apply its SQL after \`db push\` (\`rebase cloud db query -f\` on Rebase Cloud)`,
+            : `a ${object.kind} is not part of a table definition; apply its SQL after \`db push\` (\`rebase cloud db query --file\` on Rebase Cloud)`,
         ...(object.definition ? { sql: object.definition } : {})
     }));
 }
@@ -168,7 +168,7 @@ export function renderLeftBehindSql(schema: string, items: readonly LeftBehind[]
     const lines = [
         `-- Objects \`rebase schema introspect\` did not carry over from schema "${schema}".`,
         "-- Review each one, then apply after `rebase db push`:",
-        "--   psql \"$DATABASE_URL\" -f this-file.sql      (or `rebase cloud db query -f this-file.sql`)",
+        "--   psql \"$DATABASE_URL\" -f this-file.sql      (or `rebase cloud db query --file this-file.sql`)",
         "-- Functions that referenced Supabase (auth.uid(), auth.users, roles anon/authenticated)",
         "-- need the same edits the tables got: rebase.uid(), the users table, no such roles.",
         ""
@@ -182,3 +182,10 @@ export function renderLeftBehindSql(schema: string, items: readonly LeftBehind[]
     return lines.join("\n");
 }
 
+
+/** Whether a schema uses Supabase's conventions: an `auth.uid()` default, a foreign key to `auth.users`, a policy for its roles. */
+export function looksLikeSupabase(metadata: Pick<SchemaMetadata, "columns" | "externalFks" | "policies">): boolean {
+    return metadata.columns.some(col => /\bauth\.uid\(\)/i.test(col.column_default ?? ""))
+        || (metadata.externalFks ?? []).some(isAuthUsersReference)
+        || (metadata.policies ?? []).some(policy => policy.roles.some(role => SUPABASE_ROLES.has(role)));
+}

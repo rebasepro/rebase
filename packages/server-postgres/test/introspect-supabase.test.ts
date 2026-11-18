@@ -11,7 +11,7 @@
  */
 import { generateSchemaModules } from "../src/schema/introspect-db-logic";
 import { classifyTables } from "../src/schema/introspect-db-structure";
-import { isCallerIdDefault, plainIndexes, renderLeftBehindSql, translateSupabaseRoles } from "../src/schema/introspect-foreign";
+import { isCallerIdDefault, looksLikeSupabase, plainIndexes, renderLeftBehindSql, translateSupabaseRoles } from "../src/schema/introspect-foreign";
 import { buildSchema, check, column, rlsPolicy } from "./helpers/schema-metadata";
 
 const OWNER = "(owner_id = ( SELECT auth.uid() AS uid))";
@@ -52,7 +52,7 @@ function agencies() {
 
 function generate() {
     const { metadata, tables } = agencies();
-    const generation = generateSchemaModules({ metadata, classifications: classifyTables(metadata, tables) });
+    const generation = generateSchemaModules({ metadata, classifications: classifyTables(metadata, tables), from: "supabase" });
     const module = generation.tables.find(t => t.table === "agencies")?.schemaModule;
     if (!module) throw new Error("no agencies module");
     return { generation, module };
@@ -92,6 +92,17 @@ describe("introspecting a Supabase schema", () => {
         const sql = renderLeftBehindSql("public", generation.leftBehind.filter(item => item.sql));
         expect(sql).toContain("CREATE OR REPLACE FUNCTION public.get_public_proposal");
         expect(sql).toContain("ADD CONSTRAINT \"agencies_name_check\" CHECK");
+    });
+});
+
+describe("without --from supabase", () => {
+    it("keeps the roles and the uuid default as they are, for a database Rebase runs on beside Supabase, and says what it saw", () => {
+        const { metadata, tables } = agencies();
+        expect(looksLikeSupabase(metadata)).toBe(true);
+        const module = generateSchemaModules({ metadata, classifications: classifyTables(metadata, tables) })
+            .tables.find(t => t.table === "agencies")?.schemaModule ?? "";
+        expect(module).toContain("pgRoles");
+        expect(module).toMatch(/ownerId: col\.uuid\(\)/);
     });
 });
 

@@ -894,7 +894,7 @@ description: "List databases attached to the project" },
                 section: "Database",
                 args: "[sql]",
                 description: "Run SQL on the project's database (owner or admin), with no local psql",
-                flags: [["-f, --file <path>", "Run the statements in a file, stopping at the first error"]]
+                flags: [["--file <path>", "Run the statements in a file, stopping at the first error"]]
             },
             { action: "test",
 section: "Database",

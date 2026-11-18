@@ -32,8 +32,7 @@ import { loadTunnelAccess, localDsn, tunnelListener, tunnelUrl } from "./db-conn
 
 /** Documented in `action-help.ts`, and paired with it by `action-help.test.ts`. */
 export const DB_QUERY_FLAGS = {
-    "--file": String,
-    "-f": "--file"
+    "--file": String
 } as const;
 
 /** The most rows of a result printed as a table; the JSON form carries them all. */
@@ -49,7 +48,7 @@ export interface QueryResultSummary {
 /** The SQL to run: the file, or the one positional. Exactly one of them. */
 export function querySql(file: string | undefined, positional: string | undefined, read: (path: string) => string = (p) => fs.readFileSync(p, "utf-8")): string {
     if (file !== undefined && positional !== undefined) {
-        fail("Give the SQL as an argument or with --file, not both.", "rebase cloud db query -f schema-extras.sql", "usage");
+        fail("Give the SQL as an argument or with --file, not both.", "rebase cloud db query --file schema-extras.sql", "usage");
     }
     if (file === undefined && positional === undefined) {
         fail("rebase cloud db query needs SQL: rebase cloud db query \"select 1\", or --file <path>.", undefined, "usage");

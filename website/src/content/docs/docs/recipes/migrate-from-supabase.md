@@ -22,12 +22,10 @@ Introspect the Supabase database (its direct connection string, as the
 `postgres` role), or a local copy of it:
 
 ```bash
-rebase init triptelier --database-url "$SUPABASE_DB_URL" --introspect --install
-# or, in an existing project:
-rebase schema introspect --database-url "$SUPABASE_DB_URL"
+rebase schema introspect --database-url "$SUPABASE_DB_URL" --from supabase
 ```
 
-`schema introspect` translates what a Rebase database does not have:
+`--from supabase` translates what a Rebase database does not have:
 
 | In Supabase | Written as |
 |---|---|
@@ -65,7 +63,7 @@ edited: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, no
 ```bash
 psql "$DATABASE_URL" -f backend/sql/introspected-left-behind.sql
 # on Rebase Cloud, with no local psql:
-rebase cloud db query -f backend/sql/introspected-left-behind.sql
+rebase cloud db query --file backend/sql/introspected-left-behind.sql
 ```
 
 A function the browser called with `supabase.rpc('fn')` is reached through a
@@ -137,5 +135,5 @@ reports `blockedOn: email_not_configured`.
 ```bash
 rebase cloud projects create --name Triptelier --link
 rebase cloud deploy
-rebase cloud db query -f backend/sql/introspected-left-behind.sql
+rebase cloud db query --file backend/sql/introspected-left-behind.sql
 ```

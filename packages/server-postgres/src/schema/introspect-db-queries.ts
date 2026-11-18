@@ -459,7 +459,13 @@ export async function countRowsUpTo(
  */
 export async function readSchemaMetadata(
     client: QueryableClient,
-    schema: string
+    schema: string,
+    /**
+     * `true` for `schema introspect`: also read each index's columns and the
+     * functions, triggers and extensions, which only the generator and its
+     * "not carried over" report use. The runtime's read at boot leaves them out.
+     */
+    options: { forGeneration?: boolean } = {}
 ): Promise<SchemaMetadata> {
     // Sequential, not `Promise.all`. A `pg.Client` is a single connection with
     // one protocol stream: concurrent `query()` calls on one are queued and
@@ -475,10 +481,14 @@ export async function readSchemaMetadata(
     const checks = await client.query<CheckConstraintRow>(CHECK_CONSTRAINTS_QUERY, [schema]);
     const comments = await client.query<CommentRow>(COMMENTS_QUERY, [schema]);
     const policies = await client.query<PolicyRow>(POLICIES_QUERY, [schema]);
-    const indexDefinitions = await client.query<IndexDefinitionRow>(INDEX_DEFINITIONS_QUERY, [schema]);
+    const indexDefinitions = options.forGeneration
+        ? await client.query<IndexDefinitionRow>(INDEX_DEFINITIONS_QUERY, [schema])
+        : undefined;
     // A role that may not call `pg_get_functiondef` on some function still
     // gets its tables; the report is the part that goes missing.
-    const objects = await client.query<DatabaseObjectRow>(DATABASE_OBJECTS_QUERY, [schema]).catch(() => ({ rows: [] as DatabaseObjectRow[] }));
+    const objects = options.forGeneration
+        ? await client.query<DatabaseObjectRow>(DATABASE_OBJECTS_QUERY, [schema]).catch(() => ({ rows: [] as DatabaseObjectRow[] }))
+        : undefined;
 
     // A column list scoped to the schema still names tables this run excludes —
     // views, partitions, the drizzle bookkeeping tables. Narrow every row set to
@@ -498,8 +508,10 @@ export async function readSchemaMetadata(
         // collection on the other end to link to.
         fks: scoped(fks.rows).filter((fk) => (fk.foreign_schema ?? schema) === schema && known.has(fk.foreign_table_name)),
         externalFks: scoped(fks.rows).filter((fk) => fk.foreign_schema !== undefined && fk.foreign_schema !== schema),
-        indexDefinitions: scoped(indexDefinitions.rows),
-        objects: objects.rows.filter((o) => o.kind !== "trigger" || (o.table_name !== null && o.table_name !== undefined && known.has(o.table_name))),
+        ...(indexDefinitions ? { indexDefinitions: scoped(indexDefinitions.rows) } : {}),
+        ...(objects
+            ? { objects: objects.rows.filter((o) => o.kind !== "trigger" || (o.table_name !== null && o.table_name !== undefined && known.has(o.table_name))) }
+            : {}),
         uniques: scoped(uniques.rows),
         indexes: scoped(indexes.rows),
         checks: scoped(checks.rows),

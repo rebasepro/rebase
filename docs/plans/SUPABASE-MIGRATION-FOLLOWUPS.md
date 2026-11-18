@@ -51,7 +51,7 @@ patch differs.
 
 ## C7. `rebase cloud db import --from <url>`
 
-`rebase cloud db query -f` (added on this branch) applies SQL with no local
+`rebase cloud db query --file` (added on this branch) applies SQL with no local
 client, but a data import needs `COPY`, which the simple query protocol over
 the tunnel cannot stream from a file. Build `cloud db import` as a control-plane
 job, not a CLI loop: the control plane already reaches the tenant database, so
@@ -64,7 +64,7 @@ during the import.
 ## Item 2. A home for SQL functions, triggers and CHECKs
 
 `schema introspect` now writes the objects it cannot carry to
-`backend/sql/introspected-left-behind.sql`, and `rebase cloud db query -f`
+`backend/sql/introspected-left-behind.sql`, and `rebase cloud db query --file`
 applies it. What is missing is the lifecycle: nothing applies `backend/sql/`
 on `db push`, at boot, or when a preview database is made, and nothing checks
 it was applied.
@@ -158,7 +158,7 @@ still have held the port. `rebase dev` already prints the move
 ## `rebase migrate supabase`
 
 The pieces now exist separately: Supabase-aware `schema introspect` with the
-left-behind report, `cloud db query -f`, `users create --no-invite`,
+left-behind report, `cloud db query --file`, `users create --no-invite`,
 `MAGIC_LINK_URL` templates, the migration guide. A `rebase migrate supabase
 --from <db-url>` would run them in order (introspect into a fresh project,
 write `backend/sql/`, port edge functions with a codemod for `Deno.serve`,

@@ -146,20 +146,23 @@ rebase schema introspect
 - Declares each plain index (columns only, btree, gin or brin, no predicate)
   in the table's `indexes`. An index on a foreign-key column alone is left to
   the relation, which creates one
-- Translates Supabase's conventions: a column default of `auth.uid()` becomes
+- With `--from supabase`, translates Supabase's conventions for a database
+  you are leaving: a column default of `auth.uid()` becomes
   `.onCreateUser()` (the server writes the caller's id), a column holding a
   Supabase user id (that default, or a foreign key to `auth.users`) becomes
   `col.text().userId()`, as `rebase.users.id` and `rebase.uid()` are text,
   and a policy `TO authenticated` / `TO anon` loses the role (a Rebase
   database has neither) and requires a signed-in / signed-out caller instead;
   a policy only for `service_role` is dropped. Each change is noted at the top
-  of the table's file
+  of the table's file. Without the flag these are left as they are (Rebase
+  running on the same database beside Supabase still needs them), and the run
+  says when it saw them
 - Ends with what it did **not** carry over: functions, triggers, extensions,
   CHECKs, indexes `indexes` cannot spell, foreign keys over several columns or
   into another schema. The SQL that recreates each one Postgres can print is
   written to `backend/sql/introspected-left-behind.sql`, to review and apply
   after the first push (`psql "$DATABASE_URL" -f …`, or
-  `rebase cloud db query -f …` on Rebase Cloud)
+  `rebase cloud db query --file …` on Rebase Cloud)
 - Reminds you that `DATABASE_URL` still names the database it read: in a
   migration that is the source, and a `db push` now would write into it
 - Puts what it could not state exactly in a comment at the top of the table's
@@ -183,6 +186,7 @@ rebase schema introspect
 | `--force, -f` | Overwrite table files that already exist; without it, an existing file is skipped |
 | `--database-url` | Read this database instead of the project's own |
 | `--docker` | Read the compose database, starting it if needed |
+| `--from supabase` | Translate Supabase's conventions (`auth.uid()` defaults, `auth.users` foreign keys, `TO anon` / `TO authenticated`) for a Rebase database. Leave it off when Rebase runs on the same database beside Supabase |
 | `--data-inference` / `--no-data-inference` | Sample up to 100 rows per table to detect formats, constraints and panel settings, or read the structure only. Without either it asks, and without a terminal it reads the structure only |
 
 This is useful when adopting Rebase on an existing database — introspect

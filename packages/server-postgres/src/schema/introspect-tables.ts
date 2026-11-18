@@ -162,6 +162,15 @@ export interface DescribeTablesOptions extends IntrospectTablesOptions {
     leaveOut?: ReadonlySet<string>;
     /** The CHECK constraints, parsed (`parseCheckConstraints`): validation in `"generate"`. */
     checkFacts?: CheckFactsByTable;
+    /**
+     * `"supabase"` (`schema introspect --from supabase`) translates Supabase's
+     * conventions for a database that is being left: an `auth.uid()` default
+     * becomes `.onCreateUser()`, a user-id column becomes text, and `TO anon`
+     * / `TO authenticated` become conditions. Off by default, because a
+     * database Rebase runs on in place keeps those roles, and Supabase's own
+     * API still relies on them.
+     */
+    from?: "supabase";
 }
 
 /**
@@ -344,7 +353,8 @@ export function describeTables(metadata: SchemaMetadata, options: DescribeTables
         servedNames,
         checkFacts: options.checkFacts ?? new Map(),
         note,
-        leftBehind
+        leftBehind,
+        supabase: options.from === "supabase"
     };
     if (generate) {
         // The database enforces a CHECK; after a push from the files, only the
@@ -387,6 +397,8 @@ interface TableContext {
     checkFacts: CheckFactsByTable;
     note: (table: string, text: string, kind?: keyof IntrospectionNotes) => void;
     leftBehind: LeftBehind[];
+    /** `from: "supabase"`: translate Supabase's conventions (see {@link DescribeTablesOptions.from}). */
+    supabase: boolean;
 }
 
 /** A foreign key that becomes a `belongsTo`. */
@@ -594,7 +606,7 @@ function applyGeneratedFacts(out: ColumnDescriptor, col: TableColumn, meta: Tabl
     const authRef = (context.metadata.externalFks ?? []).find(fk =>
         fk.table_name === meta.name && fk.column_name === col.column_name && isAuthUsersReference(fk));
     const callerDefault = isCallerIdDefault(col.column_default);
-    if ((authRef || callerDefault) && !out.primaryKey && out.generated === undefined) {
+    if (context.supabase && (authRef || callerDefault) && !out.primaryKey && out.generated === undefined) {
         out.semantic = "user";
         if (out.type.kind === "uuid") {
             out.type = { kind: "text" };
@@ -1038,6 +1050,7 @@ function rlsOf(row: TableRow, table: string, context: TableContext): RlsDescript
     // Supabase's `TO anon` / `TO authenticated`, translated (see
     // `translateSupabaseRoles`); a policy only for `service_role` is dropped.
     const ruleOf = (policy: PolicyRow): SecurityRule | null => {
+        if (!context.supabase) return readRule(policy);
         const translated = translateSupabaseRoles(readRule(policy));
         if (translated.note) context.note(table, translated.note, "remark");
         return translated.rule;

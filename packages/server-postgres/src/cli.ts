@@ -2894,6 +2894,7 @@ async function schemaCommand(
                 "--schema": String,
                 "--data-inference": Boolean,
                 "--no-data-inference": Boolean,
+                "--from": String,
                 "-f": "--force"
             },
             {
@@ -2924,7 +2925,8 @@ async function schemaCommand(
             ...(argsList["--schema"] ? [`--schema=${argsList["--schema"]}`] : []),
             // The introspector reads these itself; without one it asks.
             ...(argsList["--data-inference"] ? ["--data-inference"] : []),
-            ...(argsList["--no-data-inference"] ? ["--no-data-inference"] : [])
+            ...(argsList["--no-data-inference"] ? ["--no-data-inference"] : []),
+            ...(argsList["--from"] ? [`--from=${argsList["--from"]}`] : [])
         ];
 
         try {
