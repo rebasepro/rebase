@@ -360,7 +360,7 @@ message: e instanceof Error ? e.message : String(e) });
                             <div className={cls("w-2 h-2 rounded-full shrink-0", stateColors[job.state] || "bg-surface-400")}/>
                             <div className="flex-1 min-w-0">
                                 <Typography variant="body2" className="truncate font-medium text-[13px]">{job.name}</Typography>
-                                <Typography variant="caption" color="secondary" className="truncate text-[11px] font-mono">{job.schedule}</Typography>
+                                <Typography variant="caption" color="secondary" className="truncate text-xs font-mono">{job.schedule}</Typography>
                             </div>
                             {job.state === "running" && <CircularProgress size="smallest"/>}
                         </div>
@@ -417,7 +417,7 @@ message: e instanceof Error ? e.message : String(e) });
                             {selectedJob.lastError && (
                                 <Alert color="error" outerClassName="mt-3">
                                     <Typography variant="caption" className="font-medium block">{t("studio_cron_last_error")}</Typography>
-                                    <Typography variant="mono" className="text-[11px] break-all">{selectedJob.lastError}</Typography>
+                                    <Typography variant="mono" className="text-xs break-all">{selectedJob.lastError}</Typography>
                                 </Alert>
                             )}
                         </div>
@@ -488,11 +488,11 @@ function LogRow({ log }: { log: CronJobLogEntry }) {
                     ? <CheckCircleIcon size={iconSize.smallest} className="text-emerald-500 shrink-0"/>
                     : <AlertCircleIcon size={iconSize.smallest} className="text-red-500 shrink-0"/>}
                 <div className="flex-1 min-w-0">
-                    <Typography variant="caption" className="font-mono text-[11px] text-surface-500">{new Date(log.startedAt).toLocaleString()}</Typography>
+                    <Typography variant="caption" className="font-mono text-xs text-surface-500">{new Date(log.startedAt).toLocaleString()}</Typography>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     {log.manual && <Chip size="smallest">{t("studio_cron_manual_run")}</Chip>}
-                    <Typography variant="caption" className="font-mono text-[11px]">{formatDuration(log.durationMs)}</Typography>
+                    <Typography variant="caption" className="font-mono text-xs">{formatDuration(log.durationMs)}</Typography>
                     <ChevronDownIcon size={iconSize.smallest} className={cls("transition-transform text-text-secondary dark:text-text-secondary-dark", expanded && "rotate-180")}/>
                 </div>
             </div>
@@ -500,20 +500,20 @@ function LogRow({ log }: { log: CronJobLogEntry }) {
                 <div className="mt-2 ml-6 space-y-2">
                     {log.error && (
                         <Alert color="error" size="small">
-                            <Typography variant="mono" className="text-[11px] break-all">{log.error}</Typography>
+                            <Typography variant="mono" className="text-xs break-all">{log.error}</Typography>
                         </Alert>
                     )}
                     {log.logs.length > 0 && (
                         <div className="p-2 rounded bg-surface-sheet border border-hairline-strong max-h-40 overflow-auto">
                             {log.logs.map((line, i) => (
-                                <div key={i} className="font-mono text-[11px] text-surface-600 dark:text-surface-400 leading-relaxed">{line}</div>
+                                <div key={i} className="font-mono text-xs text-surface-600 dark:text-surface-400 leading-relaxed">{line}</div>
                             ))}
                         </div>
                     )}
                     {log.result !== undefined && (
                         <div className="p-2 rounded bg-surface-sheet border border-hairline-strong">
                             <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-1 block">Result</Typography>
-                            <pre className="font-mono text-[11px] text-surface-600 dark:text-surface-400 whitespace-pre-wrap break-all">{JSON.stringify(log.result, null, 2)}</pre>
+                            <pre className="font-mono text-xs text-surface-600 dark:text-surface-400 whitespace-pre-wrap break-all">{JSON.stringify(log.result, null, 2)}</pre>
                         </div>
                     )}
                 </div>

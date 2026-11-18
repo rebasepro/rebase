@@ -306,15 +306,15 @@ export function CalendarWidget({ loading, tasks, onOpenTask }: CalendarWidgetPro
                     <div className="flex items-center gap-3 mt-3 mb-1 px-1">
                         <div className="flex items-center gap-1">
                             <span className="w-[5px] h-[5px] rounded-full bg-primary" />
-                            <Typography variant="caption" color="secondary" className="text-[10px]">Pending</Typography>
+                            <Typography variant="caption" color="secondary" className="text-xs">Pending</Typography>
                         </div>
                         <div className="flex items-center gap-1">
                             <span className="w-[5px] h-[5px] rounded-full bg-red-500" />
-                            <Typography variant="caption" color="secondary" className="text-[10px]">Overdue</Typography>
+                            <Typography variant="caption" color="secondary" className="text-xs">Overdue</Typography>
                         </div>
                         <div className="flex items-center gap-1">
                             <span className="w-[5px] h-[5px] rounded-full bg-emerald-500" />
-                            <Typography variant="caption" color="secondary" className="text-[10px]">Done</Typography>
+                            <Typography variant="caption" color="secondary" className="text-xs">Done</Typography>
                         </div>
                     </div>
 
@@ -362,12 +362,12 @@ export function CalendarWidget({ loading, tasks, onOpenTask }: CalendarWidgetPro
                                                     </Typography>
                                                     <div className="flex items-center gap-2">
                                                         {task.values.client?.name && (
-                                                            <Typography variant="caption" color="secondary" className="truncate text-[10px]">
+                                                            <Typography variant="caption" color="secondary" className="truncate text-xs">
                                                                 {task.values.client.name}
                                                             </Typography>
                                                         )}
                                                         {task.values.stageId && (
-                                                            <Typography variant="caption" color="disabled" className="truncate text-[10px]">
+                                                            <Typography variant="caption" color="disabled" className="truncate text-xs">
                                                                 {stageLabels[task.values.stageId] || task.values.stageId}
                                                             </Typography>
                                                         )}

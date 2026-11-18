@@ -90,7 +90,7 @@ export function DashboardMetrics({
                                     ${totalRevenue.toLocaleString()}
                                 </Typography>
                                 {insights && insights.contractedRevenue > 0 && (
-                                    <Typography variant="caption" color="secondary" className="text-[10px]">
+                                    <Typography variant="caption" color="secondary" className="text-xs">
                                         (${insights.contractedRevenue.toLocaleString()} confirmed)
                                     </Typography>
                                 )}

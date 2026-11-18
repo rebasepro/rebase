@@ -73,14 +73,14 @@ export const UIStyleGuide = () => {
                                             <Button variant={variant} color={color}>
                                                 {color}
                                             </Button>
-                                            <span className="text-[10px] text-text-disabled font-mono">{color}</span>
+                                            <span className="text-xs text-text-disabled font-mono">{color}</span>
                                         </div>
                                     ))}
                                     <div className="flex flex-col items-center gap-2">
                                         <Button variant={variant} color="primary" disabled>
                                             Disabled
                                         </Button>
-                                        <span className="text-[10px] text-text-disabled font-mono">disabled</span>
+                                        <span className="text-xs text-text-disabled font-mono">disabled</span>
                                     </div>
                                 </div>
                             </Paper>
@@ -98,7 +98,7 @@ export const UIStyleGuide = () => {
                                 <Button size={size} color="primary">
                                     {size}
                                 </Button>
-                                <span className="text-[10px] text-text-disabled font-mono">{size}</span>
+                                <span className="text-xs text-text-disabled font-mono">{size}</span>
                             </div>
                         ))}
                     </div>
@@ -113,31 +113,31 @@ export const UIStyleGuide = () => {
                             <IconButton aria-label="Example">
                                 <IconExample/>
                             </IconButton>
-                            <span className="text-[10px] text-text-disabled font-mono">primary</span>
+                            <span className="text-xs text-text-disabled font-mono">primary</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
                             <IconButton aria-label="Example">
                                 <IconExample/>
                             </IconButton>
-                            <span className="text-[10px] text-text-disabled font-mono">secondary</span>
+                            <span className="text-xs text-text-disabled font-mono">secondary</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
                             <IconButton aria-label="Example" size="small">
                                 <IconExample/>
                             </IconButton>
-                            <span className="text-[10px] text-text-disabled font-mono">small</span>
+                            <span className="text-xs text-text-disabled font-mono">small</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
                             <IconButton aria-label="Example" disabled>
                                 <IconExample/>
                             </IconButton>
-                            <span className="text-[10px] text-text-disabled font-mono">disabled</span>
+                            <span className="text-xs text-text-disabled font-mono">disabled</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
                             <IconButton aria-label="Delete" size="small">
                                 <Trash2Icon/>
                             </IconButton>
-                            <span className="text-[10px] text-text-disabled font-mono">delete</span>
+                            <span className="text-xs text-text-disabled font-mono">delete</span>
                         </div>
                     </div>
                 </Paper>

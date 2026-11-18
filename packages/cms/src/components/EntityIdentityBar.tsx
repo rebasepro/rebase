@@ -648,7 +648,7 @@ function IdChip({ value }: { value: string }) {
                     // where the bar is narrow and every button is on it, the
                     // chip broke across two lines inside a 52px row.
                     "hidden md:inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2 py-0.5 rounded-md",
-                    "font-mono text-[11px] text-text-secondary dark:text-text-secondary-dark",
+                    "font-mono text-xs text-text-secondary dark:text-text-secondary-dark",
                     "bg-surface-field",
                     "hover:bg-surface-field-hover transition-colors"
                 )}>

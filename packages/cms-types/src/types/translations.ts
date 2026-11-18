@@ -1915,6 +1915,8 @@ export interface RebaseTranslations {
     insights_change_none?: string;
     /** In place of a chart that has no values to draw. */
     insights_no_data?: string;
+    /** A `TimeBars` bucket in which nothing was recorded — a gap, which is not a zero. */
+    insights_nothing_recorded?: string;
 
     // ─── Icon button names ───────────────────────────────────────
     add_to_favourites?: string;

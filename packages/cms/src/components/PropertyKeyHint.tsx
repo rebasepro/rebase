@@ -51,7 +51,7 @@ export function PropertyKeyHint({
             aria-label={`${t("copy")} ${propertyKey}`}
             className={cls(
                 "inline-flex items-center gap-1 min-w-0 shrink-[999] px-1 -my-0.5 rounded-md",
-                "font-mono text-[11px] font-normal leading-tight",
+                "font-mono text-xs font-normal leading-tight",
                 "text-text-disabled dark:text-text-disabled-dark",
                 "hover:text-text-secondary dark:hover:text-text-secondary-dark hover:bg-surface-hover",
                 "opacity-0 transition-opacity duration-150 group-hover/label:opacity-100 group-hover/label:delay-500",

@@ -1750,6 +1750,7 @@ export const fr: RebaseTranslations = {
     insights_change_down: "Baisse : {{change}}",
     insights_change_none: "Aucun changement",
     insights_no_data: "Aucune donnée pour cette période",
+    insights_nothing_recorded: "Rien d’enregistré",
 
     // ─── Icon button names ───────────────────────────────────────
     add_to_favourites: "Ajouter aux favoris",

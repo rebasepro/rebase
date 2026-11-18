@@ -58,19 +58,19 @@ function ProjectCard({ project, compact }: { project: SampleProject; compact?: b
                 <div className="absolute inset-0 opacity-20 transition-all duration-300" style={{ background: `linear-gradient(90deg, var(--color-primary) ${project.progress}%, transparent ${project.progress}%)` }} />
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
                     <FolderKanbanIcon size={compact ? 20 : 28} className="text-surface-400 dark:text-surface-500" />
-                    {!compact && <Typography variant="caption" color="secondary" className="font-mono text-[10px]">{project.progress}% complete</Typography>}
+                    {!compact && <Typography variant="caption" color="secondary" className="font-mono text-xs">{project.progress}% complete</Typography>}
                 </div>
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200" />
                 <div className="absolute top-2 right-2"><Chip colorScheme={priorityCfg.color} size="smallest" outlined>{priorityCfg.label}</Chip></div>
             </div>
             <div className={compact ? "p-2" : "p-3"}>
-                <Typography variant="caption" color="disabled" className="font-mono truncate block text-[10px]">{project.id}</Typography>
+                <Typography variant="caption" color="disabled" className="font-mono truncate block text-xs">{project.id}</Typography>
                 <div className="truncate my-1"><Typography variant={compact ? "caption" : "body2"} className="font-medium">{project.name}</Typography></div>
                 {!compact && <Typography variant="caption" color="secondary" className="line-clamp-2 mb-2">{project.description}</Typography>}
                 <div className="flex items-center gap-1.5 flex-wrap">
                     <Chip colorScheme={statusCfg.color} size="smallest">{statusCfg.label}</Chip>
-                    {!compact && project.tags.slice(0, 2).map(tag => <Chip key={tag} size="smallest" colorScheme="cyan" className="!text-[10px]">{tag}</Chip>)}
-                    {!compact && project.tags.length > 2 && <span className="text-[10px] text-surface-400">+{project.tags.length - 2}</span>}
+                    {!compact && project.tags.slice(0, 2).map(tag => <Chip key={tag} size="smallest" colorScheme="cyan" className="!text-xs">{tag}</Chip>)}
+                    {!compact && project.tags.length > 2 && <span className="text-xs text-surface-400">+{project.tags.length - 2}</span>}
                 </div>
                 {!compact && (
                     <div className={cls("flex items-center justify-between mt-2 pt-2 border-t", defaultBorderMixin)}>
@@ -78,7 +78,7 @@ function ProjectCard({ project, compact }: { project: SampleProject; compact?: b
                             <div className="w-5 h-5 rounded-full bg-surface-raised text-surface-500 flex items-center justify-center text-[9px] font-semibold">{project.assignee[0]}</div>
                             <Typography variant="caption" color="secondary" className="truncate max-w-[100px]">{project.assignee}</Typography>
                         </div>
-                        <Typography variant="caption" className={cls("font-mono text-[10px]", isOverdue ? "text-red-500 font-semibold" : "text-surface-400")}>{project.dueDate}</Typography>
+                        <Typography variant="caption" className={cls("font-mono text-xs", isOverdue ? "text-red-500 font-semibold" : "text-surface-400")}>{project.dueDate}</Typography>
                     </div>
                 )}
             </div>

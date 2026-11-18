@@ -121,10 +121,10 @@ export const Checkbox = React.memo(({
                     <CheckboxPrimitive.Indicator asChild>
                         {indeterminate
                             ? (
-                                <MinusIcon size={iconSize} className={"absolute"}/>
+                                <MinusIcon size={iconSize} className={"absolute stroke-keep"}/>
                             )
                             : (
-                                <CheckIcon size={iconSize} className={"absolute"}/>
+                                <CheckIcon size={iconSize} className={"absolute stroke-keep"}/>
                             )}
                     </CheckboxPrimitive.Indicator>
                 </div>

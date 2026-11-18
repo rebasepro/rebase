@@ -102,12 +102,12 @@ export function TagChips({ slot, max = 4 }: { slot: PreviewSlot, max?: number })
         {shown.map(value => (
             <Chip key={value}
                 size="smallest"
-                className="!text-[10px] !leading-tight !py-0 shrink-0 max-w-[100px] truncate">
+                className="!text-xs !leading-tight !py-0 shrink-0 max-w-[100px] truncate">
                 {value}
             </Chip>
         ))}
         {hidden > 0 && (
-            <span className="text-[10px] text-surface-400 dark:text-surface-500 shrink-0">+{hidden}</span>
+            <span className="text-xs text-surface-400 dark:text-surface-500 shrink-0">+{hidden}</span>
         )}
     </>;
 }

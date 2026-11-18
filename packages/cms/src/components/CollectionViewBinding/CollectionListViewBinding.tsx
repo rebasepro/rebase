@@ -1235,14 +1235,14 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                                     key={`${rel.propertyKey}-${item.id}`}
                                     size="smallest"
                                     colorScheme={rel.colorScheme}
-                                    className="!text-[10px] !leading-tight !py-0 shrink-0 max-w-[120px] truncate"
+                                    className="!text-xs !leading-tight !py-0 shrink-0 max-w-[120px] truncate"
                                 >
                                     {item.displayName}
                                 </Chip>
                             ))
                         ))}
                         {slots.relations.some(r => r.totalCount > r.items.length) && (
-                            <span className="text-[10px] text-surface-400 dark:text-surface-500 shrink-0">
+                            <span className="text-xs text-surface-400 dark:text-surface-500 shrink-0">
                                 +{slots.relations.reduce((acc, r) => acc + Math.max(0, r.totalCount - r.items.length), 0)}
                             </span>
                         )}

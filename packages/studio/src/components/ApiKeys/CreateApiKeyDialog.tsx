@@ -88,7 +88,7 @@ function SectionLabel({ children, hint }: { children: React.ReactNode; hint?: Re
                 {children}
             </Typography>
             {hint && (
-                <Typography variant="caption" color="secondary" className="text-2xs" gutterBottom={false}>
+                <Typography variant="caption" color="secondary" className="text-xs" gutterBottom={false}>
                     {hint}
                 </Typography>
             )}
@@ -137,12 +137,12 @@ function ScopeRow({ summary, choice, reach, options, draft, onToggle, onChoice, 
                         {summary.label}
                     </Typography>
                     {summary.description && (
-                        <Typography variant="caption" component="span" color="secondary" gutterBottom={false} className="block text-2xs leading-snug font-normal">
+                        <Typography variant="caption" component="span" color="secondary" gutterBottom={false} className="block text-xs leading-snug font-normal">
                             {summary.description}
                         </Typography>
                     )}
                 </Label>
-                <Typography variant="caption" color="disabled" gutterBottom={false} className="font-mono text-2xs shrink-0 pt-0.5">
+                <Typography variant="caption" color="disabled" gutterBottom={false} className="font-mono text-xs shrink-0 pt-0.5">
                     {summary.scope}
                 </Typography>
             </div>
@@ -455,7 +455,7 @@ export function CreateApiKeyDialog({
                                         <Typography variant="body2" gutterBottom={false} className="text-[13px] font-medium">
                                             {planeLabel(t, plane)}
                                         </Typography>
-                                        <Typography variant="caption" color="secondary" gutterBottom={false} className="text-2xs truncate">
+                                        <Typography variant="caption" color="secondary" gutterBottom={false} className="text-xs truncate">
                                             {planeHint(t, plane)}
                                         </Typography>
                                     </div>
@@ -478,7 +478,7 @@ export function CreateApiKeyDialog({
                                     </div>
                                 </div>
                             ))}
-                            <Typography variant="caption" color="secondary" gutterBottom={false} className="text-2xs leading-snug max-w-[70ch]">
+                            <Typography variant="caption" color="secondary" gutterBottom={false} className="text-xs leading-snug max-w-[70ch]">
                                 {t("studio_api_keys_scopes_offered_note")}
                             </Typography>
                         </div>
@@ -491,7 +491,7 @@ export function CreateApiKeyDialog({
                         <SectionLabel hint={t("studio_api_keys_roles_rows_hint")}>
                             {t("studio_api_keys_roles")}
                         </SectionLabel>
-                        <Typography variant="caption" color="secondary" gutterBottom={false} className="block mb-3 text-2xs leading-snug max-w-[70ch]">
+                        <Typography variant="caption" color="secondary" gutterBottom={false} className="block mb-3 text-xs leading-snug max-w-[70ch]">
                             {t("studio_api_keys_roles_explainer")}
                         </Typography>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
@@ -521,7 +521,7 @@ export function CreateApiKeyDialog({
                             />
                         </div>
                         {rolesUnavailable && (
-                            <Typography variant="caption" color="secondary" gutterBottom={false} className="block mt-1.5 text-2xs">
+                            <Typography variant="caption" color="secondary" gutterBottom={false} className="block mt-1.5 text-xs">
                                 {t("studio_api_keys_roles_unavailable")}
                             </Typography>
                         )}
@@ -572,7 +572,7 @@ export function CreateApiKeyDialog({
                                     placeholder="1000"
                                     size="small"
                                     endAdornment={
-                                        <Typography variant="caption" color="secondary" component="span" gutterBottom={false} className="text-2xs whitespace-nowrap">
+                                        <Typography variant="caption" color="secondary" component="span" gutterBottom={false} className="text-xs whitespace-nowrap">
                                             {t("studio_api_keys_rate_limit_unit")}
                                         </Typography>
                                     }
@@ -581,7 +581,7 @@ export function CreateApiKeyDialog({
                         )}
                     </div>
                     {kind === "service" && (
-                        <Typography variant="caption" color="secondary" gutterBottom={false} className="block mt-1.5 text-2xs">
+                        <Typography variant="caption" color="secondary" gutterBottom={false} className="block mt-1.5 text-xs">
                             {t("studio_api_keys_rate_limit_hint")} {t("studio_api_keys_rate_limit_scope")}
                         </Typography>
                     )}
@@ -629,7 +629,7 @@ export function CreateApiKeyDialog({
                                 </div>
                             )}
                         {incomplete.length > 0 && (
-                            <Typography variant="caption" color="secondary" gutterBottom={false} className="block mt-2 text-2xs">
+                            <Typography variant="caption" color="secondary" gutterBottom={false} className="block mt-2 text-xs">
                                 {incomplete.map(scope => t("studio_api_keys_target_missing", { scope: labelOf(scope) })).join(" ")}
                             </Typography>
                         )}

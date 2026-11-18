@@ -716,7 +716,7 @@ id: String(ra.entityId) })}
         return (
             <div className="px-4 py-1.5 h-full flex items-center whitespace-nowrap text-[13px] text-text-primary dark:text-text-primary-dark font-mono">
                 <div className="truncate flex-grow" title={displayValue}>
-                    {displayValue === "" ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-[11px]">NULL</span> : displayValue}
+                    {displayValue === "" ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-xs">NULL</span> : displayValue}
                 </div>
             </div>
         );
@@ -963,7 +963,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                                                                     {matchedCollections.map(mc => (
                                                                         <Tooltip key={mc.collectionSlug} title={`${mc.collection.name} (${mc.collectionSlug})`}>
-                                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-primary/10 dark:bg-primary-dark/15 text-primary dark:text-primary-dark whitespace-nowrap border border-primary/20 dark:border-primary-dark/20">
+                                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 dark:bg-primary-dark/15 text-primary dark:text-primary-dark whitespace-nowrap border border-primary/20 dark:border-primary-dark/20">
                                                                                 {typeof mc.collection.icon === "string" && (
                                                                                     <IconForView collectionOrView={{ icon: mc.collection.icon, slug: mc.collectionSlug, name: mc.collection.name }} className="text-[12px]"/>
                                                                                 )}
@@ -1028,11 +1028,11 @@ message: t("studio_sql_markdown_copy_failed") });
                                             {!isRunning && result && !result.error && resultView === "table" && tableData.data.length > 0 && (
                                                 <div className={cls("p-2 px-4 border-t bg-surface-sheet flex justify-between items-center shrink-0", defaultBorderMixin)}>
                                                     <div className="flex space-x-4">
-                                                        <div className="flex items-center text-[11px]">
+                                                        <div className="flex items-center text-xs">
                                                             <span className="font-semibold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_rows")}</span>
                                                             <span className="font-mono text-text-secondary dark:text-text-secondary-dark">{tableData.data.length}</span>
                                                         </div>
-                                                        <div className="flex items-center text-[11px]">
+                                                        <div className="flex items-center text-xs">
                                                             <span className="font-semibold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_time")}</span>
                                                             <span className="font-mono text-text-secondary dark:text-text-secondary-dark">{result.duration.toFixed(0)}ms</span>
                                                         </div>

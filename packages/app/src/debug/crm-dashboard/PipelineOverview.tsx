@@ -200,7 +200,7 @@ export function PipelineOverview({
                                                     variant="caption"
                                                     color="secondary"
                                                     className={cls(
-                                                        "whitespace-nowrap text-[11px]",
+                                                        "whitespace-nowrap text-xs",
                                                         isEmpty && "opacity-35"
                                                     )}
                                                 >
@@ -266,7 +266,7 @@ export function PipelineOverview({
                                                     variant="caption"
                                                     color="secondary"
                                                     className={cls(
-                                                        "whitespace-nowrap text-[11px]",
+                                                        "whitespace-nowrap text-xs",
                                                         isEmpty && "opacity-35"
                                                     )}
                                                 >

@@ -249,12 +249,12 @@ export function BranchesView() {
                                 <div className="w-2 h-2 rounded-full shrink-0 bg-emerald-500"/>
                                 <div className="flex-1 min-w-0">
                                     <Typography variant="body2" className="truncate font-medium text-[13px]">{branch.name}</Typography>
-                                    <Typography variant="caption" color="secondary" className="truncate text-[11px]">
+                                    <Typography variant="caption" color="secondary" className="truncate text-xs">
                                         {t("studio_branches_list_from", { parent: branch.parentDatabase, when: formatRelative(branch.createdAt) })}
                                     </Typography>
                                 </div>
                                 {branch.sizeBytes !== undefined && (
-                                    <Typography variant="caption" color="disabled" className="font-mono text-[10px] shrink-0">
+                                    <Typography variant="caption" color="disabled" className="font-mono text-xs shrink-0">
                                         {formatSize(branch.sizeBytes)}
                                     </Typography>
                                 )}
@@ -282,7 +282,7 @@ export function BranchesView() {
                                 <div className="min-w-0">
                                     <Typography variant="subtitle1" className="font-semibold truncate">{selected.name}</Typography>
                                     <Typography variant="caption" color="secondary" className="truncate">
-                                        {t("studio_branches_created_from")} <Typography variant="mono" component="span" className="text-[11px]">{selected.parentDatabase}</Typography>
+                                        {t("studio_branches_created_from")} <Typography variant="mono" component="span" className="text-xs">{selected.parentDatabase}</Typography>
                                     </Typography>
                                 </div>
                             </div>
@@ -340,21 +340,21 @@ export function BranchesView() {
                                                     `rb_`, and a branch recorded under an older naming
                                                     scheme (`my-feature` in `rb_myfeature`) is not even
                                                     that. */}
-                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">{t("studio_branches_row_database")}</Typography>
+                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-xs">{t("studio_branches_row_database")}</Typography>
                                                 <Typography variant="body2" className="font-mono text-[12px]">{selected.database}</Typography>
                                             </div>
                                             <div className="flex items-start gap-2">
-                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">{t("studio_branches_row_connect")}</Typography>
+                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-xs">{t("studio_branches_row_connect")}</Typography>
                                                 <Typography variant="body2" className="font-mono text-[12px] break-all">
                                                     {`DATABASE_URL=…/${selected.database}`}
                                                 </Typography>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">{t("studio_branches_row_branched_from")}</Typography>
+                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-xs">{t("studio_branches_row_branched_from")}</Typography>
                                                 <Typography variant="body2" className="font-mono text-[12px]">{selected.parentDatabase}</Typography>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">{t("studio_branches_row_created_at")}</Typography>
+                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-xs">{t("studio_branches_row_created_at")}</Typography>
                                                 <Typography variant="body2" className="font-mono text-[12px]">
                                                     {selected.createdAt instanceof Date
                                                         ? selected.createdAt.toLocaleString()
