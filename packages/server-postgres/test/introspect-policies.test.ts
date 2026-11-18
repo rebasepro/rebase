@@ -145,10 +145,11 @@ describe("writing a table's policies into its `rls`", () => {
         expect(source).not.toContain("customers_default_admin_write_update");
     });
 
-    it("writes a rule that grants nothing for RLS on with no policy at all, which no one but its owner reads", () => {
+    it("writes \"admin-only\" for RLS on with no policy at all: server code and admins, as Supabase's service_role", () => {
+        // A rule granting nothing also locked out `rebase.dataAsAdmin`.
         const source = generated([], true);
-        expect(source).toContain(`{ name: "customers_closed", operation: "all", using: "false" }`);
-        expect(source).toContain("defaultPolicies: false");
+        expect(source).toContain(`rls: "admin-only"`);
+        expect(source).not.toContain("customers_closed");
     });
 
     it("keeps the baseline and the table's own policies for a table with RLS off, and says what the push will do to it", () => {

@@ -1055,5 +1055,12 @@ function rlsOf(row: TableRow, table: string, context: TableContext): RlsDescript
     const own = rules(policies.filter(policy => !(keepsBaseline && baseline.has(policy.policy_name))));
     if (keepsBaseline) return own.length > 0 ? { posture: "rules", rules: own, defaultPolicies: true } : { posture: "admin-only", rules: [], defaultPolicies: true };
     if (own.length > 0) return { posture: "rules", rules: own, defaultPolicies: false };
-    return { posture: "rules", rules: [{ name: `${table}_closed`, operation: "all", using: "false" }], defaultPolicies: false };
+    // RLS on and no policy: only the owner connection reaches the rows. Its
+    // nearest posture is "admin-only" — the server's own code
+    // (`rebase.dataAsAdmin`) and admins, which is what Supabase's
+    // `service_role` was. A rule granting nothing (`using: "false"`) locked
+    // out `rebase.dataAsAdmin` as well, leaving only `rebase.sql()`.
+    context.note(table, `"${table}" has row-level security on and no policy: it is "admin-only", so server code (\`rebase.dataAsAdmin\`) and admins reach it. ` +
+        "Write `rls: [{ operation: \"all\", using: \"false\" }]` to keep it closed to admins too.", "remark");
+    return { posture: "admin-only", rules: [], defaultPolicies: true };
 }

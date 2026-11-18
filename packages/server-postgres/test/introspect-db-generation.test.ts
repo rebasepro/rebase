@@ -259,9 +259,10 @@ describe("row-level security", () => {
         expect(notes).toContain("// ⚠ Row-level security is off on this table");
     });
 
-    it("is a rule that grants nothing for RLS on with no policy, which no one but the owner reads today", () => {
+    it("is \"admin-only\" for RLS on with no policy, and says how to keep it closed to admins too", () => {
         const notes = one({ notes: true }, []);
-        expect(notes).toContain("rls: [\n        { name: \"notes_closed\", operation: \"all\", using: \"false\" }\n    ],\n    defaultPolicies: false");
+        expect(notes).toContain("rls: \"admin-only\"");
+        expect(notes).toContain("using: \"false\"");
     });
 });
 
