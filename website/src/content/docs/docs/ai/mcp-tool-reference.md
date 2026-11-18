@@ -11,6 +11,12 @@ decides what ⚠ means are on the [MCP server](/docs/ai/mcp) page.
 53 tools, in ten groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
+Every tool outside the project registry group, `rebase_cloud_projects_list`,
+`rebase_cloud_provision` and `rebase_dev_logs` also takes an optional `project`
+(a registered name, or a Cloud slug or id), checked against the session
+directory's Cloud link before it runs. See
+[Which project a call acts on](/docs/ai/mcp#which-project-a-call-acts-on).
+
 ## Schema & database (13)
 
 Spawn the Rebase CLI in the active project directory.

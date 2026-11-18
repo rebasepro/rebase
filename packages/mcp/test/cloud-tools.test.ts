@@ -68,8 +68,15 @@ const SAMPLES: Record<string, Array<Record<string, unknown>>> = {
     rebase_cloud_projects_list: [{}]
 };
 
+/**
+ * A cloud tool's schema as its handler parses it. `project` is left out: the
+ * dispatcher resolves and removes it before the handler runs (see
+ * `project-scope.ts` and its tests), so the handler never sees it.
+ */
 function schemaOf(name: string): Schema {
-    return CLOUD.find((t) => t.name === name)!.inputSchema as Schema;
+    const schema = CLOUD.find((t) => t.name === name)!.inputSchema as Schema;
+    const { project: _project, ...properties } = schema.properties;
+    return { ...schema, properties };
 }
 
 /** A value of the wrong JSON type for a property. */
@@ -223,7 +230,7 @@ describe("cloud tool argv", () => {
         // The hosted connector plans, then confirms, the same three; an MCP
         // call has no terminal for the CLI's own prompt.
         expect(() => parseCloudToolArgs("rebase_cloud_deploy", { app: "web" })).toThrow(/would deploy the app "web" to the linked Rebase Cloud project's production\. Nothing was done/);
-        expect(() => parseCloudToolArgs("rebase_cloud_env_set", { key: "K", value: "v" })).toThrow(/would set K in production/);
+        expect(() => parseCloudToolArgs("rebase_cloud_env_set", { key: "K", value: "v" })).toThrow(/would set K in the linked Rebase Cloud project's production/);
         expect(() => parseCloudToolArgs("rebase_cloud_rollback", {})).toThrow(/confirm: true/);
         expect(() => parseCloudToolArgs("rebase_cloud_provision", { name: "Todo" })).toThrow(/would create a public Rebase Cloud project named "Todo"/);
         // What leaves production alone needs no confirmation.
@@ -251,12 +258,17 @@ describe("cloud tool argv", () => {
         expect(parseCloudToolArgs("rebase_cloud_deployments_list", {}, id).argv).toContain("--project");
     });
 
-    it("keeps deploys, env changes and rollbacks on the linked project, whatever is selected", () => {
+    /**
+     * An env change or a rollback used to go to the link of the directory the
+     * CLI was spawned in (the active registry entry's), which is not
+     * necessarily the project the call resolved to. Now it names it.
+     */
+    it("sends env changes and rollbacks to the project the call resolved to; a deploy stays on its directory's link", () => {
         const id = "aca0185f-0000-4000-8000-000000000000";
+        expect(parseCloudToolArgs("rebase_cloud_env_set", { key: "A", value: "b", confirm: true }, id).argv).toContain(id);
+        expect(parseCloudToolArgs("rebase_cloud_rollback", { confirm: true }, id).argv).toContain(id);
         for (const [name, sample] of [
             ["rebase_cloud_deploy", { confirm: true }],
-            ["rebase_cloud_env_set", { key: "A", value: "b", confirm: true }],
-            ["rebase_cloud_rollback", { confirm: true }],
             ["rebase_cloud_projects_list", {}]
         ] as const) {
             expect(parseCloudToolArgs(name, sample, id).argv).not.toContain("--project");
