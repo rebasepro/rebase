@@ -75,6 +75,33 @@ export function resolveEmailLinkBase(
 }
 
 /**
+ * Why a `magicLinkUrl` without `{token}` is probably a template that lost its
+ * end, or `undefined` when it reads as the base it is.
+ *
+ * dotenv cuts an unquoted value at `#`, so
+ * `MAGIC_LINK_URL=https://app.example.com/app.html#ml={token}` arrives as
+ * `https://app.example.com/app.html`, which is read as a base: every email
+ * then carries `…/app.html/auth/magic-link?token=…`, with no error anywhere.
+ * A base names an origin, perhaps a path; a hash, or a path ending in a file
+ * (`.html`), is the sign.
+ */
+export function magicLinkUrlProblem(value: string | undefined): string | undefined {
+    if (!value || value.includes("{token}")) return undefined;
+    let url: URL;
+    try {
+        url = new URL(value);
+    } catch {
+        return undefined;
+    }
+    if (url.hash || /\.[a-z0-9]+$/i.test(url.pathname)) {
+        return `MAGIC_LINK_URL is "${value}", which has no {token}, so it is read as a base and every magic link becomes ` +
+            `"${value.replace(/\/+$/, "")}/auth/magic-link?token=…". If it was meant as a template, quote it in .env ` +
+            "(an unquoted # starts a comment there): MAGIC_LINK_URL=\"https://app.example.com/app.html#ml={token}\".";
+    }
+    return undefined;
+}
+
+/**
  * The magic link an email carries for `token`.
  *
  * `magicLinkUrl` with `{token}` in it is the whole link, the token put where

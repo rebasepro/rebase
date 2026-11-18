@@ -5,6 +5,7 @@ import type { CaptchaConfig, CaptchaRoute } from "../auth/captcha";
 import type { RebaseBootEnv } from "./env";
 import { normalizePemFromEnv } from "../auth/jwt-keys";
 import { logger } from "../utils/logger";
+import { magicLinkUrlProblem } from "../email/link-base";
 import { BundleError } from "./bundle";
 import { DEFAULT_SCHEMA_PATH } from "../schema-edit/project-root";
 
@@ -44,6 +45,8 @@ function hasAbsoluteLinkBase(value: string | undefined): boolean {
  * and the auth routes report the missing service for themselves.
  */
 export function resolveEmailOptions(env: RebaseBootEnv): EmailConfig | undefined {
+    const magicLinkProblem = magicLinkUrlProblem(env.MAGIC_LINK_URL);
+    if (magicLinkProblem) logger.warn(`[Auth] ${magicLinkProblem}`);
     if (!env.SMTP_HOST) {
         if (env.NODE_ENV === "production") return undefined;
         if (!hasAbsoluteLinkBase(env.FRONTEND_URL)) return undefined;

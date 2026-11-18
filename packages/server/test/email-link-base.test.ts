@@ -8,7 +8,7 @@
  * fallback chain and the boot-time refusal that replaces the silent failure.
  */
 
-import { resolveEmailLinkBase, assertEmailLinkBases, magicLinkHref } from "../src/email/link-base";
+import { resolveEmailLinkBase, assertEmailLinkBases, magicLinkHref, magicLinkUrlProblem } from "../src/email/link-base";
 import { createEmailService } from "../src/email/smtp-email-service";
 import type { EmailConfig } from "../src/email/types";
 
@@ -120,5 +120,19 @@ describe("magicLinkHref", () => {
             .toBe("https://app.example.com/auth/magic-link?token=t1");
         expect(magicLinkHref({ from: "x@y.z", magicLinkUrl: "https://login.example.com", resetPasswordUrl: "https://app.example.com" }, "t1"))
             .toBe("https://login.example.com/auth/magic-link?token=t1");
+    });
+});
+
+describe("magicLinkUrlProblem", () => {
+    it("flags a template dotenv cut at its #, and a file path with no {token}", () => {
+        expect(magicLinkUrlProblem("https://app.example.com/app.html")).toContain("quote it");
+        expect(magicLinkUrlProblem("https://app.example.com/#ml=x")).toContain("{token}");
+    });
+
+    it("says nothing of a template or a plain base", () => {
+        expect(magicLinkUrlProblem("https://app.example.com/app.html#ml={token}")).toBeUndefined();
+        expect(magicLinkUrlProblem("https://app.example.com")).toBeUndefined();
+        expect(magicLinkUrlProblem("https://app.example.com/admin/")).toBeUndefined();
+        expect(magicLinkUrlProblem(undefined)).toBeUndefined();
     });
 });
