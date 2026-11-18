@@ -431,18 +431,29 @@ function describeConstraintDrops(statement: string, constraints: readonly Existi
     const [schema, table] = alter[2] ? [unquote(alter[1]), unquote(alter[2])] : [undefined, unquote(alter[1])];
 
     const lost: string[] = [];
-    for (const clause of splitClauses(alter[3])) {
+    const clauses = splitClauses(alter[3]);
+    // A foreign key dropped and added back under its name in the same
+    // statement is a changed key (its `ON DELETE`, its target), not a lost one.
+    const readded = new Set(clauses.flatMap(clause => {
+        const added = /^ADD\s+CONSTRAINT\s+("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)/i.exec(clause.trim());
+        return added ? [unquote(added[1])] : [];
+    }));
+    for (const clause of clauses) {
         const drop = DROP_CONSTRAINT_RE.exec(clause);
         if (!drop) continue;
         const name = unquote(drop[1]);
         const constraint = constraints.find(c => c.table === table && c.name === name
-            && (schema === undefined || c.schema === schema));
-        if (constraint) lost.push(`${constraint.kind === "check" ? "CHECK" : "EXCLUDE"} "${name}"`);
+            && (schema === undefined || c.schema === schema)
+            && !(c.kind === "foreign key" && readded.has(name)));
+        if (constraint) lost.push(`${constraint.kind === "check" ? "CHECK" : constraint.kind === "foreign key" ? "FOREIGN KEY" : "EXCLUDE"} "${name}"`);
     }
     if (lost.length === 0) return undefined;
     const subject = schema ? `${schema}.${table}` : table;
     return `${subject} loses ${lost.join(", ")}: no row is lost, and the database accepts every row ` +
-        `${lost.length === 1 ? "it refuses" : "they refuse"} today`;
+        `${lost.length === 1 ? "it refuses" : "they refuse"} today` +
+        (lost.some(item => item.startsWith("FOREIGN KEY"))
+            ? ". A foreign key no relation declares (one over several columns) is dropped by every push; recreate it in SQL after the push, or keep it by declaring a relation"
+            : "");
 }
 
 /**
@@ -546,7 +557,8 @@ function modifierWidens(base: string, from: number[] | undefined, to: number[] |
  *    `timestamptz(3)` → `timestamptz`);
  *  - `smallint` → `integer` → `bigint`, and any of them to a `numeric` with
  *    room for all their digits;
- *  - `varchar(n)` → `text`, and `text` → an unbounded `varchar`.
+ *  - `varchar(n)` → `text`, and `text` → an unbounded `varchar`;
+ *  - `uuid` → `text` (or a `varchar` of 36 or more), its one exact spelling.
  *
  * Arrays follow their element type, and never gain or lose a dimension.
  */
@@ -568,6 +580,9 @@ export function isLosslessTypeChange(from: string, to: string): boolean {
     }
     if (a.base === "varchar" && b.base === "text") return true;
     if (a.base === "text" && b.base === "varchar") return b.args === undefined;
+    // A uuid has one exact text form, 36 characters: Supabase's user-id
+    // columns move to text this way, because Rebase's user ids are text.
+    if (a.base === "uuid") return b.base === "text" || (b.base === "varchar" && (b.args === undefined || b.args[0] >= 36));
     return false;
 }
 

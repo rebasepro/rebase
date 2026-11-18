@@ -33,12 +33,18 @@ import { atlasExcludePattern } from "./atlas-exclude";
 /** A constraint kind the collection model has no way to declare. */
 export type UndeclarableConstraintKind = "check" | "exclude";
 
-/** A CHECK or EXCLUDE constraint, as the database holds it now. */
+/**
+ * A CHECK or EXCLUDE constraint, or a foreign key, as the database holds it
+ * now. Foreign keys are read for the destructive gate only: a push that drops
+ * one (a hand-written composite key, which no relation declares) prompts as a
+ * dropped CHECK does. They are never excluded from the plan, because removing
+ * a relation is how a declared foreign key is meant to go.
+ */
 export interface ExistingConstraint {
     schema: string;
     table: string;
     name: string;
-    kind: UndeclarableConstraintKind;
+    kind: UndeclarableConstraintKind | "foreign key";
 }
 
 /**
@@ -53,11 +59,11 @@ export const UNDECLARABLE_CONSTRAINTS_SQL = `
     SELECT n.nspname AS "schema",
            c.relname AS "table",
            con.conname AS "name",
-           CASE con.contype WHEN 'c' THEN 'check' ELSE 'exclude' END AS "kind"
+           CASE con.contype WHEN 'c' THEN 'check' WHEN 'f' THEN 'foreign key' ELSE 'exclude' END AS "kind"
     FROM pg_constraint con
     JOIN pg_class c     ON c.oid = con.conrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE con.contype IN ('c', 'x')
+    WHERE con.contype IN ('c', 'x', 'f')
       AND c.relkind IN ('r', 'p')
       AND n.nspname NOT IN ('pg_catalog', 'information_schema')
       AND n.nspname NOT LIKE 'pg\\_%'
@@ -89,6 +95,6 @@ export function undeclaredConstraintExcludes(
 ): string[] {
     const declared = declaredConstraintNames(desiredSql);
     return existing
-        .filter(constraint => !declared.has(constraint.name))
+        .filter(constraint => constraint.kind !== "foreign key" && !declared.has(constraint.name))
         .map(constraint => atlasExcludePattern(constraint.schema, constraint.table, constraint.name));
 }

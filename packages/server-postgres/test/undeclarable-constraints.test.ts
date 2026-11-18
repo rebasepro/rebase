@@ -131,7 +131,7 @@ describe("the catalogue read the excludes come from", () => {
         await db.close();
     });
 
-    it("lists CHECK and EXCLUDE constraints, and none a collection declares", async () => {
+    it("lists CHECK and EXCLUDE constraints, and foreign keys for the gate only", async () => {
         await db.exec(`
             CREATE SCHEMA shop;
             CREATE TABLE shop.customers (id serial PRIMARY KEY);
@@ -149,8 +149,38 @@ describe("the catalogue read the excludes come from", () => {
         expect(rows.filter(row => row.schema === "shop")
             .sort((a, b) => a.name.localeCompare(b.name)))
             .toEqual([
+                { schema: "shop", table: "orders", name: "orders_customer_id_fkey", kind: "foreign key" },
                 { schema: "shop", table: "orders", name: "orders_no_overlap", kind: "exclude" },
                 { schema: "shop", table: "orders", name: "orders_total_check", kind: "check" }
             ]);
+    });
+});
+
+/**
+ * A hand-written composite foreign key, which no relation declares, was
+ * planned as `DROP CONSTRAINT` under "Planned changes" with no warning, while
+ * a hand-written CHECK beside it was kept and a CHECK drop prompts.
+ */
+describe("a foreign key the push would drop", () => {
+    const EVENTS_FK: ExistingConstraint = { schema: "public", table: "events", name: "events_agency_id_proposal_id_fkey", kind: "foreign key" };
+
+    it("prompts, saying the database stops enforcing it and how to keep it", () => {
+        const found = detectDestructiveStatements(
+            `ALTER TABLE "public"."events" DROP CONSTRAINT "events_agency_id_proposal_id_fkey";`, [], [EVENTS_FK]
+        );
+        expect(found.map(d => d.kind)).toEqual(["DROP CONSTRAINT"]);
+        expect(found[0].detail).toContain("FOREIGN KEY \"events_agency_id_proposal_id_fkey\"");
+        expect(found[0].detail).toContain("recreate it in SQL");
+    });
+
+    it("does not prompt for a key dropped and added back under its name (a changed ON DELETE)", () => {
+        expect(detectDestructiveStatements(
+            `ALTER TABLE "public"."events" DROP CONSTRAINT "events_agency_id_proposal_id_fkey", ADD CONSTRAINT "events_agency_id_proposal_id_fkey" FOREIGN KEY ("agency_id") REFERENCES "public"."agencies" ("id") ON DELETE CASCADE;`,
+            [], [EVENTS_FK]
+        )).toEqual([]);
+    });
+
+    it("is never excluded from the plan: removing a relation still drops its key", () => {
+        expect(undeclaredConstraintExcludes([EVENTS_FK], "")).toEqual([]);
     });
 });
