@@ -553,7 +553,15 @@ export const METRICS_FLAGS = {
  * `packages/server/src/metrics/history-store.ts`), which is not exported;
  * `cloud-api-commands.test.ts` holds the two together.
  */
-export const HISTORY_SERIES = ["cpu_millicores", "memory_bytes", "event_loop_delay_ms"] as const;
+export const HISTORY_SERIES = [
+    "cpu_millicores", "memory_bytes", "event_loop_delay_ms",
+    // Requests and 5xx answers per minute, per surface.
+    "requests_data", "errors_data",
+    "requests_auth", "errors_auth",
+    "requests_storage", "errors_storage",
+    "requests_functions", "errors_functions",
+    "requests_app", "errors_app"
+] as const;
 
 /** The longest window the runtime keeps: fourteen days, in minutes. */
 export const HISTORY_MAX_MINUTES = 20_160;
@@ -608,6 +616,8 @@ export function resolveHistoryArgs(flags: { "--series"?: string; "--minutes"?: s
 function historyValue(series: string, value: number): string {
     if (series === "memory_bytes") return `${(value / 1024 / 1024).toFixed(0)} MiB`;
     if (series === "cpu_millicores") return `${Math.round(value)}m`;
+    if (series.startsWith("requests_")) return `${Math.round(value)} requests`;
+    if (series.startsWith("errors_")) return `${Math.round(value)} errors`;
     return `${value.toFixed(1)} ms`;
 }
 

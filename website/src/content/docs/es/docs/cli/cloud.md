@@ -1,5 +1,5 @@
 ---
-sourceHash: aae5af4b5b61ddcd
+sourceHash: 720d2918ad0263cf
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Los grupos de comandos para Rebase Cloud en la CLI — autenticación, vinculación de proyectos, despliegues, notificaciones, configuración, organizaciones, bases de datos, recursos, cómputo, almacenamiento, clústeres, facturación y uso.
@@ -453,7 +453,7 @@ rebase cloud deploy-hooks [list] | create [--name <name>] [--branch <branch>] | 
 rebase cloud alerts [list] [--all] | ack <id> | snooze <id> --hours <1-168>   # the project's incidents
 rebase cloud deploy --git [<branch>]     # build on the control plane from the connected repository
 rebase cloud metrics --runtime           # requests, errors and latency, per surface
-rebase cloud metrics --history [--series cpu_millicores|memory_bytes|event_loop_delay_ms] [--minutes <n>]
+rebase cloud metrics --history [--series cpu_millicores|memory_bytes|event_loop_delay_ms|requests_<surface>|errors_<surface>] [--minutes <n>]
 rebase cloud domains primary <domain>    # make a verified domain the canonical one
 rebase cloud domains redirect <domain> [--off]   # answer it with a 308 to the primary, path and query kept
 rebase cloud settings set --studio on|off
