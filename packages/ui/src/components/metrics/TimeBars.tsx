@@ -7,7 +7,7 @@ import { useUiLabels } from "../../hooks/UiLabelsContext";
 import { useElementWidth } from "../../hooks/useElementWidth";
 import { Typography } from "../Typography";
 import { ChartStatus } from "./ChartCard";
-import { GRID_CLASSES } from "./chart_parts";
+import { BAR_REST_OPACITY, GRID_CLASSES } from "./chart_parts";
 import { barIndexAt, barPath, markerAt, timeBarsGeometry, type BarSlot } from "./time_bars_geometry";
 
 /** A `Date`, an epoch in ms, or an ISO string. */
@@ -28,8 +28,6 @@ export interface TimeBarsMarker {
     label: string;
 }
 
-/** The request bars' strength when not hovered: sixty saturated bars read as a block. */
-const BAR_OPACITY = 0.58;
 
 function dateFormatter(locale: string | undefined, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
     try {
@@ -148,7 +146,7 @@ export function TimeBars({
                                         <path
                                             key={bar.index}
                                             d={barPath(bar.x, bar.y, bar.width, bar.height)}
-                                            opacity={active?.kind === "bar" && active.index === bar.index ? 1 : BAR_OPACITY}
+                                            opacity={active?.kind === "bar" && active.index === bar.index ? 1 : BAR_REST_OPACITY}
                                         />
                                     ))}
                                 </g>

@@ -309,7 +309,9 @@ products, so they moved into the kit.
   of `KpiTile`, not a variant: a `KpiTile` is a card with a measured figure,
   its change and a sparkline; a `StatTile` has no card, so a grid of them sits
   on a hero without becoming boxes inside boxes. They share the label voice and
-  the figure face. There is no general-purpose `Stat`; an earlier one was
+  the figure face. Its content is top-aligned (changed the same day: centred,
+  a tile with a detail line sat higher than its neighbour without one), so the
+  tiles in a row share a label line and a value line. There is no general-purpose `Stat`; an earlier one was
   removed at Francesco's request, and this tile is scoped to the fact above.
 - **`TimeBars`** is a measure over time as one bar per bucket, with an optional
   secondary share (errors of requests) as a red segment at the top of each bar.
@@ -317,7 +319,9 @@ products, so they moved into the kit.
   draws a 1px tick, so "running and quiet" is visible and differs from "not
   running". Bars are the primary at 58%, full strength under the pointer, a 1px
   gap apart at any count, top corners rounded by 1px; markers are dashed
-  hairlines. One focus stop with a hover and arrow-key readout, `ChartStatus`
+  hairlines. `BarChart` draws its bars at the same strength
+  (`BAR_REST_OPACITY` in `chart_parts.tsx`): two bar charts at two strengths
+  read as two systems. One focus stop with a hover and arrow-key readout, `ChartStatus`
   for loading, error and empty, words and locale from `UiLabelsProvider`, as
   `TimeSeriesChart` does. The geometry is `metrics/time_bars_geometry.ts`.
 

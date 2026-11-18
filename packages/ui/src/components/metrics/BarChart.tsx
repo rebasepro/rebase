@@ -67,7 +67,7 @@ export function BarChart({ bars, format, onBarClick, loading, error, className }
                             <span
                                 // Rounded at the data end, square at the baseline; at least a
                                 // sliver for any value above zero, so it does not read as nothing.
-                                className={cls("block h-4 rounded-r-sm transition-opacity", SERIES_COLORS[0].bg, (onBarClick || bar.href) && "group-hover:opacity-80")}
+                                className={cls("block h-4 rounded-r-sm transition-opacity opacity-[0.58] group-hover:opacity-100 group-focus-visible:opacity-100", SERIES_COLORS[0].bg)}
                                 style={{ width: bar.value > 0 ? `max(2px, ${share * 100}%)` : 0 }}
                             />
                         </span>

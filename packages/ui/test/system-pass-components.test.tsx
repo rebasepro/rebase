@@ -4,7 +4,7 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { StatTile, StatusDot, TimeBars, UiLabelsProvider } from "../src";
+import { BarChart, StatTile, StatusDot, TimeBars, UiLabelsProvider } from "../src";
 
 global.ResizeObserver = class {
     observe() { /* noop */ }
@@ -63,6 +63,13 @@ describe("StatTile", () => {
         expect(tile).not.toContainElement(screen.getByRole("button", { name: "More" }));
     });
 
+    it("top-aligns its content, so tiles in a row share their label and value lines", () => {
+        render(<StatTile icon={<svg/>} label="Compute" value="1" detail="1 of 1 ready" onClick={() => undefined}/>);
+        const button = screen.getByRole("button", { name: /Compute/ });
+        expect(button).toHaveClass("items-start");
+        expect(button).not.toHaveClass("items-center");
+    });
+
     it("is not a button when nothing opens", () => {
         render(<StatTile icon={<svg/>} label="Region" value="europe-west1"/>);
         expect(screen.queryByRole("button")).toBeNull();
@@ -113,5 +120,15 @@ describe("TimeBars", () => {
         expect(screen.getByText("unreachable")).toBeInTheDocument();
         rerender(<TimeBars buckets={buckets} label="x" valueLabel="v" loading/>);
         expect(container.querySelector("[role=group]")).toBeNull();
+    });
+});
+
+describe("one bar strength across the kit", () => {
+    it("draws BarChart's bars at TimeBars' resting strength, full on hover or focus", () => {
+        const { container } = render(<BarChart bars={[{ key: "a", label: "A", value: 3 }]}/>);
+        const bar = container.querySelector("span.block.h-4");
+        expect(bar).toHaveClass("opacity-[0.58]");
+        expect(bar).toHaveClass("group-hover:opacity-100");
+        expect(bar).toHaveClass("group-focus-visible:opacity-100");
     });
 });

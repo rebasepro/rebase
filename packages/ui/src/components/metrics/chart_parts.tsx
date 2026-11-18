@@ -4,6 +4,14 @@ import { LucideIconByName } from "../../icons/LucideIconByName";
 /** Gridlines and axes: a hairline, recessive. */
 export const GRID_CLASSES = "stroke-hairline-strong";
 
+/**
+ * How strongly a bar is drawn at rest, in every bar chart the kit has
+ * (`BarChart`, `TimeBars`): the primary at 58%, full strength under the pointer
+ * or on focus. Saturated bars side by side read as a block, and two bar charts
+ * at two strengths read as two systems.
+ */
+export const BAR_REST_OPACITY = 0.58;
+
 /** Axis tick text: the secondary text tier, never a series colour. */
 export const TICK_CLASSES = "fill-text-secondary dark:fill-text-secondary-dark text-[11px] tabular-nums";
 
