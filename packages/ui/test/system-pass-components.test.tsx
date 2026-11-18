@@ -4,7 +4,7 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { BarChart, StatTile, StatusDot, TimeBars, UiLabelsProvider } from "../src";
+import { BarChart, ChartCard, StatTile, StatusDot, TimeBars, UiLabelsProvider } from "../src";
 
 global.ResizeObserver = class {
     observe() { /* noop */ }
@@ -130,5 +130,16 @@ describe("one bar strength across the kit", () => {
         expect(bar).toHaveClass("opacity-[0.58]");
         expect(bar).toHaveClass("group-hover:opacity-100");
         expect(bar).toHaveClass("group-focus-visible:opacity-100");
+    });
+});
+
+describe("ChartCard", () => {
+    it("lets its title wrap between words rather than truncate, and the action move to the next line", () => {
+        render(<ChartCard title="Functions" action={<span>2 errors</span>}><div/></ChartCard>);
+        const title = screen.getByRole("heading", { name: "Functions" });
+        expect(title).not.toHaveClass("truncate");
+        expect(title).not.toHaveClass("break-words");
+        expect(title.parentElement).toHaveClass("flex-wrap");
+        expect(screen.getByText("2 errors").parentElement).toHaveClass("ml-auto", "whitespace-nowrap");
     });
 });
