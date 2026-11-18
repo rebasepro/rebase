@@ -1,11 +1,9 @@
 ---
 /**
- * "Star" + the live star count, linking to the repository. Shared by the
- * marketing header and the docs header, so the two never drift apart.
- * The count is read at build time (see utils/githubStars.ts); without it the
- * button shows "Star" alone.
+ * "Star", linking to the repository. Shared by the marketing header and the
+ * docs header, so the two never drift apart.
  */
-import { formatStars, githubStars, REPO_URL } from "../utils/githubStars";
+const REPO_URL = "https://github.com/rebasepro/rebase";
 
 interface Props {
     /** Hidden below this breakpoint; the headers have different space. */
@@ -13,8 +11,6 @@ interface Props {
 }
 
 const { class: className = "" } = Astro.props;
-const stars = await githubStars();
-const label = stars === null ? "Star Rebase on GitHub" : `Star Rebase on GitHub (${stars} stars)`;
 ---
 
 <a
@@ -22,7 +18,7 @@ const label = stars === null ? "Star Rebase on GitHub" : `Star Rebase on GitHub 
     target="_blank"
     rel="noopener noreferrer"
     class={`gh-star inline-flex items-center rounded-lg border border-white/10 text-sm font-semibold text-surface-300 hover:text-white hover:border-white/20 hover:bg-white/5 transition-colors ${className}`}
-    aria-label={label}
+    aria-label="Star Rebase on GitHub"
     data-track
     id="header-github-star"
 >
@@ -32,12 +28,4 @@ const label = stars === null ? "Star Rebase on GitHub" : `Star Rebase on GitHub 
         </svg>
         Star
     </span>
-    {stars !== null && (
-        <span class="inline-flex items-center gap-1 border-l border-white/10 px-3 py-1.5 tabular-nums">
-            <svg class="h-3.5 w-3.5 text-amber-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-            </svg>
-            {formatStars(stars)}
-        </span>
-    )}
 </a>
