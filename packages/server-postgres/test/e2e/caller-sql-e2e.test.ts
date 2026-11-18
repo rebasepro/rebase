@@ -103,6 +103,12 @@ describe("SQL as the caller (E2E)", () => {
         if (container) await stopPgContainer(container.containerName);
     }, 60_000);
 
+    it("returns an instant as /api/data does, RFC 3339 in UTC, not Postgres's text", async () => {
+        const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+        const [row] = await ada.sql("SELECT timestamptz '2026-11-18 10:52:23.5+00' AS seen, 'x'::text AS label");
+        expect(row).toEqual({ seen: "2026-11-18T10:52:23.500Z", label: "x" });
+    });
+
     it("sees only the caller's rows, whatever the query asks for", async () => {
         const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
         const rows = await ada.sql("SELECT artist FROM songs ORDER BY artist");

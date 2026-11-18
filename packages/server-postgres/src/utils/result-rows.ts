@@ -13,3 +13,42 @@ export function rowsOfResult(result: unknown): Record<string, unknown>[] {
     const rows = (last as { rows: unknown }).rows;
     return Array.isArray(rows) ? rows as Record<string, unknown>[] : [];
 }
+
+/** `timestamptz`'s type oid. */
+const TIMESTAMPTZ_OID = 1184;
+
+/**
+ * An instant as `GET /api/data` returns one: RFC 3339, in UTC
+ * (`2026-11-18T10:52:23.500Z`). Postgres's own text (`2026-11-18 10:52:23.5+00`)
+ * is not something every browser's `Date` parses. A value that is not an
+ * instant (`infinity`) is returned as it came.
+ */
+export function rfc3339Instant(value: unknown): unknown {
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? value : value.toISOString();
+    if (typeof value !== "string") return value;
+    const iso = value.trim().replace(" ", "T").replace(/([+-]\d\d)$/, "$1:00").replace(/([+-]\d\d)(\d\d)$/, "$1:$2");
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
+/**
+ * The rows of a caller-SQL result with every `timestamptz` column as
+ * `/api/data` spells it (see {@link rfc3339Instant}). Read from the result's
+ * field types, so a column named anything, computed or aliased, is covered.
+ */
+export function withInstantsAsRfc3339(result: unknown, rows: Record<string, unknown>[]): Record<string, unknown>[] {
+    const last = Array.isArray(result) ? result[result.length - 1] : result;
+    const fields = typeof last === "object" && last !== null && "fields" in last ? (last as { fields: unknown }).fields : undefined;
+    if (!Array.isArray(fields)) return rows;
+    const instants = fields.flatMap((field: unknown) =>
+        typeof field === "object" && field !== null && "name" in field && "dataTypeID" in field &&
+        (field as { dataTypeID: unknown }).dataTypeID === TIMESTAMPTZ_OID
+            ? [String((field as { name: unknown }).name)]
+            : []);
+    if (instants.length === 0) return rows;
+    return rows.map(row => {
+        const out = { ...row };
+        for (const name of instants) if (name in out) out[name] = rfc3339Instant(out[name]);
+        return out;
+    });
+}

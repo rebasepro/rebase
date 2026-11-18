@@ -383,6 +383,11 @@ export default defineFunction((app) => {
 });
 ```
 
+The values are Postgres's, with one exception: a `timestamptz` comes back as
+`/api/data` returns it, RFC 3339 in UTC (`2026-11-18T10:52:23.500Z`). A
+`bigint` or `numeric` is a string, so no digit is lost; cast it in the query
+(`count(*)::int`) when a number is what you want.
+
 The statement runs in the caller's own transaction, as the restricted `rebase_user` role with their identity — the transaction the user-scoped driver opens — so your tables' `rls` rules decide every row, exactly as they do for the SDK. A query that asks for every row gets the caller's.
 
 - **Read-only by default.** Pass `{ write: true }` to insert, update or delete; the insert and update policies still apply.
