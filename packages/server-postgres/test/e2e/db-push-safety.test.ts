@@ -231,12 +231,12 @@ describe("db push destructive-change gate E2E", () => {
         // Named once, though Atlas prints every statement twice.
         const dry = await runPush(["--dry-run"]);
         expect(dry.exitCode).toBe(0);
-        expect(dry.all ?? "").toMatch(/1 of those DESTROY data/);
+        expect(dry.all ?? "").toMatch(/1 of those need confirming: 1 destroys data/);
         expect(dry.all ?? "").toMatch(/ALTER COLUMN TYPE \("rating" numeric\(5,2\) → numeric\(4,1\)\)/);
 
         const refused = await runPush();
         expect(refused.exitCode).not.toBe(0);
-        expect(refused.all ?? "").toMatch(/This push includes 1 destructive change/);
+        expect(refused.all ?? "").toMatch(/This push includes 1 change\(s\) that need confirming: 1 destroys data/);
         expect(refused.all ?? "").not.toMatch(/UNREADABLE PLAN/);
 
         const row = await dbClient.query(`SELECT rating::text AS rating,
@@ -333,7 +333,7 @@ export const translations = defineTable("translations", {
         fs.writeFileSync(path.join(schemaDir, "translations.ts"), translationsTs(true));
         const refused = await runPush();
         expect(refused.exitCode).not.toBe(0);
-        expect(refused.all ?? "").toMatch(/This push includes 1 destructive change/);
+        expect(refused.all ?? "").toMatch(/This push includes 1 change\(s\) that need confirming: 1 destroys data/);
         expect(refused.all ?? "").toMatch(
             /PRIMARY KEY CHANGE \("public"\."translations" is re-keyed on \("id", "locale"\): every row's id changes/
         );

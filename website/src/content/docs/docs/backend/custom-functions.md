@@ -383,10 +383,11 @@ export default defineFunction((app) => {
 });
 ```
 
-The values are Postgres's, with one exception: a `timestamptz` comes back as
-`/api/data` returns it, RFC 3339 in UTC (`2026-11-18T10:52:23.500Z`). A
-`bigint` or `numeric` is a string, so no digit is lost; cast it in the query
-(`count(*)::int`) when a number is what you want.
+The values are Postgres's, with two spelled as `/api/data` spells them: a
+`timestamptz` is RFC 3339 in UTC (`2026-11-18T10:52:23.500Z`), and a `bigint`
+is a number when it fits a safe integer (past 2^53 it stays the digits, as a
+string). A `numeric` is a string, so no digit is lost; cast it in the query
+(`total::float8`) when a number is what you want.
 
 The statement runs in the caller's own transaction, as the restricted `rebase_user` role with their identity — the transaction the user-scoped driver opens — so your tables' `rls` rules decide every row, exactly as they do for the SDK. A query that asks for every row gets the caller's.
 

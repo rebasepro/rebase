@@ -452,7 +452,7 @@ function describeConstraintDrops(statement: string, constraints: readonly Existi
     return `${subject} loses ${lost.join(", ")}: no row is lost, and the database accepts every row ` +
         `${lost.length === 1 ? "it refuses" : "they refuse"} today` +
         (lost.some(item => item.startsWith("FOREIGN KEY"))
-            ? ". A foreign key no relation declares (one over several columns) is dropped by every push; recreate it in SQL after the push, or keep it by declaring a relation"
+            ? ". A one-column foreign key is a relation's: it goes when its relation is removed from the table; keep the relation to keep the key"
             : "");
 }
 
@@ -584,6 +584,22 @@ export function isLosslessTypeChange(from: string, to: string): boolean {
     // columns move to text this way, because Rebase's user ids are text.
     if (a.base === "uuid") return b.base === "text" || (b.base === "varchar" && (b.args === undefined || b.args[0] >= 36));
     return false;
+}
+
+/**
+ * What a set of findings does, for the line above them: how many destroy data
+ * and how many only drop a constraint the database enforces. A dropped CHECK
+ * or foreign key loses no row, and a header saying "DESTROY data" above a line
+ * saying "no row is lost" read as a contradiction.
+ */
+export function describeDestructiveFindings(found: readonly DestructiveStatement[]): string {
+    const constraintsOnly = found.filter(item => item.kind === "DROP CONSTRAINT").length;
+    const destroying = found.length - constraintsOnly;
+    const parts = [
+        destroying > 0 ? `${destroying} destroy${destroying === 1 ? "s" : ""} data` : undefined,
+        constraintsOnly > 0 ? `${constraintsOnly} remove${constraintsOnly === 1 ? "s" : ""} a constraint the database enforces` : undefined
+    ].filter(Boolean);
+    return parts.join(", and ");
 }
 
 export type PushDecision = "apply" | "confirm" | "refuse";

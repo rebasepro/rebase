@@ -31,24 +31,42 @@ export function rfc3339Instant(value: unknown): unknown {
     return Number.isNaN(date.getTime()) ? value : date.toISOString();
 }
 
+/** `bigint`'s type oid. */
+const INT8_OID = 20;
+
 /**
- * The rows of a caller-SQL result with every `timestamptz` column as
- * `/api/data` spells it (see {@link rfc3339Instant}). Read from the result's
- * field types, so a column named anything, computed or aliased, is covered.
+ * A `bigint` as `GET /api/data` returns one: a number when it fits a safe
+ * integer, else the digits as they came, so no digit is lost.
+ */
+export function int8AsNumber(value: unknown): unknown {
+    if (typeof value !== "string" || !/^-?\d+$/.test(value)) return value;
+    const n = Number(value);
+    return Number.isSafeInteger(n) ? n : value;
+}
+
+/**
+ * The rows of a caller-SQL result with values spelled as `/api/data` spells
+ * them: every `timestamptz` column RFC 3339 (see {@link rfc3339Instant}),
+ * every `bigint` a number when it fits (see {@link int8AsNumber}). Read from
+ * the result's field types, so a column named anything, computed or aliased,
+ * is covered.
  */
 export function withInstantsAsRfc3339(result: unknown, rows: Record<string, unknown>[]): Record<string, unknown>[] {
     const last = Array.isArray(result) ? result[result.length - 1] : result;
     const fields = typeof last === "object" && last !== null && "fields" in last ? (last as { fields: unknown }).fields : undefined;
     if (!Array.isArray(fields)) return rows;
-    const instants = fields.flatMap((field: unknown) =>
-        typeof field === "object" && field !== null && "name" in field && "dataTypeID" in field &&
-        (field as { dataTypeID: unknown }).dataTypeID === TIMESTAMPTZ_OID
-            ? [String((field as { name: unknown }).name)]
-            : []);
-    if (instants.length === 0) return rows;
+    const convert = new Map<string, (value: unknown) => unknown>();
+    for (const field of fields) {
+        if (typeof field !== "object" || field === null || !("name" in field) || !("dataTypeID" in field)) continue;
+        const oid = (field as { dataTypeID: unknown }).dataTypeID;
+        const name = String((field as { name: unknown }).name);
+        if (oid === TIMESTAMPTZ_OID) convert.set(name, rfc3339Instant);
+        else if (oid === INT8_OID) convert.set(name, int8AsNumber);
+    }
+    if (convert.size === 0) return rows;
     return rows.map(row => {
         const out = { ...row };
-        for (const name of instants) if (name in out) out[name] = rfc3339Instant(out[name]);
+        for (const [name, fn] of convert) if (name in out) out[name] = fn(out[name]);
         return out;
     });
 }

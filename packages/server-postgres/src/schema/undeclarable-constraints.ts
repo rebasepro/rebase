@@ -35,16 +35,23 @@ export type UndeclarableConstraintKind = "check" | "exclude";
 
 /**
  * A CHECK or EXCLUDE constraint, or a foreign key, as the database holds it
- * now. Foreign keys are read for the destructive gate only: a push that drops
- * one (a hand-written composite key, which no relation declares) prompts as a
- * dropped CHECK does. They are never excluded from the plan, because removing
- * a relation is how a declared foreign key is meant to go.
+ * now.
+ *
+ * A foreign key over several columns is undeclarable too: a relation holds one
+ * column, so no table definition can state it, and it is kept out of the plan
+ * like a CHECK. That is the composite key `schema introspect` lists under "not
+ * carried over" with the SQL to recreate it; a push that then dropped it made
+ * that advice undo itself. A one-column foreign key is a relation's, so it
+ * stays Atlas's to manage (removing the relation drops it), and a push that
+ * drops one prompts, as a dropped CHECK does.
  */
 export interface ExistingConstraint {
     schema: string;
     table: string;
     name: string;
     kind: UndeclarableConstraintKind | "foreign key";
+    /** How many columns a foreign key spans. Absent on rows read before it was asked. */
+    columns?: number;
 }
 
 /**
@@ -59,7 +66,8 @@ export const UNDECLARABLE_CONSTRAINTS_SQL = `
     SELECT n.nspname AS "schema",
            c.relname AS "table",
            con.conname AS "name",
-           CASE con.contype WHEN 'c' THEN 'check' WHEN 'f' THEN 'foreign key' ELSE 'exclude' END AS "kind"
+           CASE con.contype WHEN 'c' THEN 'check' WHEN 'f' THEN 'foreign key' ELSE 'exclude' END AS "kind",
+           coalesce(array_length(con.conkey, 1), 0)::int AS "columns"
     FROM pg_constraint con
     JOIN pg_class c     ON c.oid = con.conrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -95,6 +103,6 @@ export function undeclaredConstraintExcludes(
 ): string[] {
     const declared = declaredConstraintNames(desiredSql);
     return existing
-        .filter(constraint => constraint.kind !== "foreign key" && !declared.has(constraint.name))
+        .filter(constraint => (constraint.kind !== "foreign key" || (constraint.columns ?? 1) > 1) && !declared.has(constraint.name))
         .map(constraint => atlasExcludePattern(constraint.schema, constraint.table, constraint.name));
 }

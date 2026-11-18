@@ -57,7 +57,7 @@ import { forAtlas, redactConnectionPasswords } from "./utils/connection-string";
 import { ADMIN_POLICY_ROLE_SQL, dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL, REQUEST_ROLE_FUNCTION_SQL } from "./schema/rls-bootstrap-sql";
 import { declaredRlsPolicyShape, REBASE_ADMIN_ROLE } from "@rebasepro/types";
 
-import { detectDestructiveStatements, decidePushSafety, destructiveOptInFlag, extractPlanStatements, warnIfYesApprovedDestructive, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
+import { describeDestructiveFindings, detectDestructiveStatements, decidePushSafety, destructiveOptInFlag, extractPlanStatements, warnIfYesApprovedDestructive, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
 import type { LegacyRename } from "./schema/push-legacy-renames";
 import { declaredIndexesIfNotExists, indexAdoptionStatement, type IndexAdoption } from "./schema/index-adoption";
 import {
@@ -459,7 +459,7 @@ async function reportDestructiveMigration(migrationSql: string, migrationFile: s
     const destructive = detectDestructiveStatements(migrationSql, await columnTypesOrNone(databaseUrl), await constraintsOrNone(databaseUrl));
     if (destructive.length === 0) return;
     outWarn("");
-    outWarn(chalk.yellow(`  ⚠️  ${migrationFile} includes ${destructive.length} destructive change(s) that will DESTROY data when applied:`));
+    outWarn(chalk.yellow(`  ⚠️  ${migrationFile} includes ${destructive.length} change(s) that need confirming: ${describeDestructiveFindings(destructive)}.`));
     outWarn("");
     for (const line of destructiveLines(destructive)) outWarn(line);
     outWarn("");
@@ -909,7 +909,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     outWarn(formatForeignGeneratedColumnBanner(unowned));
                 }
                 if (destructive.length > 0) {
-                    outWarn(chalk.yellow(`  ⚠️  ${destructive.length} of those DESTROY data:`));
+                    outWarn(chalk.yellow(`  ⚠️  ${destructive.length} of those need confirming: ${describeDestructiveFindings(destructive)}.`));
                     for (const line of destructiveLines(destructive)) outWarn(line);
                     outWarn("");
                     outWarn(chalk.yellow("  Applying them needs `rebase db push --allow-destructive`. Back up first: rebase db backup"));
@@ -937,7 +937,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             });
 
             if (destructive.length > 0) {
-                outWarn(chalk.yellow(`  ⚠️  This push includes ${destructive.length} destructive change(s) that will DESTROY data:`));
+                outWarn(chalk.yellow(`  ⚠️  This push includes ${destructive.length} change(s) that need confirming: ${describeDestructiveFindings(destructive)}.`));
                 outWarn("");
                 for (const line of destructiveLines(destructive)) outWarn(line);
                 outWarn("");

@@ -103,10 +103,10 @@ describe("SQL as the caller (E2E)", () => {
         if (container) await stopPgContainer(container.containerName);
     }, 60_000);
 
-    it("returns an instant as /api/data does, RFC 3339 in UTC, not Postgres's text", async () => {
+    it("returns an instant and a bigint as /api/data does", async () => {
         const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
-        const [row] = await ada.sql("SELECT timestamptz '2026-11-18 10:52:23.5+00' AS seen, 'x'::text AS label");
-        expect(row).toEqual({ seen: "2026-11-18T10:52:23.500Z", label: "x" });
+        const [row] = await ada.sql("SELECT timestamptz '2026-11-18 10:52:23.5+00' AS seen, 'x'::text AS label, 42::bigint AS n, 9007199254740993::bigint AS big");
+        expect(row).toEqual({ seen: "2026-11-18T10:52:23.500Z", label: "x", n: 42, big: "9007199254740993" });
     });
 
     it("sees only the caller's rows, whatever the query asks for", async () => {

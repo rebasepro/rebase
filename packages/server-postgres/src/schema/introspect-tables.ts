@@ -442,7 +442,7 @@ function linkableForeignKeys(meta: TableMeta, context: TableContext): ForeignKey
                     kind: "foreign key",
                     name: constraint,
                     table: meta.name,
-                    why: "a foreign key over several columns has no relation to hold it; recreate it with its SQL",
+                    why: "a foreign key over several columns has no relation to hold it; `db push` leaves it where it is, and a new database needs its SQL",
                     sql: `ALTER TABLE ${quoteIdent(context.schema)}.${quoteIdent(meta.name)} ADD CONSTRAINT ${quoteIdent(constraint)} ` +
                         `FOREIGN KEY (${ordered.map(r => quoteIdent(r.column_name)).join(", ")}) REFERENCES ` +
                         `${quoteIdent(context.schema)}.${quoteIdent(fk.foreign_table_name)} (${ordered.map(r => quoteIdent(r.foreign_column_name)).join(", ")})` +

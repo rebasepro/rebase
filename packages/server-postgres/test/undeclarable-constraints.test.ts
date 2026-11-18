@@ -7,7 +7,7 @@ import {
     type ExistingConstraint
 } from "../src/schema/undeclarable-constraints";
 import { ExcludeIntrospectionError, getUndeclaredConstraintExcludes } from "../src/cli-helpers";
-import { detectDestructiveStatements } from "../src/schema/destructive-sql";
+import { describeDestructiveFindings, detectDestructiveStatements } from "../src/schema/destructive-sql";
 
 /**
  * A collection cannot declare a CHECK or an EXCLUDE constraint, so the desired
@@ -131,7 +131,7 @@ describe("the catalogue read the excludes come from", () => {
         await db.close();
     });
 
-    it("lists CHECK and EXCLUDE constraints, and foreign keys for the gate only", async () => {
+    it("lists CHECK and EXCLUDE constraints, and foreign keys with how many columns they span", async () => {
         await db.exec(`
             CREATE SCHEMA shop;
             CREATE TABLE shop.customers (id serial PRIMARY KEY);
@@ -149,9 +149,9 @@ describe("the catalogue read the excludes come from", () => {
         expect(rows.filter(row => row.schema === "shop")
             .sort((a, b) => a.name.localeCompare(b.name)))
             .toEqual([
-                { schema: "shop", table: "orders", name: "orders_customer_id_fkey", kind: "foreign key" },
-                { schema: "shop", table: "orders", name: "orders_no_overlap", kind: "exclude" },
-                { schema: "shop", table: "orders", name: "orders_total_check", kind: "check" }
+                { schema: "shop", table: "orders", name: "orders_customer_id_fkey", kind: "foreign key", columns: 1 },
+                { schema: "shop", table: "orders", name: "orders_no_overlap", kind: "exclude", columns: 1 },
+                { schema: "shop", table: "orders", name: "orders_total_check", kind: "check", columns: 1 }
             ]);
     });
 });
@@ -164,13 +164,13 @@ describe("the catalogue read the excludes come from", () => {
 describe("a foreign key the push would drop", () => {
     const EVENTS_FK: ExistingConstraint = { schema: "public", table: "events", name: "events_agency_id_proposal_id_fkey", kind: "foreign key" };
 
-    it("prompts, saying the database stops enforcing it and how to keep it", () => {
+    it("prompts for a one-column key, saying the database stops enforcing it and how to keep it", () => {
         const found = detectDestructiveStatements(
             `ALTER TABLE "public"."events" DROP CONSTRAINT "events_agency_id_proposal_id_fkey";`, [], [EVENTS_FK]
         );
         expect(found.map(d => d.kind)).toEqual(["DROP CONSTRAINT"]);
         expect(found[0].detail).toContain("FOREIGN KEY \"events_agency_id_proposal_id_fkey\"");
-        expect(found[0].detail).toContain("recreate it in SQL");
+        expect(found[0].detail).toContain("keep the relation");
     });
 
     it("does not prompt for a key dropped and added back under its name (a changed ON DELETE)", () => {
@@ -180,7 +180,18 @@ describe("a foreign key the push would drop", () => {
         )).toEqual([]);
     });
 
-    it("is never excluded from the plan: removing a relation still drops its key", () => {
-        expect(undeclaredConstraintExcludes([EVENTS_FK], "")).toEqual([]);
+    it("keeps a key over several columns out of the plan, which no relation can declare, and leaves a one-column key to the relations", () => {
+        // introspect lists the composite key with the SQL to recreate it; a
+        // push that dropped it again made that advice undo itself.
+        expect(undeclaredConstraintExcludes([{ ...EVENTS_FK, columns: 2 }], "")).toEqual(["public.events.events_agency_id_proposal_id_fkey"]);
+        expect(undeclaredConstraintExcludes([{ ...EVENTS_FK, name: "events_agency_id_fkey", columns: 1 }], "")).toEqual([]);
+    });
+
+    it("heads the findings with what they do: a dropped constraint destroys no data", () => {
+        const found = detectDestructiveStatements(
+            `ALTER TABLE "public"."events" DROP CONSTRAINT "events_agency_id_proposal_id_fkey";\nALTER TABLE "public"."events" DROP COLUMN "note";`, [], [EVENTS_FK]
+        );
+        expect(describeDestructiveFindings(found)).toBe("1 destroys data, and 1 removes a constraint the database enforces");
+        expect(describeDestructiveFindings(found.slice(0, 1))).toBe("1 removes a constraint the database enforces");
     });
 });

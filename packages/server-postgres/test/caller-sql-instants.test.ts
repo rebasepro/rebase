@@ -5,7 +5,7 @@
  * browsers' `Date` cannot parse, while the same column read through the data
  * API is RFC 3339.
  */
-import { rfc3339Instant, withInstantsAsRfc3339 } from "../src/utils/result-rows";
+import { int8AsNumber, rfc3339Instant, withInstantsAsRfc3339 } from "../src/utils/result-rows";
 
 describe("instants in caller-SQL results", () => {
     it("spells Postgres's timestamptz text, and a Date, as RFC 3339 in UTC", () => {
@@ -17,7 +17,7 @@ describe("instants in caller-SQL results", () => {
         expect(rfc3339Instant(null)).toBeNull();
     });
 
-    it("rewrites only the columns whose type is timestamptz, aliased or not", () => {
+    it("rewrites only the timestamptz and bigint columns, aliased or not", () => {
         const result = {
             rows: [{ seen: "2026-11-18 10:52:23.5+00", label: "2026-11-18 10:52:23.5+00", n: "12" }],
             fields: [
@@ -27,7 +27,14 @@ describe("instants in caller-SQL results", () => {
             ]
         };
         expect(withInstantsAsRfc3339(result, result.rows)).toEqual([
-            { seen: "2026-11-18T10:52:23.500Z", label: "2026-11-18 10:52:23.5+00", n: "12" }
+            { seen: "2026-11-18T10:52:23.500Z", label: "2026-11-18 10:52:23.5+00", n: 12 }
         ]);
+    });
+
+    it("returns a bigint as a number when it fits, as /api/data does, and the digits when it does not", () => {
+        expect(int8AsNumber("42")).toBe(42);
+        expect(int8AsNumber("-7")).toBe(-7);
+        expect(int8AsNumber("9007199254740993")).toBe("9007199254740993");
+        expect(int8AsNumber(null)).toBeNull();
     });
 });
