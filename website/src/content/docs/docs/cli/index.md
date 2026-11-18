@@ -133,6 +133,19 @@ flagged as a downgrade. A `--dry-run` of an upgrade the real run would refuse
 shows what would move and exits 0, and under `--json` its document carries the
 refusal as `wouldRefuse` (`{ code, message, hint }`).
 
+#### Upgrade a PostgreSQL project to Rebase 0.34
+
+Run the 0.34 CLI from your project root on Linux, macOS, or Windows:
+
+```bash
+pnpm dlx @rebasepro/cli@0.34.0 upgrade --to 0.34.0 # version-pin: ignore
+```
+
+The 0.34 upgrader updates the Rebase packages and changes the PostgreSQL
+backend's dependency from `@ariga/atlas` to `@stokaro/ptah-compat`. Run it
+with the new CLI even if your project currently pins an older one.
+Existing migration files, `atlas.sum`, and recorded revisions carry over.
+
 ### `rebase start`
 
 Run the built bundle the way a deployment runs it:

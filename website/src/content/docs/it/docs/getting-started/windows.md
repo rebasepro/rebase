@@ -1,9 +1,11 @@
 ---
-sourceHash: ce9b9cd9e35c5c3d
+sourceHash: 79e9278ca30f0078
 title: Windows
 sidebar_label: Windows
 description: Installa un progetto Rebase e usa i comandi del database su Windows.
 ---
+
+**Rebase 0.34+**
 
 I progetti Rebase funzionano su Windows. Lo scaffold installa Ptah Compat,
 incluso il suo eseguibile per Windows, tramite il gestore dei pacchetti.
@@ -31,12 +33,51 @@ Il pacchetto fornisce eseguibili nativi per Windows x64 e Arm64. Se
 [`rebase doctor`](/docs/cli/#rebase-doctor) segnala un eseguibile mancante,
 reinstalla le dipendenze del progetto con le dipendenze opzionali abilitate.
 
-## Aggiorna un progetto precedente
+## Aggiornare un progetto PostgreSQL a Rebase 0.34
 
-I progetti creati prima dell'integrazione di Ptah potrebbero ancora dipendere
-da `@ariga/atlas`. Quando passi a una versione di Rebase che usa Ptah Compat,
-esegui `rebase upgrade`. L'aggiornamento sostituisce quella dipendenza con
-`@stokaro/ptah-compat`. Esegui poi `pnpm install`.
+Esegui la CLI di Rebase 0.34 dalla radice del progetto su Linux, macOS o Windows.
+Sostituisce `@ariga/atlas` con `@stokaro/ptah-compat` nel backend PostgreSQL.
+Mantiene i file di migrazione, `atlas.sum` e le revisioni registrate.
+
+```bash
+pnpm dlx @rebasepro/cli@0.34.0 upgrade --to 0.34.0 # version-pin: ignore
+```
+
+## Rebase 0.33 e precedenti
+
+```powershell
+$dir = "$env:LOCALAPPDATA\Programs\atlas"
+New-Item -ItemType Directory -Force $dir | Out-Null
+Invoke-WebRequest https://release.ariga.io/atlas/atlas-windows-amd64-v1.2.3.exe -OutFile "$dir\atlas.exe"
+[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$dir", "User")
+```
+
+Apri un nuovo terminale, in modo che rilevi il nuovo `PATH`, e verificalo:
+
+```powershell
+atlas version
+```
+
+La versione 1.2.3 è la versione minima accettata dallo scaffold (`"@ariga/atlas": "^1.2.3"`).
+Su Linux e macOS l'installazione scarica la versione 1.x più recente, quindi anche qualsiasi versione 1.x
+successiva funzionerà qui: basta sostituire la versione nell'URL. È pubblicata solo una build x64;
+Windows on Arm la esegue tramite emulazione.
+
+La CLI cerca prima in `node_modules/.bin` e poi interroga Windows (`where atlas`),
+quindi una volta che `atlas.exe` si trova nel `PATH`, i tre comandi lo troveranno:
+
+```bash
+pnpm run db:push
+```
+
+Anche [`rebase doctor`](/docs/cli/#rebase-doctor) esegue questa verifica. Finché `atlas.exe` non si trova nel `PATH`, mostrerà un avviso con un link a questa pagina.
+
+### Se l’installazione di un progetto precedente fallisce
+
+Se l’installazione di un progetto precedente fallisce con `ELIFECYCLE`, sposta
+`@ariga/atlas` da `dependencies` a `optionalDependencies` in
+`backend/package.json`. Esegui `pnpm install` e installa `atlas.exe` come indicato
+sopra.
 
 ## WSL2
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: ab3e8ab0477304ad
+sourceHash: d0327f13212ae542
 title: Riferimento CLI
 sidebar_label: CLI
 description: Comandi della CLI di Rebase per l'inizializzazione del progetto, la generazione dello schema, le migrazioni del database e la generazione dell'SDK.
@@ -131,6 +131,16 @@ dist-tag che porterebbe indietro una versione viene rifiutato (`downgrade_refuse
 contrassegnato come downgrade. Un `--dry-run` di un aggiornamento che l'esecuzione reale rifiuterebbe
 mostra cosa verrebbe spostato ed esce con 0, e con `--json` il suo documento include il
 rifiuto come `wouldRefuse` (`{ code, message, hint }`).
+
+#### Aggiornare un progetto PostgreSQL a Rebase 0.34
+
+Esegui la CLI di Rebase 0.34 dalla radice del progetto su Linux, macOS o Windows.
+Sostituisce `@ariga/atlas` con `@stokaro/ptah-compat` nel backend PostgreSQL.
+Mantiene i file di migrazione, `atlas.sum` e le revisioni registrate.
+
+```bash
+pnpm dlx @rebasepro/cli@0.34.0 upgrade --to 0.34.0 # version-pin: ignore
+```
 
 ### `rebase start`
 

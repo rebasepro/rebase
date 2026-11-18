@@ -1,5 +1,5 @@
 ---
-sourceHash: ab3e8ab0477304ad
+sourceHash: d0327f13212ae542
 title: Referência da CLI
 sidebar_label: CLI
 description: Comandos da CLI do Rebase para inicialização de projetos, geração de schemas, migrações de banco de dados e geração de SDKs.
@@ -93,6 +93,16 @@ Cada aplicação estática incluída no bundle recebe uma cópia brotli (`.br`) 
 Atualiza cada pacote `@rebasepro/*` fixado no projeto para uma única versão e, em seguida, instala com o gerenciador de pacotes indicado pelo lockfile. `rebase upgrade` pega a versão mais recente; `--to 0.21.0` uma versão exata, sem consulta ao registro; `--to canary` uma dist-tag. Cada fixação em `dependencies`, `devDependencies` e `optionalDependencies`, em cada `package.json` do projeto, mantém seu `^` ou `~`, e nada mais no arquivo é alterado. `peerDependencies` e especificações `workspace:`, `link:`, `file:`, git e tags são listadas e mantidas intactas. Overrides em `pnpm-workspace.yaml` e `package.json` também são atualizados, mas um override `link:` ou `file:` tem precedência sobre qualquer fixação: ele é relatado e `--drop-local-overrides` o remove. `--dry-run` não grava nada, `--no-install` pula a instalação e `--json` imprime um único documento.
 
 Um projeto em versão de pré-lançamento, como uma versão canary, permanece em seu canal, a menos que `latest` seja mais recente. Uma dist-tag que moveria uma versão para trás é recusada (`downgrade_refused` sob `--json`), a menos que você passe `--allow-downgrade`; um `--to` exato é aplicado e sinalizado como downgrade. Um `--dry-run` de um upgrade que a execução real recusaria mostra o que seria alterado e sai com código 0, e sob `--json` seu documento traz a recusa como `wouldRefuse` (`{ code, message, hint }`).
+
+#### Atualizar um projeto PostgreSQL para o Rebase 0.34
+
+Execute a CLI do Rebase 0.34 na raiz do projeto no Linux, macOS ou Windows. Ela
+substitui `@ariga/atlas` por `@stokaro/ptah-compat` no backend PostgreSQL. Os
+arquivos de migração, o `atlas.sum` e as revisões registradas são preservados.
+
+```bash
+pnpm dlx @rebasepro/cli@0.34.0 upgrade --to 0.34.0 # version-pin: ignore
+```
 
 ### `rebase start`
 

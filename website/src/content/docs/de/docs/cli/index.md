@@ -1,5 +1,5 @@
 ---
-sourceHash: ab3e8ab0477304ad
+sourceHash: d0327f13212ae542
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -93,6 +93,17 @@ Jede statische App, die das Bundle enthält, erhält eine Brotli- (`.br`) und ei
 Aktualisiert jedes vom Projekt festgelegte `@rebasepro/*`-Paket auf ein gemeinsames Release und installiert dann mit dem Paketmanager, den die Lockfile vorgibt. `rebase upgrade` wählt die Version `latest`; `--to 0.21.0` eine exakte Version ohne Registry-Lookup; `--to canary` einen Dist-Tag. Jedes Pinning in `dependencies`, `devDependencies` und `optionalDependencies` in jeder `package.json` des Projekts behält sein `^` oder `~`, und nichts anderes in der Datei ändert sich. `peerDependencies` sowie `workspace:`, `link:`, `file:`, Git- und Tag-Spezifikationen werden aufgelistet und unberührt gelassen. Overrides in `pnpm-workspace.yaml` und `package.json` werden ebenfalls aktualisiert, aber ein `link:`- oder `file:`-Override hat Vorrang vor jedem Pin: Dies wird gemeldet, und `--drop-local-overrides` entfernt es. `--dry-run` schreibt nichts, `--no-install` überspringt die Installation und `--json` gibt ein einzelnes Dokument aus.
 
 Ein Projekt, das auf einem Vorab-Release wie Canary basiert, bleibt auf diesem Channel, es sei denn, `latest` ist neuer. Ein Dist-Tag, der ein Pinning herabstufen würde, wird abgelehnt (`downgrade_refused` unter `--json`), es sei denn, Sie übergeben `--allow-downgrade`; ein exaktes `--to` wird angewendet und als Downgrade gekennzeichnet. Ein `--dry-run` eines Upgrades, das der reale Lauf ablehnen würde, zeigt an, was geändert werden würde, und beendet sich mit 0. Unter `--json` enthält das Dokument die Ablehnung als `wouldRefuse` (`{ code, message, hint }`).
+
+#### PostgreSQL-Projekt auf Rebase 0.34 aktualisieren
+
+Führen Sie im Projektverzeichnis unter Linux, macOS oder Windows die CLI von Rebase
+0.34 aus. Sie ersetzt `@ariga/atlas` im PostgreSQL-Backend durch
+`@stokaro/ptah-compat`. Migrationsdateien, `atlas.sum` und erfasste Revisionen
+bleiben erhalten.
+
+```bash
+pnpm dlx @rebasepro/cli@0.34.0 upgrade --to 0.34.0 # version-pin: ignore
+```
 
 ### `rebase start`
 
