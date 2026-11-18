@@ -1478,6 +1478,11 @@ export function printGroupHelp(page: GroupHelp): void {
         {
             usage: `rebase ${page.command} ${page.usage ?? "<action>"} [options]`,
             summary: page.title,
+            // `flags`, as on an action's page, so a reader takes one shape for
+            // every page: the group's own options and the global ones. Each
+            // action's flags are under `actions[].flags`.
+            flags: [...(page.options ?? []), ...(page.globalFlags ?? GLOBAL_HELP_FLAGS)].map(([flag, description]) => ({ flag,
+description })),
             options: (page.options ?? []).map(([flag, description]) => ({ flag,
 description })),
             globalFlags: (page.globalFlags ?? GLOBAL_HELP_FLAGS).map(([flag, description]) => ({ flag,
