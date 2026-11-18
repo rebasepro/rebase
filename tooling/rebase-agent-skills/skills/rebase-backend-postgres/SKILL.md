@@ -24,12 +24,10 @@ tables, columns and enum types, and the tables' RLS policies
 (`REBASE_MIGRATE_ON_BOOT=ensure`, the default; `none` opts out). It never drops,
 renames or narrows — that is what step 2 is for.
 
-On the way, `db push` and `db generate` render the tables to SQL in `.rebase/sql/`
-beside the backend (`backend/.rebase/sql/` in a scaffolded project): `schema.sql` is
-Atlas's desired state, and `policies.sql`, `search.sql`, `vector.sql` and `triggers.sql`
-are applied by Rebase itself. Both commands rewrite all five from the tables on
-every run, and the directory ignores itself — never edit or commit them. Migrations
-are what you commit, in `drizzle/migrations/`.
+Both commands render the schema to `backend/.rebase/sql/schema.sql`. In Rebase
+0.34 and later, Ptah Compat plans the tables and their declared application
+objects together. Commit the migration history and `backend/drizzle/ptah-managed.json`.
+The generated files under `backend/.rebase/sql/` are Git-ignored.
 
 ## Prerequisites
 
@@ -535,23 +533,23 @@ In non-production mode, `loadEnv()` **auto-generates** `JWT_SECRET` and `REBASE_
 | `JWT_SECRET` set explicitly (nothing is generated in production) | `JWT_SECRET: is required` |
 | No localhost URLs (unless `ALLOW_LOCALHOST_IN_PRODUCTION=true`) | `Environment variable DATABASE_URL points at a local/loopback host...` |
 
-## Migrations and Atlas (there is no `drizzle.config.ts`)
+## Migrations with Ptah Compat
 
-A project has no `drizzle.config.ts` and runs no `drizzle-kit`: do not create one.
-`db push`, `db generate` and `db migrate` drive [Atlas](https://atlasgo.io)
-(`@ariga/atlas`, a dependency of `backend/package.json`) from the tables:
+A Rebase project has no `drizzle.config.ts` and runs no `drizzle-kit`.
+From Rebase 0.34, the PostgreSQL backend uses `@stokaro/ptah-compat` for
+`db push`, `db generate`, and `db migrate`.
 
-- The desired state is `.rebase/sql/schema.sql`, rendered from the tables on
-  every run (see above). Migrations go to `backend/drizzle/migrations/`, with
-  Atlas's `atlas.sum` beside them.
-- Atlas plans against a second, empty database: `<db>_dev_diff` on a real server,
-  a throwaway in-memory PGlite on the managed one, or the one
-  `REBASE_ATLAS_DEV_URL` names.
-- **Only tables declared in `backend/schema` (and their many-to-many junctions) are in
-  scope.** Every other table is excluded from the diff, so Atlas never drops it;
-  the `rebase` schema (auth tables, RLS helpers, Atlas's revision table) is never
-  touched. If the database cannot be read to build that list, the command fails
-  rather than plan without it.
+- Ptah reads the declared schema from `.rebase/sql/schema.sql`. Commit
+  `backend/drizzle/ptah-managed.json` and the migration files and
+  `atlas.sum` under `backend/drizzle/migrations/`.
+- `db push` and `db generate` plan against a scratch database. Managed
+  PGlite starts its own disposable server. External PostgreSQL may require
+  explicit replay authorization. Use `PTAH_DEV_SERVER_DISPOSABLE=1` only for
+  a disposable server or `PTAH_TRUST_REPLAY_SQL=1` only for SQL you trust.
+  `REBASE_ATLAS_DEV_URL` selects the scratch database.
+- The current declarations and saved managed names define the planning
+  scope. Auth provisioning and migration revisions stay outside it.
+  Review any drops before applying the plan.
 
 ## Entity History (Audit Trail)
 
@@ -666,15 +664,10 @@ The `shutdown(timeoutMs?: number, options?: { server })` method (default timeout
 - **Never use `schema introspect` then `db migrate`** — introspected databases already have the tables
 - **Always backup before production migrations** — `ALTER COLUMN` or `DROP COLUMN` can cause data loss
 - **Tables not in schema are ignored** — custom tables and internal Rebase tables are safe
-- **CHECK and EXCLUDE constraints are kept (0.25+)** — a table cannot declare either, so
-  `db push` leaves every one on a declared table alone: hand-written, or carried by a database
-  `schema introspect` adopted (a readable CHECK also becomes the column's `.validate()`). On 0.24
-  the first push after an introspection dropped them all without a prompt. To remove one, drop it
-  by hand. Triggers and functions a user wrote are never touched (Atlas does not inspect them).
-  `db generate` is different: it diffs the migration files, so a CHECK a hand-written migration
-  added is dropped again by the next generated migration. Its report names the drop when the
-  database holds the constraint, but the statement stays in the file — delete it before
-  `db migrate`, or let `db migrate --refuse-destructive` stop on it
+- **Review CHECK and EXCLUDE constraints.** Rebase reads the live catalog to
+  exclude these custom constraints from planning. `db generate` can still
+  plan a drop for a constraint that exists only in replayed migration history.
+  Review every `DROP CONSTRAINT` before applying a generated migration.
 - **Odd names are safe (0.25+)** — every exclude matches the name exactly, a `.`, `[`, `]` or `*`
   in it included. On 0.24 a hand-written index named like `orders_idx[v1]` was dropped without a
   prompt, and a `.` in a table's or an index's name failed every push (`too many parts in pattern`)
