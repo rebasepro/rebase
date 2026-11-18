@@ -42,7 +42,7 @@ const toolGroups = [
     {
         name: "Data",
         icon: "M3 12a9 3 0 1 0 18 0 9 3 0 1 0-18 0M3 5v14a9 3 0 0 0 18 0V5M3 12a9 3 0 0 0 18 0",
-        tools: ["list_documents", "get_document", "create_document", "update_document", "delete_document"]
+        tools: ["query_table", "get_row", "create_row", "update_row", "delete_row"]
     },
     {
         name: "Users & roles",
@@ -52,17 +52,17 @@ const toolGroups = [
     {
         name: "Schema & database",
         icon: "M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01",
-        tools: ["rebase_schema_generate", "rebase_schema_introspect", "rebase_db_push", "rebase_db_generate", "rebase_db_migrate", "rebase_generate_sdk", "rebase_doctor"]
+        tools: ["rebase_schema_generate", "rebase_schema_introspect", "rebase_schema_plan", "rebase_db_push", "rebase_db_generate", "rebase_db_migrate", "rebase_generate_sdk", "rebase_doctor"]
     },
     {
         name: "Branching",
         icon: "M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6M15 6a9 9 0 0 1-9 9",
-        tools: ["rebase_db_branch_create", "rebase_db_branch_list", "rebase_db_branch_info", "rebase_db_branch_delete"]
+        tools: ["rebase_db_branch_create", "rebase_db_branch_list", "rebase_db_branch_info", "rebase_db_branch_diff", "rebase_db_branch_switch", "rebase_db_branch_delete"]
     },
     {
         name: "Storage",
         icon: "M21 8v13H3V8M1 3h22v5H1zM10 12h4",
-        tools: ["storage_list_objects", "storage_get_metadata", "storage_delete_object"]
+        tools: ["storage_list_objects", "storage_get_download_url", "storage_delete_object"]
     },
     {
         name: "Cron",
@@ -82,7 +82,12 @@ const toolGroups = [
     {
         name: "Projects",
         icon: "M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2",
-        tools: ["rebase_project_list", "rebase_project_current", "rebase_project_switch", "rebase_project_add", "rebase_project_remove", "rebase_project_status"]
+        tools: ["rebase_project_list", "rebase_project_current", "rebase_project_switch", "rebase_project_use_cloud", "rebase_project_add", "rebase_project_remove", "rebase_project_status"]
+    },
+    {
+        name: "Rebase Cloud",
+        icon: "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z",
+        tools: ["rebase_cloud_provision", "rebase_cloud_projects_list", "rebase_cloud_status", "rebase_cloud_deploy", "rebase_cloud_logs", "rebase_cloud_env_list", "rebase_cloud_env_set", "rebase_cloud_deployments_list", "rebase_cloud_rollback"]
     }
 ];
 

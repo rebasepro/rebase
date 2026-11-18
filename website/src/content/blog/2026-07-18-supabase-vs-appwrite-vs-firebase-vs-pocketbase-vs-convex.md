@@ -19,10 +19,10 @@ Here's the field: **Supabase**, **Appwrite**, **Firebase**, **PocketBase**, **Co
 | License | MIT | Apache 2.0 (core) | BSD-3 | Proprietary | MIT | FSL (source-available) | MIT |
 | Runs as | npm packages in *your* Node app | ~6-container Docker stack | Docker Compose stack | Google Cloud only | Single Go binary | Rust binary + dashboard | Next.js app |
 | Authorization | **Postgres RLS, enforced** — tables without RLS aren't served | Postgres RLS (opt-in) | Role/permission rules | Security rules DSL | JS-like filter rules | TypeScript functions | TS access-control functions |
-| Schema source of truth | TypeScript collections → migrations, or inferred from an existing DB | The database itself (SQL) | Console/API-defined | Schemaless | Admin UI / JS migrations | TS schema | TS config |
+| Schema source of truth | TypeScript tables → migrations, or inferred from an existing DB | The database itself (SQL) | Console/API-defined | Schemaless | Admin UI / JS migrations | TS schema | TS config |
 | Realtime | Live queries, broadcast, presence + **DB-level CDC** | Postgres WAL-based | WebSocket events | Native listeners | SSE subscriptions | **Best-in-class** reactive queries | None built in |
 | Admin panel | **Opt-in**: spreadsheet CMS + Studio (SQL, RLS editor, ER diagram) | Studio (DB-centric) | Console | Firebase console | Minimal | Dashboard | **Excellent**, content-centric |
-| Typed client | Generated TS SDK from collections | Generated types from DB | SDKs (many languages) | SDKs | SDKs | **End-to-end types** | Generated types |
+| Typed client | Generated TS SDK from your tables | Generated types from DB | SDKs (many languages) | SDKs | SDKs | **End-to-end types** | Generated types |
 | Managed cloud | Early | Mature ($25 Pro / $599 Team) | $15/member Pro | Pay-per-operation | **None** | $25/dev + usage | Payload Cloud |
 
 Now the detail — because the table hides everything that matters.
@@ -45,7 +45,7 @@ Appwrite's pitch is breadth: auth, databases, storage, functions, messaging (pus
 
 The structural difference: **Appwrite's database is an abstraction, not your database**. Under the hood it runs MariaDB, but you don't get SQL, you can't point it at an existing Postgres, and permissions live in Appwrite's own rule system rather than in the database. If your app outgrows the abstraction — reporting queries, migrations, another service reading the same data — you're working around the platform instead of with it.
 
-Where Appwrite genuinely leads: multi-platform SDKs (Flutter, Swift, Kotlin, and more), built-in messaging campaigns, and a very polished console. Rebase is TypeScript-first on the client; if you're building Flutter apps, Appwrite is the stronger fit today. If your data model is relational and you want to own it in SQL, that's Rebase's home turf — including [pointing Rebase at an existing database](/docs) and inferring collections from it. More: [Rebase vs Appwrite](/rebase-vs-appwrite).
+Where Appwrite genuinely leads: multi-platform SDKs (Flutter, Swift, Kotlin, and more), built-in messaging campaigns, and a very polished console. Rebase is TypeScript-first on the client; if you're building Flutter apps, Appwrite is the stronger fit today. If your data model is relational and you want to own it in SQL, that's Rebase's home turf — including [pointing Rebase at an existing database](/docs) and inferring the tables from it. More: [Rebase vs Appwrite](/rebase-vs-appwrite).
 
 ## Firebase: still the mobile king, still a one-way door
 

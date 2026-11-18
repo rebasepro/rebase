@@ -822,7 +822,7 @@ export const es = {
   "productpage.06": "Lo que dejas de mantener",
   "productpage.07": "Hecho para ser operado — por tu equipo, y por sus agentes",
   "productpage.08": "El mismo modelo de autorización que protege una sesión humana protege a un agente de código. Es la única versión de acceso para agentes que nos parece defendible.",
-  "productpage.09": "Cuarenta herramientas que un agente puede llamar: leer el esquema, generar migraciones, consultar datos, gestionar almacenamiento y cron.",
+  "productpage.09": "Más de cincuenta herramientas que un agente puede llamar: leer el esquema, generar migraciones, consultar datos, gestionar almacenamiento y cron.",
   "productpage.10": "Claves de API con alcance",
   "productpage.11": "Las claves llevan una lista de permisos <em>y</em> pasan por la seguridad a nivel de fila. No hay ninguna clave que esquive la base de datos.",
   "productpage.12": "Instrucciones instalables para Claude Code, Cursor, Windsurf y Gemini, para que un agente escriba Rebase como lo harías tú.",
@@ -958,7 +958,7 @@ export const es = {
 
   // ── comparepage ─────────────────────────────────────────────────
   "comparepage.00": "Rebase, junto a<br/>la herramienta que ya usas.",
-  "comparepage.01": "La mayoría de estos productos son buenos. También resuelven un problema distinto al nuestro. Abajo: qué cambia de verdad, qué herramienta gana en qué situación y los casos en los que no deberías elegir Rebase.",
+  "comparepage.01": "La mayoría de estos productos son buenos. También resuelven un problema distinto al nuestro. Abajo: qué cambia de verdad y qué supone para el sistema con el que acabas.",
   "comparepage.02": "¿Qué estás buscando en realidad?",
   "comparepage.03": "Rebase cae en cuatro categorías, y por eso las comparaciones de una línea nunca funcionan. Busca la fila que corresponda a lo que tienes abierto en la otra pestaña.",
   "comparepage.04": "Cómo lo modelan ellos",
@@ -982,13 +982,6 @@ export const es = {
     "Sin usuario en la sesión, ninguna política coincide. Cerrado por defecto.",
   "comparepage.fig.caption":
     "La misma consulta contra los mismos datos, desde una sesión que se salta la aplicación.",
-  "comparepage.15": "La parte honesta",
-  "comparepage.16": "Cuatro veces en las que no deberías elegir Rebase",
-  "comparepage.17": "<span class=\"mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-600\"></span> <span><span class=\"text-white\">No estás en Postgres y no piensas estarlo.</span> Todo el modelo de seguridad es la seguridad a nivel de fila de Postgres. En MySQL o Mongo no aplica nada de la parte interesante.</span>",
-  "comparepage.18": "<span class=\"mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-600\"></span> <span><span class=\"text-white\">Necesitas un contrato de soporte hoy.</span> Rebase Cloud está en beta privada — ejecuta clientes reales y se abre por tandas, así que la respuesta a «¿puedo empezar el lunes?» puede ser no. Autoalojado, esto es software que ejecutas tú: Docker, Railway, Fly.io o tu propio hierro. Si necesitas a otra persona de guardia este trimestre, un competidor gestionado es la respuesta correcta.</span>",
-  "comparepage.19": "<span class=\"mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-600\"></span> <span><span class=\"text-white\">Necesitas un CMS para una web de marketing.</span> Los constructores de páginas, la maquetación visual y los flujos de publicación son para lo que existe una plataforma de contenidos. Rebase gestiona datos de aplicación, no landing pages.</span>",
-  "comparepage.20":
-    "<span class=\"mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-600\"></span> <span><span class=\"text-white\">Quieres dibujar cada pantalla a mano.</span> Rebase genera el panel de administración a partir de tu esquema y te deja sustituir piezas con tu propio React. Si el objetivo es un lienzo a medida por pantalla, un constructor de herramientas internas encajará mejor.</span>",
   "comparepage.21": "Más fácil de probar que de comparar",
   "comparepage.22": "La demo en vivo es un backend de Rebase real con su panel generado encima. Sin registro.",
   "comparepage.23": "O empieza por lo que estás sustituyendo",
@@ -1029,7 +1022,7 @@ export const es = {
   "comparepage.axis.leaving.others": "Depende de cuánto se metió la herramienta en tu esquema. Si creó las tablas, irse significa una migración.",
   "comparepage.meta.title":
     "Compara Supabase, Directus, Strapi, Retool y más — Rebase",
-  "comparepage.meta.description": "Una comparación honesta: dónde gana Rebase, dónde la competencia es la mejor opción y cuáles son de verdad las concesiones.",
+  "comparepage.meta.description": "Una comparación honesta: qué cambia de verdad entre Rebase y la herramienta que usas hoy, y cuáles son las concesiones.",
 
   // ── devpage ─────────────────────────────────────────────────────
   "devpage.00": "TypeScript · Postgres · tu editor",
@@ -1049,7 +1042,7 @@ export const es = {
   "devpage.14": "Declara lo que necesitas. En código, una vez.",
   "devpage.15": "Las bases de datos, los buckets y los topics son constructores, no YAML. Cada uno nombra su propio motor — Postgres; disco local, S3, GCS, Azure — y un motor del que nunca hemos oído hablar se escribe <code class=\"font-mono text-surface-300\">custom:</code> y se acepta, para que falle en el punto de llamada en vez de parecer una errata.",
   "devpage.16": "<code class=\"font-mono text-surface-300\">rebase resources</code> genera el grafo que un host lee antes de construir nada, y <code class=\"font-mono text-surface-300\">--check</code> hace fallar la CI cuando el grafo confirmado y tu código no coinciden. No hay un segundo sitio donde declarar un bucket, y ese es el punto: dos hogares para un mismo hecho significa que uno de ellos está perdiendo en silencio.",
-  "devpage.17": "config/resources.ts",
+  "devpage.17": "backend/resources.ts",
   "devpage.18": "Publicar dentro de una transacción que se revierte no fue publicar nada. Cada suscriptor reintenta según su propia planificación, y el que se rinde es una fila que puedes mirar.",
   "devpage.19": "Dónde se ejecuta realmente cada pieza",
   "devpage.20": "Tu navegador, tu servidor, tu base de datos. Nada pasa por nosotros — no hay ningún nosotros en la ruta de la petición.",
@@ -1208,10 +1201,9 @@ export const es = {
   // ── vs ──────────────────────────────────────────────────────────
   "vs.pain": "Dónde duele",
   "vs.solve": "Qué hace Rebase en su lugar",
-  "vs.noswitch": "No cambies",
   "vs.hub.eyebrow": "Sigue comparando",
   "vs.hub.title": "¿No era esta la comparación que buscabas?",
-  "vs.hub.blurb": "El índice explica los cuatro tipos de herramienta con los que se confunde Rebase, las cinco preguntas que de verdad cambian, y los casos en los que deberías elegir otra cosa.",
+  "vs.hub.blurb": "El índice explica los cuatro tipos de herramienta con los que se confunde Rebase y las cinco preguntas que de verdad cambian.",
 
   // ── vssupabase ──────────────────────────────────────────────────
   "vssupabase.00": "Rebase frente a Supabase",
@@ -1235,8 +1227,6 @@ export const es = {
   "vssupabase.23": "Rebase Studio usa manipulación del AST para inyectar campos en tu código de forma segura.",
   "vssupabase.24": "Las migraciones de Drizzle se generan y se aplican desde la misma definición.",
   "vssupabase.25": "El código es la fuente de la verdad, así que los entornos coinciden por construcción.",
-  "vssupabase.27": "Cuándo quedarte en Supabase",
-  "vssupabase.28": "Cuando quieres el mayor ecosistema de esta categoría, la mayor cantidad de tutoriales de terceros o funciones edge ejecutándose en la CDN. Supabase es el producto más maduro y con una comunidad mucho mayor, y si nadie fuera de tu equipo de ingeniería va a abrir nunca el back office, casi todo lo que añade Rebase es peso que no vas a usar.",
 
   // ── vsfirebase ──────────────────────────────────────────────────
   "vsfirebase.00": "Rebase frente a Firebase",
@@ -1261,8 +1251,6 @@ export const es = {
   "vsfirebase.22": "Rebase tiene licencia MIT y se entrega como imagen Docker.",
   "vsfirebase.23": "Alójalo en AWS, DigitalOcean, Fly.io, Railway, Hetzner o tu propio hardware.",
   "vsfirebase.24": "Debajo hay una base de datos PostgreSQL corriente, así que cualquier herramienta de BI, trabajo ETL o sesión de psql que hable Postgres ya funciona contra ella.",
-  "vsfirebase.26": "Cuándo quedarte en Firebase",
-  "vsfirebase.27": "Cuando construyes una app móvil que tiene que funcionar sin conexión. Los SDKs de cliente de Firebase y su persistencia offline son genuinamente excelentes y aquí no hay equivalente. También es la mejor respuesta si quieres la escala operativa de Google sin pensar en una base de datos en absoluto — la otra cara de que el Postgres sea tuyo es que el Postgres es tuyo.",
 
   // ── vsappwrite ──────────────────────────────────────────────────
   "vsappwrite.00": "Rebase frente a Appwrite",
@@ -1285,8 +1273,6 @@ export const es = {
   "vsappwrite.23": "Tablas tipo hoja de cálculo, formularios y tableros kanban, generados desde el esquema.",
   "vsappwrite.24": "Se le puede dar a gente no técnica sin miedo, porque las políticas están en la base de datos.",
   "vsappwrite.25": "Sustituye cualquier parte con tus propios componentes React.",
-  "vsappwrite.27": "Cuándo quedarte en Appwrite",
-  "vsappwrite.28": "Cuando tu app es Flutter, Swift o Kotlin: Appwrite tiene SDKs de cliente oficiales para los tres, y el SDK tipado de Rebase es solo TypeScript. Cuando quieres notificaciones push y SMS, decenas de proveedores OAuth o funciones en Python, Go o Dart desde la misma plataforma — Appwrite trae todo eso y Rebase no. Y cuando nadie fuera de ingeniería va a abrir el back office y nada salvo tu app va a leer nunca los datos, una base de datos a la que no llegas directamente no es un coste que vayas a notar.",
 
   // ── vsdirectus ──────────────────────────────────────────────────
   "vsdirectus.00": "Rebase frente a Directus",
@@ -1309,8 +1295,6 @@ export const es = {
   "vsdirectus.23": "Las reglas se compilan a la seguridad a nivel de fila de Postgres, así que aguantan venga de donde venga la consulta — incluida una sesión de psql que nunca tocó la API.",
   "vsdirectus.24": "El editor visual hace legible una política, y reporta la deriva frente a la base de datos.",
   "vsdirectus.25": "El contexto de seguridad sigue siendo tuyo, en tu repositorio.",
-  "vsdirectus.27": "Cuándo quedarte en Directus",
-  "vsdirectus.28": "Cuando necesitas hoy una experiencia madura de gestión de contenidos. Directus tiene años de trabajo en su interfaz editorial, un marketplace mayor y más motores de base de datos detrás — Rebase es solo PostgreSQL, a propósito, porque de eso depende toda la historia de la seguridad a nivel de fila. Si tu equipo son sobre todo editores gestionando contenido, Directus es el producto más acabado para ese trabajo.",
 
   // ── vsstrapi ────────────────────────────────────────────────────
   "vsstrapi.00": "Rebase frente a Strapi",
@@ -1333,8 +1317,6 @@ export const es = {
   "vsstrapi.23": "Guardas un archivo de tabla y el servidor de desarrollo regenera el esquema y el SDK, y luego recarga en caliente.",
   "vsstrapi.24": "Un servidor Hono estándar y componentes React corrientes, no un monolito.",
   "vsstrapi.25": "El comportamiento propio es una ruta de API que escribes, no una API de plugins que aprendes.",
-  "vsstrapi.27": "Cuándo quedarte en Strapi",
-  "vsstrapi.28": "Cuando los usuarios principales son editores de contenido y quieres una experiencia editorial pulida de fábrica, o cuando necesitas uno de los plugins de su marketplace. Strapi lleva años en esa superficie. Rebase es mejor respuesta cuando lo importante es la aplicación y el back office tiene que seguir al esquema en vez de definirlo.",
 
   // ── vspayload ───────────────────────────────────────────────────
   "vspayload.00": "Rebase frente a Payload CMS",
@@ -1356,8 +1338,6 @@ export const es = {
   "vspayload.22": "Una consola SQL que consulta las tablas directamente.",
   "vspayload.23": "EXPLAIN en el sitio, para que una consulta cara se vea mientras aún la estás escribiendo.",
   "vspayload.24": "Un editor visual sobre políticas reales de seguridad a nivel de fila.",
-  "vspayload.26": "Cuándo quedarte en Payload",
-  "vspayload.27": "Cuando construyes una web con mucho contenido en Next.js y quieres que el CMS viva en la misma base de código y el mismo despliegue. Es una arquitectura genuinamente buena y Rebase no la replica. Rebase encaja mejor cuando el backend tiene que sostenerse solo — varios clientes, un equipo que no es todo frontend, o una autorización que tiene que aguantar en la base de datos.",
 
   // ── vsretool ────────────────────────────────────────────────────
   "vsretool.00": "Rebase frente a Retool",
@@ -1381,8 +1361,6 @@ export const es = {
   "vsretool.23": "La configuración y los esquemas de interfaz son ficheros TypeScript corrientes.",
   "vsretool.24": "Una PR se lee como cualquier otra revisión de frontend: + published: boolean.",
   "vsretool.25": "Despliega con la CI/CD que ya usas, no con una herramienta de release propietaria.",
-  "vsretool.27": "Cuándo quedarte en Retool",
-  "vsretool.28": "Cuando necesitas unir datos de muchos sitios deprisa. El catálogo de integraciones de Retool — Stripe, Salesforce, S3, media docena de bases de datos, REST arbitrario — es enorme, y construir una pantalla de operaciones que cruce cuatro productos SaaS es genuinamente rápido ahí. Rebase está centrado en Postgres; si tus datos no están mayormente en Postgres, buena parte del argumento de aquí no aplica.",
 
   // ── vshasura ────────────────────────────────────────────────────
   "vshasura.00": "Rebase frente a Hasura",
@@ -1400,8 +1378,6 @@ export const es = {
   "vshasura.14": "Tu lógica de negocio se ejecuta en el mismo proceso que los endpoints generados.",
   "vshasura.15": "Sin salto de red para un trigger interno, y sin configuración de webhooks que mantener sincronizada.",
   "vshasura.16": "Un repositorio TypeScript, un despliegue.",
-  "vshasura.18": "Cuándo quedarte en Hasura",
-  "vshasura.19": "Cuando GraphQL es la decisión de producto, cuando necesitas federar varias fuentes de datos tras un solo grafo, o cuando tus clientes ya generan código desde un esquema GraphQL. Ese es el terreno de Hasura.",
 
   // ── vsdjango ────────────────────────────────────────────────────
   "vsdjango.00": "Rebase frente a Django",
@@ -1418,8 +1394,6 @@ export const es = {
   "vsdjango.14": "La navegación no va y vuelve al servidor, y una acción no recarga la página.",
   "vsdjango.15": "Las suscripciones en tiempo real hacen que un registro se actualice cuando otra persona lo edita, sin refrescar.",
   "vsdjango.16": "Personalizable con componentes React corrientes.",
-  "vsdjango.18": "Cuándo quedarte en Django",
-  "vsdjango.19": "Cuando tu equipo escribe Python, cuando necesitas su ecosistema — bibliotecas de ciencia de datos, Celery, la madurez del ORM — o cuando la aplicación es una app Django renderizada en servidor y añadir un backend aparte sería una segunda cosa que operar. Django es un framework completo; Rebase es un backend más un panel de administración, y no intenta ser lo primero.",
 
   // ── close ───────────────────────────────────────────────────────
   "close.vs.title": "No te fíes de nuestra palabra.",
@@ -1476,8 +1450,6 @@ export const es = {
   "cfaq.supabase.1.a": "De dónde vienen las políticas. En Supabase escribes la RLS como SQL en un panel, y una política que devuelve cero filas en silencio es una sesión de depuración sin traza de pila. En Rebase la política forma parte de la definición de la tabla en TypeScript y se compila a una política real de Postgres cuando migras. La aplicación es idéntica — es Postgres en ambos casos — pero la regla vive en tu repositorio, pasa por revisión de código y aparece en un diff.",
   "cfaq.supabase.2.q": "¿No es ya el panel de Supabase un panel de administración?",
   "cfaq.supabase.2.a": "Es un editor de tablas, que es otro producto. Está hecho para quien desarrolla: filas en crudo, UUIDs de claves foráneas, sin flujo de trabajo, sin más roles que los de la base de datos. Rebase genera una interfaz para las personas que llevan el negocio — formularios, medios, permisos, tableros kanban y tus propios componentes React allí donde lo generado no encaja — desde las mismas definiciones de tabla que produjeron la API.",
-  "cfaq.supabase.3.q": "¿Cuándo es Supabase la mejor opción?",
-  "cfaq.supabase.3.a": "Cuando quieres el mayor ecosistema de la categoría, la mayor cantidad de tutoriales de terceros o funciones edge en la CDN. Supabase es el producto más maduro y con mucha más comunidad, y si nadie fuera de tu equipo de ingeniería va a abrir nunca el back office, casi todo lo que añade Rebase es peso que no vas a usar.",
   "cfaq.supabase.4.q": "¿Cuánta reescritura supone mover una aplicación de Supabase a Rebase?",
   "cfaq.supabase.4.a":
     "La base de datos es la parte que no cambia — es Postgres en ambos lados. Lo que cambia es el cliente: el cliente JS de Supabase y el SDK tipado de Rebase son APIs distintas, por lo que hay que reescribir las llamadas, y cualquier política que hayas definido en el panel debe expresarse como reglas de acceso de una tabla. En la práctica, es una migración de la capa de cliente, no de datos.",
@@ -1487,8 +1459,6 @@ export const es = {
   "cfaq.firebase.1.a": "Sí — suscripciones en tiempo real por WebSocket, movidas por cambios en Postgres, y entregadas bajo la misma seguridad a nivel de fila que cualquier otra lectura. Esa última parte es la diferencia que conviene saber: una suscripción no puede ver filas que quien se suscribe no tiene permitido leer, porque la política la aplica la base de datos y no el código que montó el listener.",
   "cfaq.firebase.2.q": "¿Qué sustituye a Firebase Auth?",
   "cfaq.firebase.2.a": "Rebase trae su propia autenticación: email y contraseña, magic links, códigos de un solo uso, multifactor TOTP, claves de API con alcance y doce proveedores OAuth y OIDC —Google, Microsoft Entra ID, Apple, GitHub— o tu propio adaptador delante de Auth0, Clerk o el mismísimo Firebase Auth. La identidad de quien inicia sesión es aquello sobre lo que se escriben las políticas de seguridad a nivel de fila. La diferencia práctica es que tus usuarios viven en tu propio Postgres, en una tabla que puedes consultar y unir, en vez de en un servicio de identidad aparte al que llegas por API.",
-  "cfaq.firebase.3.q": "¿Cuándo es Firebase la mejor opción?",
-  "cfaq.firebase.3.a": "Cuando construyes una app móvil que tiene que funcionar sin conexión. Los SDKs de cliente de Firebase y su persistencia offline son genuinamente excelentes y aquí no hay equivalente. También es la mejor respuesta si quieres la escala operativa de Google sin pensar en una base de datos en absoluto — la otra cara de que el Postgres sea tuyo es que el Postgres es tuyo.",
   "cfaq.firebase.4.q": "¿Por qué pasarse a Postgres?",
   "cfaq.firebase.4.a": "Normalmente porque una consulta se puso difícil. Los almacenes de documentos son agradables hasta que necesitas hacer una pregunta que cruza tres colecciones, garantizar que dos escrituras ocurren juntas, o darle a alguien de analítica algo que pueda consultar. Eso son problemas de una línea en SQL y problemas de arquitectura en Firestore.",
   "cfaq.appwrite.0.q": "¿Puedo pasar un proyecto de Appwrite a Rebase?",
@@ -1497,10 +1467,8 @@ export const es = {
   "cfaq.appwrite.1.a": "A quién obedece la base de datos. Un Appwrite 2.0 autoalojado usa PostgreSQL por defecto, pero Appwrite crea el esquema, comprueba los permisos en su propio servidor y expone los datos por su API de consultas, REST y GraphQL, no por SQL. El PostgreSQL nativo de Appwrite Cloud te da SQL — y a cambio, ni SDKs de Appwrite ni permisos de la plataforma. Rebase es las dos cosas a la vez: la API, el SDK tipado y el panel de administración se generan sobre tablas que también puedes abrir en psql, bajo la misma seguridad a nivel de fila.",
   "cfaq.appwrite.2.q": "¿Cubre Rebase las funciones de autenticación de Appwrite?",
   "cfaq.appwrite.2.a": "La mayoría, con huecos que conviene nombrar. Rebase trae email y contraseña, magic links, códigos de un solo uso por email, sesiones anónimas, multifactor TOTP, claves de API con alcance y doce proveedores OAuth y OIDC — o tu propio adaptador delante de Auth0, Clerk o Firebase Auth. Appwrite tiene bastantes más proveedores OAuth, inicio de sesión por teléfono y SMS, y email o SMS como segundo factor. Ninguno de los dos trae SAML integrado para tus usuarios finales. Lo que aporta Rebase es dónde viven los usuarios: una tabla en tu propio Postgres contra la que las políticas y las consultas pueden hacer join.",
-  "cfaq.appwrite.3.q": "¿Cuándo es Appwrite la mejor opción?",
-  "cfaq.appwrite.3.a": "Cuando tu app es Flutter, Swift o Kotlin: Appwrite tiene SDKs de cliente oficiales para los tres, y el SDK tipado de Rebase es solo TypeScript. Cuando quieres notificaciones push y SMS, decenas de proveedores OAuth o funciones en Python, Go o Dart desde la misma plataforma — Appwrite trae todo eso y Rebase no. Y cuando nadie fuera de ingeniería va a abrir el back office y nada salvo tu app va a leer nunca los datos, una base de datos a la que no llegas directamente no es un coste que vayas a notar.",
   "cfaq.appwrite.4.q": "¿Tiene Rebase funciones, almacenamiento y mensajería como Appwrite?",
-  "cfaq.appwrite.4.a": "Funciones y almacenamiento, sí; mensajería, solo por email. Rebase tiene funciones en TypeScript montadas como rutas de la API, tareas cron, trabajos en segundo plano con reintentos y almacenamiento de archivos en disco local, cualquier servicio compatible con S3 o Google Cloud Storage. Envía email transaccional por SMTP, pero no tiene notificaciones push ni SMS, y sus funciones son solo TypeScript, mientras que las de Appwrite corren en más de una docena de lenguajes.",
+  "cfaq.appwrite.4.a": "Funciones y almacenamiento, sí; mensajería, por email y Web Push. Rebase tiene funciones en TypeScript montadas como rutas de la API, tareas cron, trabajos en segundo plano con reintentos y almacenamiento de archivos en disco local, cualquier servicio compatible con S3 o Google Cloud Storage. Envía email transaccional por SMTP y Web Push a navegadores, pero no tiene push nativo en móvil ni SMS, y sus funciones son solo TypeScript, mientras que las de Appwrite corren en más de una docena de lenguajes.",
   "cfaq.directus.0.q": "¿Puede Rebase funcionar sobre una base de datos que ya gestiona Directus?",
   "cfaq.directus.0.a": "Sí. Rebase apunta a una base de datos PostgreSQL existente y lee las tablas que encuentra, así que un esquema gestionado por Directus es un punto de partida válido. Las tablas internas de Directus se quedan donde están y simplemente no se modelan como tablas — describes las tablas que te importan y dejas el resto en paz.",
   "cfaq.directus.1.q": "¿De quién es el esquema?",
@@ -1508,21 +1476,17 @@ export const es = {
   "cfaq.directus.2.q": "¿Dónde se aplica el control de acceso?",
   "cfaq.directus.2.a":
     "En Postgres. Rebase compila las reglas de acceso de una tabla en políticas reales de seguridad a nivel de fila, de modo que cualquier consulta que llegue a la base de datos por otra vía — psql, un informe, otro servicio — sigue estando gobernada por ellas. Directus aplica los permisos en su capa de aplicación, por delante de la base de datos: un motor real y bien construido, pero que se detiene en los límites de Directus.",
-  "cfaq.directus.3.q": "¿Cuándo es Directus la mejor opción?",
-  "cfaq.directus.3.a": "Cuando necesitas hoy una experiencia madura de gestión de contenidos. Directus tiene años de trabajo en su interfaz editorial, un marketplace mayor y más motores de base de datos detrás — Rebase es solo PostgreSQL, a propósito, porque de eso depende la historia de la seguridad a nivel de fila. Si tu equipo son sobre todo editores gestionando contenido, Directus es el producto más acabado para ese trabajo.",
   "cfaq.directus.4.q": "¿Rebase me da una API además de un panel de administración?",
   "cfaq.directus.4.a":
     "Ambas cosas, a partir de la misma definición. Una API REST, un SDK tipado, suscripciones en tiempo real y un servidor MCP para agentes se generan desde las tablas, y el panel de administración es un consumidor más de esa misma API pública bajo las mismas políticas. No hay canales secundarios privados para los datos ni una segunda copia de ellos.",
 
   // ── cfaq-b ──────────────────────────────────────────────────────
   "cfaq.strapi.0.q": "¿Puedo apuntar Rebase a la base de datos que hay detrás de mi proyecto Strapi?",
-  "cfaq.strapi.0.a": "Sí, si es PostgreSQL. Rebase lee tablas existentes en vez de crear las suyas, así que las tablas de contenido de Strapi se pueden leer como colecciones. Ten en cuenta que Strapi modela algunas relaciones con sus propias tablas de unión y metadatos, así que estarás describiendo la forma que de verdad quieres en vez de importar el modelo interno de Strapi tal cual.",
+  "cfaq.strapi.0.a": "Sí, si es PostgreSQL. Rebase lee tablas existentes en vez de crear las suyas, así que las tablas de contenido de Strapi se pueden servir tal cual. Ten en cuenta que Strapi modela algunas relaciones con sus propias tablas de unión y metadatos, así que estarás describiendo la forma que de verdad quieres en vez de importar el modelo interno de Strapi tal cual.",
   "cfaq.strapi.1.q": "¿Es Rebase un CMS headless?",
   "cfaq.strapi.1.a": "No exactamente, y la diferencia importa al elegir. Un CMS headless es dueño del esquema y te entrega el contenido por su API. Rebase es un backend: tu esquema de Postgres sigue siendo tuyo, la API y el panel de administración se generan los dos desde él, y la gestión de contenido es una de las cosas que el panel resulta hacer bien, no el producto entero.",
   "cfaq.strapi.2.q": "¿Y el ecosistema de plugins?",
   "cfaq.strapi.2.a": "Aquí Strapi va por delante y sería deshonesto fingir lo contrario: su marketplace es mucho mayor. Rebase se extiende de otra manera: el panel de administración es React, y cualquier campo, vista o página que sepas construir en React entra en él con acceso a los hooks internos. Eso le va bien a un equipo que ya escribe React, y bastante peor a un equipo que quiere instalar un plugin.",
-  "cfaq.strapi.3.q": "¿Cuándo es Strapi la mejor opción?",
-  "cfaq.strapi.3.a": "Cuando los usuarios principales son editores de contenido y quieres una experiencia editorial pulida de fábrica, o cuando necesitas uno de los plugins de su marketplace. Strapi lleva años en esa superficie. Rebase es mejor respuesta cuando lo importante es la aplicación y el back office tiene que seguir al esquema en vez de definirlo.",
   "cfaq.strapi.4.q": "¿En qué se diferencia la autorización?",
   "cfaq.strapi.4.a":
     "Strapi tiene un sistema de roles y permisos dentro de la aplicación. Rebase compila sus reglas de acceso a la seguridad a nivel de fila de PostgreSQL, así que las reglas las aplica la base de datos para todos los clientes, no solo para las peticiones que llegan a través del framework. Si alguien se conecta con psql, las políticas siguen ahí.",
@@ -1532,8 +1496,6 @@ export const es = {
   "cfaq.payload.1.a": "Sí, incluso con uno anterior a él. Rebase lee las tablas a las que se le apunta y genera la API y el panel de administración desde definiciones de tabla que escribes contra ellas. No exige ser dueño de la base de datos ni mantiene un esquema propio junto al tuyo.",
   "cfaq.payload.2.q": "¿Y la edición de contenido enriquecido?",
   "cfaq.payload.2.a": "Rebase trae un editor de bloques en su capa CMS, junto a formularios, gestión de medios y roles. El modelado de contenido de Payload — bloques anidados, localización, versionado de contenido editorial — es más profundo, y si el producto que construyes es fundamentalmente una publicación, esa profundidad es justo lo que estás comprando.",
-  "cfaq.payload.3.q": "¿Cuándo es Payload la mejor opción?",
-  "cfaq.payload.3.a": "Cuando construyes una web con mucho contenido en Next.js y quieres que el CMS viva en la misma base de código y el mismo despliegue. Es una arquitectura genuinamente buena y Rebase no la replica. Rebase encaja mejor cuando el backend tiene que sostenerse solo — varios clientes, un equipo que no es todo frontend, o una autorización que tiene que aguantar en la base de datos.",
   "cfaq.payload.4.q": "¿Dónde vive la autorización?",
   "cfaq.payload.4.a":
     "En PostgreSQL. Las reglas de acceso de las tablas compilan a políticas de seguridad a nivel de fila, que la base de datos aplica a cada consulta sin importar qué cliente la envió. Payload aplica el control de acceso en el código de la aplicación, lo que es expresivo y fácil de razonar, pero solo está en vigor para las peticiones que pasan por Payload.",
@@ -1543,8 +1505,6 @@ export const es = {
   "cfaq.retool.1.a": "No, y esta es la mayor diferencia práctica. Las pantallas de Retool se dibujan de una en una, y se quedan dibujadas: añade una columna y tendrás que volver a cada pantalla que debería mostrarla. Rebase genera la interfaz desde las definiciones de tabla, así que un campo nuevo aparece a la vez en la tabla, en el formulario y en la API. Sigues bajando a React propio allí donde lo generado está mal.",
   "cfaq.retool.2.q": "¿Cómo se compara el modelo de precios?",
   "cfaq.retool.2.a": "Retool se cobra por usuario, que es lo que hace cara una herramienta interna justo cuando tiene éxito — cada persona que la mira cuesta más. Rebase es de código abierto y autoalojable sin coste de licencia, y Rebase Cloud se cobra por recurso y no por usuario. Añadir a la undécima persona que necesita acceso de lectura no cambia la factura.",
-  "cfaq.retool.3.q": "¿Cuándo es Retool la mejor opción?",
-  "cfaq.retool.3.a": "Cuando necesitas unir datos de muchos sitios deprisa. El catálogo de integraciones de Retool — Stripe, Salesforce, S3, media docena de bases de datos, REST arbitrario — es enorme, y construir ahí una pantalla de operaciones que cruce cuatro productos SaaS es genuinamente rápido. Rebase está centrado en Postgres; si tus datos no están mayormente en Postgres, buena parte del argumento no aplica.",
   "cfaq.retool.4.q": "¿Puede usar Rebase CMS gente que no programa?",
   "cfaq.retool.4.a": "Es justo para quien está hecho. Roles y permisos, formularios con validación, medios, vistas kanban y de lista, edición en línea y búsqueda son la experiencia por defecto, y lo que cada rol puede ver lo aplica la seguridad a nivel de fila en la base de datos, no un botón escondido.",
   "cfaq.hasura.0.q": "¿REST o GraphQL?",
@@ -1556,8 +1516,6 @@ export const es = {
     "El sistema de permisos de Hasura se define en sus metadatos y lo aplica el motor mientras construye cada consulta — potente y muy bien diseñado. Rebase compila las reglas de acceso a la seguridad a nivel de fila de PostgreSQL, así que la aplicación ocurre dentro de la base de datos y sobrevive a cualquier cliente, incluidos los que nunca pasan por Rebase. La contrapartida es expresividad frente a alcance.",
   "cfaq.hasura.3.q": "¿Qué añade Rebase que Hasura no tenga?",
   "cfaq.hasura.3.a": "Un panel de administración que tus colegas no técnicos pueden usar, generado desde las mismas definiciones que la API. La consola de Hasura es una herramienta para desarrollar y explorar el grafo; no es un back office, y no pretende serlo. Si tenías planeado construir una interfaz interna encima de Hasura, esa es la pieza que trae Rebase.",
-  "cfaq.hasura.4.q": "¿Cuándo es Hasura la mejor opción?",
-  "cfaq.hasura.4.a": "Cuando GraphQL es la decisión de producto, cuando necesitas federar varias fuentes de datos tras un solo grafo, o cuando tus clientes ya generan código desde un esquema GraphQL. Ese es el terreno de Hasura.",
   "cfaq.django.0.q": "¿Tengo que dejar Python?",
   "cfaq.django.0.a":
     "Para el backend, sí — Rebase es TypeScript. Ese es el coste honesto, y si la experiencia de tu equipo y el código que ya tienes son Python, es un coste grande. Lo que recuperas es un solo lenguaje en todo el stack: las mismas definiciones de tabla producen el esquema de la base de datos, la API REST, el SDK tipado y el panel de administración, así que el frontend no consume una API que alguien mantiene a mano.",
@@ -1565,8 +1523,6 @@ export const es = {
   "cfaq.django.1.a": "Sí, si es PostgreSQL. Rebase se conecta a tablas existentes en vez de generar su propio esquema, así que las tablas de Django — incluidas las de auth, si quieres modelarlas — se pueden describir como tablas y obtener un panel de administración y una API sin tocar los datos.",
   "cfaq.django.2.q": "¿Cómo se compara el admin con django-admin?",
   "cfaq.django.2.a": "django-admin es excelente y justamente famoso, y esta comparación existe porque la gente la pide en otros sitios. Las diferencias: el panel de Rebase es React, así que se extiende en el framework que la mayoría de los equipos de frontend ya usan, y se genera junto a una API tipada en vez de ser una superficie aparte sobre el ORM. django-admin está mucho más probado en batalla.",
-  "cfaq.django.3.q": "¿Cuándo es Django la mejor opción?",
-  "cfaq.django.3.a": "Cuando tu equipo escribe Python, cuando necesitas su ecosistema — bibliotecas de ciencia de datos, Celery, la madurez del ORM — o cuando la aplicación es una app Django renderizada en servidor y añadir un backend aparte sería una segunda cosa que operar. Django es un framework completo; Rebase es un backend más un panel de administración, y no intenta ser lo primero.",
   "cfaq.django.4.q": "¿Dónde se aplica la autorización?",
   "cfaq.django.4.a": "En PostgreSQL, mediante seguridad a nivel de fila compilada desde las definiciones de tabla. Django aplica los permisos en la capa de aplicación, que es lo normal y sensato para un framework. La diferencia aparece cuando algo que no es tu aplicación Django llega a la base de datos — un script, un informe, otro servicio — y las reglas o viajan con los datos o no.",
 
@@ -1628,7 +1584,7 @@ export const es = {
   "alt.tool.pocketbase.bestFor": "Un binario, un fichero, sin infraestructura",
   "alt.tool.pocketbase.desc": "Un único ejecutable de Go con una base de datos SQLite embebida, auth, almacenamiento de ficheros, realtime y una interfaz de administración. Genuinamente encantador para una app pequeña o un prototipo. La restricción es la misma que el atractivo: SQLite y un solo proceso, así que la escala horizontal y las funciones específicas de Postgres no están sobre la mesa.",
   "alt.tool.appwrite.bestFor": "Una API con la forma de Firebase que puedes autoalojar",
-  "alt.tool.appwrite.desc": "Un backend con todo incluido: auth, bases de datos, almacenamiento, funciones y mensajería, con SDKs de cliente para casi cualquier plataforma. Más cerca de la forma de Firebase que de un backend SQL — la base de datos es orientada a documentos, lo cual es la decisión correcta si eso era lo que querías y la equivocada si venías por los joins.",
+  "alt.tool.appwrite.desc": "Un backend con todo incluido: auth, bases de datos, almacenamiento, funciones y mensajería, con SDKs de cliente para casi cualquier plataforma. Más cerca de la forma de Firebase que de un backend SQL — desde la 2.0 la base de datos son tablas y filas sobre PostgreSQL, pero se accede por la API de Appwrite y no por SQL, lo cual es la decisión correcta si eso era lo que querías y la equivocada si venías a escribir tú los joins.",
   "alt.tool.directus.bestFor": "Una interfaz editorial madura sobre una base de datos existente",
   "alt.tool.directus.desc": "Envuelve una base de datos SQL en una API REST y GraphQL y una aplicación de administración bien hecha, y funciona con un esquema que ya tengas. Los permisos se aplican en la capa de Directus y no en la base de datos, y la aplicación es dueña de un conjunto de tablas propias.",
   "alt.tool.hasura.bestFor": "GraphQL, sobre todo federado entre varias fuentes",
@@ -1679,7 +1635,7 @@ export const es = {
   "alt.page.supabase.r5.reason": "Solo quería Postgres gestionado",
   "alt.page.supabase.r5.why": "Postgres con branching y escalado a cero, y nada de la plataforma alrededor. Pon encima lo que quieras.",
   "alt.page.supabase.f0.q": "¿Cuál es la alternativa más cercana a Supabase?",
-  "alt.page.supabase.f0.a": "Depende de qué parte estés sustituyendo. Appwrite es la más parecida en forma — un backend autoalojable con todo incluido y SDKs de cliente — aunque su base de datos es orientada a documentos y no relacional. Si lo que quieres es específicamente Postgres-con-plataforma, Nhost y Rebase son las más cercanas; Nhost se inclina a GraphQL, Rebase a REST más un panel de administración generado.",
+  "alt.page.supabase.f0.a": "Depende de qué parte estés sustituyendo. Appwrite es la más parecida en forma — un backend autoalojable con todo incluido y SDKs de cliente — aunque a su base de datos se accede por la API de Appwrite y no por SQL. Si lo que quieres es específicamente Postgres-con-plataforma, Nhost y Rebase son las más cercanas; Nhost se inclina a GraphQL, Rebase a REST más un panel de administración generado.",
   "alt.page.supabase.f1.q": "¿Hay una alternativa a Supabase autoalojada?",
   "alt.page.supabase.f1.a": "Varias, y el propio Supabase es autoalojable — es de código abierto, y ejecutarlo tú es un camino soportado, aunque trabajoso. Si la razón por la que buscas es que autoalojar Supabase pesa más de lo que querías, PocketBase es la opción más ligera de aquí, y Rebase, Appwrite y Directus corren como una aplicación normal junto a un Postgres normal.",
   "alt.page.supabase.f2.q": "¿Tengo que migrar mi base de datos para cambiar?",
@@ -1728,8 +1684,6 @@ export const es = {
   "alt.page.retool.r3.why": "Una interfaz de hoja de cálculo sobre la base de datos, que a menudo es todo el requisito real y se resuelve en una tarde.",
   "alt.page.retool.r4.reason": "Sobre todo necesitamos que la gente lea números",
   "alt.page.retool.r4.why": "Una parte sorprendente de las peticiones de herramienta interna son peticiones de informes. Metabase las responde directamente y no finge ser una superficie de operaciones.",
-  "alt.page.retool.r5.reason": "Necesitamos unir Stripe, Salesforce y tres bases de datos",
-  "alt.page.retool.r5.why": "Honestamente, quédate. El catálogo de integraciones es el producto y nada de código abierto se le acerca.",
   "alt.page.retool.f0.q": "¿Cuál es la mejor alternativa de código abierto a Retool?",
   "alt.page.retool.f0.a": "Budibase y Appsmith son las más parecidas en naturaleza — las dos son constructores de arrastrar y soltar autoalojables con un modelo similar. Si tus datos están mayormente en Postgres y prefieres que la interfaz siga al esquema en vez de dibujarse pantalla a pantalla, Rebase es una respuesta distinta al mismo problema: el panel se genera desde las definiciones de tabla, y la API viene con él.",
   "alt.page.retool.f1.q": "¿Por qué es Retool tan caro?",
@@ -1752,8 +1706,6 @@ export const es = {
   "alt.page.directus.r2.why": "Los dos definen tablas en TypeScript en tu repositorio en vez de a través de una interfaz, así que un cambio de esquema es una pull request.",
   "alt.page.directus.r3.reason": "Sobre todo necesitamos editores gestionando contenido",
   "alt.page.directus.r3.why": "La experiencia editorial más madura entre los CMS abiertos, con el mayor marketplace de plugins detrás.",
-  "alt.page.directus.r4.reason": "Necesitamos una base de datos que no sea Postgres ni MySQL",
-  "alt.page.directus.r4.why": "Quédate. Su soporte multi-motor es más amplio que el de casi toda esta lista, y Rebase en particular es solo PostgreSQL, a propósito.",
   "alt.page.directus.r5.reason": "En realidad solo queremos una cuadrícula sobre las tablas",
   "alt.page.directus.r5.why": "Menos producto que operar, y una hoja de cálculo es lo que muchos equipos querían decir de verdad.",
   "alt.page.directus.f0.q": "¿Cuál es la mejor alternativa a Directus?",
@@ -1779,10 +1731,6 @@ export const es = {
   "alt.page.strapi.r2.why": "Auth, realtime, almacenamiento, funciones, cron y un SDK tipado salen de las mismas definiciones que el panel de administración, en vez de ser plugins alrededor de un CMS.",
   "alt.page.strapi.r3.reason": "Es una web Next.js y queremos el CMS dentro",
   "alt.page.strapi.r3.why": "Se despliega como parte de la aplicación Next.js en vez de junto a ella, que es una cosa menos que operar y un salto de red menos.",
-  "alt.page.strapi.r4.reason": "Nuestros editores son los usuarios principales y están contentos",
-  "alt.page.strapi.r4.why": "Quédate. Nada de aquí tiene una experiencia editorial más acabada, y el cambio lo pagaría la gente para la que existe el producto.",
-  "alt.page.strapi.r5.reason": "Necesitamos un plugin concreto del marketplace",
-  "alt.page.strapi.r5.why": "El marketplace es genuinamente un foso. Rebase se extiende escribiendo componentes React, lo cual le va bien a otro tipo de equipo.",
   "alt.page.strapi.f0.q": "¿Cuál es la mejor alternativa a Strapi?",
   "alt.page.strapi.f0.a": "Payload es lo más parecido si quieres un CMS code-first, sobre todo dentro de Next.js. Directus es lo más cercano si quieres una aplicación de administración sobre una base de datos que ya es tuya. Rebase es la respuesta cuando lo que necesitabas de verdad era un backend — auth, API, realtime, políticas — que además incluye gestión de contenido, en vez de un CMS que luego extiendes hasta convertirlo en backend.",
   "alt.page.strapi.f1.q": "¿Sigue siendo Strapi de código abierto?",
@@ -1805,8 +1753,6 @@ export const es = {
   "alt.page.hasura.r2.why": "graphql-engine es Apache-2.0, pero el producto DDN más reciente de Hasura es una oferta aparte con términos aparte, y los dos se confunden. PostgREST es una pieza de infraestructura pequeña y con licencia permisiva que hace un solo trabajo; Supabase construye encima y es Apache-2.0.",
   "alt.page.hasura.r3.reason": "Queremos GraphQL con auth y almacenamiento ya conectados",
   "alt.page.hasura.r3.why": "Hasura más las piezas de alrededor, montadas y mantenidas juntas.",
-  "alt.page.hasura.r4.reason": "Estamos federando varias fuentes de datos tras un solo grafo",
-  "alt.page.hasura.r4.why": "Quédate. Ese es su terreno y nada más de aquí se le acerca.",
   "alt.page.hasura.f0.q": "¿Cuál es la mejor alternativa a Hasura?",
   "alt.page.hasura.f0.a": "Para GraphQL en concreto, Nhost es la más cercana — es Hasura con auth, almacenamiento y funciones montados alrededor. Si GraphQL no era el punto, Supabase y Rebase te dan los dos una API instantánea sobre Postgres con menos cosas entre tú y la base de datos; Rebase además genera un panel de administración desde las mismas definiciones.",
   "alt.page.hasura.f1.q": "¿Hay una alternativa REST a Hasura?",

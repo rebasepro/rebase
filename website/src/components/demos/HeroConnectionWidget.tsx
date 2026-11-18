@@ -143,7 +143,7 @@ export default function HeroConnectionWidget() {
                             <div className="space-y-1">
                                 <h4 className="text-white font-semibold text-sm">Schema Introspected!</h4>
                                 <p className="text-xs text-emerald-400 font-mono">
-                                    ✔ Generated 8 collections & types in 0.8s
+                                    ✔ Generated 8 tables & types in 0.8s
                                 </p>
                             </div>
                         </div>

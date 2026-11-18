@@ -273,9 +273,9 @@ its own close and drops `ClosingCta`.
 | `/ui` | What do I build my custom fields with? | UIReferenceView |
 | `/rls-check` | Is my database exposed right now? | The tool's real output; the 15 checks from `src/data/rls-checks.ts` |
 | `/demo` | Can I see it before I run it? | The hosted panel, in place |
-| `/compare` | Why this and not X? | comparison matrix, RLSEditor, "four times you should not pick Rebase" |
-| `/rebase-vs-*` | Why this and not X, for someone who uses X today? | The shared FAQ layer, and a visible "When to stay on X" section on every page |
-| `/alternatives/*` | Which of these should I actually use? | `src/data/alternatives.ts` — "Stay." rows, the disclosure line, no prices |
+| `/compare` | Why this and not X? | comparison matrix, RLSEditor. No "when not to pick Rebase" list: removed 2026-11-18 (Francesco: "do not limit ourselves ever") |
+| `/rebase-vs-*` | Why this and not X, for someone who uses X today? | The shared FAQ layer. No "When to stay on X" section and no "when is X the better choice?" FAQ: removed 2026-11-18 |
+| `/alternatives/*` | Which of these should I actually use? | `src/data/alternatives.ts` — the disclosure line, no prices. No row answers with the incumbent ("Stay."): removed 2026-11-18 |
 | `/pricing` | What is free, what costs money, and who operates what? | — |
 | `/about` | Who builds this, and why? | The manifesto's why, the FireCMS heritage paragraph, the roadmap |
 | `/manifesto` | What do you believe? | Five beliefs, each one disagreeable |
@@ -643,8 +643,8 @@ changes, and replace the date here.
   its own docs' words "no Appwrite layer in between" — no SDKs, no platform
   permissions. Permissions are enforced by Appwrite's server, not RLS; a scoped
   server API key bypasses them. BSD-3-Clause. No SAML for end users.
-  So "document-oriented rather than relational" no longer stands as written —
-  `alt.tool.appwrite.desc` and `alt.page.supabase.f0.a` still say it.
+  So "document-oriented rather than relational" no longer stands as written;
+  `alt.tool.appwrite.desc` and `alt.page.supabase.f0.a` were corrected 2026-11-18.
 - None of the eight keeps a second copy of your data. "Often two databases" was
   false for all of them.
 

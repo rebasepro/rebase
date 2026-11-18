@@ -159,8 +159,8 @@ export function ArchitectureDiagram() {
                                     <div className="flex flex-wrap gap-1.5">
                                         <Tag tip="Typed pub/sub between connected clients" color="cyan">Broadcast</Tag>
                                         <Tag tip="Per-channel online/offline user state tracking" color="cyan">Presence</Tag>
-                                        <Tag tip="Filtered/sorted/paginated with RLS enforcement" color="cyan">Collection Subs</Tag>
-                                        <Tag tip="Individual entity change notifications" color="cyan">Entity Subs</Tag>
+                                        <Tag tip="Filtered/sorted/paginated with RLS enforcement" color="cyan">Table Subs</Tag>
+                                        <Tag tip="Individual row change notifications" color="cyan">Row Subs</Tag>
                                     </div>
                                 </div>
                             </div>
@@ -204,7 +204,7 @@ export function ArchitectureDiagram() {
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                         <Tag tip="SMTP, SES, Resend, Postmark — templates + transactional" color="violet">Email</Tag>
-                                        <Tag tip="Signed outbound HTTP on entity INSERT/UPDATE/DELETE" color="violet">Webhooks</Tag>
+                                        <Tag tip="Signed outbound HTTP on row INSERT/UPDATE/DELETE" color="violet">Webhooks</Tag>
                                         <Tag tip="Versioned audit trail with programmatic revert" color="violet">History</Tag>
                                         <Tag tip="Postgres tsvector full-text search via SDK" color="violet">Search</Tag>
                                     </div>

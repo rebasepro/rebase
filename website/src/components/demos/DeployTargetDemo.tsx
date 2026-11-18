@@ -30,8 +30,8 @@ const TARGETS: Target[] = [
         subtitle: "dt.vps.sub",
         lines: [
             { kind: "cmd", text: "rebase build" },
-            { kind: "out", text: "collections   12 compiled" },
-            { kind: "out", text: "bundle        dist-bundle/  (format 2)" },
+            { kind: "out", text: "tables        12 compiled" },
+            { kind: "out", text: "bundle        dist-bundle/  (format 3)" },
             { kind: "cmd", text: "rsync -a dist-bundle docker-compose.yml root@box.example.eu:/srv/api/" },
             { kind: "cmd", text: "ssh root@box.example.eu 'cd /srv/api && docker compose up -d'" },
             { kind: "out", text: "✔ db    postgres:18-alpine   healthy" },
