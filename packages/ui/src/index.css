@@ -50,6 +50,19 @@ svg.lucide:not(.stroke-keep):not([width="8"]):not([width="9"]):not([width="10"])
     stroke-width: 1.5;
 }
 
+/* A dot-grid ground for a well: a map, a canvas, anything drawn on rather than
+   read. Dots in the strong hairline at a 16px pitch, so they switch with the
+   theme and stay one step quieter than anything placed on them. Pair it with
+   the well's own fill (`bg-surface-well bg-dot-grid`).
+
+   A plain class rather than `@utility`: consumers import this sheet into
+   `layer(base)`, and Tailwind refuses an `@utility` nested in a layer. It sets
+   only the image and its size, so a `bg-*` colour utility beside it composes. */
+.bg-dot-grid {
+    background-image: radial-gradient(circle, var(--hairline-strong) 1px, transparent 1px);
+    background-size: 16px 16px;
+}
+
 /* Optical ladder: weight comes down as size comes down, tracking tightens as
    size goes up. Seven consecutive levels of semibold was a Rubik-era setting,
    and holding 600 all the way down to text-sm made every heading shout equally

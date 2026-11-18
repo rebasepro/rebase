@@ -5,3 +5,7 @@ export { TimeSeriesChart } from "./TimeSeriesChart";
 export type { TimeSeries, TimeSeriesPoint } from "./TimeSeriesChart";
 export { BarChart } from "./BarChart";
 export type { Bar } from "./BarChart";
+export { StatTile } from "./StatTile";
+export type { StatTileProps } from "./StatTile";
+export { TimeBars } from "./TimeBars";
+export type { TimeBucket, TimeBarsMarker } from "./TimeBars";

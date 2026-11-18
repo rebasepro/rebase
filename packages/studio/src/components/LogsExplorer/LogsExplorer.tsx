@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Alert, ArrowDownToLineIcon, Checkbox, cls, defaultBorderMixin, Label, Select, SelectItem, TextField, Typography } from "@rebasepro/ui";
+import { Alert, ArrowDownToLineIcon, Checkbox, cls, defaultBorderMixin, Label, Select, SelectItem, StatusDot, TextField, Typography, type StatusTone } from "@rebasepro/ui";
 import { idNum, useLogTail } from "./useLogTail";
 import type { LogTransport } from "./useLogTail";
 
@@ -24,10 +24,10 @@ const TRANSPORT_LABELS: Record<LogTransport, string> = {
     polling: "Polling"
 };
 
-const TRANSPORT_DOTS: Record<LogTransport, string> = {
-    connecting: "bg-amber-500",
-    live: "bg-green-500",
-    polling: "bg-surface-400"
+const TRANSPORT_TONES: Record<LogTransport, StatusTone> = {
+    connecting: "busy",
+    live: "ok",
+    polling: "idle"
 };
 
 const TRANSPORT_TITLES: Record<LogTransport, string> = {
@@ -181,14 +181,10 @@ export function LogsExplorer() {
                     nothing in it is ambiguous — quiet server, or a stream that
                     dropped — and this is the difference. */}
                 <div className="ml-auto pl-4 flex items-center gap-3">
-                    <div className="flex items-center gap-1.5" title={TRANSPORT_TITLES[transport]}>
-                        <span
-                            aria-hidden
-                            className={cls("w-1.5 h-1.5 rounded-full shrink-0", TRANSPORT_DOTS[transport])}
-                        />
-                        <Typography variant="caption" color="secondary">
+                    <div className="flex items-center" title={TRANSPORT_TITLES[transport]}>
+                        <StatusDot tone={TRANSPORT_TONES[transport]} size="small">
                             {TRANSPORT_LABELS[transport]}
-                        </Typography>
+                        </StatusDot>
                     </div>
                     <div className="min-w-0" title={INSTANCE_TITLE}>
                         <Typography variant="caption" color="secondary" className="block truncate max-w-[18rem]">

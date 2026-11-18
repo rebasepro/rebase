@@ -1750,6 +1750,7 @@ export const hi: RebaseTranslations = {
     insights_change_down: "गिरावट: {{change}}",
     insights_change_none: "कोई बदलाव नहीं",
     insights_no_data: "इस अवधि के लिए कोई डेटा नहीं",
+    insights_nothing_recorded: "कुछ भी दर्ज नहीं",
 
     // ─── Icon button names ───────────────────────────────────────
     add_to_favourites: "पसंदीदा में जोड़ें",
