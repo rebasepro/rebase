@@ -757,6 +757,8 @@ export const hi: RebaseTranslations = {
     auth_email_change_continue: "जारी रखें",
     auth_email_change_unavailable: "इस बैकएंड पर ईमेल पता बदलना उपलब्ध नहीं है।",
     auth_signing_in_with_link: "आपको साइन इन किया जा रहा है…",
+    auth_continue_with_platform: "Rebase Cloud के साथ जारी रखें",
+    auth_platform_signin_hint: "यह प्रोजेक्ट Rebase Cloud पर चलता है। इसके मालिक कंसोल में प्रोजेक्ट के पेज से साइन इन करते हैं, बिना कोई पासवर्ड सेट किए।",
     auth_magic_link_failed_title: "साइन-इन लिंक स्वीकार नहीं हुआ",
     auth_magic_link_unavailable: "इस बैकएंड पर साइन-इन लिंक उपलब्ध नहीं हैं।",
     reset_mfa_title: "दो-चरणीय सत्यापन रीसेट करें",

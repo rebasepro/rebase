@@ -80,6 +80,25 @@ export const PLATFORM_TOKEN_SCOPES: readonly AdminScope[] = ["cron:read", "cron:
  */
 export const PLATFORM_MCP_SCOPES: readonly string[] = ["data:read", "data:write", "data:delete"];
 
+/**
+ * What a platform token can be granted at the sign-in door, and only there:
+ * `POST /auth/platform-signin` (`platform-signin-routes.ts`), which turns it
+ * into an ordinary session for the person it names, with the `admin` role.
+ *
+ * This is the one scope that makes a platform token worth a person of the app,
+ * so it is held tighter than the others: the token must name the person's
+ * email, carry a `jti`, live at most {@link PLATFORM_SIGNIN_MAX_LIFETIME_SECONDS},
+ * and is spent by its first use. The control plane mints it only for an owner
+ * or admin of the organization that owns the project — someone who could
+ * already set `REBASE_ADMIN_EMAIL` and redeploy, which is the reach this
+ * grants, without the password nobody knew to choose. Never on an admin
+ * surface or the MCP endpoint: neither lists it.
+ */
+export const PLATFORM_SIGNIN_SCOPES: readonly string[] = ["auth:admin-signin"];
+
+/** The longest `exp - iat` a sign-in token may declare. */
+export const PLATFORM_SIGNIN_MAX_LIFETIME_SECONDS = 120;
+
 /** The longest `exp - iat` a platform token may declare. */
 export const PLATFORM_TOKEN_MAX_LIFETIME_SECONDS = 600;
 
@@ -89,6 +108,12 @@ const CLOCK_SKEW_SECONDS = 60;
 /** The environment variables a platform sets to turn platform tokens on. */
 export const PLATFORM_TOKEN_KEY_ENV = "REBASE_PLATFORM_TOKEN_KEY";
 export const PLATFORM_TOKEN_AUDIENCE_ENV = "REBASE_PLATFORM_TOKEN_AUDIENCE";
+/**
+ * Where the admin panel's "Continue with Rebase Cloud" goes: the project's page
+ * in the platform's console, which mints a sign-in token and comes back. Set by
+ * the platform with the other two; optional.
+ */
+export const PLATFORM_SIGNIN_URL_ENV = "REBASE_PLATFORM_SIGNIN_URL";
 
 /** What this server verifies platform tokens against. */
 export interface PlatformTokenConfig {
@@ -99,6 +124,8 @@ export interface PlatformTokenConfig {
     publicKeys: string[];
     /** This project, as the platform names it in `aud`. */
     audience: string;
+    /** {@link PLATFORM_SIGNIN_URL_ENV}, when the platform set a valid http(s) URL. */
+    signInUrl?: string;
 }
 
 /** A verified platform token, as the request will act. */
@@ -109,6 +136,14 @@ export interface PlatformCaller {
     scopes: string[];
     /** `jti`, when the platform set one — what an audit line quotes. */
     tokenId?: string;
+    /**
+     * The person's email, when the platform set one: the control plane's
+     * verified address for `sub`. Only the sign-in door reads it.
+     */
+    email?: string;
+    /** `iat` and `exp`, in seconds. */
+    issuedAt: number;
+    expiresAt: number;
 }
 
 /** Why a presented platform token does not authenticate. */
@@ -190,12 +225,24 @@ export async function platformTokensFromEnv(
         return undefined;
     }
 
+    const rawSignInUrl = env[PLATFORM_SIGNIN_URL_ENV]?.trim();
+    let signInUrl: string | undefined;
+    if (rawSignInUrl) {
+        try {
+            const parsed = new URL(rawSignInUrl);
+            if (parsed.protocol === "https:" || parsed.protocol === "http:") signInUrl = parsed.toString();
+        } catch {
+            // Reported below.
+        }
+        if (!signInUrl) logger.warn(`[Auth] ${PLATFORM_SIGNIN_URL_ENV} is not an http(s) URL, so the login screen will not link to it.`);
+    }
+
     logger.info("Platform tokens accepted on admin surfaces", {
         audience,
         keys: publicKeys.length,
         scopes: PLATFORM_TOKEN_SCOPES
     });
-    return { publicKeys, audience };
+    return { publicKeys, audience, ...(signInUrl ? { signInUrl } : {}) };
 }
 
 /** Narrow a claim to a non-empty string. */
@@ -267,7 +314,15 @@ export async function verifyPlatformToken(
     }
 
     const tokenId = stringClaim(claims, "jti");
-    return { subject, scopes, ...(tokenId ? { tokenId } : {}) };
+    const email = stringClaim(claims, "email");
+    return {
+        subject,
+        scopes,
+        issuedAt: iat,
+        expiresAt: exp,
+        ...(tokenId ? { tokenId } : {}),
+        ...(email ? { email } : {})
+    };
 }
 
 /**

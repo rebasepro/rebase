@@ -42,6 +42,8 @@ export interface SeedAdminEnv {
     REBASE_ADMIN_PASSWORD?: string;
     /** Decides whether the seed is this deployment's way in at all. */
     NODE_ENV?: string;
+    /** Set by a platform that signs the project's owners in; see `platform-token.ts`. */
+    REBASE_PLATFORM_TOKEN_KEY?: string;
 }
 
 export type SeedAdminOutcome =
@@ -79,7 +81,10 @@ export async function seedInitialAdmin(
         // means an empty table with no seed is a deployment nobody can
         // administer yet — say so at boot, once, while the operator is still
         // looking at the log.
-        if (users && !isBootstrapWindowOpen(env)) {
+        // On a platform that signs the project's owners in (its key is set,
+        // see `platform-signin-routes.ts`) an empty table is not a dead end:
+        // the owner opens the admin from the console.
+        if (users && !isBootstrapWindowOpen(env) && !env.REBASE_PLATFORM_TOKEN_KEY?.trim()) {
             try {
                 const existing = await users.listUsers({ limit: 1 });
                 if ((existing.total ?? existing.users.length) === 0) {

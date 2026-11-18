@@ -886,6 +886,8 @@ export interface RebaseTranslations {
     auth_email_change_continue?: string;
     auth_email_change_unavailable?: string;
     auth_signing_in_with_link?: string;
+    auth_continue_with_platform?: string;
+    auth_platform_signin_hint?: string;
     auth_magic_link_failed_title?: string;
     auth_magic_link_unavailable?: string;
     reset_mfa_title?: string;

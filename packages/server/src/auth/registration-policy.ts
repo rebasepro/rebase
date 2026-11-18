@@ -106,8 +106,9 @@ export async function isOnlyUser(repo: UserPresenceRepository, uid: string): Pro
  */
 export const SETUP_REQUIRED_MESSAGE =
     "This deployment has no administrator yet, and in production the first account is not " +
-    "promoted automatically. Set REBASE_ADMIN_EMAIL and REBASE_ADMIN_PASSWORD before the first " +
-    "boot, or assign the admin role with the service key.";
+    "promoted automatically. On Rebase Cloud, open the admin from the project's page in the " +
+    "console, which signs the project's owners in. Self-hosted, set REBASE_ADMIN_EMAIL and " +
+    "REBASE_ADMIN_PASSWORD before the first boot, or assign the admin role with the service key.";
 
 /** The full predicate, for callers that already know whether setup is needed. */
 export function isRegistrationOpen(policy: RegistrationPolicy): boolean {

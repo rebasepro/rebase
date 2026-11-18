@@ -137,6 +137,12 @@ the runtime image ships without the CLI.
 Every platform guide on this site points here, because this is the one step that
 has no recovery from the outside.
 
+On Rebase Cloud there is nothing to set: the owners and admins of the
+organization that owns the project open its admin panel from the project's page
+in the console (**Open CMS**, or **Continue with Rebase Cloud** on the admin's
+own login screen) and are signed in as admins. This section is for every other
+place you run Rebase.
+
 A fresh database has no users, and outside production the registration policy
 admits the first sign-up and promotes it to admin. It has to: bootstrapping an
 admin needs a caller who is already signed in, so an empty database with no such

@@ -678,6 +678,9 @@ export function LoginView({
                                             </Typography>
                                         </label>
                                     )}
+                                    {authController.platformSignIn && (
+                                        <PlatformSignIn platformSignIn={authController.platformSignIn} disabled={disabled}/>
+                                    )}
                                     <LoginButton
                                         disabled={disabled}
                                         text={"Sign in with email"}
@@ -699,6 +702,13 @@ export function LoginView({
                                             </Typography>
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {/* Form-first: the platform's sign-in, above the form */}
+                            {formFirst && mode === "login" && authController.platformSignIn && (
+                                <div className="w-full mb-5">
+                                    <PlatformSignIn platformSignIn={authController.platformSignIn} disabled={disabled}/>
                                 </div>
                             )}
 
@@ -1948,6 +1958,38 @@ function VerifyEmailView({
             <Button onClick={onDone} variant="filled" color="primary" size="large" className="w-full">
                 {t("auth_continue_to_sign_in")}
             </Button>
+        </div>
+    );
+}
+
+/**
+ * "Continue with Rebase Cloud": on a backend whose platform signs the
+ * project's owners in, the way in for the person who owns it, who holds no
+ * password here. It goes to the project's page in the platform's console,
+ * which comes back with a sign-in token (`auth/platform-signin.ts`). Without
+ * a `url` only the line that explains it is shown.
+ */
+function PlatformSignIn({ platformSignIn, disabled }: { platformSignIn: { url?: string }, disabled?: boolean }) {
+    const { t } = useTranslation();
+    const url = platformSignIn.url;
+    return (
+        <div className="w-full flex flex-col gap-2">
+            {url && (
+                <Button
+                    component="a"
+                    href={url}
+                    variant="filled"
+                    color="primary"
+                    size="large"
+                    className="w-full"
+                    disabled={disabled}
+                >
+                    {t("auth_continue_with_platform")}
+                </Button>
+            )}
+            <Typography variant="caption" color="secondary" className="text-center">
+                {t("auth_platform_signin_hint")}
+            </Typography>
         </div>
     );
 }

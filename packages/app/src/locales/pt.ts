@@ -762,6 +762,8 @@ export const pt: RebaseTranslations = {
     auth_email_change_continue: "Continuar",
     auth_email_change_unavailable: "A alteração do endereço de email não está disponível neste backend.",
     auth_signing_in_with_link: "A iniciar a sua sessão…",
+    auth_continue_with_platform: "Continuar com o Rebase Cloud",
+    auth_platform_signin_hint: "Este projeto corre no Rebase Cloud. Os seus proprietários entram a partir da página do projeto na consola, sem palavra-passe para definir.",
     auth_magic_link_failed_title: "Ligação de início de sessão não aceite",
     auth_magic_link_unavailable: "As ligações de início de sessão não estão disponíveis neste backend.",
     reset_mfa_title: "Repor a verificação em dois passos",

@@ -77,14 +77,15 @@ The `cms` field of the app in `rebase.json` is what the console's *Open CMS*
 link points at; on an app with a hostname it is a path on that hostname.
 
 > **IMPORTANT FOR AGENTS:** Every Cloud project runs with `NODE_ENV=production`,
-> where there is no first-visit bootstrap screen: the first account to register
-> is **not** promoted to admin, and an empty user table refuses the bootstrap
-> registration with `SETUP_REQUIRED`. The owner names the first admin before the
-> first deploy — `rebase cloud env set REBASE_ADMIN_EMAIL=…` and
-> `rebase cloud env set REBASE_ADMIN_PASSWORD=… --secret` (at least 12
-> characters) — and the runtime creates that account once, while the user table
-> is empty. **Never choose these values, or register an account, on the user's
-> behalf.**
+> where the first account to register is **not** promoted to admin. A Cloud
+> project needs no admin set up for that: its owners and admins (the owning
+> organization's `owner` and `admin` roles) open the admin panel from the
+> project's page in the console — **Open CMS**, or the admin's own
+> **Continue with Rebase Cloud** — and are signed in as `admin`, the account
+> created on first use. Send the user there; do not ask them for
+> `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`, and **never choose those values,
+> or register an account, on the user's behalf.** The env pair still works on
+> Cloud for an admin that is not an organization member.
 
 ---
 

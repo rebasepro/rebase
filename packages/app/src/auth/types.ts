@@ -111,6 +111,8 @@ export interface ClientAuth {
     /** Optional so a hand-built auth client need not implement it. */
     verifyMagicLink?(token: string): Promise<unknown>;
     /** Optional so a hand-built auth client need not implement it. */
+    signInWithPlatformToken?(token: string): Promise<unknown>;
+    /** Optional so a hand-built auth client need not implement it. */
     changeEmail?(newEmail: string): Promise<{ pendingEmail: string; expiresAt: string }>;
     /** Optional so a hand-built auth client need not implement it. */
     confirmEmailChange?(token: string): Promise<{ email: string; removedProviders: string[] }>;
