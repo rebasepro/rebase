@@ -1641,3 +1641,20 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
     return router;
 }
+
+/**
+ * A storage hook's reader with nothing but reads on it: `table(slug).find`
+ * and `findById`. The object it wraps can write; this one cannot, whatever
+ * the hook does with it at run time.
+ */
+export function readOnlyAuthorizeData(data: StorageAuthorizeData): StorageAuthorizeData {
+    return Object.freeze({
+        table(slug: string) {
+            const table = data.table(slug);
+            return Object.freeze({
+                find: (query?: Record<string, unknown>) => table.find(query),
+                findById: (id: string) => table.findById(id)
+            });
+        }
+    });
+}
