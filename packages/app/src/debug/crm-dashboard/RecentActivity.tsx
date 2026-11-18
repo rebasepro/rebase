@@ -121,7 +121,7 @@ export function RecentActivity({
                                                 {activity.values?.description || actType || "Activity"}
                                             </Typography>
                                             {activity.values?.createdAt && (
-                                                <Typography variant="caption" color="secondary" className="text-[10px]">
+                                                <Typography variant="caption" color="secondary" className="text-xs">
                                                     {relativeTime(activity.values.createdAt)}
                                                 </Typography>
                                             )}

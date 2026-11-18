@@ -140,7 +140,7 @@ export const SchemaBrowser = ({
                                                 {table.columns.map(col => (
                                                     <div key={col.name} className="flex items-center p-1 group pl-2 hover:bg-surface-hover rounded-r relative min-h-[28px]">
                                                         <svg className="w-3 h-3 mr-1.5 text-text-disabled dark:text-text-disabled-dark shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 4.5v15m6-15v15m-10.5-1.5h15c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125h-15c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125Z"/></svg>
-                                                        <Typography variant="caption" className="text-text-primary dark:text-text-primary-dark text-[11px] truncate flex-grow mr-2">{col.name}</Typography>
+                                                        <Typography variant="caption" className="text-text-primary dark:text-text-primary-dark text-xs truncate flex-grow mr-2">{col.name}</Typography>
                                                         <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-[9px] truncate mr-1 uppercase shrink-0" title={col.dataType}>{col.dataType}</Typography>
                                                         <IconButton aria-label={t("copy_column_name")}
                                                             size="smallest"

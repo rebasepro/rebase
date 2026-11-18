@@ -184,7 +184,7 @@ export function Tab({
                     "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-hover"
                 ),
                 variant === "pill" && cls(
-                    "px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors",
+                    "px-2 py-0.5 rounded-md text-xs font-medium transition-colors",
                     "data-[state=active]:bg-primary/10 data-[state=active]:text-primary dark:data-[state=active]:bg-primary/20 dark:data-[state=active]:text-primary",
                     "text-text-disabled dark:text-text-disabled-dark hover:text-text-secondary dark:hover:text-text-secondary-dark"
                 ),

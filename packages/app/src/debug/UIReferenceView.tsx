@@ -320,7 +320,7 @@ export function UIReferenceView() {
                     <div className="flex flex-col gap-3">
                         {TYPE_LADDER.map(([v, spec]) => (
                             <div key={v} className={cls("flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4 border-b pb-3 last:border-0", defaultBorderMixin)}>
-                                <span className="w-56 shrink-0 text-[11px] text-text-secondary dark:text-text-secondary-dark font-mono">
+                                <span className="w-56 shrink-0 text-xs text-text-secondary dark:text-text-secondary-dark font-mono">
                                     {v} <span className="text-text-disabled dark:text-text-disabled-dark">· {spec}</span>
                                 </span>
                                 {/* `component="p"` keeps the variant's styling but not its
@@ -376,11 +376,11 @@ export function UIReferenceView() {
 
                         <div className="mt-6 flex flex-wrap items-end gap-10">
                             <div>
-                                <span className="text-[11px] text-text-secondary dark:text-text-secondary-dark font-mono">stat · 30 · 600 · tabular</span>
+                                <span className="text-xs text-text-secondary dark:text-text-secondary-dark font-mono">stat · 30 · 600 · tabular</span>
                                 <Typography variant="stat" component="div" className="block mt-1">1,284</Typography>
                             </div>
                             <div>
-                                <span className="text-[11px] text-text-secondary dark:text-text-secondary-dark font-mono">display-2 · 36→64 fluid · 600 · the one greeting a page has</span>
+                                <span className="text-xs text-text-secondary dark:text-text-secondary-dark font-mono">display-2 · 36→64 fluid · 600 · the one greeting a page has</span>
                                 <div className="text-display-2 font-headers font-semibold mt-1">Good afternoon, Zulu.</div>
                             </div>
                         </div>

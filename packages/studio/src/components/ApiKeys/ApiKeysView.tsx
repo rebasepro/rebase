@@ -428,7 +428,7 @@ function PersonalKeysOff() {
             <Typography variant="caption" color="disabled" className="max-w-[34ch]">
                 {t("studio_api_keys_personal_off_body")}
             </Typography>
-            <Typography variant="mono" component="div" className="text-[11px] px-2 py-1 rounded-md bg-surface-field">
+            <Typography variant="mono" component="div" className="text-xs px-2 py-1 rounded-md bg-surface-field">
                 {"auth: { personalKeys: true }"}
             </Typography>
         </div>
@@ -484,10 +484,10 @@ function KeyListItem({ apiKey, catalogue, selected, onClick }: {
                     <Typography variant="body2" className="truncate font-medium text-[13px]">{apiKey.name}</Typography>
                     {runsAsAdmin(apiKey) && <AdminChip/>}
                 </div>
-                <Typography variant="caption" color="secondary" className="truncate text-[11px] font-mono">{apiKey.key_prefix}•••</Typography>
+                <Typography variant="caption" color="secondary" className="truncate text-xs font-mono">{apiKey.key_prefix}•••</Typography>
             </div>
             <div className="shrink-0">
-                <Typography variant="caption" color="disabled" className="text-[10px]">
+                <Typography variant="caption" color="disabled" className="text-xs">
                     {scopeBrief(t, groupKeyScopes(apiKey.scopes, catalogue))}
                 </Typography>
             </div>
@@ -522,7 +522,7 @@ function KeyDetail({ apiKey, catalogue, revoking, onRevoke }: {
                             <Typography variant="subtitle1" className="font-semibold truncate">{apiKey.name}</Typography>
                             {runsAsAdmin(apiKey) && <AdminChip/>}
                         </div>
-                        <Typography variant="caption" color="secondary" className="font-mono text-[11px]">{apiKey.key_prefix}•••</Typography>
+                        <Typography variant="caption" color="secondary" className="font-mono text-xs">{apiKey.key_prefix}•••</Typography>
                     </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -564,7 +564,7 @@ function KeyDetail({ apiKey, catalogue, revoking, onRevoke }: {
                         ? <StatCard label={t("studio_api_keys_stat_created_by")} value={apiKey.created_by} mono/>
                         : <StatCard label={t("studio_api_keys_stat_owner")} value={apiKey.owner_uid ?? "—"} mono/>}
                 </div>
-                <Typography variant="caption" color="secondary" className="block mt-2 text-[11px] leading-snug">
+                <Typography variant="caption" color="secondary" className="block mt-2 text-xs leading-snug">
                     {t("studio_api_keys_rate_limit_scope")}
                 </Typography>
             </div>
@@ -595,12 +595,12 @@ function KeyDetail({ apiKey, catalogue, revoking, onRevoke }: {
                                                 <Typography variant="body2" className="text-[13px] font-medium truncate">
                                                     {held.label}
                                                 </Typography>
-                                                <Typography variant="caption" color="disabled" className="font-mono text-[11px] shrink-0">
+                                                <Typography variant="caption" color="disabled" className="font-mono text-xs shrink-0">
                                                     {held.scope}
                                                 </Typography>
                                             </div>
                                             {held.description && (
-                                                <Typography variant="caption" color="secondary" className="block text-[11px] leading-snug">
+                                                <Typography variant="caption" color="secondary" className="block text-xs leading-snug">
                                                     {held.description}
                                                 </Typography>
                                             )}
@@ -635,7 +635,7 @@ function BlockHeading({ icon, label, hint }: { icon: React.ReactNode; label: str
         <div className="flex items-center gap-2 mb-2 min-w-0">
             {icon}
             <Typography variant="body2" className="text-[13px] font-medium shrink-0">{label}</Typography>
-            <Typography variant="caption" color="secondary" className="text-[11px] truncate">{hint}</Typography>
+            <Typography variant="caption" color="secondary" className="text-xs truncate">{hint}</Typography>
         </div>
     );
 }
@@ -682,7 +682,7 @@ function RolesBlock({ apiKey }: { apiKey: ApiKeyMasked }) {
                     </Alert>
                 )
                 : (
-                    <Typography variant="caption" color="secondary" className="block mt-1.5 text-[11px] leading-snug">
+                    <Typography variant="caption" color="secondary" className="block mt-1.5 text-xs leading-snug">
                         {apiKey.roles.length === 0 ? t("studio_api_keys_roles_service_only") : t("studio_api_keys_roles_service_plus")}
                     </Typography>
                 )}

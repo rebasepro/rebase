@@ -749,29 +749,29 @@ totalPolicies };
                                                 <ShieldIcon size={iconSize.smallest} className="text-primary"/>
                                                 <Typography variant="body2" className="font-semibold text-[13px]">RLS Studio</Typography>
                                             </div>
-                                            <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px] leading-relaxed block">
+                                            <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-xs leading-relaxed block">
                                                 Manage Row Level Security policies for your PostgreSQL tables. Enable RLS and create fine-grained access policies.
                                             </Typography>
                                         </div>
 
                                         <div className="space-y-2">
                                             <div className={cls("p-2.5 rounded border bg-surface-card flex items-center justify-between", defaultBorderMixin)}>
-                                                <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px]">Total tables</Typography>
+                                                <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-xs">Total tables</Typography>
                                                 <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.total}</Typography>
                                             </div>
                                             <div className={cls("p-2.5 rounded border bg-surface-card flex items-center justify-between", defaultBorderMixin)}>
-                                                <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px]">RLS enabled</Typography>
+                                                <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-xs">RLS enabled</Typography>
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                                                     <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.enabled}</Typography>
                                                 </div>
                                             </div>
                                             <div className={cls("p-2.5 rounded border bg-surface-card flex items-center justify-between", defaultBorderMixin)}>
-                                                <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px]">Tables with policies</Typography>
+                                                <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-xs">Tables with policies</Typography>
                                                 <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.withPolicies}</Typography>
                                             </div>
                                             <div className={cls("p-2.5 rounded border bg-surface-card flex items-center justify-between", defaultBorderMixin)}>
-                                                <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px]">Total policies</Typography>
+                                                <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-xs">Total policies</Typography>
                                                 <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.totalPolicies}</Typography>
                                             </div>
                                         </div>
@@ -781,10 +781,10 @@ totalPolicies };
                                             <div className={cls("p-2.5 rounded border border-yellow-200 dark:border-yellow-900/50 bg-yellow-50 dark:bg-yellow-900/20 flex items-start gap-2", defaultBorderMixin)}>
                                                 <AlertTriangleIcon size={14} className="text-yellow-600 dark:text-yellow-500 mt-0.5 shrink-0"/>
                                                 <div>
-                                                    <Typography variant="caption" className="text-yellow-800 dark:text-yellow-400 text-[11px] font-semibold block">
+                                                    <Typography variant="caption" className="text-yellow-800 dark:text-yellow-400 text-xs font-semibold block">
                                                         {rlsStats.total - rlsStats.enabled} table{rlsStats.total - rlsStats.enabled > 1 ? "s" : ""} without RLS
                                                     </Typography>
-                                                    <Typography variant="caption" className="text-yellow-700 dark:text-yellow-600 text-[10px] block mt-0.5">
+                                                    <Typography variant="caption" className="text-yellow-700 dark:text-yellow-600 text-xs block mt-0.5">
                                                         These tables have no row-level access control. If auth enforcement is disabled, data may be publicly accessible.
                                                     </Typography>
                                                 </div>
@@ -795,10 +795,10 @@ totalPolicies };
                                             <div className={cls("p-2.5 rounded border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-900/20 flex items-start gap-2", defaultBorderMixin)}>
                                                 <ShieldIcon size={14} className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0"/>
                                                 <div>
-                                                    <Typography variant="caption" className="text-blue-800 dark:text-blue-300 text-[11px] font-semibold block">
+                                                    <Typography variant="caption" className="text-blue-800 dark:text-blue-300 text-xs font-semibold block">
                                                         {rlsStats.enabled - rlsStats.withPolicies} table{rlsStats.enabled - rlsStats.withPolicies > 1 ? "s" : ""} with RLS but no policies
                                                     </Typography>
-                                                    <Typography variant="caption" className="text-blue-700 dark:text-blue-500 text-[10px] block mt-0.5">
+                                                    <Typography variant="caption" className="text-blue-700 dark:text-blue-500 text-xs block mt-0.5">
                                                         RLS is enabled but no permissive policies exist. All access is denied by default (Postgres deny-all).
                                                     </Typography>
                                                 </div>
@@ -1167,7 +1167,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                                 which Postgres rewrites. */}
                                                             {policy.drift && policy.drift.length > 0 && (
                                                                 <Tooltip title={t("studio_rls_drift_tooltip", { fields: policy.drift.join(", ") })}>
-                                                                    <div className="px-1.5 py-0.5 rounded text-[10px] bg-orange-500/10 text-orange-600 border border-orange-500/20 shrink-0">
+                                                                    <div className="px-1.5 py-0.5 rounded text-xs bg-orange-500/10 text-orange-600 border border-orange-500/20 shrink-0">
                                                                         {`${t("studio_rls_drift")}: ${policy.drift.join(", ")}`}
                                                                     </div>
                                                                 </Tooltip>

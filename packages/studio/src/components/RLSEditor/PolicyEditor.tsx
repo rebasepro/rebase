@@ -189,7 +189,7 @@ export const PolicyEditor = ({
                         {/* Behavior */}
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">
-                                {t("studio_policy_behavior")} <code className="text-[10px] bg-hairline text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">AS</code>
+                                {t("studio_policy_behavior")} <code className="text-xs bg-hairline text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">AS</code>
                             </Typography>
                             <Select
                                 value={behavior}
@@ -215,7 +215,7 @@ export const PolicyEditor = ({
                     {/* Command */}
                     <div className="flex flex-col gap-1.5">
                         <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">
-                            {t("studio_policy_command")} <code className="text-[10px] bg-hairline text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">FOR</code>
+                            {t("studio_policy_command")} <code className="text-xs bg-hairline text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">FOR</code>
                         </Typography>
                         <div className="flex flex-wrap gap-1.5">
                             {COMMAND_OPTIONS.map(cmd => (
@@ -236,7 +236,7 @@ export const PolicyEditor = ({
                     {/* Roles */}
                     <div className="flex flex-col gap-1.5">
                         <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">
-                            {t("studio_policy_target_roles")} <code className="text-[10px] bg-hairline text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">TO</code>
+                            {t("studio_policy_target_roles")} <code className="text-xs bg-hairline text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">TO</code>
                         </Typography>
                         <MultiSelect
                             size="small"
@@ -376,15 +376,15 @@ export const PolicyEditor = ({
                             <ul className="list-disc pl-5 space-y-2 text-sm text-text-secondary dark:text-text-secondary-dark font-normal">
                                 <li>
                                     <code className="bg-surface-well px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_UID_SQL}</code>
-                                    <span className="block mt-0.5">{t("studio_policy_help_auth_uid")} <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">{RLS_UID_SQL} = uid</code></span>
+                                    <span className="block mt-0.5">{t("studio_policy_help_auth_uid")} <code className="bg-surface-well px-1 py-0.5 rounded text-xs">{RLS_UID_SQL} = uid</code></span>
                                 </li>
                                 <li>
                                     <code className="bg-surface-well px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_JWT_SQL}</code>
-                                    <span className="block mt-0.5">{t("studio_policy_help_auth_jwt")} <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">{RLS_JWT_SQL} -&gt;&gt; &apos;email&apos; = &apos;admin@example.com&apos;</code></span>
+                                    <span className="block mt-0.5">{t("studio_policy_help_auth_jwt")} <code className="bg-surface-well px-1 py-0.5 rounded text-xs">{RLS_JWT_SQL} -&gt;&gt; &apos;email&apos; = &apos;admin@example.com&apos;</code></span>
                                 </li>
                                 <li>
                                     <code className="bg-surface-well px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_ROLES_SQL}</code>
-                                    <span className="block mt-0.5">{t("studio_policy_help_auth_roles")} <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">string_to_array({RLS_ROLES_SQL}, &apos;,&apos;) @&gt; ARRAY[&apos;admin&apos;]</code></span>
+                                    <span className="block mt-0.5">{t("studio_policy_help_auth_roles")} <code className="bg-surface-well px-1 py-0.5 rounded text-xs">string_to_array({RLS_ROLES_SQL}, &apos;,&apos;) @&gt; ARRAY[&apos;admin&apos;]</code></span>
                                 </li>
                             </ul>
                         </Paper>

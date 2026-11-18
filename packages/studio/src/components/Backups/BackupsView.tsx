@@ -320,7 +320,7 @@ export function BackupsView() {
                                             <DatabaseIcon size={iconSize.small} className="text-surface-400 shrink-0"/>
                                             <div className="flex-1 min-w-0">
                                                 <Typography variant="body2" className="truncate font-medium font-mono text-[12px]">{backup.name}</Typography>
-                                                <Typography variant="caption" color="secondary" className="text-[11px]">
+                                                <Typography variant="caption" color="secondary" className="text-xs">
                                                     {formatDate(backup.createdAt)} · {formatSize(backup.sizeBytes)}
                                                 </Typography>
                                             </div>

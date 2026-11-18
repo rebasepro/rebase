@@ -713,7 +713,7 @@ export function CrmDashboardDemo() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <Typography variant="body2" className="font-medium truncate">{clientInfo.name}</Typography>
-                                    <Typography variant="caption" color="secondary" className="truncate text-[11px] block">{clientInfo.email}</Typography>
+                                    <Typography variant="caption" color="secondary" className="truncate text-xs block">{clientInfo.email}</Typography>
                                 </div>
                             </div>
                         </Card>
@@ -806,7 +806,7 @@ export function CrmDashboardDemo() {
                                         <div className="flex-1 min-w-0">
                                             <Typography variant="body2" className="truncate font-medium leading-snug">{t.values.title}</Typography>
                                             {t.values.dueDate && (
-                                                <Typography variant="caption" color="secondary" className="text-[10px] block mt-0.5">Due: {t.values.dueDate}</Typography>
+                                                <Typography variant="caption" color="secondary" className="text-xs block mt-0.5">Due: {t.values.dueDate}</Typography>
                                             )}
                                         </div>
                                     </div>

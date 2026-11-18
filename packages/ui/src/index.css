@@ -108,8 +108,12 @@ html.dark {
     @apply text-xs;
 }
 
+/* 12px since 2026-11-18. It was 11px, and caption is the kit's variant for
+   descriptions, hints and detail lines — sentences — so the rule stated above
+   `typography-micro` (the only tier under `text-xs` is the one that never
+   carries a sentence) was broken at the source, in about a hundred files. */
 .typography-caption {
-    @apply text-[11px] leading-[1.4];
+    @apply text-xs leading-[1.45];
 }
 
 .typography-label {

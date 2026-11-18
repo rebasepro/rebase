@@ -63,7 +63,7 @@ export const ExplainVisualizer: React.FC<ExplainVisualizerProps> = ({ plan, isRo
                         </Typography>
 
                         {plan["Relation Name"] && (
-                            <span className="font-mono text-[11px] text-text-secondary dark:text-text-secondary-dark px-2 py-0.5 rounded bg-hairline ml-2">
+                            <span className="font-mono text-xs text-text-secondary dark:text-text-secondary-dark px-2 py-0.5 rounded bg-hairline ml-2">
                                 on {plan["Relation Name"]} {plan.Alias && plan.Alias !== plan["Relation Name"] ? `(${plan.Alias})` : ""}
                             </span>
                         )}

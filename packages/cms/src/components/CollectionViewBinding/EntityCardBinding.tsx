@@ -230,14 +230,14 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                                     key={`${rel.propertyKey}-${item.id}`}
                                     size="smallest"
                                     colorScheme={rel.colorScheme}
-                                    className="!text-[10px] !leading-tight !py-0 shrink-0 max-w-[100px] truncate"
+                                    className="!text-xs !leading-tight !py-0 shrink-0 max-w-[100px] truncate"
                                 >
                                     {item.displayName}
                                 </Chip>
                             ))
                         ))}
                         {slots.relations.some(r => r.totalCount > r.items.length) && (
-                            <span className="text-[10px] text-surface-400 dark:text-surface-500 shrink-0">
+                            <span className="text-xs text-surface-400 dark:text-surface-500 shrink-0">
                                 +{slots.relations.reduce((acc, r) => acc + Math.max(0, r.totalCount - r.items.length), 0)}
                             </span>
                         )}
@@ -256,7 +256,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                     row has always shown it. It was the one slot the card resolved
                     and never rendered. */}
                 {slots.date && (
-                    <div className="mt-1 text-[10px] text-surface-500 dark:text-surface-400">
+                    <div className="mt-1 text-xs text-surface-500 dark:text-surface-400">
                         {slots.date.formatted}
                     </div>
                 )}

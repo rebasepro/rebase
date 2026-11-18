@@ -210,7 +210,7 @@ export function TaskTable({
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {dueLabel && (
                             <span className={cls(
-                                "inline-flex items-center gap-1 text-[11px]",
+                                "inline-flex items-center gap-1 text-xs",
                                 overdue && "text-red-600 dark:text-red-400 font-medium",
                                 soon && !overdue && "text-amber-600 dark:text-amber-400 font-medium",
                                 !overdue && !soon && "text-text-secondary dark:text-text-secondary-dark"
@@ -230,7 +230,7 @@ export function TaskTable({
                                 className={cls(
                                     "inline-flex items-center gap-1 text-primary hover:text-primary-dark",
                                     "dark:text-primary-light dark:hover:text-primary",
-                                    "hover:underline cursor-pointer text-[11px]"
+                                    "hover:underline cursor-pointer text-xs"
                                 )}
                                 onClick={(e) => {
                                     e.stopPropagation();

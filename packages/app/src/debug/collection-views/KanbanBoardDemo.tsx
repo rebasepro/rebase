@@ -31,15 +31,15 @@ function KanbanProjectCard({ item, isDragging, isGroupedOver, style }: BoardItem
                     <div className="line-clamp-2 text-sm font-medium">{project.name}</div>
                     <div className="text-xs text-surface-500 mt-1 line-clamp-2 opacity-80">{project.description}</div>
                     <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                        <Chip colorScheme={priorityCfg.color} size="smallest" outlined className="!text-[10px] !leading-tight !py-0">{priorityCfg.label}</Chip>
-                        {project.tags.slice(0, 2).map(tag => <Chip key={tag} size="smallest" colorScheme="cyan" className="!text-[10px] !leading-tight !py-0 max-w-[80px] truncate">{tag}</Chip>)}
+                        <Chip colorScheme={priorityCfg.color} size="smallest" outlined className="!text-xs !leading-tight !py-0">{priorityCfg.label}</Chip>
+                        {project.tags.slice(0, 2).map(tag => <Chip key={tag} size="smallest" colorScheme="cyan" className="!text-xs !leading-tight !py-0 max-w-[80px] truncate">{tag}</Chip>)}
                     </div>
                     <div className="flex items-center justify-between mt-1.5">
                         <div className="flex items-center gap-1">
                             <div className="w-4 h-4 rounded-full bg-surface-raised text-surface-500 flex items-center justify-center text-[8px] font-semibold">{project.assignee[0]}</div>
-                            <Typography variant="caption" color="secondary" className="truncate max-w-[80px] text-[10px]">{project.assignee}</Typography>
+                            <Typography variant="caption" color="secondary" className="truncate max-w-[80px] text-xs">{project.assignee}</Typography>
                         </div>
-                        <Typography variant="caption" className={cls("font-mono text-[10px]", isOverdue ? "text-red-500 font-semibold" : "text-surface-400")}>{project.dueDate}</Typography>
+                        <Typography variant="caption" className={cls("font-mono text-xs", isOverdue ? "text-red-500 font-semibold" : "text-surface-400")}>{project.dueDate}</Typography>
                     </div>
                 </div>
             </div>
