@@ -430,32 +430,17 @@ so. If an assistant seems to be reading the wrong database, call
 
 ### Which project a call acts on
 
-`activeProject` is machine-wide, and one server is often installed once for the
-whole machine. So every tool that acts on a project (everything but the
-`rebase_project_*` registry tools, `rebase_cloud_projects_list`,
-`rebase_cloud_provision` and `rebase_dev_logs`) resolves its project **per
-call**, and takes an optional `project` argument: a registered project's name,
-or a Rebase Cloud project's slug or id.
-
-The call is checked against the Rebase Cloud link (`.rebase/cloud.json`) of the
-directory the session works in, which is the client's first
-[root](https://modelcontextprotocol.io/specification/latest/client/roots), or
-else the server's working directory:
+`activeProject` is machine-wide, and one server is often installed once for the whole machine. So every tool that acts on a project (all but the `rebase_project_*` registry tools, `rebase_cloud_projects_list`, `rebase_cloud_provision` and `rebase_dev_logs`) resolves its project **per call**, and takes an optional `project`: a registered project's name, or a Rebase Cloud slug or id. The call is checked against the Cloud link (`.rebase/cloud.json`) of the directory the session works in: the client's first [root](https://modelcontextprotocol.io/specification/latest/client/roots), else the server's working directory.
 
 | The call | The session's directory | Result |
 |---|---|---|
 | names a project | is linked to the same project | runs on it |
 | names a project | is linked to another project | **refused**, nothing runs |
 | names no project | is linked to a project the active one is not | **refused**, nothing runs |
-| names no project | is linked; the active project is a local one in another directory | runs on the linked project |
-| names no project | is not linked | runs on the active project; a *write* to a Cloud project an earlier session selected is refused until the call names it |
+| names no project | is linked; the active project is a local one elsewhere | runs on the linked project |
+| names no project | is not linked | runs on the active project; a *write* to a Cloud project an earlier session selected needs the project named |
 
-A refusal names both projects and says how to call again.
-`rebase_project_current` reports the session's directory and its link under
-`session`. `rebase_cloud_env_set` and `rebase_cloud_rollback` pass the resolved
-project to the CLI with `--project`; `rebase_cloud_deploy` ships the directory
-it runs in, so it is refused when that directory is linked to a different
-project than the one the call resolved to.
+A refusal names both projects. `rebase_project_current` reports the session's directory and link under `session`. `rebase_cloud_env_set` and `rebase_cloud_rollback` pass the resolved project to the CLI with `--project`; `rebase_cloud_deploy` ships the directory it runs in, so it is refused when that directory's link is another project.
 
 Tokens are stored in that registry **in plaintext**. It is a file in your home
 directory holding admin credentials for every project you have registered; treat

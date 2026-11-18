@@ -18,10 +18,12 @@ project at the **target** before anything writes.
 
 ## 1. Generate the tables
 
-Introspect the Supabase database (its direct connection string, as the
-`postgres` role), or a local copy of it:
+Introspect the Supabase database, or a local copy of it. `SUPABASE_DB_URL`
+below is its direct connection string, as the `postgres` role (Supabase's
+dashboard: Connect → Direct connection); set it in your shell first:
 
 ```bash
+SUPABASE_DB_URL="postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
 rebase schema introspect --database-url "$SUPABASE_DB_URL" --from supabase
 ```
 
@@ -88,10 +90,13 @@ export default defineFunction((app) => {
 
 Keep the Supabase user ids, so every `owner_id` still points at its user:
 insert the users first, with their ids, then the application tables. With
-`pg_dump` against the source and the target (on Cloud, through
-`rebase cloud db connect`):
+`pg_dump` against the source and the target. `TARGET_URL` is the new
+database's connection string: your `DATABASE_URL`, or on Rebase Cloud the
+`connectionString` that `rebase cloud db connect --reveal` prints while it runs.
 
 ```bash
+SUPABASE_DB_URL="postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
+TARGET_URL="postgresql://…"   # the new database: your DATABASE_URL, or the tunnel's URL on Rebase Cloud
 psql "$SUPABASE_DB_URL" -c "\copy (select id::text, email, created_at from auth.users) to users.csv csv"
 psql "$TARGET_URL" -c "\copy rebase.users (id, email, created_at) from users.csv csv"
 pg_dump "$SUPABASE_DB_URL" --data-only --schema=public --no-owner > data.sql

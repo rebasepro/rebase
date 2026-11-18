@@ -199,6 +199,7 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `STORAGE_RENDITION_CACHE` | Cache generated image renditions (resizes, format conversions) instead of producing them per request. | `false` |
 
 ### Email (Optional)
+<span class="since-badge" data-since="0.34">Since 0.34</span> `MAGIC_LINK_URL`.
 
 | Variable | Description |
 |----------|-------------|
