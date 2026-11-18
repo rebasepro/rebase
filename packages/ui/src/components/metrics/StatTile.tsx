@@ -33,6 +33,12 @@ export interface StatTileProps {
  * sits on a hero or a card without becoming boxes inside boxes. They share the
  * label voice (micro, secondary ink) and the figure face (headings,
  * tabular), so a page carrying both reads as one system.
+ *
+ * Content is TOP-aligned: the well's top edge meets the label line, the label
+ * is the first line, the value the second and the detail the third. Tiles in a
+ * row therefore share a label baseline and a value baseline whether or not
+ * they carry a detail line; centred, a tile with a detail line sat higher than
+ * its neighbour without one.
  */
 export function StatTile({ icon, label, value, detail, size = "medium", onClick, action, className }: StatTileProps) {
     const large = size === "large";
@@ -54,19 +60,19 @@ export function StatTile({ icon, label, value, detail, size = "medium", onClick,
         </>
     );
     return (
-        <div className={cls("relative flex items-center min-w-0 rounded-lg", onClick && "hover:bg-surface-hover transition-colors", className)}>
+        <div className={cls("relative flex items-start min-w-0 rounded-lg", onClick && "hover:bg-surface-hover transition-colors", className)}>
             {onClick ? (
                 <button
                     type="button"
                     onClick={onClick}
-                    className="flex items-center gap-3 min-w-0 flex-1 p-2 text-left cursor-pointer rounded-lg"
+                    className="flex items-start gap-3 min-w-0 flex-1 p-2 text-left cursor-pointer rounded-lg"
                 >
                     {body}
                 </button>
             ) : (
-                <div className="flex items-center gap-3 min-w-0 flex-1 p-2">{body}</div>
+                <div className="flex items-start gap-3 min-w-0 flex-1 p-2">{body}</div>
             )}
-            {action && <div className="shrink-0 pr-1">{action}</div>}
+            {action && <div className="shrink-0 pr-1 pt-2">{action}</div>}
         </div>
     );
 }

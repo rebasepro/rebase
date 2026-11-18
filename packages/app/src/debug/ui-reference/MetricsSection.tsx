@@ -120,12 +120,21 @@ export function MetricsSection() {
                 </ChartCard>
             </div>
 
-            <SpecimenLabel>StatTile · medium and large, a button to the page that owns the fact, an action beside it</SpecimenLabel>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 mb-8 max-w-3xl">
-                <StatTile icon="Activity" label="Status" value={<StatusDot tone="ok" size="inherit">Running</StatusDot>} onClick={() => setOpened("status")}/>
-                <StatTile icon="Cpu" label="Compute" value="100m · 384Mi" detail="1/1 instances" onClick={() => setOpened("compute")}/>
-                <StatTile size="large" icon="Rocket" label="Last deploy" value="23m ago" detail="Last deploy succeeded" onClick={() => setOpened("deploys")}/>
-                <StatTile size="large" icon="Archive" label="Last backup" value="20h ago"/>
+            <SpecimenLabel>StatTile · top-aligned, so a row shares its label and value lines with or without a detail line</SpecimenLabel>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                {(["medium", "large"] as const).map(size => (
+                    <div key={size}>
+                        <Typography variant="micro" color="secondary" component="div" className="mb-2">
+                            {size === "medium" ? "medium · 40px well · h5 value" : "large · 48px well · h4 value"}
+                        </Typography>
+                        <div className="grid grid-cols-2 gap-2">
+                            <StatTile size={size} icon="Activity" label="Status" value={<StatusDot tone="ok" size="inherit">Running</StatusDot>} onClick={() => setOpened("status")}/>
+                            <StatTile size={size} icon="Cpu" label="Compute" value="100m · 384Mi" detail="1 of 1 ready" onClick={() => setOpened("compute")}/>
+                            <StatTile size={size} icon="Rocket" label="Last deploy" value="23m ago" detail="Last deploy succeeded"/>
+                            <StatTile size={size} icon="Archive" label="Last backup" value="20h ago"/>
+                        </div>
+                    </div>
+                ))}
             </div>
 
             <SpecimenLabel>ChartCard · TimeBars — one bar a minute, errors as a red top, a gap where nothing ran, a deploy marker</SpecimenLabel>
