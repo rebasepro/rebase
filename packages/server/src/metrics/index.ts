@@ -1,6 +1,17 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { METRIC_SERIES, type MetricSeries, type SeriesPoint } from "./history-store.js";
+import {
+    HISTORY_BUCKETS,
+    MAX_BATCH_SERIES,
+    MAX_HISTORY_MINUTES,
+    METRIC_SERIES,
+    RECORDED_SURFACES,
+    type HistoryBucket,
+    type MetricSeries,
+    type RecordedSurface,
+    type SeriesPoint,
+    type SurfaceTotals
+} from "./history-store.js";
 import type { HonoEnv } from "../api/types";
 import { safeCompare } from "../auth/crypto-utils";
 import { extractBearerToken } from "../auth/bearer-token";
@@ -55,6 +66,24 @@ const UNCOUNTED_PATHS = new Set(["/metrics", "/health", "/livez", "/readyz"]);
 /** Whether a path is the platform looking in, rather than a request served. */
 export function isUncountedPath(pathname: string): boolean {
     return UNCOUNTED_PATHS.has(pathname);
+}
+
+/**
+ * Whether a request's `status` label counts as an error.
+ *
+ * A 5xx and nothing else: the server failed. A 4xx is the caller's mistake and
+ * a working API answers plenty of them. This is THE definition — the stored
+ * per-minute error series use it, and the control plane's rollup of
+ * `rebase_requests_total` (`metrics-rollup.ts` in the cloud console) applies
+ * the same rule to the same label, which a test on each side pins to one table
+ * of statuses.
+ */
+export function isErrorStatus(status: string | undefined): boolean {
+    return (status ?? "").startsWith("5");
+}
+
+function isRecordedSurface(surface: string | undefined): surface is RecordedSurface {
+    return RECORDED_SURFACES.some(s => s === surface);
 }
 
 const LATENCY_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
@@ -186,6 +215,25 @@ total: 0 };
         let bucket = LATENCY_BUCKETS_MS.findIndex(upper => durationMs <= upper);
         if (bucket === -1) bucket = LATENCY_BUCKETS_MS.length;
         hist.counts[bucket] += 1;
+    }
+
+    /**
+     * Requests and errors since this process started, summed per recorded
+     * surface. Read by the history sampler to compute per-minute deltas; the
+     * surfaces it does not record (`admin`, `meta`, `other`) are left out.
+     */
+    requestTotalsBySurface(): SurfaceTotals {
+        const totals: SurfaceTotals = {};
+        for (const [key, count] of this.requests) {
+            const labels = MetricsRegistry.parseLabels(key);
+            const surface = labels.surface;
+            if (!isRecordedSurface(surface)) continue;
+            const entry = totals[surface] ?? { requests: 0, errors: 0 };
+            entry.requests += count;
+            if (isErrorStatus(labels.status)) entry.errors += count;
+            totals[surface] = entry;
+        }
+        return totals;
     }
 
     incrementCounter(name: string, labels: Record<string, string> = {}, by = 1): void {
@@ -460,7 +508,12 @@ export function createMetricsRoutes(
      * route then answers 501 rather than pretending an empty chart is a quiet
      * period.
      */
-    history?: (series: MetricSeries, sinceMinutes: number) => Promise<SeriesPoint[]>
+    history?: (series: MetricSeries, sinceMinutes: number) => Promise<SeriesPoint[]>,
+    /**
+     * Reads several stored series at once, bucketed. Absent under the same
+     * conditions as `history`, with the same 501.
+     */
+    historyBatch?: (series: MetricSeries[], minutes: number, bucket: HistoryBucket) => Promise<Record<string, SeriesPoint[]>>
 ): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
 
@@ -475,6 +528,63 @@ export function createMetricsRoutes(
         return c.text(registry.render(), 200, {
             "Content-Type": "text/plain; version=0.0.4; charset=utf-8"
         });
+    });
+
+    /**
+     * Several series over a window, bucketed in SQL.
+     *
+     * Registered before `/history` only for readability; Hono matches the
+     * exact path either way. The overview reads ten series at once, and a
+     * week at one-minute resolution is 10,080 points a series — so the window
+     * is bucketed where the rows are, not in the browser.
+     */
+    router.get("/history/batch", async (c) => {
+        if (!authorized(c)) return c.text("Unauthorized", 401);
+        if (!historyBatch) {
+            return c.json({
+                error: "history_unavailable",
+                message: "This deployment stores no metrics history. It needs a SQL driver and a role that provisions schema."
+            }, 501);
+        }
+
+        const names = (c.req.query("series") ?? "").split(",").map(s => s.trim()).filter(Boolean);
+        if (names.length === 0 || names.length > MAX_BATCH_SERIES) {
+            return c.json({
+                error: "invalid_series",
+                message: `Name between 1 and ${MAX_BATCH_SERIES} series, comma-separated.`
+            }, 400);
+        }
+        const series: MetricSeries[] = [];
+        for (const name of names) {
+            const known = METRIC_SERIES.find(s => s === name);
+            if (!known) {
+                return c.json({
+                    error: "unknown_series",
+                    message: `Unknown series "${name}". Available: ${METRIC_SERIES.join(", ")}.`
+                }, 400);
+            }
+            series.push(known);
+        }
+
+        const minutesRaw = c.req.query("minutes") ?? "60";
+        const minutes = Number(minutesRaw);
+        if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_HISTORY_MINUTES) {
+            return c.json({
+                error: "invalid_minutes",
+                message: `minutes must be a whole number from 1 to ${MAX_HISTORY_MINUTES}.`
+            }, 400);
+        }
+
+        const bucketRaw = Number(c.req.query("bucket") ?? "1");
+        const bucket = HISTORY_BUCKETS.find(b => b === bucketRaw);
+        if (bucket === undefined) {
+            return c.json({
+                error: "invalid_bucket",
+                message: `bucket must be one of ${HISTORY_BUCKETS.join(", ")} (minutes).`
+            }, 400);
+        }
+
+        return c.json({ minutes, bucket, series: await historyBatch(series, minutes, bucket) });
     });
 
     /**

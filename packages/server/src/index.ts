@@ -573,6 +573,7 @@ export {
     createMetricsMiddleware,
     createMetricsRoutes,
     classifySurface,
+    isErrorStatus,
     isUncountedPath
 } from "./metrics";
 export type { MetricSurface, MetricsHandle } from "./metrics";
