@@ -679,6 +679,18 @@ export interface DevStaticShape {
 }
 
 /**
+ * Where the site the dev backend serves itself is, for `FRONTEND_URL`, or
+ * `undefined` when it serves none: the app at `/` when there is one, else the
+ * first. Exported for its test.
+ */
+export function devServedSiteUrl(shape: DevStaticShape, backendPort: number): string | undefined {
+    const apps = shape.servedByBackend ?? [];
+    const app = apps.find(candidate => candidate.path === "/") ?? apps[0];
+    if (!app || /^https?:\/\//i.test(app.path)) return undefined;
+    return `http://localhost:${backendPort}${app.path === "/" ? "" : app.path.replace(/\/+$/, "")}`;
+}
+
+/**
  * Read {@link DevStaticShape} out of a loaded manifest. Exported for its test.
  *
  * Which declared app is running is decided by its `root` being `frontend/`,
@@ -1861,6 +1873,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // case never reaches here, and there the .env value is still right.
         if (!backendOnly && frontendDir) {
             env.FRONTEND_URL = `http://localhost:${frontendPort}`;
+        } else {
+            // No Vite, and the backend serves a no-build site itself: that
+            // site, on the backend's port, is where emailed links have to land.
+            // The `.env` value named the port of some earlier setup (:3082),
+            // which the comment in the scaffold's `.env` says dev replaces.
+            const served = devServedSiteUrl(staticShape, startPort);
+            if (served) env.FRONTEND_URL = served;
         }
 
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);

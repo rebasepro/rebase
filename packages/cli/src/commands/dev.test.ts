@@ -21,7 +21,7 @@ import path from "path";
 import { execa } from "execa";
 
 import { getProjectPort } from "../utils/dev-server";
-import { appBannerLines, backendWatchCommand, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, envFileHiddenFromTsx, needsStaleSchemaPreflight, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
+import { appBannerLines, backendWatchCommand, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devServedSiteUrl, devStaticShape, devWatchArgs, devWatchIncludes, envFileHiddenFromTsx, needsStaleSchemaPreflight, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
 import { validateManifest } from "../manifest";
 
@@ -896,6 +896,11 @@ describe("the banner's app lines", () => {
             admin: { type: "static", root: "frontend", output: "frontend/dist", path: "/admin" }
         });
         expect(shape.servedByBackend).toEqual([{ appName: "web", path: "/" }]);
+        // Emailed links land on that site, on the backend's port, not on the
+        // `.env`'s FRONTEND_URL from an earlier setup.
+        expect(devServedSiteUrl(shape, 3082)).toBe("http://localhost:3082");
+        expect(devServedSiteUrl({ declaresStaticApp: true, servedByBackend: [{ appName: "site", path: "/site/" }] }, 3001)).toBe("http://localhost:3001/site");
+        expect(devServedSiteUrl({ declaresStaticApp: true }, 3001)).toBeUndefined();
     });
 
     it("prints exactly what it always did for the scaffolded project", () => {

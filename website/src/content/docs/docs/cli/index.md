@@ -61,8 +61,9 @@ side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 
 
 A static app in `rebase.json` with no build step (no `build`, and `output` is
 its `root`, such as a plain HTML site) is served by the backend from that
-directory, at its `path`, as `rebase start` serves it from the bundle. An app
-with a build runs in Vite on its own port.
+directory, at its `path`, as `rebase start` serves it from the bundle, and
+`FRONTEND_URL` is set to it (on the backend's port) so emailed links land there.
+An app with a build runs in Vite on its own port, and `FRONTEND_URL` is Vite's.
 
 An edit to `.env`
 restarts the backend, which reads the file again, as the admin panel does. What
