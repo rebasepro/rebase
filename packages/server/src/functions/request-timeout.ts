@@ -100,7 +100,7 @@ export function createFunctionsRequestTimeout(ms: number): MiddlewareHandler<Hon
                 // `errorCode` like every other failure. Hand-built, it was the
                 // one 504 nobody could join to a log line.
                 return errorHandler(
-                    new ApiError(504, "FUNCTION_TIMEOUT", "Function timed out"),
+                    new ApiError(504, "FUNCTION_TIMEOUT", `Function timed out after ${ms}ms. Raise REBASE_FUNCTIONS_TIMEOUT_MS (or \`functionsTimeoutMs\`) for one that waits on a slow service.`),
                     c
                 ) as Response;
             }

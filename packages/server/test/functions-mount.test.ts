@@ -180,6 +180,9 @@ describe("request timeout on the functions router", () => {
 
         const res = await app.request("/api/functions");
         expect(res.status).toBe(504);
-        expect((await res.json() as { error: { code: string } }).error.code).toBe("FUNCTION_TIMEOUT");
+        const error = (await res.json() as { error: { code: string; message: string } }).error;
+        expect(error.code).toBe("FUNCTION_TIMEOUT");
+        // The caller learns which setting to raise, not only that it timed out.
+        expect(error.message).toContain("REBASE_FUNCTIONS_TIMEOUT_MS");
     });
 });
