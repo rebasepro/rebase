@@ -1725,6 +1725,24 @@ describe("the environment block outranks the persisted registry", () => {
         rmSync(dir, { recursive: true, force: true });
     });
 
+    it("does not call the scaffold's relative REBASE_PROJECT_DIR a server bug", async () => {
+        // The scaffolded .mcp.json sets REBASE_PROJECT_DIR: ".", and the raw
+        // "." was compared with the resolved directory the default holds.
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-dot-"));
+        const cwd = process.cwd();
+        process.chdir(dir);
+        const warn = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        try {
+            await bootWith({ activeProject: null, projects: {} }, { REBASE_PROJECT_DIR: "." });
+            const written = warn.mock.calls.map((c) => String(c[0])).join("");
+            expect(written).not.toContain("this is a bug in the server");
+        } finally {
+            warn.mockRestore();
+            process.chdir(cwd);
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
     it("resolves the working directory, not another project's persisted default", async () => {
         // The registry is machine-wide. Project A calling rebase_project_add
         // used to persist a `default` carrying A's directory, URL and dev

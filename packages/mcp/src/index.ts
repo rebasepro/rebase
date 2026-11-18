@@ -677,7 +677,10 @@ function warnIfEnvIgnored(fromEnv: ReturnType<typeof envDeclaredProject>): void 
     if (!fromEnv) return;
     const def = registry.projects["default"];
     const mismatched: string[] = [];
-    if (fromEnv.projectDir && def?.projectDir !== fromEnv.projectDir) mismatched.push("REBASE_PROJECT_DIR");
+    // Resolved, as the `default` entry was built from it: the scaffolded
+    // `.mcp.json` sets `REBASE_PROJECT_DIR: "."`, and the raw "." never equals
+    // the absolute path, so every scaffolded project was told this was a bug.
+    if (fromEnv.projectDir && (def?.projectDir === undefined || resolve(def.projectDir) !== resolve(fromEnv.projectDir))) mismatched.push("REBASE_PROJECT_DIR");
     if (fromEnv.baseUrl && def?.baseUrl !== fromEnv.baseUrl) mismatched.push("REBASE_BASE_URL");
     if (fromEnv.token && def?.token !== fromEnv.token) mismatched.push("REBASE_API_TOKEN");
     if (mismatched.length) {
