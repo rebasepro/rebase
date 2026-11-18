@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import { CHIP_COLORS, cls, getColorSchemeForKey } from "../util";
 import type { ChipColorKey, ChipColorScheme } from "../util/chip_colors";
 import { useIsDarkMode } from "../hooks/useIsDarkMode";
@@ -70,7 +70,20 @@ export function Chip({
     const usedColorScheme = typeof colorScheme === "string" ? getColorSchemeForKey(colorScheme) : colorScheme;
     // Live, not read once: the ink is chosen in JS per theme, so a theme switch
     // has to reach every mounted chip (see useIsDarkMode).
-    const dark = useIsDarkMode();
+    const documentDark = useIsDarkMode();
+    // A region can declare its own theme with `data-theme` — a dark demo on a
+    // light marketing page. CSS honours that through the `dark:` variant, but
+    // the ink here is picked in JS, and reading only <html> drew light-mode ink
+    // on the dark region. The nearest declared theme wins; with none, the
+    // document's.
+    const ref = useRef<HTMLDivElement>(null);
+    const [scopedDark, setScopedDark] = useState<boolean | null>(null);
+    useLayoutEffect(() => {
+        const scope = ref.current?.parentElement?.closest("[data-theme]");
+        const declared = scope?.getAttribute("data-theme");
+        setScopedDark(declared === "dark" ? true : declared === "light" ? false : null);
+    }, [documentDark]);
+    const dark = scopedDark ?? documentDark;
 
     const hasScheme = error || usedColorScheme;
 
@@ -115,6 +128,7 @@ export function Chip({
 
     return (
         <div
+            ref={ref}
             // `rounded-md`, not `lg`: a radius is proportional to the thing it
             // rounds. At a chip's 20-24px height the control radius makes a pill,
             // and a pill is a different object (a segment, a search field).
