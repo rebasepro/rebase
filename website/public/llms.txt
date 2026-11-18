@@ -306,6 +306,7 @@
 - [Recipe: Blog CMS](https://rebase.pro/docs/recipes/blog-cms.md): Build a complete blog CMS with articles, authors, categories, rich text editing, and image uploads — tables in backend/schema, presentation in frontend/src/cms.
 - [Recipe: Editorial publishing](https://rebase.pro/docs/recipes/editorial-publishing.md): Run a blog or newsroom on Rebase: writers and editors, review, scheduled publishing, drafts of live posts, previews, translations, a media library, content blocks, feeds, editorial notes and a WordPress import.
 - [Recipe: Importing from WordPress](https://rebase.pro/docs/recipes/import-from-wordpress.md): Move posts from WordPress into Rebase with a script that reads the WordPress REST API and upserts each post by slug, so it can run again safely.
+- [Recipe: Migrating from Supabase](https://rebase.pro/docs/recipes/migrate-from-supabase.md): Move a Supabase project to Rebase: introspect the schema, apply the SQL objects that are not tables, copy the data keeping user ids, port edge functions, and deploy, all from the CLI.
 - [Recipe: Custom Dashboard](https://rebase.pro/docs/recipes/custom-dashboard.md): Build a dashboard page with KPI tiles and charts — numbers computed in SQL, drawn with the blocks from @rebasepro/ui.
 - [Recipe: Webhook Integration](https://rebase.pro/docs/recipes/webhooks.md): Use table hooks to send webhooks to external services when data changes, without holding the write's transaction open.
 
