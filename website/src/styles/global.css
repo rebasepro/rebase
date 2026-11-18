@@ -58,7 +58,8 @@
 
 :root,
 [data-theme="dark"],
-:is(.island-dark, .ground-chroma) {
+:is(.island-dark, .ground-chroma),
+html[data-theme="light"]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header {
     --tone-max: #ffffff;
     --tone-50: #f9fafb;
     --tone-100: #f4f5f7;
@@ -1937,4 +1938,45 @@ html.banner-dismissed-instant #manifesto-banner {
     [data-theme="light"] :is(.island-dark, .ground-chroma, [data-theme="dark"]) {
         color: var(--page-ink);
     }
+}
+
+/* ── The bar over the hero, before the page moves ────────────────────────────
+   At the top of a route the header has no fill (Header.astro) and sits on the
+   hero's Neat glow, which is the SAME saturated field in both themes: it only
+   fades into the page ground further down (`.hero-glow`'s mask). Dark ink on
+   that blue read as mud, so until the page scrolls the bar is a dark island in
+   light mode too, once the glow has actually painted (`data-painted`, set by
+   NeatBackground; no WebGL or a software renderer means no glow and no mark): white links and controls, exactly as the dark site draws
+   them. The tone block at the top of this file lists this selector; this rule
+   carries the rest of the island (link blue, ink). Once scrolled, the bar gets
+   its plate and follows the page theme again. Not while a menu is open: the
+   menus paint their own plate in the page theme. */
+html[data-theme="light"]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header {
+    --color-primary-light: #359aff;
+    color: var(--page-ink);
+    color-scheme: dark;
+}
+
+/* Over the painted glow, in BOTH themes: the field runs from deep indigo to
+   bright cyan and coral, and the bar's usual greys (and the blue active link)
+   wash out on the bright end. So the bar's ink goes white, links at 88% and
+   full white on hover, with a soft shadow that holds the letterforms on cyan.
+   The active page is marked by an underline rather than by a blue that the
+   coral eats. Same specificity as the light-mode island rule above, and
+   later, so it wins there too. */
+html[data-theme]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header {
+    --tone-300: rgb(255 255 255 / 0.88);
+    --tone-max: #ffffff;
+    --color-primary-light: #ffffff;
+}
+html[data-theme]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header :is(nav > div:first-child a, nav > div:first-child button, .theme-toggle, .gh-star, rebase-lang-select) {
+    text-shadow: 0 1px 10px rgb(0 0 0 / 0.28);
+}
+html[data-theme]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header [aria-current="page"] {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+}
+html[data-theme]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header :is(.theme-toggle, .gh-star, [title="Change language"], #mobile-menu-button) svg {
+    filter: drop-shadow(0 1px 5px rgb(0 0 0 / 0.3));
 }

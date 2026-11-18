@@ -988,6 +988,12 @@ export function NeatBackground({
             });
             // The whole seat, not just the offset the constructor took.
             if (isGlow) writeGlow(glowPose);
+            // A painted glow is what the header reads to draw light ink over the
+            // hero (global.css, "The bar over the hero"). On the canvas, not on
+            // <html>: the canvas persists across navigations and keeps the mark,
+            // while a swap strips <html>'s attributes. A browser that never gets
+            // a gradient never gets the mark, and the bar keeps the page's ink.
+            if (variant === "glow") canvas.setAttribute("data-painted", "");
             scrollHandler?.();
         };
 
@@ -1153,6 +1159,7 @@ export function NeatBackground({
             document.removeEventListener("astro:after-swap", onAfterSwap);
             if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
             if (neat) neat.destroy();
+            canvas.removeAttribute("data-painted");
         };
 
         // Scroll parallax is motion too, so reduced-motion viewers keep the still

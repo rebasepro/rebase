@@ -219,6 +219,7 @@ const flatNavLinks = [
                             <a
                                     href={link.href}
                                     class={`p-3 transition-colors hover:text-primary-light ${currentPath === link.href ? "text-primary-light" : "text-tone-300"}`}
+                                    aria-current={currentPath === link.href ? "page" : undefined}
                             >
                                 {link.label}
                             </a>
@@ -232,6 +233,7 @@ const flatNavLinks = [
                     <a
                         href={link.href}
                         class={`p-3 transition-colors hover:text-primary-light ${currentPath === link.href ? "text-primary-light" : "text-tone-300"}`}
+                                    aria-current={currentPath === link.href ? "page" : undefined}
                     >
                         {link.label}
                     </a>
