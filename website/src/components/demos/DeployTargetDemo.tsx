@@ -180,20 +180,20 @@ export function DeployTargetDemo({ s = {} }: { s?: Record<string, string> }) {
                         className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
                             t.id === targetId
                                 ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/30"
-                                : "text-surface-400 ring-1 ring-inset ring-surface-800 hover:text-surface-200 hover:ring-surface-700"
+                                : "text-tone-400 ring-1 ring-inset ring-tone-800 hover:text-tone-200 hover:ring-tone-700"
                         }`}>
                         {T(t.label)}
                     </button>
                 ))}
             </div>
 
-            <p className="px-5 pt-4 text-sm text-surface-400 sm:px-6">{T(target.subtitle)}</p>
+            <p className="px-5 pt-4 text-sm text-tone-400 sm:px-6">{T(target.subtitle)}</p>
 
             {/* Terminal */}
             <div
                 ref={scrollRef}
                 onClick={done ? undefined : skipToEnd}
-                className={`mx-5 mb-5 mt-4 h-[19rem] overflow-y-auto rounded-xl border border-hairline bg-[#0b0c0f] p-4 font-mono text-[12.5px] leading-[1.75] sm:mx-6 sm:mb-6 sm:p-5 ${
+                className={`mx-5 mb-5 mt-4 h-[19rem] overflow-y-auto rounded-xl border border-hairline bg-[#0b0c0f] island-dark p-4 font-mono text-[12.5px] leading-[1.75] sm:mx-6 sm:mb-6 sm:p-5 ${
                     done ? "" : "cursor-pointer"
                 }`}>
                 {lines.slice(0, step).map((line, i) => (
@@ -210,13 +210,13 @@ export function DeployTargetDemo({ s = {} }: { s?: Record<string, string> }) {
 
             {/* Footer */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline bg-surface-well/60 px-5 py-3 sm:px-6">
-                <p className="text-[11px] leading-relaxed text-surface-500">
+                <p className="text-[11px] leading-relaxed text-tone-500">
                     {T("dt.footnote")}
                 </p>
                 <button
                     type="button"
                     onClick={done ? replay : skipToEnd}
-                    className="flex-none rounded-lg px-3 py-1.5 text-xs font-medium text-surface-400 ring-1 ring-inset ring-surface-800 transition-colors hover:text-white hover:ring-surface-700">
+                    className="flex-none rounded-lg px-3 py-1.5 text-xs font-medium text-tone-400 ring-1 ring-inset ring-tone-800 transition-colors hover:text-tone-max hover:ring-tone-700">
                     {done ? T("dt.replay") : T("dt.skip")}
                 </button>
             </div>
@@ -229,7 +229,7 @@ function TerminalLine({ line, caret }: { line: Line; caret?: boolean }) {
         return (
             <div className="flex gap-2">
                 <span className="flex-none select-none text-primary">$</span>
-                <span className="text-surface-100 break-all">
+                <span className="text-tone-100 break-all">
                     {line.text}
                     {caret && <span className="ml-0.5 inline-block h-[1.05em] w-[0.5em] translate-y-[0.15em] bg-primary/90 animate-pulse" />}
                 </span>
@@ -250,10 +250,10 @@ function TerminalLine({ line, caret }: { line: Line; caret?: boolean }) {
     }
 
     if (line.kind === "note") {
-        return <div className="text-surface-600 break-all">{line.text}</div>;
+        return <div className="text-tone-600 break-all">{line.text}</div>;
     }
 
-    return <div className="pl-4 text-surface-400 break-all">{line.text}</div>;
+    return <div className="pl-4 text-tone-400 break-all">{line.text}</div>;
 }
 
 export default DeployTargetDemo;

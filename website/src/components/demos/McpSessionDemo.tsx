@@ -119,13 +119,13 @@ export function McpSessionDemo() {
                 <div className="border-b border-hairline p-5 sm:p-6 lg:border-b-0 lg:border-r">
                     <div className="mb-1 flex items-center gap-2">
                         <Icon name="key"/>
-                        <span className="font-mono text-sm text-surface-200">support-agent</span>
+                        <span className="font-mono text-sm text-tone-200">support-agent</span>
                     </div>
-                    <p className="mb-5 text-[11px] text-surface-500">
+                    <p className="mb-5 text-[11px] text-tone-500">
                         The key you hand the agent. Revoke something and watch the session below.
                     </p>
 
-                    <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
+                    <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-tone-500">
                         scopes
                     </p>
                     <ul className="space-y-1.5">
@@ -137,11 +137,11 @@ export function McpSessionDemo() {
                                     aria-pressed={g.on}
                                     className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-left font-mono text-[12.5px] transition-all duration-200 ${
                                         g.on
-                                            ? "bg-primary/[0.07] text-surface-200 ring-1 ring-inset ring-primary/25"
-                                            : "text-surface-600 ring-1 ring-inset ring-surface-800 hover:text-surface-400"
+                                            ? "bg-primary/[0.07] text-tone-200 ring-1 ring-inset ring-primary/25"
+                                            : "text-tone-600 ring-1 ring-inset ring-tone-800 hover:text-tone-400"
                                     }`}>
-                                    <span className={g.on ? "" : "line-through decoration-surface-700"}>
-                                        data<span className="text-surface-500">:</span>{g.op}<span className="text-surface-500">:</span>{g.collection}
+                                    <span className={g.on ? "" : "line-through decoration-tone-700"}>
+                                        data<span className="text-tone-500">:</span>{g.op}<span className="text-tone-500">:</span>{g.collection}
                                     </span>
                                     <Switch on={g.on}/>
                                 </button>
@@ -149,7 +149,7 @@ export function McpSessionDemo() {
                         ))}
                     </ul>
 
-                    <p className="mb-2.5 mt-5 text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
+                    <p className="mb-2.5 mt-5 text-[11px] font-semibold uppercase tracking-[0.15em] text-tone-500">
                         RLS roles
                     </p>
                     <button
@@ -159,14 +159,14 @@ export function McpSessionDemo() {
                         className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-left font-mono text-[12.5px] transition-all duration-200 ${
                             admin
                                 ? "bg-amber-500/[0.08] text-amber-200 ring-1 ring-inset ring-amber-500/30"
-                                : "text-surface-600 ring-1 ring-inset ring-surface-800 hover:text-surface-400"
+                                : "text-tone-600 ring-1 ring-inset ring-tone-800 hover:text-tone-400"
                         }`}>
                         <span>roles: [{admin ? "\"service\", \"admin\"" : "\"service\""}]</span>
                         <Switch on={admin} tone="amber"/>
                     </button>
-                    <p className="mt-2.5 text-[11px] leading-relaxed text-surface-500">
+                    <p className="mt-2.5 text-[11px] leading-relaxed text-tone-500">
                         Scopes decide which calls the key may make; roles decide which rows those calls see.
-                        As <span className="font-mono text-surface-400">service</span> alone, Postgres grants it nothing
+                        As <span className="font-mono text-tone-400">service</span> alone, Postgres grants it nothing
                         unless a policy names it.
                     </p>
                 </div>
@@ -174,7 +174,7 @@ export function McpSessionDemo() {
                 {/* ── The session ───────────────────────────────────── */}
                 <div className="p-5 sm:p-6">
                     <div className="mb-4 flex items-center justify-between gap-3">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-tone-500">
                             MCP session
                         </span>
                         <span className={`rounded-md px-2 py-0.5 text-[11px] transition-colors duration-300 ${
@@ -194,15 +194,15 @@ export function McpSessionDemo() {
                             return (
                                 <div key={call.tool}
                                      className={`rounded-xl border p-3.5 transition-colors duration-300 ${
-                                         pass ? "border-white/5 bg-surface-well/60" : "border-rose-500/20 bg-rose-500/[0.04]"
+                                         pass ? "border-tone-max/5 bg-surface-well/60" : "border-rose-500/20 bg-rose-500/[0.04]"
                                      }`}>
                                     <div className="flex items-start gap-2">
-                                        <span className="mt-[3px] flex-none text-surface-600">
+                                        <span className="mt-[3px] flex-none text-tone-600">
                                             <Icon name="tool"/>
                                         </span>
                                         <div className="min-w-0 font-mono text-[12.5px] leading-relaxed">
-                                            <span className="text-surface-100">{call.tool}</span>
-                                            <span className="ml-2 break-all text-surface-500">{call.args}</span>
+                                            <span className="text-tone-100">{call.tool}</span>
+                                            <span className="ml-2 break-all text-tone-500">{call.args}</span>
                                         </div>
                                     </div>
 
@@ -223,7 +223,7 @@ export function McpSessionDemo() {
                                     </p>
 
                                     {!pass && (
-                                        <p className="mt-1.5 border-l-2 border-rose-500/25 pl-2.5 text-[11px] leading-relaxed text-surface-500">
+                                        <p className="mt-1.5 border-l-2 border-rose-500/25 pl-2.5 text-[11px] leading-relaxed text-tone-500">
                                             {gateKey
                                                 /* The most useful state in the figure: scope granted,
                                                    database unmoved. Granting a scope does not write a policy. */
@@ -238,9 +238,9 @@ export function McpSessionDemo() {
                         })}
                     </div>
 
-                    <p className="mt-4 text-[11px] leading-relaxed text-surface-500">
+                    <p className="mt-4 text-[11px] leading-relaxed text-tone-500">
                         The two gates are independent, which is the part worth sitting with: grant
-                        <span className="font-mono text-surface-400"> data:delete:orders</span> above and the call still
+                        <span className="font-mono text-tone-400"> data:delete:orders</span> above and the call still
                         deletes nothing, because a scope is not a policy — and it comes back 403 rather
                         than reporting a delete that never happened. No prompt, jailbreak or bug in the tool layer
                         widens what the database will return.
@@ -272,7 +272,7 @@ function Switch({ on, tone = "primary" }: { on: boolean; tone?: "primary" | "amb
         <span className={`relative inline-flex h-4 w-7 flex-none rounded-full transition-colors duration-300 ${
             on ? (tone === "amber" ? "bg-amber-500" : "bg-primary") : "bg-surface-raised-hover"
         }`}>
-            <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all duration-300 ${
+            <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-tone-max transition-all duration-300 ${
                 on ? "left-3.5" : "left-0.5 opacity-60"
             }`}/>
         </span>
@@ -286,7 +286,7 @@ function Icon({ name }: { name: "key" | "tool" }) {
     };
     return (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-surface-500">
+             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-tone-500">
             {paths[name]}
         </svg>
     );

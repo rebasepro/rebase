@@ -9,7 +9,7 @@ const translatePath = useTranslatedPath(lang);
 
 // Whitespace matters inside <pre>, so every sample lives in frontmatter.
 
-const sdkCode = `<span class="text-surface-500">// generated once by \`rebase generate-sdk\`</span>
+const sdkCode = `<span class="text-tone-500">// generated once by \`rebase generate-sdk\`</span>
 <span class="text-primary-light">import</span> { tablesDictionary, <span class="text-primary-light">type</span> Database } <span class="text-primary-light">from</span> <span class="text-green-400">"./generated/sdk/database.types"</span>;
 
 <span class="text-primary-light">const</span> client = <span class="text-amber-400">createRebaseClient</span>&lt;Database&gt;({
@@ -17,7 +17,7 @@ const sdkCode = `<span class="text-surface-500">// generated once by \`rebase ge
   <span class="text-blue-300">tables</span>: tablesDictionary,
 });
 
-<span class="text-surface-500">// table names, column names and return types all autocomplete</span>
+<span class="text-tone-500">// table names, column names and return types all autocomplete</span>
 <span class="text-primary-light">const</span> { data } = <span class="text-primary-light">await</span> client.data.orders
   .<span class="text-amber-400">find</span>({
     <span class="text-blue-300">where</span>: { status: [<span class="text-green-400">"=="</span>, <span class="text-green-400">"paid"</span>] },
@@ -47,9 +47,9 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
   auth: { jwtSecret: process.env.<span class="text-amber-400">JWT_SECRET</span> },
   storage: { type: <span class="text-emerald-400">"local"</span>, basePath: <span class="text-emerald-400">"./uploads"</span> },
 });
-<span class="text-surface-500">// it's a Hono app — mount it, wrap it, add your own middleware</span>`;
+<span class="text-tone-500">// it's a Hono app — mount it, wrap it, add your own middleware</span>`;
 
-const drizzleCode = `<span class="text-surface-500">// one table, one relation</span>
+const drizzleCode = `<span class="text-tone-500">// one table, one relation</span>
 <span class="text-blue-400">export const</span> posts = <span class="text-amber-400">defineTable</span>(<span class="text-emerald-400">"posts"</span>, {
   columns: {
     id: col.<span class="text-amber-400">uuid</span>().<span class="text-amber-400">primaryKey</span>().<span class="text-amber-400">defaultRandom</span>(),
@@ -59,23 +59,23 @@ const drizzleCode = `<span class="text-surface-500">// one table, one relation</
   rls: <span class="text-emerald-400">"inherit"</span>,
 });
 
-<span class="text-surface-500">// GET /api/data/posts?include=author</span>
-<span class="text-surface-500">// → one query via db.query.findMany, not 1 + N</span>`;
+<span class="text-tone-500">// GET /api/data/posts?include=author</span>
+<span class="text-tone-500">// → one query via db.query.findMany, not 1 + N</span>`;
 
-const rulesCode = `<span class="text-primary-light">export const</span> <span class="text-white">orders</span> = <span class="text-amber-400">defineTable</span>(<span class="text-green-400">"orders"</span>, {
-  columns: { <span class="text-surface-500">/* … customer_id, total, status */</span> },
+const rulesCode = `<span class="text-primary-light">export const</span> <span class="text-tone-max">orders</span> = <span class="text-amber-400">defineTable</span>(<span class="text-green-400">"orders"</span>, {
+  columns: { <span class="text-tone-500">/* … customer_id, total, status */</span> },
 
   <span class="text-blue-300">rls</span>: [
-    <span class="text-surface-500">// customers see their own orders…</span>
+    <span class="text-tone-500">// customers see their own orders…</span>
     { operation: <span class="text-green-400">"select"</span>, ownerField: <span class="text-green-400">"customer_id"</span> },
 
-    <span class="text-surface-500">// …support can read and update all of them</span>
+    <span class="text-tone-500">// …support can read and update all of them</span>
     { operations: [<span class="text-green-400">"select"</span>, <span class="text-green-400">"update"</span>],
       roles: [<span class="text-green-400">"support"</span>] },
   ],
 });`;
 
-const policyCode = `<span class="text-surface-500">-- rebase schema generate → db push</span>
+const policyCode = `<span class="text-tone-500">-- rebase schema generate → db push</span>
 <span class="text-primary-light">ALTER TABLE</span> orders <span class="text-primary-light">ENABLE ROW LEVEL SECURITY</span>;
 
 <span class="text-primary-light">CREATE POLICY</span> orders_select_1f4c9ab <span class="text-primary-light">ON</span> orders
@@ -87,8 +87,8 @@ const policyCode = `<span class="text-surface-500">-- rebase schema generate →
   <span class="text-primary-light">USING</span> (<span class="text-amber-400">string_to_array</span>(<span class="text-amber-400">rebase.roles</span>(), <span class="text-green-400">','</span>)
          &amp;&amp; <span class="text-primary-light">ARRAY</span>[<span class="text-green-400">'support'</span>]);
 
-<span class="text-surface-500">-- no policy for INSERT or DELETE:</span>
-<span class="text-surface-500">-- nobody can insert or delete. Closed by default.</span>`;
+<span class="text-tone-500">-- no policy for INSERT or DELETE:</span>
+<span class="text-tone-500">-- nobody can insert or delete. Closed by default.</span>`;
 
 // The routes the server actually mounts. Nothing aspirational in this list.
 const routes = [
@@ -126,11 +126,11 @@ import ChapterRule from "../ChapterRule.astro";
 
         <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
             <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t("backendpage.badge")}</span></div>
-            <h1 class="mb-6 text-display-2 text-white" set:html={t("backendpage.hero.title")}></h1>
-            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
+            <h1 class="mb-6 text-display-2 text-tone-max" set:html={t("backendpage.hero.title")}></h1>
+            <p class="mb-10 text-lg leading-8 text-tone-300 lg:text-xl">
                 REST, a typed SDK, realtime over WebSocket, auth, storage and an OpenAPI spec — with every access
                 rule enforced by the database itself. Point it at your own Postgres, or
-                run <code class="font-mono text-surface-200">rebase dev</code> and get one without installing
+                run <code class="font-mono text-tone-200">rebase dev</code> and get one without installing
                 anything. No admin panel required.
             </p>
             <div class="mt-4 max-w-xl">
@@ -147,15 +147,15 @@ import ChapterRule from "../ChapterRule.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
                 <div class="lg:col-span-5">
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
+                    <h2 class="text-3xl sm:text-4xl text-tone-max mb-5">
                         {t("backendpage.rest.sub")}
                     </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
+                    <p class="text-base text-tone-400 leading-relaxed mb-4">
                         No controllers, no serializers, no validation middleware. Filtering, sorting, pagination
                         and relation loading are query parameters, in a PostgREST-compatible syntax your team
                         probably already knows.
                     </p>
-                    <p class="text-base text-surface-400 leading-relaxed">
+                    <p class="text-base text-tone-400 leading-relaxed">
                         Nested relations are addressable as paths, so a customer's orders are a URL rather than
                         a join you hand-wrote.
                     </p>
@@ -164,10 +164,10 @@ import ChapterRule from "../ChapterRule.astro";
                     the one only it has — the generated URL surface. */}
                 <div class="lg:col-span-7 space-y-5">
                     <div class="frame overflow-hidden">
-                        <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                            <span class="font-mono text-xs text-surface-400">{t("backendpage.label.generated")}</span>
+                        <div class="px-4 py-3 border-b border-tone-800/80 bg-tone-900/50">
+                            <span class="font-mono text-xs text-tone-400">{t("backendpage.label.generated")}</span>
                         </div>
-                        <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={restCode}></code></pre>
+                        <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-tone-300"><code set:html={restCode}></code></pre>
                     </div>
                 </div>
             </div>
@@ -182,9 +182,9 @@ import ChapterRule from "../ChapterRule.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
                 <div class="lg:col-span-5 lg:order-last">
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("backendpage.01")}</h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4" set:html={t("backendpage.02")}></p>
-                    <p class="text-base text-surface-400 leading-relaxed mb-6" set:html={t("backendpage.03")}></p>
+                    <h2 class="text-3xl sm:text-4xl text-tone-max mb-5">{t("backendpage.01")}</h2>
+                    <p class="text-base text-tone-400 leading-relaxed mb-4" set:html={t("backendpage.02")}></p>
+                    <p class="text-base text-tone-400 leading-relaxed mb-6" set:html={t("backendpage.03")}></p>
                     <a href={translatePath("/sdk")}
                        class="inline-flex items-center gap-2 text-sm font-medium text-primary-light hover:text-primary/80 transition-colors">
                         {t("backendpage.link.sdk")}
@@ -197,10 +197,10 @@ import ChapterRule from "../ChapterRule.astro";
                 </div>
                 <div class="lg:col-span-7 space-y-5">
                     <div class="frame overflow-hidden">
-                        <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                            <span class="font-mono text-xs text-surface-400">{t("backendpage.04")}</span>
+                        <div class="px-4 py-3 border-b border-tone-800/80 bg-tone-900/50">
+                            <span class="font-mono text-xs text-tone-400">{t("backendpage.04")}</span>
                         </div>
-                        <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={sdkCode}></code></pre>
+                        <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-tone-300"><code set:html={sdkCode}></code></pre>
                     </div>
                 </div>
             </div>
@@ -216,20 +216,20 @@ import ChapterRule from "../ChapterRule.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
                 <div class="lg:col-span-5">
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("backendpage.05")}</h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4" set:html={t("backendpage.06")}></p>
-                    <p class="text-base text-surface-400 leading-relaxed" set:html={t("backendpage.07")}></p>
+                    <h2 class="text-3xl sm:text-4xl text-tone-max mb-5">{t("backendpage.05")}</h2>
+                    <p class="text-base text-tone-400 leading-relaxed mb-4" set:html={t("backendpage.06")}></p>
+                    <p class="text-base text-tone-400 leading-relaxed" set:html={t("backendpage.07")}></p>
                 </div>
                 {/* Its own figure. The home page shows two live tables mirroring each
                     other; this section's claim is different — a write from anywhere
                     produces the same event — so the figure is the sources converging. */}
                 <div class="lg:col-span-7">
                     <figure class="frame overflow-hidden">
-                        <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                            <span class="font-mono text-xs text-surface-400">orders · four writers, one stream</span>
-                            <span class="font-mono text-xs text-surface-500">LISTEN/NOTIFY</span>
+                        <div class="px-4 py-3 border-b border-tone-800/80 bg-tone-900/50 flex items-center justify-between">
+                            <span class="font-mono text-xs text-tone-400">orders · four writers, one stream</span>
+                            <span class="font-mono text-xs text-tone-500">LISTEN/NOTIFY</span>
                         </div>
-                        <ul class="divide-y divide-surface-800/70 font-mono text-xs">
+                        <ul class="divide-y divide-tone-800/70 font-mono text-xs">
                             {[
                                 ["REST", "PATCH /api/data/orders/42", "your app"],
                                 ["psql", "UPDATE orders SET status = 'shipped' WHERE id = 42;", "a person at a terminal"],
@@ -239,15 +239,15 @@ import ChapterRule from "../ChapterRule.astro";
                                 <li class="grid grid-cols-[4.5rem_1fr] gap-x-4 px-5 py-3">
                                     <span class="text-primary-light">{source}</span>
                                     <span class="min-w-0">
-                                        <span class="block truncate text-surface-200">{statement}</span>
-                                        <span class="block text-surface-500">{who}</span>
+                                        <span class="block truncate text-tone-200">{statement}</span>
+                                        <span class="block text-tone-500">{who}</span>
                                     </span>
                                 </li>
                             ))}
                         </ul>
-                        <div class="border-t border-surface-800/80 bg-surface-900/40 px-5 py-4 font-mono text-xs">
-                            <p class="text-surface-300"><span class="text-surface-500">→</span> one change event: <span class="text-white">orders · UPDATE · id 42</span></p>
-                            <p class="mt-2 text-surface-400"><span class="text-surface-500">→</span> each subscriber re-reads the row under its own access rules</p>
+                        <div class="border-t border-tone-800/80 bg-tone-900/40 px-5 py-4 font-mono text-xs">
+                            <p class="text-tone-300"><span class="text-tone-500">→</span> one change event: <span class="text-tone-max">orders · UPDATE · id 42</span></p>
+                            <p class="mt-2 text-tone-400"><span class="text-tone-500">→</span> each subscriber re-reads the row under its own access rules</p>
                         </div>
                         <figcaption class="sr-only">Four ways to write to the orders table — the REST API, psql, a cron job and Studio's SQL editor — all produce the same change event, which each subscriber receives filtered by its own access rules.</figcaption>
                     </figure>
@@ -263,27 +263,27 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <h2 class="text-3xl sm:text-4xl text-white">{t("backendpage.08")}</h2>
-                <p class="mt-lead text-lg leading-8 text-surface-400" set:html={t("backendpage.09")}></p>
+                <h2 class="text-3xl sm:text-4xl text-tone-max">{t("backendpage.08")}</h2>
+                <p class="mt-lead text-lg leading-8 text-tone-400" set:html={t("backendpage.09")}></p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                 <div class="frame overflow-hidden flex flex-col">
-                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">{t("backendpage.10")}</span>
-                        <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">{t("backendpage.11")}</span>
+                    <div class="px-4 py-3 border-b border-tone-800/80 bg-tone-900/50 flex items-center justify-between">
+                        <span class="font-mono text-xs text-tone-400">{t("backendpage.10")}</span>
+                        <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-tone-800 text-tone-400">{t("backendpage.11")}</span>
                     </div>
-                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={rulesCode}></code></pre>
+                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-tone-300 flex-1"><code set:html={rulesCode}></code></pre>
                 </div>
 
-                <div class="rounded-2xl border border-primary/20 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col relative">
+                <div class="rounded-2xl border border-primary/20 bg-tone-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col relative">
                     <div class="pointer-events-none absolute inset-0" aria-hidden="true"
                          style="background: radial-gradient(500px 260px at 70% 0%, rgba(0,112,244,0.10), transparent 70%);"></div>
-                    <div class="relative px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">{t("backendpage.12")}</span>
+                    <div class="relative px-4 py-3 border-b border-tone-800/80 bg-tone-900/50 flex items-center justify-between">
+                        <span class="font-mono text-xs text-tone-400">{t("backendpage.12")}</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary-light ring-1 ring-inset ring-primary/20">generated</span>
                     </div>
-                    <pre class="relative p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={policyCode}></code></pre>
+                    <pre class="relative p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-tone-300 flex-1"><code set:html={policyCode}></code></pre>
                 </div>
             </div>
 
@@ -297,8 +297,8 @@ import ChapterRule from "../ChapterRule.astro";
                         <path d="m12 5 7 7-7 7"/>
                     </svg>
                 </a>
-                <span class="text-surface-700">·</span>
-                <span class="text-sm text-surface-500" set:html={t("backendpage.13")}></span>
+                <span class="text-tone-700">·</span>
+                <span class="text-sm text-tone-500" set:html={t("backendpage.13")}></span>
             </div>
         </div>
     </section>
@@ -311,15 +311,15 @@ import ChapterRule from "../ChapterRule.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
                 <div class="lg:col-span-5">
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("backendpage.14")}</h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">{t("backendpage.15")}</p>
-                    <p class="text-base text-surface-400 leading-relaxed mb-6">{t("backendpage.16")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-tone-max mb-5">{t("backendpage.14")}</h2>
+                    <p class="text-base text-tone-400 leading-relaxed mb-4">{t("backendpage.15")}</p>
+                    <p class="text-base text-tone-400 leading-relaxed mb-6">{t("backendpage.16")}</p>
                     <div class="space-y-4">
                         {alsoShipped.map(item => (
                                 <div class="flex gap-3">
                                     <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60"></span>
-                                    <p class="text-sm text-surface-400 leading-relaxed">
-                                        <span class="text-white">{item.title}.</span> {item.desc}
+                                    <p class="text-sm text-tone-400 leading-relaxed">
+                                        <span class="text-tone-max">{item.title}.</span> {item.desc}
                                     </p>
                                 </div>
                         ))}
@@ -328,17 +328,17 @@ import ChapterRule from "../ChapterRule.astro";
 
                 <div class="lg:col-span-7">
                     <div class="frame overflow-hidden">
-                        <div class="px-4 py-3 flex items-center gap-1.5 border-b border-surface-800/80 bg-surface-900/50">
+                        <div class="px-4 py-3 flex items-center gap-1.5 border-b border-tone-800/80 bg-tone-900/50">
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <span class="ml-2 font-mono text-xs text-surface-400">{t("backendpage.17")}</span>
+                            <span class="ml-2 font-mono text-xs text-tone-400">{t("backendpage.17")}</span>
                         </div>
-                        <ul class="divide-y divide-surface-800/60">
+                        <ul class="divide-y divide-tone-800/60">
                             {routes.map(route => (
-                                    <li class="px-5 py-4 flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-5 hover:bg-surface-900/40 transition-colors">
+                                    <li class="px-5 py-4 flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-5 hover:bg-tone-900/40 transition-colors">
                                         <code class="font-mono text-xs sm:text-sm text-primary-light shrink-0 sm:w-[15.5rem]">{route.path}</code>
-                                        <span class="text-sm text-surface-400 leading-relaxed">{route.note}</span>
+                                        <span class="text-sm text-tone-400 leading-relaxed">{route.note}</span>
                                     </li>
                             ))}
                         </ul>
@@ -355,18 +355,18 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <h2 class="text-3xl sm:text-4xl text-white">{t("backendpage.18")}</h2>
-                <p class="mt-lead text-lg leading-8 text-surface-400">{t("backendpage.19")}</p>
+                <h2 class="text-3xl sm:text-4xl text-tone-max">{t("backendpage.18")}</h2>
+                <p class="mt-lead text-lg leading-8 text-tone-400">{t("backendpage.19")}</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="frame overflow-hidden flex flex-col">
-                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">{t("backendpage.20")}</span>
+                    <div class="px-4 py-3 border-b border-tone-800/80 bg-tone-900/50 flex items-center justify-between">
+                        <span class="font-mono text-xs text-tone-400">{t("backendpage.20")}</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 ring-1 ring-inset ring-orange-500/20">Hono</span>
                     </div>
-                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={honoCode}></code></pre>
-                    <ul class="px-5 pb-5 space-y-2 text-sm text-surface-400">
+                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-tone-300 flex-1"><code set:html={honoCode}></code></pre>
+                    <ul class="px-5 pb-5 space-y-2 text-sm text-tone-400">
                         <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f1")}</li>
                         <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f2")}</li>
                         <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f3")}</li>
@@ -374,12 +374,12 @@ import ChapterRule from "../ChapterRule.astro";
                 </div>
 
                 <div class="frame overflow-hidden flex flex-col">
-                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">{t("backendpage.21")}</span>
+                    <div class="px-4 py-3 border-b border-tone-800/80 bg-tone-900/50 flex items-center justify-between">
+                        <span class="font-mono text-xs text-tone-400">{t("backendpage.21")}</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20">Drizzle</span>
                     </div>
-                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={drizzleCode}></code></pre>
-                    <ul class="px-5 pb-5 space-y-2 text-sm text-surface-400">
+                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-tone-300 flex-1"><code set:html={drizzleCode}></code></pre>
+                    <ul class="px-5 pb-5 space-y-2 text-sm text-tone-400">
                         <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f1")}</li>
                         <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f2")}</li>
                         <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f3")}</li>
@@ -396,8 +396,8 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <h2 class="text-3xl sm:text-4xl text-white">{t("backendpage.23")}</h2>
-                <p class="mt-lead text-lg leading-8 text-surface-400" set:html={t("backendpage.24")}></p>
+                <h2 class="text-3xl sm:text-4xl text-tone-max">{t("backendpage.23")}</h2>
+                <p class="mt-lead text-lg leading-8 text-tone-400" set:html={t("backendpage.24")}></p>
             </div>
             <SplitLayerDemo client:visible/>
             <div class="mt-10 text-center">

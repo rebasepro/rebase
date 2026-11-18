@@ -434,7 +434,7 @@ sql: DEFAULT_SQL }];
     };
 
     return (
-        <div className="flex h-[560px] w-full rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-frame shadow-2xl text-surface-300 text-sm pointer-events-none select-none">
+        <div className="flex h-[560px] w-full rounded-xl overflow-hidden ring-1 ring-tone-700 bg-surface-frame shadow-2xl text-tone-300 text-sm pointer-events-none select-none">
             {/* ── Sidebar ── */}
             <div className="w-[200px] border-r border-hairline flex flex-col shrink-0">
                 {/* Sidebar tabs */}
@@ -444,7 +444,7 @@ sql: DEFAULT_SQL }];
                             key={tab}
                             onClick={() => setSidebarTab(tab)}
                             className={`flex-1 py-2 text-[10px] uppercase tracking-wider font-semibold transition-colors ${
-                                sidebarTab === tab ? "text-primary border-b-2 border-primary bg-surface-sheet" : "text-surface-500 hover:text-surface-300"
+                                sidebarTab === tab ? "text-primary border-b-2 border-primary bg-surface-sheet" : "text-tone-500 hover:text-tone-300"
                             }`}
                         >
                             {tab}
@@ -458,7 +458,7 @@ sql: DEFAULT_SQL }];
                         <div key={schema.name}>
                             <button
                                 onClick={() => toggleSchema(schema.name)}
-                                className="flex items-center gap-1 px-1.5 py-1 text-[10px] font-semibold text-surface-500 tracking-wider w-full text-left hover:text-surface-300 transition-colors"
+                                className="flex items-center gap-1 px-1.5 py-1 text-[10px] font-semibold text-tone-500 tracking-wider w-full text-left hover:text-tone-300 transition-colors"
                             >
                                 <span>{expandedSchemas.has(schema.name) ? "▾" : "▸"}</span>
                                 {schema.name}
@@ -467,7 +467,7 @@ sql: DEFAULT_SQL }];
                                 <div key={table.name}>
                                     <button
                                         onClick={() => toggleTable(table.name)}
-                                        className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-surface-400 hover:bg-surface-hover cursor-pointer w-full text-left transition-colors"
+                                        className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-tone-400 hover:bg-surface-hover cursor-pointer w-full text-left transition-colors"
                                     >
                                         <svg className="w-3 h-3 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h16M4 17h16"/></svg>
                                         <span className="truncate flex-1 font-mono text-[11px]">{table.name}</span>
@@ -478,16 +478,16 @@ sql: DEFAULT_SQL }];
                                             {table.columns.map(col => (
                                                 <div
                                                     key={col.name}
-                                                    className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] text-surface-500 hover:text-surface-300 hover:bg-surface-hover cursor-pointer transition-colors"
+                                                    className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] text-tone-500 hover:text-tone-300 hover:bg-surface-hover cursor-pointer transition-colors"
                                                     onClick={() => handleSQLChange(activeTab.sql + col.name)}
                                                 >
                                                     {col.isPK ? (
                                                         <svg className="w-2.5 h-2.5 text-amber-400 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
                                                     ) : (
-                                                        <span className="w-2.5 h-2.5 flex items-center justify-center text-[8px] text-surface-600">·</span>
+                                                        <span className="w-2.5 h-2.5 flex items-center justify-center text-[8px] text-tone-600">·</span>
                                                     )}
                                                     <span className="font-mono">{col.name}</span>
-                                                    <span className="ml-auto text-surface-600 font-mono text-[9px]">{col.type}</span>
+                                                    <span className="ml-auto text-tone-600 font-mono text-[9px]">{col.type}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -498,7 +498,7 @@ sql: DEFAULT_SQL }];
                     ))}
 
                     {sidebarTab === "snippets" && (
-                        <div className="p-3 text-center text-surface-600 text-[11px]">
+                        <div className="p-3 text-center text-tone-600 text-[11px]">
                             <div className="mb-2">
                                 <svg className="w-8 h-8 mx-auto opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                             </div>
@@ -507,7 +507,7 @@ sql: DEFAULT_SQL }];
                     )}
 
                     {sidebarTab === "history" && (
-                        <div className="p-3 text-center text-surface-600 text-[11px]">
+                        <div className="p-3 text-center text-tone-600 text-[11px]">
                             <div className="mb-2">
                                 <svg className="w-8 h-8 mx-auto opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </div>
@@ -530,7 +530,7 @@ sql: DEFAULT_SQL }];
                                 className={`group flex items-center gap-1.5 px-3 py-2 text-xs border-b-2 transition-colors whitespace-nowrap ${
                                     activeTabId === tab.id
                                         ? "border-primary text-primary bg-surface-field"
-                                        : "border-transparent text-surface-500 hover:text-surface-300"
+                                        : "border-transparent text-tone-500 hover:text-tone-300"
                                 }`}
                             >
                                 <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -543,29 +543,29 @@ sql: DEFAULT_SQL }];
                                 )}
                             </button>
                         ))}
-                        <button onClick={addTab} aria-label="Add new query tab" className="p-2 text-surface-500 hover:text-surface-300 transition-colors">
+                        <button onClick={addTab} aria-label="Add new query tab" className="p-2 text-tone-500 hover:text-tone-300 transition-colors">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
                         </button>
                     </div>
 
                     {/* Right toolbar */}
                     <div className="flex shrink-0 items-center gap-1.5 pr-2">
-                        <button className="p-1.5 text-surface-500 hover:text-surface-300 transition-colors" title="Format SQL" aria-label="Format SQL">
+                        <button className="p-1.5 text-tone-500 hover:text-tone-300 transition-colors" title="Format SQL" aria-label="Format SQL">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16"/></svg>
                         </button>
-                        <button className="px-2 py-1 text-[10px] text-surface-500 hover:text-surface-300 transition-colors">EXPLAIN</button>
+                        <button className="px-2 py-1 text-[10px] text-tone-500 hover:text-tone-300 transition-colors">EXPLAIN</button>
                         <div className="h-4 w-px bg-hairline mx-1"/>
                         <label className="flex items-center gap-1.5 cursor-pointer select-none" onClick={() => setAutoLimit(!autoLimit)}>
-                            <span className="text-[10px] text-surface-500">LIMIT 1000</span>
+                            <span className="text-[10px] text-tone-500">LIMIT 1000</span>
                             <div className={`w-3.5 h-3.5 rounded border ${autoLimit ? "bg-primary border-primary" : "border-hairline-strong"} flex items-center justify-center transition-colors`}>
-                                {autoLimit && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                                {autoLimit && <svg className="w-2.5 h-2.5 text-tone-max" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
                             </div>
                         </label>
                         <div className="h-4 w-px bg-hairline mx-1"/>
 
                         {/* DB Selector */}
-                        <div className="px-2 py-1 rounded bg-surface-raised text-[10px] text-surface-400 font-mono flex items-center gap-1 cursor-pointer">
-                            <svg className="w-3 h-3 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
+                        <div className="px-2 py-1 rounded bg-surface-raised text-[10px] text-tone-400 font-mono flex items-center gap-1 cursor-pointer">
+                            <svg className="w-3 h-3 text-tone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
                             {selectedDb}
                         </div>
 
@@ -590,14 +590,14 @@ sql: DEFAULT_SQL }];
                     {/* Editor area */}
                     <div className="relative flex min-h-[200px]" style={{ height: "50%" }}>
                         {/* Line numbers */}
-                        <div className="py-3 px-2 text-right text-[11px] font-mono text-surface-600 leading-[1.6rem] select-none border-r border-hairline bg-surface-frame shrink-0">
+                        <div className="py-3 px-2 text-right text-[11px] font-mono text-tone-600 leading-[1.6rem] select-none border-r border-hairline bg-surface-frame shrink-0">
                             {sqlLines.map((_, i) => (
                                 <div key={i}>{i + 1}</div>
                             ))}
                         </div>
                         {/* Code display + hidden textarea */}
                         <div className="flex-1 relative overflow-auto bg-surface-frame">
-                            <pre className="py-3 px-4 text-[12px] font-mono leading-[1.6rem] whitespace-pre-wrap pointer-events-none absolute inset-0 text-surface-300">
+                            <pre className="py-3 px-4 text-[12px] font-mono leading-[1.6rem] whitespace-pre-wrap pointer-events-none absolute inset-0 text-tone-300">
                                 {highlightSQL(activeTab.sql)}
                             </pre>
                             <textarea
@@ -624,7 +624,7 @@ sql: DEFAULT_SQL }];
                     <div className="flex-1 flex flex-col min-h-0 bg-surface-frame">
                         {/* Results header */}
                         <div className="p-2 px-4 bg-surface-sheet border-b border-hairline flex items-center shrink-0">
-                            <span className="font-semibold text-surface-500 uppercase tracking-widest text-[10px]">QUERY RESULTS</span>
+                            <span className="font-semibold text-tone-500 uppercase tracking-widest text-[10px]">QUERY RESULTS</span>
                         </div>
 
                         {/* Results content */}
@@ -633,7 +633,7 @@ sql: DEFAULT_SQL }];
                                 <div className="flex items-center justify-center h-full">
                                     <div className="text-center">
                                         <svg className="w-8 h-8 mx-auto mb-3 animate-spin text-primary opacity-60" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                        <span className="text-surface-500 text-[11px] font-mono animate-pulse">EXECUTING...</span>
+                                        <span className="text-tone-500 text-[11px] font-mono animate-pulse">EXECUTING...</span>
                                     </div>
                                 </div>
                             ) : result ? (
@@ -641,10 +641,10 @@ sql: DEFAULT_SQL }];
                                     {/* Execution info */}
                                     <div className="flex items-center justify-between px-4 py-1.5 bg-surface-sheet border-b border-hairline text-[10px] shrink-0">
                                         <span className="text-green-400 font-medium">✓ {result.rowCount} rows · {result.execTime}ms</span>
-                                        <span className="text-surface-500 font-mono">public.posts</span>
+                                        <span className="text-tone-500 font-mono">public.posts</span>
                                     </div>
                                     {/* Table header */}
-                                    <div className="flex text-[10px] font-semibold text-surface-500 tracking-wider uppercase border-b border-hairline bg-surface-field shrink-0">
+                                    <div className="flex text-[10px] font-semibold text-tone-500 tracking-wider uppercase border-b border-hairline bg-surface-field shrink-0">
                                         {result.columns.map(col => (
                                             <div key={col} className="px-3 py-2 flex-1 min-w-[80px]">{col}</div>
                                         ))}
@@ -654,12 +654,12 @@ sql: DEFAULT_SQL }];
                                         {result.rows.map((row, i) => (
                                             <div key={i} className="flex text-xs border-b border-hairline hover:bg-surface-hover transition-colors">
                                                 {result.columns.map(col => (
-                                                    <div key={col} className="px-3 py-2 flex-1 min-w-[80px] truncate text-surface-300 font-mono text-[11px]">
+                                                    <div key={col} className="px-3 py-2 flex-1 min-w-[80px] truncate text-tone-300 font-mono text-[11px]">
                                                         {col === "status" ? (
                                                             <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-medium ${
                                                                 row[col] === "published" ? "bg-green-950 text-green-300" :
                                                                 row[col] === "draft" ? "bg-amber-950 text-amber-300" :
-                                                                "bg-surface-raised text-surface-400"
+                                                                "bg-surface-raised text-tone-400"
                                                             }`}>{String(row[col])}</span>
                                                         ) : (
                                                             String(row[col] ?? "")
@@ -673,23 +673,23 @@ sql: DEFAULT_SQL }];
                                     <div className="p-2 px-4 border-t border-hairline bg-surface-sheet flex justify-between items-center shrink-0">
                                         <div className="flex space-x-4">
                                             <div className="flex items-center text-[10px]">
-                                                <span className="font-semibold text-surface-600 mr-2 uppercase tracking-tighter">ROWS</span>
-                                                <span className="font-mono text-surface-400">{result.rowCount}</span>
+                                                <span className="font-semibold text-tone-600 mr-2 uppercase tracking-tighter">ROWS</span>
+                                                <span className="font-mono text-tone-400">{result.rowCount}</span>
                                             </div>
                                             <div className="flex items-center text-[10px]">
-                                                <span className="font-semibold text-surface-600 mr-2 uppercase tracking-tighter">TIME</span>
-                                                <span className="font-mono text-surface-400">{result.execTime}ms</span>
+                                                <span className="font-semibold text-tone-600 mr-2 uppercase tracking-tighter">TIME</span>
+                                                <span className="font-mono text-tone-400">{result.execTime}ms</span>
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button className="text-[10px] text-surface-500 hover:text-surface-300 uppercase font-semibold transition-colors">Copy MD</button>
-                                            <button className="text-[10px] text-surface-500 hover:text-surface-300 uppercase font-semibold transition-colors">Export JSON</button>
-                                            <button className="text-[10px] text-surface-500 hover:text-surface-300 uppercase font-semibold transition-colors">Export CSV</button>
+                                            <button className="text-[10px] text-tone-500 hover:text-tone-300 uppercase font-semibold transition-colors">Copy MD</button>
+                                            <button className="text-[10px] text-tone-500 hover:text-tone-300 uppercase font-semibold transition-colors">Export JSON</button>
+                                            <button className="text-[10px] text-tone-500 hover:text-tone-300 uppercase font-semibold transition-colors">Export CSV</button>
                                         </div>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex items-center justify-center h-full text-surface-600">
+                                <div className="flex items-center justify-center h-full text-tone-600">
                                     <div className="text-center">
                                         <svg className="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                         <p className="text-[11px]">Press <kbd className="px-1.5 py-0.5 rounded bg-surface-raised text-[10px] font-mono">⌘ Enter</kbd> to run</p>

@@ -224,22 +224,22 @@ const COLUMNS = [
                 </div>
             </div>
         </div>
-        <p class="mt-3 font-mono text-2xs text-surface-400">
+        <p class="mt-3 font-mono text-2xs text-tone-400">
             OrderDesk.tsx · {t("whatsnew.code.caption")} · {t("whatsnew.preview.caption")}
         </p>
 
-        <div class="mt-content grid grid-cols-1 md:grid-cols-3 border-t border-white/8">
+        <div class="mt-content grid grid-cols-1 md:grid-cols-3 border-t border-tone-max/8">
             {COLUMNS.map(({ tag, title, desc, handle }, i) => (
                 <div class:list={[
                     "py-10",
-                    i === 0 && "md:border-r border-white/8 md:pr-8",
-                    i === 1 && "md:border-r border-white/8 md:px-8 border-t md:border-t-0",
-                    i === 2 && "md:pl-8 border-t md:border-t-0 border-white/8",
+                    i === 0 && "md:border-r border-tone-max/8 md:pr-8",
+                    i === 1 && "md:border-r border-tone-max/8 md:px-8 border-t md:border-t-0",
+                    i === 2 && "md:pl-8 border-t md:border-t-0 border-tone-max/8",
                 ]}>
-                    <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-400">{t(tag)}</p>
+                    <p class="font-mono text-2xs uppercase tracking-[0.18em] text-tone-400">{t(tag)}</p>
                     <h3 class="mt-3 font-headers text-lg">{t(title)}</h3>
                     <p class="mt-2 text-sm text-page-copy leading-relaxed" set:html={t(desc)}></p>
-                    <p class="mt-4 font-mono text-2xs text-surface-400">{handle}</p>
+                    <p class="mt-4 font-mono text-2xs text-tone-400">{handle}</p>
                 </div>
             ))}
         </div>
@@ -255,12 +255,12 @@ const COLUMNS = [
             </a>
             <a
                 href="/blog/2026-11-09-rebase-0-29-your-admin-panel-in-parts"
-                class="group inline-flex items-start gap-2.5 text-sm text-surface-400 hover:text-white transition-colors"
+                class="group inline-flex items-start gap-2.5 text-sm text-tone-400 hover:text-tone-max transition-colors"
             >
-                <span class="mt-px inline-flex flex-none items-center rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wider bg-white/5 text-surface-300 ring-1 ring-white/10">
+                <span class="mt-px inline-flex flex-none items-center rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wider bg-tone-max/5 text-tone-300 ring-1 ring-tone-max/10">
                     {t("label.blog")}
                 </span>
-                <span class="max-w-[30rem] leading-relaxed group-hover:underline underline-offset-4 decoration-white/30">
+                <span class="max-w-[30rem] leading-relaxed group-hover:underline underline-offset-4 decoration-tone-max/30">
                     {t("whatsnew.postLink")}
                 </span>
             </a>
@@ -376,6 +376,6 @@ const COLUMNS = [
     section :global(p code) {
         font-family: var(--font-mono);
         font-size: 0.92em;
-        color: var(--color-surface-200);
+        color: var(--tone-200);
     }
 </style>

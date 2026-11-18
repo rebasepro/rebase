@@ -32,7 +32,7 @@ const t = useTranslations(lang);
 const DbIcon = Database, RestIcon = Globe, SdkIcon = Code, ViewIcon = TableProperties, FormIcon = LayoutDashboard;
 // Plate 03's call: a real @rebasepro/mcp tool with its real arguments, filtering
 // on the sample table's own field. Highlighted like the samples above.
-const TOOL_CALL_HTML = `<span class="text-white">query_table</span>({
+const TOOL_CALL_HTML = `<span class="text-tone-max">query_table</span>({
   <span class="text-blue-300">table</span>: <span class="text-green-400">"products"</span>,
   <span class="text-blue-300">where</span>: { <span class="text-blue-300">in_stock</span>: <span class="text-green-400">"eq.true"</span> },
   <span class="text-blue-300">orderBy</span>: <span class="text-green-400">"price:desc"</span>,
@@ -43,7 +43,7 @@ import ChapterRule from "./ChapterRule.astro";
 
 <section id="collection-layers" class="chapter ground-chroma ground-claim relative z-0 py-chapter" style="--hue: var(--color-primary)">
     <div class="mx-auto max-w-6xl px-6 lg:px-8">
-        <ChapterRule label={t("productpage.layers.badge")} dot="text-white" />
+        <ChapterRule label={t("productpage.layers.badge")} dot="text-tone-max" />
         <div class="mt-lead max-w-[42rem] animate-on-scroll fade-in-up">
             <h2 class="font-headers text-display-2 text-balance">{t("productpage.layers.title")}</h2>
             <p class="mt-lead max-w-[38rem] text-lg">{t("productpage.layers.subtitle")}</p>
@@ -55,10 +55,10 @@ import ChapterRule from "./ChapterRule.astro";
             {/* ── The file ─────────────────────────────────────────────── */}
             <div class="frame mx-auto w-full max-w-[34rem]">
                 <div class="frame-head">
-                    <span class="text-surface-200">products.ts</span>
+                    <span class="text-tone-200">products.ts</span>
                     <span class="ml-auto">{t("productpage.layers.file")}</span>
                 </div>
-                <pre class="px-5 py-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
+                <pre class="px-5 py-5 font-mono text-2xs leading-relaxed text-tone-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
             </div>
 
             {/* ── The fork: one stem, one bar, two drops ───────────────── */}
@@ -86,29 +86,29 @@ import ChapterRule from "./ChapterRule.astro";
 
                     {/* A product name alone tells a first-time visitor nothing; the line
                         under it says what the plate holds in words they already have. */}
-                    <div class="relative px-6 py-4 border-b border-white/8">
+                    <div class="relative px-6 py-4 border-b border-tone-max/8">
                         <div class="flex items-baseline gap-3">
                             <span class="eyebrow">01</span>
-                            <span class="text-lg text-white">{t("productpage.layers.l1")}</span>
+                            <span class="text-lg text-tone-max">{t("productpage.layers.l1")}</span>
                             <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-primary-light">{t("productpage.layer1.state")}</span>
                         </div>
-                        <p class="mt-1.5 text-sm text-surface-400">{t("productpage.layers.l1.desc")}</p>
+                        <p class="mt-1.5 text-sm text-tone-400">{t("productpage.layers.l1.desc")}</p>
                     </div>
 
-                    <div class="relative grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_13.5rem] border-b border-white/8">
+                    <div class="relative grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_13.5rem] border-b border-tone-max/8">
                         {/* DB schema */}
-                        <div class="md:border-r border-b md:border-b-0 border-white/8">
+                        <div class="md:border-r border-b md:border-b-0 border-tone-max/8">
                             <div class="frame-head"><DbIcon class="w-3 h-3" />{t("power.label.db")}<img src="/img/postgres_elephant.webp" loading="lazy" decoding="async" width="540" height="557" class="h-3 w-auto opacity-35 grayscale filter brightness-200 ml-auto" alt=""/></div>
-                            <pre class="p-4 font-mono text-2xs leading-relaxed text-surface-400 overflow-x-auto" set:html={SQL_HTML}></pre>
+                            <pre class="p-4 font-mono text-2xs leading-relaxed text-tone-400 overflow-x-auto" set:html={SQL_HTML}></pre>
                         </div>
                         {/* REST */}
                         <div>
                             <div class="frame-head"><RestIcon class="w-3 h-3" />{t("power.label.rest")}</div>
-                            <div class="divide-y divide-white/6">
+                            <div class="divide-y divide-tone-max/6">
                                 {SAMPLE_ENDPOINTS.map(ep => (
                                     <div class="flex items-center justify-between gap-2 px-3 py-2.5">
                                         <span class={`flex-shrink-0 text-3xs font-semibold border px-1.5 py-0.5 rounded font-mono ${ep.color}`}>{ep.method}</span>
-                                        <span class="font-mono text-3xs text-surface-400 truncate text-right">{ep.path}</span>
+                                        <span class="font-mono text-3xs text-tone-400 truncate text-right">{ep.path}</span>
                                     </div>
                                 ))}
                             </div>
@@ -118,39 +118,39 @@ import ChapterRule from "./ChapterRule.astro";
                     {/* Typed SDK */}
                     <div class="relative">
                         <div class="frame-head"><SdkIcon class="w-3 h-3" />{t("power.label.sdk")}<span class="ml-auto text-3xs font-semibold text-blue-400">TS</span></div>
-                        <pre class="p-4 font-mono text-2xs leading-relaxed text-surface-400 overflow-x-auto" set:html={SDK_HTML}></pre>
+                        <pre class="p-4 font-mono text-2xs leading-relaxed text-tone-400 overflow-x-auto" set:html={SDK_HTML}></pre>
                     </div>
 
-                    <p class="relative px-6 py-4 text-sm text-surface-400 border-t border-white/8">{t("productpage.layers.l1.note")}</p>
+                    <p class="relative px-6 py-4 text-sm text-tone-400 border-t border-tone-max/8">{t("productpage.layers.l1.note")}</p>
                 </div>
 
                 {/* ── Layer 02 · Rebase CMS ────────────────────────────── */}
-                <div class="cl-layer relative overflow-hidden rounded-2xl border border-white/10 bg-surface-well/70">
-                    <div class="px-6 py-4 border-b border-white/8">
+                <div class="cl-layer relative overflow-hidden rounded-2xl border border-tone-max/10 bg-surface-well/70">
+                    <div class="px-6 py-4 border-b border-tone-max/8">
                         <div class="flex items-baseline gap-3">
                             <span class="eyebrow">02</span>
-                            <span class="text-lg text-white">{t("productpage.layers.l2")}</span>
-                            <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-surface-500">{t("productpage.layer2.state")}</span>
+                            <span class="text-lg text-tone-max">{t("productpage.layers.l2")}</span>
+                            <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-tone-500">{t("productpage.layer2.state")}</span>
                         </div>
-                        <p class="mt-1.5 text-sm text-surface-400">{t("productpage.layers.l2.desc")}</p>
+                        <p class="mt-1.5 text-sm text-tone-400">{t("productpage.layers.l2.desc")}</p>
                     </div>
 
                     {/* Collection view — the real VirtualTable's proportions */}
-                    <div class="border-b border-white/8">
+                    <div class="border-b border-tone-max/8">
                         <div class="frame-head"><ViewIcon class="w-3 h-3" />{t("power.label.admin")}</div>
-                        <div class="flex items-center justify-between px-4 py-2 border-b border-white/6">
-                            <span class="text-sm text-white font-medium">Products</span>
+                        <div class="flex items-center justify-between px-4 py-2 border-b border-tone-max/6">
+                            <span class="text-sm text-tone-max font-medium">Products</span>
                             <div class="flex items-center gap-1.5">
                                 <div class="h-8 rounded-lg px-2.5 flex items-center gap-1.5 border border-hairline bg-surface-card">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
-                                    <span class="text-2xs text-surface-500">Search…</span>
+                                    <span class="text-2xs text-tone-500">Search…</span>
                                 </div>
                                 <div class="w-8 h-8 rounded-lg flex items-center justify-center border border-hairline bg-surface-card">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                                 </div>
                             </div>
                         </div>
-                        <div class="flex text-3xs font-semibold text-surface-500 tracking-wider uppercase border-b border-white/6 bg-surface-sheet">
+                        <div class="flex text-3xs font-semibold text-tone-500 tracking-wider uppercase border-b border-tone-max/6 bg-surface-sheet">
                             <div class="hidden sm:block px-3 py-2.5 w-[72px] text-center">ID</div>
                             <div class="px-3 py-2.5 flex-1">Name</div>
                             <div class="px-3 py-2.5 w-[100px]">Category</div>
@@ -158,11 +158,11 @@ import ChapterRule from "./ChapterRule.astro";
                             <div class="px-3 py-2.5 w-14 text-center">Stock</div>
                         </div>
                         {SAMPLE_ROWS.map((row) => (
-                            <div class="flex text-sm border-b border-white/5 last:border-0">
-                                <div class="hidden sm:block px-3 py-3 w-[72px] text-surface-500 font-mono text-xs text-center truncate">{row.id}</div>
-                                <div class="px-3 py-3 text-surface-200 flex-1 truncate">{row.name}</div>
+                            <div class="flex text-sm border-b border-tone-max/5 last:border-0">
+                                <div class="hidden sm:block px-3 py-3 w-[72px] text-tone-500 font-mono text-xs text-center truncate">{row.id}</div>
+                                <div class="px-3 py-3 text-tone-200 flex-1 truncate">{row.name}</div>
                                 <div class="px-3 py-3 w-[100px]"><span class={row.catColor}>{row.cat}</span></div>
-                                <div class="px-3 py-3 text-surface-200 text-right w-14">{row.price}</div>
+                                <div class="px-3 py-3 text-tone-200 text-right w-14">{row.price}</div>
                                 <div class="px-3 py-3 w-14 flex justify-center">
                                     <div class={`switch-track scale-[0.68] origin-center ${row.stock ? 'switch-track-on' : ''}`}>
                                         <div class={`switch-knob ${row.stock ? 'switch-knob-on' : ''}`}></div>
@@ -177,33 +177,33 @@ import ChapterRule from "./ChapterRule.astro";
                         <div class="frame-head"><FormIcon class="w-3 h-3" />{t("power.label.form")}</div>
                         <div class="px-5 pt-5 pb-5 space-y-4">
                             <div class="flex items-center justify-between">
-                                <span class="text-base font-medium text-white">Wireless Headphones</span>
+                                <span class="text-base font-medium text-tone-max">Wireless Headphones</span>
                                 <span class="inline-flex items-center gap-1 text-3xs font-medium text-green-400 bg-green-950/60 border border-green-800/40 px-1.5 py-0.5 rounded-full">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                                     Saved
                                 </span>
                             </div>
                             <div class="rounded-md bg-surface-raised px-3 py-1.5">
-                                <code class="text-3xs text-surface-500">products/x7kQ2p</code>
+                                <code class="text-3xs text-tone-500">products/x7kQ2p</code>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div class="field min-h-[66px] flex flex-col justify-center">
                                     <span class="field-label text-primary-light">Name <span class="text-red-500">*</span></span>
-                                    <div class="px-3 pt-8 pb-2 text-base leading-6 text-surface-200">Wireless Headphones</div>
+                                    <div class="px-3 pt-8 pb-2 text-base leading-6 text-tone-200">Wireless Headphones</div>
                                 </div>
                                 <div class="field min-h-[66px] flex flex-col justify-center">
                                     <span class="field-label">Category</span>
                                     <div class="px-3 pt-8 pb-2 pr-10 flex items-center">
                                         <span class="chip chip-blue">Electronics</span>
-                                        <svg class="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                        <svg class="absolute right-3 top-1/2 -translate-y-1/2 text-tone-400" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                                     </div>
                                 </div>
                                 <div class="field min-h-[66px] flex flex-col justify-center">
                                     <span class="field-label">Price</span>
-                                    <div class="px-3 pt-8 pb-2 text-base leading-6 text-surface-200 flex items-center gap-1"><span class="text-surface-500">€</span> 129</div>
+                                    <div class="px-3 pt-8 pb-2 text-base leading-6 text-tone-200 flex items-center gap-1"><span class="text-tone-500">€</span> 129</div>
                                 </div>
                                 <div class="field min-h-[66px] pl-4 pr-6 flex items-center justify-between">
-                                    <span class="text-sm text-surface-200">In Stock</span>
+                                    <span class="text-sm text-tone-200">In Stock</span>
                                     <div class="switch-track switch-track-on"><div class="switch-knob switch-knob-on"></div></div>
                                 </div>
                             </div>
@@ -213,7 +213,7 @@ import ChapterRule from "./ChapterRule.astro";
                         </div>
                     </div>
 
-                    <p class="px-6 py-4 text-sm text-surface-400 border-t border-white/8">{t("productpage.layers.l2.note")}</p>
+                    <p class="px-6 py-4 text-sm text-tone-400 border-t border-tone-max/8">{t("productpage.layers.l2.note")}</p>
                 </div>
             </div>
             </div>
@@ -221,40 +221,40 @@ import ChapterRule from "./ChapterRule.astro";
             {/* ── Layer 03 · Rebase MCP ────────────────────────────────── */}
             <div class="relative mt-8 lg:mt-14">
                 <i class="cl-node cl-c-node" aria-hidden="true"></i>
-                <div class="cl-layer relative overflow-hidden rounded-2xl border border-white/10 bg-surface-well/70">
-                    <div class="px-6 py-4 border-b border-white/8">
+                <div class="cl-layer relative overflow-hidden rounded-2xl border border-tone-max/10 bg-surface-well/70">
+                    <div class="px-6 py-4 border-b border-tone-max/8">
                         <div class="flex items-baseline gap-3">
                             <span class="eyebrow">03</span>
-                            <span class="text-lg text-white">{t("productpage.layers.l3")}</span>
-                            <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-surface-500">{t("productpage.layer3.state")}</span>
+                            <span class="text-lg text-tone-max">{t("productpage.layers.l3")}</span>
+                            <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-tone-500">{t("productpage.layer3.state")}</span>
                         </div>
-                        <p class="mt-1.5 text-sm text-surface-400">{t("productpage.layers.l3.desc")}</p>
+                        <p class="mt-1.5 text-sm text-tone-400">{t("productpage.layers.l3.desc")}</p>
                     </div>
 
-                    <div class="grid grid-cols-1 lg:grid-cols-2 border-b border-white/8">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 border-b border-tone-max/8">
                         {/* A real tool from @rebasepro/mcp, with its real arguments. */}
-                        <div class="lg:border-r border-b lg:border-b-0 border-white/8">
-                            <div class="frame-head"><Bot class="w-3 h-3" />{t("productpage.layers.l3.call")}<span class="ml-auto text-surface-400">query_table</span></div>
-<pre class="p-4 font-mono text-2xs leading-relaxed text-surface-400 overflow-x-auto" set:html={TOOL_CALL_HTML}></pre>
+                        <div class="lg:border-r border-b lg:border-b-0 border-tone-max/8">
+                            <div class="frame-head"><Bot class="w-3 h-3" />{t("productpage.layers.l3.call")}<span class="ml-auto text-tone-400">query_table</span></div>
+<pre class="p-4 font-mono text-2xs leading-relaxed text-tone-400 overflow-x-auto" set:html={TOOL_CALL_HTML}></pre>
                         </div>
                         <div>
                             <div class="frame-head"><ShieldCheck class="w-3 h-3" />{t("productpage.layers.l3.result")}<span class="ml-auto text-3xs font-semibold text-emerald-400">RLS</span></div>
-                            <div class="divide-y divide-white/6">
+                            <div class="divide-y divide-tone-max/6">
                                 {SAMPLE_ROWS.filter((r) => r.stock)
                                     .sort((a, b) => Number(b.price.slice(1)) - Number(a.price.slice(1)))
                                     .slice(0, 3)
                                     .map((row) => (
                                         <div class="flex items-center gap-3 px-4 py-2.5 text-sm">
-                                            <span class="font-mono text-2xs text-surface-500">{row.id}</span>
-                                            <span class="flex-1 truncate text-surface-200">{row.name}</span>
-                                            <span class="text-surface-200">{row.price}</span>
+                                            <span class="font-mono text-2xs text-tone-500">{row.id}</span>
+                                            <span class="flex-1 truncate text-tone-200">{row.name}</span>
+                                            <span class="text-tone-200">{row.price}</span>
                                         </div>
                                     ))}
                             </div>
                         </div>
                     </div>
 
-                    <p class="px-6 py-4 text-sm text-surface-400 [&_code]:font-mono [&_code]:text-surface-300" set:html={t("productpage.layers.l3.note")}></p>
+                    <p class="px-6 py-4 text-sm text-tone-400 [&_code]:font-mono [&_code]:text-tone-300" set:html={t("productpage.layers.l3.note")}></p>
                 </div>
             </div>
         </div>
@@ -342,7 +342,7 @@ import ChapterRule from "./ChapterRule.astro";
        as blue dirt and drags the product UI inside it along; opaque, with the
        inset-screen edge `ground-chroma` already gives a `.frame`. */
     .ground-claim .cl-layer {
-        background-color: var(--color-surface-950);
+        background-color: var(--tone-950);
         border-color: rgb(8 9 10 / 0.4);
         box-shadow:
             inset 0 1px 0 rgb(255 255 255 / 0.05),

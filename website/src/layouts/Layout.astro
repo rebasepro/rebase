@@ -213,6 +213,64 @@ const twitterImageType = /\.jpe?g$/.test(ogImage) ? "image/jpeg" : "image/png";
          no runtime <style> to be kept in sync by two different call sites. -->
     <style is:inline set:html={abVariantCss}></style>
 
+    <!-- Theme, before paint. A stored choice wins; with none, the OS preference
+         decides. Same shape as the A/B script below and for the same reason: a
+         view-transition swap re-applies only the attributes the incoming
+         server-rendered <html> carried (data-theme="dark"), and Astro runs an
+         inline script once per session, so apply() is named and re-run on
+         every swap. The header's switch calls window.__rebaseSetTheme. -->
+    <script is:inline>
+    (function(){
+        var KEY = 'rebase-theme';
+        function stored() {
+            try { var v = localStorage.getItem(KEY); return v === 'light' || v === 'dark' ? v : null; }
+            catch (e) { return null; }
+        }
+        function preferred() {
+            return window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        function apply(doc) {
+            var theme = stored() || preferred();
+            var root = (doc || document).documentElement;
+            root.setAttribute('data-theme', theme);
+            // The class is what the kit's runtime reads (see the comment on <html>).
+            root.classList.toggle('dark', theme === 'dark');
+            var meta = (doc || document).querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', theme === 'light' ? '#EFF0F3' : '#090A0C');
+            var buttons = (doc || document).querySelectorAll('.theme-toggle');
+            for (var i = 0; i < buttons.length; i++) {
+                var label = buttons[i].getAttribute(theme === 'light' ? 'data-label-dark' : 'data-label-light');
+                if (label) { buttons[i].setAttribute('aria-label', label); buttons[i].setAttribute('title', label); }
+            }
+        }
+        apply();
+        if (window.__rebaseThemeBound) return;
+        window.__rebaseThemeBound = true;
+        window.__rebaseSetTheme = function (theme) {
+            try { localStorage.setItem(KEY, theme); } catch (e) {}
+            apply();
+            window.dispatchEvent(new CustomEvent('rebase:theme', { detail: theme }));
+        };
+        // Swap into the incoming document before it is shown, so the new page
+        // never paints in the server's default theme.
+        document.addEventListener('astro:before-swap', function (e) { apply(e.newDocument); });
+        document.addEventListener('astro:after-swap', function () { apply(); });
+        document.addEventListener('DOMContentLoaded', function () { apply(); });
+        document.addEventListener('click', function (e) {
+            var btn = e.target && e.target.closest && e.target.closest('.theme-toggle');
+            if (!btn) return;
+            var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+            window.__rebaseSetTheme(next);
+        });
+        // Follow the OS while the visitor has not picked a mode themselves.
+        if (window.matchMedia) {
+            var mq = matchMedia('(prefers-color-scheme: light)');
+            var onChange = function () { if (!stored()) apply(); };
+            if (mq.addEventListener) mq.addEventListener('change', onChange);
+        }
+    })();
+    </script>
+
     <!-- Dismissed-banner class + active A/B assignment, applied before paint to avoid CLS.
 
          Everything below writes to the *document*: a class and the data-ab-* attributes
@@ -465,7 +523,7 @@ const twitterImageType = /\.jpe?g$/.test(ogImage) ? "image/jpeg" : "image/png";
     <slot name="head"/>
 </head>
 
-<body class="font-sans bg-surface-frame text-surface-300 antialiased" style="color-scheme: dark;">
+<body class="font-sans bg-surface-frame text-tone-300 antialiased">
 <div id="app-shell" class="flex flex-col min-h-screen">
 {showBanner && <ManifestoBanner />}
 <Header/>

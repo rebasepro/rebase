@@ -16,12 +16,12 @@ const { id, slideNumber, totalSlides } = Astro.props;
         <slot />
     </div>
     {slideNumber && totalSlides && (
-        <div class="absolute bottom-4 right-8 text-xs text-surface-300 font-mono print:text-surface-300">
+        <div class="absolute bottom-4 right-8 text-xs text-tone-300 font-mono print:text-tone-300">
             {slideNumber} / {totalSlides}
         </div>
     )}
     <div class="absolute bottom-4 left-8 flex items-center gap-2 opacity-40">
         <img src="/favicon.svg" width="306" height="306" alt="" class="h-4 w-4" />
-        <span class="text-3xs font-medium text-surface-300 tracking-wider uppercase">Rebase</span>
+        <span class="text-3xs font-medium text-tone-300 tracking-wider uppercase">Rebase</span>
     </div>
 </section>

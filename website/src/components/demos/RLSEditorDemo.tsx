@@ -281,7 +281,7 @@ function VisualRuleBuilder({
     return (
         <div className="space-y-2 p-3 rounded-lg bg-surface-raised border border-hairline">
             <div className="flex items-center justify-between">
-                <span className="text-[10px] text-surface-400 uppercase font-semibold tracking-wider">{label}</span>
+                <span className="text-[10px] text-tone-400 uppercase font-semibold tracking-wider">{label}</span>
                 <div className="flex gap-1 bg-surface-frame p-0.5 rounded border border-hairline text-[10px]">
                     <button
                         type="button"
@@ -289,7 +289,7 @@ function VisualRuleBuilder({
                         className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                             cond.type === "always" 
                                 ? "bg-primary/20 text-primary-light font-semibold" 
-                                : "text-surface-500 hover:text-surface-300"
+                                : "text-tone-500 hover:text-tone-300"
                         }`}
                     >
                         Always (true)
@@ -300,7 +300,7 @@ function VisualRuleBuilder({
                         className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                             cond.type === "rule" 
                                 ? "bg-primary/20 text-primary-light font-semibold" 
-                                : "text-surface-500 hover:text-surface-300"
+                                : "text-tone-500 hover:text-tone-300"
                         }`}
                     >
                         Custom Rule
@@ -327,7 +327,7 @@ function VisualRuleBuilder({
                                     handleUpdate({ left, operator: "=", right: "true" });
                                 }
                             }}
-                            className="field px-2 py-1 text-surface-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                            className="field px-2 py-1 text-tone-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                         >
                             <option value="rebase.uid()">rebase.uid() [User ID]</option>
                             <option value="auth.role()">auth.role() [User Role]</option>
@@ -343,7 +343,7 @@ function VisualRuleBuilder({
                                 <select
                                     value={cond.operator}
                                     onChange={(e) => handleUpdate({ operator: e.target.value })}
-                                    className="field px-1.5 py-1 text-surface-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                                    className="field px-1.5 py-1 text-tone-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                                 >
                                     <option value="=">=</option>
                                     <option value="!=">!=</option>
@@ -354,7 +354,7 @@ function VisualRuleBuilder({
                                     <select
                                         value={cond.right}
                                         onChange={(e) => handleUpdate({ right: e.target.value })}
-                                        className="field px-2 py-1 text-surface-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                                        className="field px-2 py-1 text-tone-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                                     >
                                         {columns.map(col => (
                                             <option key={col} value={col}>{col}</option>
@@ -364,7 +364,7 @@ function VisualRuleBuilder({
                                     <select
                                         value={cond.right}
                                         onChange={(e) => handleUpdate({ right: e.target.value })}
-                                        className="field px-2 py-1 text-surface-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                                        className="field px-2 py-1 text-tone-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                                     >
                                         <option value="public">public</option>
                                         <option value="authenticated">authenticated</option>
@@ -377,7 +377,7 @@ function VisualRuleBuilder({
                                         value={cond.right}
                                         onChange={(e) => handleUpdate({ right: e.target.value })}
                                         placeholder="value (e.g. true, 'admin')"
-                                        className="field px-2 py-1 text-surface-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all flex-1 min-w-[80px]"
+                                        className="field px-2 py-1 text-tone-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all flex-1 min-w-[80px]"
                                     />
                                 )}
                             </>
@@ -394,13 +394,13 @@ function VisualRuleBuilder({
                         />
                     )}
 
-                    <div className="text-[10px] text-surface-500 font-mono bg-surface-well/80 px-2 py-1.5 rounded flex items-center justify-between">
+                    <div className="text-[10px] text-tone-500 font-mono bg-surface-well/80 px-2 py-1.5 rounded flex items-center justify-between">
                         <span className="opacity-70">Compiled SQL:</span>
                         <code className="text-amber-400 font-semibold">{expression}</code>
                     </div>
                 </div>
             ) : (
-                <div className="text-[11px] text-surface-500 font-mono bg-surface-well/80 px-3 py-2 rounded-md">
+                <div className="text-[11px] text-tone-500 font-mono bg-surface-well/80 px-3 py-2 rounded-md">
                     Always allows access (evaluates to <code className="text-emerald-400 font-semibold">true</code>).
                 </div>
             )}
@@ -541,18 +541,18 @@ export function RLSEditorDemo() {
     const editShowUsing = editCommand !== "INSERT";
 
     return (
-        <div className="flex h-[580px] w-full rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-frame shadow-2xl text-surface-300 text-sm">
+        <div className="flex h-[580px] w-full rounded-xl overflow-hidden ring-1 ring-tone-700 bg-surface-frame shadow-2xl text-tone-300 text-sm">
             {/* ── Sidebar ── */}
             <div className="w-[180px] border-r border-hairline flex flex-col shrink-0">
                 <div className="px-3 py-2.5 border-b border-hairline bg-surface-sheet flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-wider font-semibold text-surface-500">Tables</span>
-                    <svg className="h-3 w-3 text-surface-500 cursor-pointer hover:text-surface-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span className="text-[10px] uppercase tracking-wider font-semibold text-tone-500">Tables</span>
+                    <svg className="h-3 w-3 text-tone-500 cursor-pointer hover:text-tone-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                 </div>
                 <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
                     {/* Group by schema */}
                     {["public", "auth"].map(schema => (
                         <div key={schema}>
-                            <div className="text-[10px] font-semibold text-surface-500 px-1.5 py-1 tracking-wider">▾ {schema}</div>
+                            <div className="text-[10px] font-semibold text-tone-500 px-1.5 py-1 tracking-wider">▾ {schema}</div>
                             {tables.filter(t => t.schema === schema).map(table => (
                                 <button
                                     key={table.name}
@@ -564,7 +564,7 @@ export function RLSEditorDemo() {
                                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs w-full text-left transition-colors cursor-pointer ${
                                         selectedTable === table.name
                                             ? "bg-primary/10 text-primary"
-                                            : "text-surface-400 hover:bg-surface-hover"
+                                            : "text-tone-400 hover:bg-surface-hover"
                                     }`}
                                 >
                                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
@@ -584,7 +584,7 @@ export function RLSEditorDemo() {
                 {/* Table header */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-hairline bg-surface-field shrink-0">
                     <div className="flex items-center gap-2">
-                        <span className="text-sm font-mono text-surface-300">{activeTable.schema}.{activeTable.name}</span>
+                        <span className="text-sm font-mono text-tone-300">{activeTable.schema}.{activeTable.name}</span>
                         <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${
                             activeTable.rlsEnabled
                                 ? "bg-emerald-950/30 text-emerald-400 border-emerald-900/40"
@@ -596,7 +596,7 @@ export function RLSEditorDemo() {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => toggleRLS(activeTable.name)}
-                            className="text-[10px] px-2 py-1 rounded-md bg-surface-raised text-surface-400 hover:text-surface-300 cursor-pointer transition-colors"
+                            className="text-[10px] px-2 py-1 rounded-md bg-surface-raised text-tone-400 hover:text-tone-300 cursor-pointer transition-colors"
                         >
                             {activeTable.rlsEnabled ? "Disable RLS" : "Enable RLS"}
                         </button>
@@ -606,11 +606,11 @@ export function RLSEditorDemo() {
                             <button
                                 onClick={() => syncToDB(activeTable.name)}
                                 disabled={isSyncing}
-                                className="text-[10px] px-2.5 py-1 rounded-md bg-emerald-500 text-surface-950 font-semibold cursor-pointer hover:bg-emerald-400 disabled:opacity-50 transition-all flex items-center gap-1 shadow-md shadow-emerald-500/10 animate-pulse"
+                                className="text-[10px] px-2.5 py-1 rounded-md bg-emerald-500 text-tone-950 font-semibold cursor-pointer hover:bg-emerald-400 disabled:opacity-50 transition-all flex items-center gap-1 shadow-md shadow-emerald-500/10 animate-pulse"
                             >
                                 {isSyncing ? (
                                     <>
-                                        <svg className="animate-spin h-3 w-3 text-surface-950" fill="none" viewBox="0 0 24 24">
+                                        <svg className="animate-spin h-3 w-3 text-tone-950" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
@@ -641,7 +641,7 @@ export function RLSEditorDemo() {
                 {/* Policies list */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-surface-field">
                     {!activeTable.rlsEnabled ? (
-                        <div className="flex items-center justify-center h-full text-surface-500">
+                        <div className="flex items-center justify-center h-full text-tone-500">
                             <div className="text-center">
                                 <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                                 <p className="text-xs mb-3">RLS is disabled for this table</p>
@@ -654,11 +654,11 @@ export function RLSEditorDemo() {
                             </div>
                         </div>
                     ) : activeTable.policies.length === 0 && !showNewPolicyForm ? (
-                        <div className="flex items-center justify-center h-full text-surface-500">
+                        <div className="flex items-center justify-center h-full text-tone-500">
                             <div className="text-center">
                                 <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                                 <p className="text-xs mb-1">No policies defined</p>
-                                <p className="text-[10px] text-surface-500 mb-3">All access is denied by default</p>
+                                <p className="text-[10px] text-tone-500 mb-3">All access is denied by default</p>
                                 <button
                                     onClick={openNewPolicyForm}
                                     className="px-3 py-1.5 rounded-md bg-primary/20 text-primary-light text-[11px] font-semibold hover:bg-primary/30 cursor-pointer transition-colors"
@@ -689,8 +689,8 @@ export function RLSEditorDemo() {
                                             <>
                                                 <div className="flex items-center justify-between mb-2.5">
                                                     <div className="flex items-center gap-2">
-                                                        <svg className="h-3.5 w-3.5 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                                                        <span className="text-sm text-white font-semibold">{policy.name}</span>
+                                                        <svg className="h-3.5 w-3.5 text-tone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                                                        <span className="text-sm text-tone-max font-semibold">{policy.name}</span>
                                                         <span className={`text-[8px] px-1.5 py-0.5 rounded font-semibold uppercase ${cmdStyle.bg} ${cmdStyle.text} border ${cmdStyle.text.replace("text-", "border-").replace("300", "800/40")}`}>
                                                             {policy.command}
                                                         </span>
@@ -701,14 +701,14 @@ export function RLSEditorDemo() {
                                                         </span>
                                                         <button
                                                             onClick={() => startEditing(policy)}
-                                                            className="text-surface-500 hover:text-surface-300 cursor-pointer transition-colors"
+                                                            className="text-tone-500 hover:text-tone-300 cursor-pointer transition-colors"
                                                             title="Edit Policy"
                                                         >
                                                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                                         </button>
                                                         <button
                                                             onClick={() => deletePolicy(activeTable.name, policy.id)}
-                                                            className="text-surface-500 hover:text-red-400 cursor-pointer transition-colors"
+                                                            className="text-tone-500 hover:text-red-400 cursor-pointer transition-colors"
                                                             title="Delete Policy"
                                                         >
                                                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
@@ -718,18 +718,18 @@ export function RLSEditorDemo() {
 
                                                 <div className="flex flex-wrap gap-1.5">
                                                     <div className="flex items-center gap-1 px-2 py-1 rounded bg-surface-raised text-[10px]">
-                                                        <span className="text-surface-500 uppercase font-semibold">USING:</span>
+                                                        <span className="text-tone-500 uppercase font-semibold">USING:</span>
                                                         <code className="text-amber-300 font-mono font-semibold">{policy.using}</code>
                                                     </div>
                                                     {policy.withCheck && (
                                                         <div className="flex items-center gap-1 px-2 py-1 rounded bg-surface-raised text-[10px]">
-                                                            <span className="text-surface-500 uppercase font-semibold">CHECK:</span>
+                                                            <span className="text-tone-500 uppercase font-semibold">CHECK:</span>
                                                             <code className="text-amber-300 font-mono font-semibold">{policy.withCheck}</code>
                                                         </div>
                                                     )}
                                                     <div className="flex items-center gap-1 px-2 py-1 rounded bg-surface-raised text-[10px]">
-                                                        <span className="text-surface-500 uppercase font-semibold">Roles:</span>
-                                                        <span className="text-surface-300 font-mono font-medium">{policy.roles.join(", ")}</span>
+                                                        <span className="text-tone-500 uppercase font-semibold">Roles:</span>
+                                                        <span className="text-tone-300 font-mono font-medium">{policy.roles.join(", ")}</span>
                                                     </div>
                                                 </div>
                                             </>
@@ -738,7 +738,7 @@ export function RLSEditorDemo() {
                                             <div className="space-y-3.5">
                                                 <div className="flex items-center gap-2 border-b border-hairline pb-2 mb-1">
                                                     <svg className="h-3.5 w-3.5 text-primary-light animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                                                    <span className="text-xs text-white font-semibold">Editing Policy "{policy.name}"</span>
+                                                    <span className="text-xs text-tone-max font-semibold">Editing Policy "{policy.name}"</span>
                                                 </div>
                                                 
                                                 <div className="grid grid-cols-2 gap-3">
@@ -746,7 +746,7 @@ export function RLSEditorDemo() {
                                                         <label className="typography-micro text-text-secondary-dark block mb-1">Policy Name</label>
                                                         <input
                                                             type="text"
-                                                            className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-surface-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                                                            className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-tone-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                                                             value={editName}
                                                             onChange={(e) => setEditName(e.target.value)}
                                                             placeholder="policy_name"
@@ -755,7 +755,7 @@ export function RLSEditorDemo() {
                                                     <div>
                                                         <label className="typography-micro text-text-secondary-dark block mb-1">Command / Action</label>
                                                         <select
-                                                            className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-surface-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                                                            className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-tone-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                                                             value={editCommand}
                                                             onChange={(e) => setEditCommand(e.target.value as RLSPolicy["command"])}
                                                         >
@@ -788,7 +788,7 @@ export function RLSEditorDemo() {
                                                                     className={`px-2 py-0.5 rounded text-[10px] border transition-all cursor-pointer ${
                                                                         isSelected
                                                                             ? "bg-primary/25 text-primary-light border-primary/35 font-semibold"
-                                                                            : "bg-surface-raised text-surface-500 border-hairline hover:text-surface-300"
+                                                                            : "bg-surface-raised text-tone-500 border-hairline hover:text-tone-300"
                                                                     }`}
                                                                 >
                                                                     {role}
@@ -826,7 +826,7 @@ export function RLSEditorDemo() {
                                                     </button>
                                                     <button
                                                         onClick={() => setEditingPolicy(null)}
-                                                        className="px-3 py-1 rounded bg-surface-raised text-surface-400 text-[10px] font-semibold hover:text-surface-300 transition-colors cursor-pointer"
+                                                        className="px-3 py-1 rounded bg-surface-raised text-tone-400 text-[10px] font-semibold hover:text-tone-300 transition-colors cursor-pointer"
                                                     >
                                                         Cancel
                                                     </button>
@@ -842,14 +842,14 @@ export function RLSEditorDemo() {
                                 <div className="p-3.5 rounded-lg border border-primary/35 bg-primary/5 space-y-3.5 shadow-md">
                                     <div className="flex items-center gap-2 border-b border-primary/10 pb-2 mb-1">
                                         <svg className="h-3.5 w-3.5 text-primary-light" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/></svg>
-                                        <span className="text-xs text-white font-semibold">New Policy</span>
+                                        <span className="text-xs text-tone-max font-semibold">New Policy</span>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="typography-micro text-text-secondary-dark block mb-1">Name</label>
                                             <input
                                                 type="text"
-                                                className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-surface-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                                                className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-tone-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                                                 value={newPolicyName}
                                                 onChange={(e) => setNewPolicyName(e.target.value)}
                                                 placeholder="policy_name"
@@ -858,7 +858,7 @@ export function RLSEditorDemo() {
                                         <div>
                                             <label className="typography-micro text-text-secondary-dark block mb-1">Command / Action</label>
                                             <select
-                                                className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-surface-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                                                className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-tone-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                                                 value={newPolicyCommand}
                                                 onChange={(e) => setNewPolicyCommand(e.target.value as RLSPolicy["command"])}
                                             >
@@ -891,7 +891,7 @@ export function RLSEditorDemo() {
                                                         className={`px-2 py-0.5 rounded text-[10px] border transition-all cursor-pointer ${
                                                             isSelected
                                                                 ? "bg-primary/25 text-primary-light border-primary/35 font-semibold"
-                                                                : "bg-surface-raised text-surface-500 border-hairline hover:text-surface-300"
+                                                                : "bg-surface-raised text-tone-500 border-hairline hover:text-tone-300"
                                                         }`}
                                                     >
                                                         {role}
@@ -930,7 +930,7 @@ export function RLSEditorDemo() {
                                         </button>
                                         <button
                                             onClick={() => setShowNewPolicyForm(false)}
-                                            className="px-3 py-1.5 rounded bg-surface-raised text-surface-400 text-[10px] font-semibold hover:text-surface-300 transition-colors cursor-pointer"
+                                            className="px-3 py-1.5 rounded bg-surface-raised text-tone-400 text-[10px] font-semibold hover:text-tone-300 transition-colors cursor-pointer"
                                         >
                                             Cancel
                                         </button>

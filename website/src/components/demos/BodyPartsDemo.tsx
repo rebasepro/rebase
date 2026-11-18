@@ -144,13 +144,13 @@ export function BodyPartsDemo() {
                     <div className="flex gap-2">
                         <div className="flex flex-col items-center">
                             {renderBodyView("front", "/img/body_front.webp")}
-                            <span className="mt-1 text-[9px] sm:text-[10px] uppercase tracking-wider text-surface-500">
+                            <span className="mt-1 text-[9px] sm:text-[10px] uppercase tracking-wider text-tone-500">
                                 Front
                             </span>
                         </div>
                         <div className="flex flex-col items-center">
                             {renderBodyView("back", "/img/body_back.webp")}
-                            <span className="mt-1 text-[9px] sm:text-[10px] uppercase tracking-wider text-surface-500">
+                            <span className="mt-1 text-[9px] sm:text-[10px] uppercase tracking-wider text-tone-500">
                                 Back
                             </span>
                         </div>
@@ -173,14 +173,14 @@ export function BodyPartsDemo() {
                             const isActive = selected.includes(entry.id);
                             const isHovered = hoveredPart === entry.id;
                             
-                            let btnClasses = "outline-transparent text-surface-400 hover:text-surface-200";
+                            let btnClasses = "outline-transparent text-tone-400 hover:text-tone-200";
                             let dotClasses = "bg-surface-raised-hover";
                             
                             if (isActive) {
                                 btnClasses = "outline-primary/50 bg-primary/10 text-primary font-semibold";
                                 dotClasses = "bg-primary";
                             } else if (isHovered) {
-                                btnClasses = "outline-primary/30 bg-primary/5 text-surface-300";
+                                btnClasses = "outline-primary/30 bg-primary/5 text-tone-300";
                             }
 
                             return (

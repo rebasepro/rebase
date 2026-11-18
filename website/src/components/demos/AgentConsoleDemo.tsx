@@ -39,12 +39,12 @@ const CAPABILITIES: Capability[] = [
         guardrailDetail: "1 table file → 0 custom controllers to hallucinate · TypeScript + SQL migration verified before apply",
         body: (
             <>
-                {line(0, <span className="text-blue-400">export const</span>, <span className="text-surface-200"> orders</span>, <span className="text-surface-300"> = </span>, <span className="text-cyan-300">defineTable</span>, <span className="text-surface-300">(</span>, <span className="text-emerald-300">"orders"</span>, <span className="text-surface-300">, {"{"}</span>)}
-                {line(1, <span className="text-surface-300">columns: {"{"} total, status, customer {"}"},</span>)}
-                {line(1, <span className="text-surface-300">rls: [{"{"} operation: </span>, <span className="text-emerald-300">"select"</span>, <span className="text-surface-300">, … {"}"}],</span>)}
-                {line(0, <span className="text-surface-300">{"}"});</span>)}
+                {line(0, <span className="text-blue-400">export const</span>, <span className="text-tone-200"> orders</span>, <span className="text-tone-300"> = </span>, <span className="text-cyan-300">defineTable</span>, <span className="text-tone-300">(</span>, <span className="text-emerald-300">"orders"</span>, <span className="text-tone-300">, {"{"}</span>)}
+                {line(1, <span className="text-tone-300">columns: {"{"} total, status, customer {"}"},</span>)}
+                {line(1, <span className="text-tone-300">rls: [{"{"} operation: </span>, <span className="text-emerald-300">"select"</span>, <span className="text-tone-300">, … {"}"}],</span>)}
+                {line(0, <span className="text-tone-300">{"}"});</span>)}
                 <div className="mt-3 border-t border-hairline pt-3">
-                    {line(0, <span className="text-surface-500">→ REST · typed SDK · RLS policies · admin views</span>)}
+                    {line(0, <span className="text-tone-500">→ REST · typed SDK · RLS policies · admin views</span>)}
                 </div>
             </>
         )
@@ -61,13 +61,13 @@ const CAPABILITIES: Capability[] = [
         guardrailDetail: "Agent INSERT with status='approved' → rejected by Postgres RLS · Operator approval required in Rebase CMS",
         body: (
             <>
-                {line(0, <span className="text-surface-300">status: col.enum([</span>, <span className="text-emerald-300">"draft"</span>, <span className="text-surface-300">, </span>, <span className="text-emerald-300">"approved"</span>, <span className="text-surface-300">]),</span>)}
-                {line(0, <span className="text-surface-300">rls: [</span>)}
-                {line(1, <span className="text-surface-300">{"{"} roles: [</span>, <span className="text-amber-300">"agent"</span>, <span className="text-surface-300">], operation: </span>, <span className="text-emerald-300">"insert"</span>, <span className="text-surface-300">, check: {"{"} status: </span>, <span className="text-cyan-300">"draft"</span>, <span className="text-surface-300"> {"}"} {"}"},</span>)}
-                {line(1, <span className="text-surface-300">{"{"} roles: [</span>, <span className="text-primary">"operator"</span>, <span className="text-surface-300">], operation: </span>, <span className="text-emerald-300">"update"</span>, <span className="text-surface-300"> {"}"}</span>)}
-                {line(0, <span className="text-surface-300">]</span>)}
+                {line(0, <span className="text-tone-300">status: col.enum([</span>, <span className="text-emerald-300">"draft"</span>, <span className="text-tone-300">, </span>, <span className="text-emerald-300">"approved"</span>, <span className="text-tone-300">]),</span>)}
+                {line(0, <span className="text-tone-300">rls: [</span>)}
+                {line(1, <span className="text-tone-300">{"{"} roles: [</span>, <span className="text-amber-300">"agent"</span>, <span className="text-tone-300">], operation: </span>, <span className="text-emerald-300">"insert"</span>, <span className="text-tone-300">, check: {"{"} status: </span>, <span className="text-cyan-300">"draft"</span>, <span className="text-tone-300"> {"}"} {"}"},</span>)}
+                {line(1, <span className="text-tone-300">{"{"} roles: [</span>, <span className="text-primary">"operator"</span>, <span className="text-tone-300">], operation: </span>, <span className="text-emerald-300">"update"</span>, <span className="text-tone-300"> {"}"}</span>)}
+                {line(0, <span className="text-tone-300">]</span>)}
                 <div className="mt-3 border-t border-hairline pt-3">
-                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">agent drafts in Postgres · operator approves in the panel</span>)}
+                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-tone-400">agent drafts in Postgres · operator approves in the panel</span>)}
                 </div>
             </>
         )
@@ -84,23 +84,23 @@ const CAPABILITIES: Capability[] = [
         guardrailDetail: "Every key binds SET LOCAL role & rebase.uid() inside the Postgres transaction · Revoke in 1 click from the panel",
         body: (
             <div className="space-y-1.5">
-                <div className="grid grid-cols-[1fr_auto_auto] gap-3 text-surface-500 pb-1.5 border-b border-hairline">
+                <div className="grid grid-cols-[1fr_auto_auto] gap-3 text-tone-500 pb-1.5 border-b border-hairline">
                     <span>key</span><span>scope</span><span>rate</span>
                 </div>
                 <div className="grid grid-cols-[1fr_auto_auto] gap-3">
-                    <span className="text-surface-300">rk_live_a91…</span>
+                    <span className="text-tone-300">rk_live_a91…</span>
                     <span className="text-primary">docs:read</span>
-                    <span className="text-surface-500">1000/15m</span>
+                    <span className="text-tone-500">1000/15m</span>
                 </div>
                 <div className="grid grid-cols-[1fr_auto_auto] gap-3">
-                    <span className="text-surface-300">rk_live_7c2…</span>
+                    <span className="text-tone-300">rk_live_7c2…</span>
                     <span className="text-primary">orders:rw</span>
-                    <span className="text-surface-500">5000/15m</span>
+                    <span className="text-tone-500">5000/15m</span>
                 </div>
                 <div className="grid grid-cols-[1fr_auto_auto] gap-3 opacity-50">
-                    <span className="text-surface-400 line-through">rk_live_44f…</span>
-                    <span className="text-surface-500">revoked</span>
-                    <span className="text-surface-600">—</span>
+                    <span className="text-tone-400 line-through">rk_live_44f…</span>
+                    <span className="text-tone-500">revoked</span>
+                    <span className="text-tone-600">—</span>
                 </div>
             </div>
         )
@@ -117,13 +117,13 @@ const CAPABILITIES: Capability[] = [
         guardrailDetail: "AGENTS.md & CLAUDE.md pre-loaded with table conventions, relation rules, and @rebasepro/rls-check verification",
         body: (
             <>
-                {line(0, <span className="text-primary">~ </span>, <span className="text-surface-200">pnpm dlx @rebasepro/cli init my-app</span>)}
+                {line(0, <span className="text-primary">~ </span>, <span className="text-tone-200">pnpm dlx @rebasepro/cli init my-app</span>)}
                 <div className="mt-2.5 space-y-1">
-                    {line(0, <span className="text-surface-400">my-app/</span>)}
-                    {line(1, <span className="text-emerald-300">AGENTS.md</span>, <span className="text-surface-600"> — layout, commands, conventions</span>)}
-                    {line(1, <span className="text-emerald-300">CLAUDE.md</span>, <span className="text-surface-600"> — same, for Claude Code</span>)}
-                    {line(1, <span className="text-surface-400">backend/schema/</span>)}
-                    {line(1, <span className="text-surface-400">frontend/src/cms/</span>)}
+                    {line(0, <span className="text-tone-400">my-app/</span>)}
+                    {line(1, <span className="text-emerald-300">AGENTS.md</span>, <span className="text-tone-600"> — layout, commands, conventions</span>)}
+                    {line(1, <span className="text-emerald-300">CLAUDE.md</span>, <span className="text-tone-600"> — same, for Claude Code</span>)}
+                    {line(1, <span className="text-tone-400">backend/schema/</span>)}
+                    {line(1, <span className="text-tone-400">frontend/src/cms/</span>)}
                 </div>
             </>
         )
@@ -140,12 +140,12 @@ const CAPABILITIES: Capability[] = [
         guardrailDetail: "Installed into .claude/skills/ and .cursor/rules/ so coding agents author valid defineTable() & RLS rules on the first try",
         body: (
             <>
-                {line(0, <span className="text-primary">~ </span>, <span className="text-surface-200">rebase skills</span>)}
-                {line(0, <span className="text-surface-500">detected .claude/ — installing to .claude/skills/</span>)}
+                {line(0, <span className="text-primary">~ </span>, <span className="text-tone-200">rebase skills</span>)}
+                {line(0, <span className="text-tone-500">detected .claude/ — installing to .claude/skills/</span>)}
                 <div className="mt-2 space-y-1">
-                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">rebase-tables, rebase-security, rebase-auth</span>)}
-                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">rebase-realtime, rebase-sdk, rebase-storage …</span>)}
-                    {line(0, <span className="text-surface-300">24 skills installed</span>)}
+                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-tone-400">rebase-tables, rebase-security, rebase-auth</span>)}
+                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-tone-400">rebase-realtime, rebase-sdk, rebase-storage …</span>)}
+                    {line(0, <span className="text-tone-300">24 skills installed</span>)}
                 </div>
             </>
         )
@@ -162,12 +162,12 @@ const CAPABILITIES: Capability[] = [
         guardrailDetail: "Every MCP tool call executes under the caller's scoped API key and Postgres RLS policies — never a superuser connection",
         body: (
             <>
-                {line(0, <span className="text-surface-500">→ initialize</span>)}
+                {line(0, <span className="text-tone-500">→ initialize</span>)}
                 {line(0, <span className="text-emerald-400">← 53 tools registered</span>)}
                 <div className="mt-2.5 space-y-1">
-                    {line(1, <span className="text-primary">query_table</span>, <span className="text-surface-500"> — read any table under RLS</span>)}
-                    {line(1, <span className="text-primary">rebase_schema_introspect</span>, <span className="text-surface-500"> — tables, relations, enums</span>)}
-                    {line(1, <span className="text-primary">rebase_db_migrate</span>, <span className="text-surface-500"> — apply pending migrations</span>)}
+                    {line(1, <span className="text-primary">query_table</span>, <span className="text-tone-500"> — read any table under RLS</span>)}
+                    {line(1, <span className="text-primary">rebase_schema_introspect</span>, <span className="text-tone-500"> — tables, relations, enums</span>)}
+                    {line(1, <span className="text-primary">rebase_db_migrate</span>, <span className="text-tone-500"> — apply pending migrations</span>)}
                 </div>
             </>
         )
@@ -184,11 +184,11 @@ const CAPABILITIES: Capability[] = [
         guardrailDetail: "Custom functions inherit the request's authenticated Postgres session & RLS policies automatically",
         body: (
             <>
-                {line(0, <span className="text-blue-400">export default</span>, <span className="text-surface-300"> </span>, <span className="text-amber-300">async</span>, <span className="text-surface-300"> (req, res) ={">"} {"{"}</span>)}
-                {line(1, <span className="text-surface-500">// full typed access to the driver</span>)}
-                {line(1, <span className="text-blue-400">const</span>, <span className="text-surface-300"> docs = </span>, <span className="text-blue-400">await</span>, <span className="text-amber-300"> data</span>, <span className="text-surface-300">.docs.find();</span>)}
-                {line(1, <span className="text-blue-400">return</span>, <span className="text-surface-300"> stream(summarize(docs));</span>)}
-                {line(0, <span className="text-surface-300">{"}"}</span>)}
+                {line(0, <span className="text-blue-400">export default</span>, <span className="text-tone-300"> </span>, <span className="text-amber-300">async</span>, <span className="text-tone-300"> (req, res) ={">"} {"{"}</span>)}
+                {line(1, <span className="text-tone-500">// full typed access to the driver</span>)}
+                {line(1, <span className="text-blue-400">const</span>, <span className="text-tone-300"> docs = </span>, <span className="text-blue-400">await</span>, <span className="text-amber-300"> data</span>, <span className="text-tone-300">.docs.find();</span>)}
+                {line(1, <span className="text-blue-400">return</span>, <span className="text-tone-300"> stream(summarize(docs));</span>)}
+                {line(0, <span className="text-tone-300">{"}"}</span>)}
             </>
         )
     },
@@ -204,17 +204,17 @@ const CAPABILITIES: Capability[] = [
         guardrailDetail: "Scheduled jobs run with explicit role bindings and structured execution logs visible in Rebase Studio",
         body: (
             <div className="space-y-1.5">
-                <div className="grid grid-cols-[auto_1fr_auto] gap-4 text-surface-500 pb-1.5 border-b border-hairline">
+                <div className="grid grid-cols-[auto_1fr_auto] gap-4 text-tone-500 pb-1.5 border-b border-hairline">
                     <span>schedule</span><span>job</span><span>last run</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr_auto] gap-4">
                     <span className="text-amber-300">0 3 * * *</span>
-                    <span className="text-surface-300">reindex-embeddings</span>
+                    <span className="text-tone-300">reindex-embeddings</span>
                     <span className="text-emerald-400">ok · 2m</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr_auto] gap-4">
                     <span className="text-amber-300">*/15 * * * *</span>
-                    <span className="text-surface-300">sync-crm</span>
+                    <span className="text-tone-300">sync-crm</span>
                     <span className="text-emerald-400">ok · 4s</span>
                 </div>
             </div>
@@ -232,11 +232,11 @@ const CAPABILITIES: Capability[] = [
         guardrailDetail: "LISTEN/NOTIFY events are filtered through the subscriber's Postgres SELECT policy before delivery over WebSocket",
         body: (
             <>
-                {line(0, <span className="text-emerald-400">● connected</span>, <span className="text-surface-500"> · subscribed to orders</span>)}
+                {line(0, <span className="text-emerald-400">● connected</span>, <span className="text-tone-500"> · subscribed to orders</span>)}
                 <div className="mt-2.5 space-y-1">
-                    {line(0, <span className="text-surface-500">12:04:11 </span>, <span className="text-amber-300">UPDATE</span>, <span className="text-surface-300"> orders/ORD-2026-0042 → shipped</span>)}
-                    {line(0, <span className="text-surface-500">12:04:11 </span>, <span className="text-primary">presence</span>, <span className="text-surface-300"> agent-7 joined</span>)}
-                    {line(0, <span className="text-surface-500">12:04:13 </span>, <span className="text-emerald-400">INSERT</span>, <span className="text-surface-300"> orders/ORD-2026-0043</span>)}
+                    {line(0, <span className="text-tone-500">12:04:11 </span>, <span className="text-amber-300">UPDATE</span>, <span className="text-tone-300"> orders/ORD-2026-0042 → shipped</span>)}
+                    {line(0, <span className="text-tone-500">12:04:11 </span>, <span className="text-primary">presence</span>, <span className="text-tone-300"> agent-7 joined</span>)}
+                    {line(0, <span className="text-tone-500">12:04:13 </span>, <span className="text-emerald-400">INSERT</span>, <span className="text-tone-300"> orders/ORD-2026-0043</span>)}
                 </div>
             </>
         )
@@ -253,13 +253,13 @@ const CAPABILITIES: Capability[] = [
         guardrailDetail: "Vector similarity queries run inside the same Postgres SELECT policy — an agent never retrieves embeddings for rows it cannot read",
         body: (
             <>
-                {line(0, <span className="text-emerald-400">GET </span>, <span className="text-surface-300">/api/data/docs</span>)}
-                {line(1, <span className="text-surface-500">?vector_search=</span>, <span className="text-amber-300">embedding</span>)}
-                {line(1, <span className="text-surface-500">&vector=</span>, <span className="text-primary">[0.12, 0.98, …]</span>)}
-                {line(1, <span className="text-surface-500">&vector_distance=</span>, <span className="text-cyan-300">cosine</span>)}
+                {line(0, <span className="text-emerald-400">GET </span>, <span className="text-tone-300">/api/data/docs</span>)}
+                {line(1, <span className="text-tone-500">?vector_search=</span>, <span className="text-amber-300">embedding</span>)}
+                {line(1, <span className="text-tone-500">&vector=</span>, <span className="text-primary">[0.12, 0.98, …]</span>)}
+                {line(1, <span className="text-tone-500">&vector_distance=</span>, <span className="text-cyan-300">cosine</span>)}
                 <div className="mt-3 border-t border-hairline pt-3">
-                    {line(0, <span className="text-surface-500">200 OK · 14ms</span>)}
-                    {line(0, <span className="text-surface-400">[{"{"} "id": "d_91", "score": 0.94 {"}"}, …]</span>)}
+                    {line(0, <span className="text-tone-500">200 OK · 14ms</span>)}
+                    {line(0, <span className="text-tone-400">[{"{"} "id": "d_91", "score": 0.94 {"}"}, …]</span>)}
                 </div>
             </>
         )
@@ -295,7 +295,7 @@ export function AgentConsoleDemo() {
 
             {/* window chrome */}
             <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-hairline bg-surface-well/70">
-                <span className="font-mono text-[11px] text-surface-500">
+                <span className="font-mono text-[11px] text-tone-500">
                     agent · what it can reach
                 </span>
                 <span className="font-mono text-[10px] text-emerald-400/90 flex items-center gap-1.5">
@@ -321,10 +321,10 @@ export function AgentConsoleDemo() {
                                 aria-pressed={on}
                                 className={`flex-none lg:w-full flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-200 ${
                                     on
-                                        ? "bg-surface-active text-white"
-                                        : "text-surface-400 hover:text-surface-200 hover:bg-white/[0.03]"
+                                        ? "bg-surface-active text-tone-max"
+                                        : "text-tone-400 hover:text-tone-200 hover:bg-tone-max/[0.03]"
                                 }`}>
-                                <cap.Icon size={15} className={on ? "text-primary" : "text-surface-500"}/>
+                                <cap.Icon size={15} className={on ? "text-primary" : "text-tone-500"}/>
                                 <span className="whitespace-nowrap">{cap.label}</span>
                             </button>
                         );
@@ -333,13 +333,13 @@ export function AgentConsoleDemo() {
 
                 {/* Detail pane */}
                 <div className="p-6 sm:p-7 min-w-0 lg:h-[560px] lg:overflow-y-auto flex flex-col">
-                    <h3 className="text-lg font-semibold text-white">{active.title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-surface-400 max-w-2xl">{active.desc}</p>
+                    <h3 className="text-lg font-semibold text-tone-max">{active.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-tone-400 max-w-2xl">{active.desc}</p>
 
                     {/* the mock surface */}
                     <div className="mt-5 rounded-xl border border-hairline bg-surface-well/85 overflow-hidden">
                         <div className="px-3.5 py-2.5 border-b border-hairline bg-surface-sheet flex items-center justify-between">
-                            <span className="font-mono text-[10px] text-surface-400">{active.screen}</span>
+                            <span className="font-mono text-[10px] text-tone-400">{active.screen}</span>
                             <span className="font-mono text-[9.5px] text-emerald-400/80">postgres · rls active</span>
                         </div>
                         <div className="p-4 sm:p-5 font-mono text-[11.5px] leading-relaxed overflow-x-auto">
@@ -350,7 +350,7 @@ export function AgentConsoleDemo() {
                     <div className="mt-4 flex flex-wrap gap-1.5">
                         {active.pills.map((p) => (
                             <span key={p}
-                                  className="px-2.5 py-1 rounded-lg bg-surface-raised text-[11px] text-surface-300 ring-1 ring-inset ring-surface-700/50">
+                                  className="px-2.5 py-1 rounded-lg bg-surface-raised text-[11px] text-tone-300 ring-1 ring-inset ring-tone-700/50">
                                 {p}
                             </span>
                         ))}
@@ -364,12 +364,12 @@ export function AgentConsoleDemo() {
                                     <ShieldCheck size={13} />
                                     {active.guardrailLabel}
                                 </span>
-                                <span className="font-mono text-[10px] text-surface-500">enforced by construction</span>
+                                <span className="font-mono text-[10px] text-tone-500">enforced by construction</span>
                             </div>
-                            <p className="mt-1.5 text-xs leading-relaxed text-surface-300">
+                            <p className="mt-1.5 text-xs leading-relaxed text-tone-300">
                                 {active.guardrailDetail}
                             </p>
-                            <div className="mt-2.5 pt-2 border-t border-hairline flex items-center justify-between font-mono text-[10px] text-surface-400">
+                            <div className="mt-2.5 pt-2 border-t border-hairline flex items-center justify-between font-mono text-[10px] text-tone-400">
                                 <span>tx · SET LOCAL role = &apos;rebase_authenticated&apos;</span>
                                 <span className="text-emerald-400">✓ verified</span>
                             </div>

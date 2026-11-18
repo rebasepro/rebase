@@ -40,9 +40,9 @@ export function CodeBlock({ children, code, language = "javascript", className =
   const codeContent = children || code || "";
 
   return (
-    <div className={`relative rounded-2xl overflow-hidden bg-surface-950 border border-surface-800 p-6 ${className}`}>
+    <div className={`relative rounded-2xl overflow-hidden bg-tone-950 border border-tone-800 p-6 ${className}`}>
       {resolvedLanguage && (
-        <div className="absolute top-2 right-2 text-xs text-surface-500 uppercase font-mono">
+        <div className="absolute top-2 right-2 text-xs text-tone-500 uppercase font-mono">
           {resolvedLanguage}
         </div>
       )}

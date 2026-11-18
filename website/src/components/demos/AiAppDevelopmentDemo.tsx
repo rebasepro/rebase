@@ -6,7 +6,7 @@ export default function AiAppDevelopmentDemo() {
   const [recipeTab, setRecipeTab] = useState<"schema" | "sql">("schema");
 
   return (
-    <div className="w-full max-w-6xl mx-auto rounded-3xl border border-hairline bg-[#070709] p-6 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden">
+    <div className="w-full max-w-6xl mx-auto rounded-3xl border border-hairline bg-[#070709] island-dark p-6 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden">
       {/* Background glow effects - strictly using site primary blue (#0070f4) */}
       <div className="absolute -left-48 -top-48 w-[400px] h-[400px] rounded-full bg-primary/5 blur-[120px] pointer-events-none"></div>
       <div className="absolute -right-48 -bottom-48 w-[400px] h-[400px] rounded-full bg-primary/5 blur-[120px] pointer-events-none"></div>
@@ -20,8 +20,8 @@ export default function AiAppDevelopmentDemo() {
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold ring-1 ring-primary/20 mb-2">
             <Zap className="w-3.5 h-3.5" /> Decoupled Architectures
           </span>
-          <h3 className="text-2xl font-semibold text-white tracking-tight">Decoupled AI Engine</h3>
-          <p className="text-surface-400 text-sm mt-1">Implement intelligent features seamlessly without cluttering your core codebase.</p>
+          <h3 className="text-2xl font-semibold text-tone-max tracking-tight">Decoupled AI Engine</h3>
+          <p className="text-tone-400 text-sm mt-1">Implement intelligent features seamlessly without cluttering your core codebase.</p>
         </div>
 
         {/* Mode Selector */}
@@ -31,7 +31,7 @@ export default function AiAppDevelopmentDemo() {
             className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer ${
               activeMode === "recipes"
                 ? "bg-primary text-white shadow-lg shadow-primary/20"
-                : "text-surface-400 hover:text-white"
+                : "text-tone-400 hover:text-tone-max"
             }`}
           >
             <Terminal className="w-4 h-4" /> CLI Recipes
@@ -41,7 +41,7 @@ export default function AiAppDevelopmentDemo() {
             className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer ${
               activeMode === "pipelines"
                 ? "bg-primary text-white shadow-lg shadow-primary/20"
-                : "text-surface-400 hover:text-white"
+                : "text-tone-400 hover:text-tone-max"
             }`}
           >
             <Settings className="w-4 h-4" /> Event Pipelines
@@ -66,14 +66,14 @@ export default function AiAppDevelopmentDemo() {
           >
             <div className="flex items-center gap-3 mb-2">
               <div className={`p-2 rounded-lg border ${
-                activeMode === "recipes" ? "bg-primary/10 border-primary/20 text-primary" : "bg-surface-sheet border-hairline text-surface-500"
+                activeMode === "recipes" ? "bg-primary/10 border-primary/20 text-primary" : "bg-surface-sheet border-hairline text-tone-500"
               }`}>
                 <Terminal className="w-4 h-4" />
               </div>
-              <h4 className="font-semibold text-white text-sm">CLI Recipes</h4>
-              <span className="ml-auto text-[10px] text-surface-500 font-mono">Option 1</span>
+              <h4 className="font-semibold text-tone-max text-sm">CLI Recipes</h4>
+              <span className="ml-auto text-[10px] text-tone-500 font-mono">Option 1</span>
             </div>
-            <p className="text-surface-400 text-xs leading-relaxed">
+            <p className="text-tone-400 text-xs leading-relaxed">
               Inject tables and table hooks directly into your codebase.
               The AI hooks run on every write, from your local project files.
             </p>
@@ -90,22 +90,22 @@ export default function AiAppDevelopmentDemo() {
           >
             <div className="flex items-center gap-3 mb-2">
               <div className={`p-2 rounded-lg border ${
-                activeMode === "pipelines" ? "bg-primary/10 border-primary/20 text-primary" : "bg-surface-sheet border-hairline text-surface-500"
+                activeMode === "pipelines" ? "bg-primary/10 border-primary/20 text-primary" : "bg-surface-sheet border-hairline text-tone-500"
               }`}>
                 <Settings className="w-4 h-4" />
               </div>
-              <h4 className="font-semibold text-white text-sm">Event Pipelines</h4>
-              <span className="ml-auto text-[10px] text-surface-500 font-mono">Option 2</span>
+              <h4 className="font-semibold text-tone-max text-sm">Event Pipelines</h4>
+              <span className="ml-auto text-[10px] text-tone-500 font-mono">Option 2</span>
             </div>
-            <p className="text-surface-400 text-xs leading-relaxed">
+            <p className="text-tone-400 text-xs leading-relaxed">
               Configure database webhooks in Rebase Studio. 
               Route write triggers directly to decoupled Hono custom functions to invoke LLM logic asynchronously.
             </p>
           </div>
 
           <div className="mt-auto p-4 rounded-xl bg-surface-raised border border-hairline hidden lg:block">
-            <span className="text-[11px] font-semibold text-white block mb-1">Architectural Rule</span>
-            <p className="text-[10px] text-surface-400 leading-normal">
+            <span className="text-[11px] font-semibold text-tone-max block mb-1">Architectural Rule</span>
+            <p className="text-[10px] text-tone-400 leading-normal">
               Never build third-party API dependencies into the core engine. Always inject features locally or route via event streams.
             </p>
           </div>
@@ -115,15 +115,15 @@ export default function AiAppDevelopmentDemo() {
         <div className="lg:col-span-8">
           
           {/* Main Visual Frame */}
-          <div className="rounded-2xl border border-hairline bg-[#0d0d0f] shadow-2xl flex flex-col h-[510px] overflow-hidden relative">
+          <div className="rounded-2xl border border-hairline bg-[#0d0d0f] island-dark shadow-2xl flex flex-col h-[510px] overflow-hidden relative">
             
             {/* Window Topbar */}
-            <div className="px-4 py-3 bg-[#121215] border-b border-hairline flex items-center justify-between">
+            <div className="px-4 py-3 bg-[#121215] island-dark border-b border-hairline flex items-center justify-between">
               <div className="flex items-center gap-1.5">
               </div>
               
               {activeMode === "recipes" ? (
-                <div className="flex items-center gap-2 font-mono text-[10px] text-slate-500 bg-[#09090b] px-3 py-1 rounded border border-hairline">
+                <div className="flex items-center gap-2 font-mono text-[10px] text-slate-500 bg-[#09090b] island-dark px-3 py-1 rounded border border-hairline">
                   <span className="text-primary font-semibold">$</span> rebase skills install --agent claude
                 </div>
               ) : (
@@ -135,13 +135,13 @@ export default function AiAppDevelopmentDemo() {
 
             {/* Mode 1 Layout: Mock Editor */}
             {activeMode === "recipes" && (
-              <div className="flex-1 flex flex-col overflow-hidden bg-[#0d0d0f]">
+              <div className="flex-1 flex flex-col overflow-hidden bg-[#0d0d0f] island-dark">
                 {/* Editor Tabs */}
-                <div className="flex bg-[#121215] border-b border-hairline select-none">
+                <div className="flex bg-[#121215] island-dark border-b border-hairline select-none">
                   <button
                     onClick={() => setRecipeTab("schema")}
                     className={`px-4 py-2 text-xs font-mono flex items-center gap-2 border-r border-hairline cursor-pointer ${
-                      recipeTab === "schema" ? "bg-[#0d0d0f] text-white border-t border-t-primary" : "text-surface-500 hover:text-surface-300"
+                      recipeTab === "schema" ? "bg-[#0d0d0f] island-dark text-tone-max border-t border-t-primary" : "text-tone-500 hover:text-tone-300"
                     }`}
                   >
                     <Code className="w-3.5 h-3.5 text-sky-400" />
@@ -150,7 +150,7 @@ export default function AiAppDevelopmentDemo() {
                   <button
                     onClick={() => setRecipeTab("sql")}
                     className={`px-4 py-2 text-xs font-mono flex items-center gap-2 border-r border-hairline cursor-pointer ${
-                      recipeTab === "sql" ? "bg-[#0d0d0f] text-white border-t border-t-primary" : "text-surface-500 hover:text-surface-300"
+                      recipeTab === "sql" ? "bg-[#0d0d0f] island-dark text-tone-max border-t border-t-primary" : "text-tone-500 hover:text-tone-300"
                     }`}
                   >
                     <Database className="w-3.5 h-3.5 text-amber-400" />
@@ -159,7 +159,7 @@ export default function AiAppDevelopmentDemo() {
                 </div>
 
                 {/* Styled Editor Pane */}
-                <div className="flex-1 p-5 font-mono text-[11px] sm:text-xs text-slate-300 overflow-hidden leading-relaxed select-text bg-[#0d0d0f]">
+                <div className="flex-1 p-5 font-mono text-[11px] sm:text-xs text-slate-300 overflow-hidden leading-relaxed select-text bg-[#0d0d0f] island-dark">
                   {recipeTab === "schema" ? (
                     <div className="space-y-1">
                       <div><span className="text-slate-500">{"// backend/schema/feedbacks.ts"}</span></div>
@@ -227,7 +227,7 @@ export default function AiAppDevelopmentDemo() {
 
             {/* Mode 2 Layout: Visual Event Pipeline Diagram */}
             {activeMode === "pipelines" && (
-              <div className="flex-1 flex flex-col justify-between p-6 bg-[#0d0d0f] select-none">
+              <div className="flex-1 flex flex-col justify-between p-6 bg-[#0d0d0f] island-dark select-none">
 
                 {/* Active flow labels */}
                 <div className="w-full flex justify-between px-6 text-[10px] font-mono text-slate-500">
@@ -242,7 +242,7 @@ export default function AiAppDevelopmentDemo() {
 
                   {/* Connector track + animated flow, behind the node tiles */}
                   <div
-                    className="absolute left-14 right-14 md:left-20 md:right-20 top-[calc(50%-1.25rem)] -translate-y-1/2 h-1 rounded-full bg-[#232332] overflow-hidden"
+                    className="absolute left-14 right-14 md:left-20 md:right-20 top-[calc(50%-1.25rem)] -translate-y-1/2 h-1 rounded-full bg-[#232332] island-dark overflow-hidden"
                     aria-hidden="true"
                   >
                     <div
@@ -253,28 +253,28 @@ export default function AiAppDevelopmentDemo() {
 
                   {/* Node 1: Postgres Row (feedbacks) */}
                   <div className="relative z-10 flex flex-col items-center">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/20 bg-[#0e1520] text-primary shadow-[0_0_15px_rgba(0,112,244,0.05)]">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/20 bg-[#0e1520] island-dark text-primary shadow-[0_0_15px_rgba(0,112,244,0.05)]">
                       <Database className="w-6 h-6" />
                     </div>
-                    <span className="text-xs font-semibold text-white mt-2.5">Postgres Row</span>
+                    <span className="text-xs font-semibold text-tone-max mt-2.5">Postgres Row</span>
                     <span className="text-[9px] font-mono text-slate-500">feedbacks table</span>
                   </div>
 
                   {/* Node 2: Webhook Trigger */}
                   <div className="relative z-10 flex flex-col items-center">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/30 bg-[#101b2e] text-primary shadow-[0_0_20px_rgba(0,112,244,0.1)]">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/30 bg-[#101b2e] island-dark text-primary shadow-[0_0_20px_rgba(0,112,244,0.1)]">
                       <Settings className="w-6 h-6 animate-[spin_8s_linear_infinite]" />
                     </div>
-                    <span className="text-xs font-semibold text-white mt-2.5">Webhook Trigger</span>
+                    <span className="text-xs font-semibold text-tone-max mt-2.5">Webhook Trigger</span>
                     <span className="text-[9px] font-mono text-slate-500">on row insert · no code</span>
                   </div>
 
                   {/* Node 3: AI Logic */}
                   <div className="relative z-10 flex flex-col items-center">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/20 bg-[#0e1520] text-primary shadow-[0_0_15px_rgba(0,112,244,0.05)]">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/20 bg-[#0e1520] island-dark text-primary shadow-[0_0_15px_rgba(0,112,244,0.05)]">
                       <Brain className="w-6 h-6 animate-pulse" />
                     </div>
-                    <span className="text-xs font-semibold text-white mt-2.5">AI Worker</span>
+                    <span className="text-xs font-semibold text-tone-max mt-2.5">AI Worker</span>
                     <span className="text-[9px] font-mono text-slate-500">ai-extractor.ts</span>
                   </div>
 
@@ -284,7 +284,7 @@ export default function AiAppDevelopmentDemo() {
                 <div className="bg-surface-raised border border-hairline rounded-xl p-3 text-[11px] font-mono text-slate-400 flex items-center gap-3 z-10 leading-relaxed">
                   <div className="h-2 w-2 rounded-full bg-primary animate-pulse shrink-0"></div>
                   <span>
-                    When a row enters <code className="text-white">feedbacks</code>, Rebase forwards the payload to your local function to trigger the AI analysis asynchronously.
+                    When a row enters <code className="text-tone-max">feedbacks</code>, Rebase forwards the payload to your local function to trigger the AI analysis asynchronously.
                   </span>
                 </div>
 

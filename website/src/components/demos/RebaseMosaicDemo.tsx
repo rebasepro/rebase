@@ -144,31 +144,31 @@ function FloatingCursor({
     const colorMap: Record<string, { bg: string; text: string; border: string; fill: string }> = {
         purple: {
             bg: "bg-[#8b5cf6]",
-            text: "text-white",
+            text: "text-tone-max",
             border: "border-[#a78bfa]",
             fill: "#8b5cf6"
         },
         teal: {
             bg: "bg-[#0d9488]",
-            text: "text-white",
+            text: "text-tone-max",
             border: "border-[#2dd4bf]",
             fill: "#0d9488"
         },
         red: {
             bg: "bg-[#dc2626]",
-            text: "text-white",
+            text: "text-tone-max",
             border: "border-[#f87171]",
             fill: "#dc2626"
         },
         blue: {
             bg: "bg-[#2563eb]",
-            text: "text-white",
+            text: "text-tone-max",
             border: "border-[#60a5fa]",
             fill: "#2563eb"
         },
         orange: {
             bg: "bg-[#ea580c]",
-            text: "text-white",
+            text: "text-tone-max",
             border: "border-[#fb923c]",
             fill: "#ea580c"
         }
@@ -426,7 +426,7 @@ export default function RebaseMosaicDemo() {
                                     <span className="text-neutral-700">/</span>
                                     <span className="text-neutral-400">spec</span>
                                 </div>
-                                <div className="text-lg font-semibold text-white font-sans">Rebase Setup Spec</div>
+                                <div className="text-lg font-semibold text-tone-max font-sans">Rebase Setup Spec</div>
                             </div>
 
                             {/* Block elements list */}
@@ -460,7 +460,7 @@ export default function RebaseMosaicDemo() {
                                         <div
                                             className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all duration-300 ${isCheckboxChecked ? "bg-primary border-primary" : "border-neutral-700 bg-neutral-950"}`}>
                                             {isCheckboxChecked &&
-                                                <Check size={10} className="text-white stroke-[3px]"/>}
+                                                <Check size={10} className="text-tone-max stroke-[3px]"/>}
                                         </div>
                                     </div>
                                     <span
@@ -519,7 +519,7 @@ export default function RebaseMosaicDemo() {
                                                     <Layers size={10} className="text-primary"/>
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-[9px] font-medium text-white">Callout</span>
+                                                    <span className="text-[9px] font-medium text-tone-max">Callout</span>
                                                     <span
                                                         className="text-[7px] text-neutral-400">Info box with emoji</span>
                                                 </div>
@@ -561,7 +561,7 @@ export default function RebaseMosaicDemo() {
                                 </h3>
                             </div>
                             <button
-                                className="flex items-center gap-1 px-2 py-1 rounded-md bg-neutral-900 border border-neutral-800 text-[10px] font-semibold text-neutral-300 hover:text-white transition-colors">
+                                className="flex items-center gap-1 px-2 py-1 rounded-md bg-neutral-900 border border-neutral-800 text-[10px] font-semibold text-neutral-300 hover:text-tone-max transition-colors">
                                 <Plus size={10}/> Create New
                             </button>
                         </div>
@@ -634,7 +634,7 @@ export default function RebaseMosaicDemo() {
 
                     {/* Card 4: TypeScript Code Block */}
                     <div
-                        className="group relative overflow-hidden rounded-2xl border border-neutral-800/80 bg-[#0b0c10] shadow-[0_4px_30px_rgba(0,0,0,0.5)] font-mono text-[11px] leading-relaxed p-4 hover:border-primary/30 transition-colors duration-300">
+                        className="group relative overflow-hidden rounded-2xl border border-neutral-800/80 bg-[#0b0c10] island-dark shadow-[0_4px_30px_rgba(0,0,0,0.5)] font-mono text-[11px] leading-relaxed p-4 hover:border-primary/30 transition-colors duration-300">
                         {/* Floating Developer Cursor */}
                         <FloatingCursor
                             role="Developer"
@@ -813,7 +813,7 @@ export default function RebaseMosaicDemo() {
                                     className="absolute inset-2 border border-dashed border-primary/40 rounded-lg pointer-events-none animate-pulse"/>
 
                                 <div className="text-center space-y-1.5 max-w-[130px]">
-                                    <h4 className="text-[10px] font-semibold tracking-tight text-white leading-tight">
+                                    <h4 className="text-[10px] font-semibold tracking-tight text-tone-max leading-tight">
                                         {currentLivePreviewText}
                                     </h4>
                                     <div className="h-0.5 w-6 bg-primary mx-auto rounded"/>

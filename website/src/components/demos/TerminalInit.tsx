@@ -11,23 +11,23 @@ export function TerminalInit() {
     };
 
     return (
-        <div className="w-full max-w-lg mx-auto rounded-xl border border-hairline bg-[#0c0d10] shadow-2xl overflow-hidden font-mono text-xs select-none">
+        <div className="w-full max-w-lg mx-auto rounded-xl border border-hairline bg-[#0c0d10] island-dark shadow-2xl overflow-hidden font-mono text-xs select-none">
             {/* Terminal Top bar */}
-            <div className="flex items-center justify-between px-4 py-2.5 bg-[#14151a] border-b border-hairline">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-[#14151a] island-dark border-b border-hairline">
                 <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
                 </div>
-                <span className="text-[10px] text-surface-500 font-medium">zsh</span>
+                <span className="text-[10px] text-tone-500 font-medium">zsh</span>
                 <div className="w-6"></div>
             </div>
 
             {/* Terminal Body */}
             <div className="p-5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2 text-surface-300">
+                <div className="flex items-center gap-2 text-tone-300">
                     <span className="text-primary font-semibold select-none">&gt;</span>
-                    <span className="text-white font-medium select-all">{command}</span>
+                    <span className="text-tone-max font-medium select-all">{command}</span>
                     <span className="w-1.5 h-4 bg-primary animate-pulse inline-block align-middle select-none"></span>
                 </div>
                 <button
@@ -35,7 +35,7 @@ export function TerminalInit() {
                     className={`flex items-center gap-1 px-3 py-1.5 rounded-md border text-[10px] font-medium uppercase transition-all duration-300 cursor-pointer ${
                         copied
                             ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 ring-1 ring-emerald-500/20"
-                            : "bg-surface-sheet text-surface-400 border-hairline hover:text-white hover:border-hairline-strong active:scale-95"
+                            : "bg-surface-sheet text-tone-400 border-hairline hover:text-tone-max hover:border-hairline-strong active:scale-95"
                     }`}
                 >
                     {copied ? (

@@ -95,8 +95,8 @@ const articleSchema = {
 					<FormattedDate date={pubDate} />
 					{updatedDate && <> · Updated <FormattedDate date={updatedDate} /></>}
 				</p>
-				<h1 class="mt-4 max-w-4xl text-4xl md:text-5xl lg:text-6xl text-white">{title}</h1>
-				{description && <p class="mt-5 max-w-2xl text-lg leading-8 text-surface-400">{description}</p>}
+				<h1 class="mt-4 max-w-4xl text-4xl md:text-5xl lg:text-6xl text-tone-max">{title}</h1>
+				{description && <p class="mt-5 max-w-2xl text-lg leading-8 text-tone-400">{description}</p>}
 
 				{author && (
 					<div class="mt-8 flex items-center gap-4">
@@ -106,8 +106,8 @@ const articleSchema = {
 							class="w-11 h-11 rounded-full"
 						/>
 						<div>
-							<div class="text-white font-semibold">{author.name}</div>
-							<div class="font-mono text-2xs uppercase tracking-[0.2em] text-surface-500">{author.title}</div>
+							<div class="text-tone-max font-semibold">{author.name}</div>
+							<div class="font-mono text-2xs uppercase tracking-[0.2em] text-tone-500">{author.title}</div>
 						</div>
 					</div>
 				)}
@@ -128,7 +128,7 @@ const articleSchema = {
 				</div>
 			)}
 
-		<div class="prose prose-invert prose-lg max-w-3xl [&_p]:my-3 [&_img]:my-8 [&_h1]:mt-8 [&_h1]:mb-4 [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:mt-6 [&_h3]:mb-2 [&_h4]:mt-4 [&_h4]:mb-2 [&_ul]:my-4 [&_ol]:my-4 [&_li]:my-1 [&_blockquote]:my-4 [&_pre]:my-4 [&_hr]:my-6 [&_table]:my-4 [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_figure]:my-4">
+		<div class="prose dark:prose-invert prose-lg max-w-3xl [&_p]:my-3 [&_img]:my-8 [&_h1]:mt-8 [&_h1]:mb-4 [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:mt-6 [&_h3]:mb-2 [&_h4]:mt-4 [&_h4]:mb-2 [&_ul]:my-4 [&_ol]:my-4 [&_li]:my-1 [&_blockquote]:my-4 [&_pre]:my-4 [&_hr]:my-6 [&_table]:my-4 [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_figure]:my-4">
 			<slot />
 		</div>
 		</article>

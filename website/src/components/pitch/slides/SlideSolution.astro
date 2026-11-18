@@ -3,15 +3,15 @@ import PitchSlide from '../PitchSlide.astro';
 const TOTAL = 13;
 ---
 <PitchSlide id="slide-solution" slideNumber={4} totalSlides={TOTAL}>
-    <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase mb-4">The Solution</p>
-    <h2 class="text-4xl md:text-5xl font-semibold text-white mb-4">Connect your database.<br/>Get your entire platform.</h2>
-    <p class="text-lg text-surface-300 max-w-3xl mb-8">Rebase reads your existing database and instantly generates everything a team needs to build and ship — admin panel, APIs, user management, and more. No months of development. No vendor lock-in.</p>
+    <p class="text-xs font-semibold tracking-[0.25em] text-tone-500 uppercase mb-4">The Solution</p>
+    <h2 class="text-4xl md:text-5xl font-semibold text-tone-max mb-4">Connect your database.<br/>Get your entire platform.</h2>
+    <p class="text-lg text-tone-300 max-w-3xl mb-8">Rebase reads your existing database and instantly generates everything a team needs to build and ship — admin panel, APIs, user management, and more. No months of development. No vendor lock-in.</p>
 
     {/* Before / After comparison — the key "aha" moment for non-technical readers */}
     <div class="grid grid-cols-2 gap-6 mb-8">
         <div class="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-6">
             <div class="text-xs font-semibold text-rose-400 uppercase tracking-wider mb-4">Without Rebase</div>
-            <ul class="space-y-2.5 text-sm text-surface-300">
+            <ul class="space-y-2.5 text-sm text-tone-300">
                 <li class="flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-rose-400 flex-shrink-0"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                     Months of CRUD, auth and back-office work before the product starts
@@ -32,7 +32,7 @@ const TOTAL = 13;
         </div>
         <div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-6">
             <div class="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-4">With Rebase</div>
-            <ul class="space-y-2.5 text-sm text-surface-300">
+            <ul class="space-y-2.5 text-sm text-tone-300">
                 <li class="flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400 flex-shrink-0"><path d="M20 6 9 17l-5-5"/></svg>
                     Full admin + APIs in minutes, not months
@@ -63,7 +63,7 @@ const TOTAL = 13;
             { label: "Real-time Updates", color: "text-cyan-400" },
             { label: "AI Integration", color: "text-rose-400" },
         ].map(item => (
-            <div class="rounded-lg border border-surface-700 bg-surface-900/40 p-3 text-center">
+            <div class="rounded-lg border border-tone-700 bg-tone-900/40 p-3 text-center">
                 <p class={`text-xs font-semibold ${item.color}`}>{item.label}</p>
             </div>
         ))}

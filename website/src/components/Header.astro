@@ -186,7 +186,7 @@ const flatNavLinks = [
                      would trade a layout shift for a slower first render. -->
                 <img src="/img/rebase_logo.svg" width="32" height="32" fetchpriority="high"
                      class="h-8 w-8 mr-4" alt="Rebase Logo" transition:name="logo-image"/>
-                <span class="self-center text-lg font-semibold whitespace-nowrap text-white"
+                <span class="self-center text-lg font-semibold whitespace-nowrap text-tone-max"
                       transition:name="logo-text">Rebase</span>
             </a>
 
@@ -198,16 +198,16 @@ const flatNavLinks = [
                                 <div class="grid grid-cols-3 gap-x-10 gap-y-3">
                                     {link.columns.map(column => (
                                             <div class="flex flex-col gap-1">
-                                                <p class="px-3 pb-2 text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500">{column.heading}</p>
+                                                <p class="px-3 pb-2 text-2xs font-semibold uppercase tracking-[0.18em] text-tone-500">{column.heading}</p>
                                                 {column.items.map(subLink => (
                                                         <a href={subLink.href}
-                                                           class="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
+                                                           class="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-tone-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
                                                             <svg class="w-6 h-6 text-primary-light shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                                 <path d={iconSvgPaths[subLink.icon] || ""} />
                                                             </svg>
                                                             <div>
-                                                                <p class="font-semibold text-white">{subLink.label}</p>
-                                                                <p class="text-surface-400 text-sm leading-snug">{subLink.description}</p>
+                                                                <p class="font-semibold text-tone-max">{subLink.label}</p>
+                                                                <p class="text-tone-400 text-sm leading-snug">{subLink.description}</p>
                                                             </div>
                                                         </a>
                                                 ))}
@@ -218,7 +218,7 @@ const flatNavLinks = [
                     ) : (
                             <a
                                     href={link.href}
-                                    class={`p-3 transition-colors hover:text-primary-light ${currentPath === link.href ? "text-primary-light" : "text-surface-300"}`}
+                                    class={`p-3 transition-colors hover:text-primary-light ${currentPath === link.href ? "text-primary-light" : "text-tone-300"}`}
                             >
                                 {link.label}
                             </a>
@@ -231,7 +231,7 @@ const flatNavLinks = [
                 {flatNavLinks.map(link => (
                     <a
                         href={link.href}
-                        class={`p-3 transition-colors hover:text-primary-light ${currentPath === link.href ? "text-primary-light" : "text-surface-300"}`}
+                        class={`p-3 transition-colors hover:text-primary-light ${currentPath === link.href ? "text-primary-light" : "text-tone-300"}`}
                     >
                         {link.label}
                     </a>
@@ -240,6 +240,29 @@ const flatNavLinks = [
         </div>
         <div class="flex flex-1 justify-end items-center gap-4">
             <LanguageSelect iconOnly={true} />
+            <!-- Theme switch. The label names the mode a click goes TO; both
+                 strings ship and Layout's boot script picks one, so the label
+                 is right before any script on this component runs. -->
+            <button
+                    type="button"
+                    class="theme-toggle relative w-9 h-9 inline-flex items-center justify-center rounded-md text-tone-300 hover:text-tone-max hover:bg-tone-max/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 transition-colors"
+                    data-label-light={t("nav.theme.toLight")}
+                    data-label-dark={t("nav.theme.toDark")}
+                    aria-label={t("nav.theme.toLight")}
+                    title={t("nav.theme.toLight")}
+                    data-track
+                    id="header-theme-toggle"
+            >
+                <!-- Sun: shown in dark mode (the click lights the page). -->
+                <svg class="theme-icon-sun w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="4"/>
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                </svg>
+                <!-- Moon: shown in light mode. -->
+                <svg class="theme-icon-moon w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                </svg>
+            </button>
             <GitHubStarButton class="hidden sm:inline-flex" />
             <a
                     href={DEMO_URL} target="_blank" rel="noopener noreferrer"
@@ -268,7 +291,7 @@ const flatNavLinks = [
             <!-- Mobile menu button -->
             <button
                     type="button"
-                    class="lg:hidden relative z-50 inline-flex items-center justify-center p-2 rounded-md text-surface-300 hover:text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white transition-colors"
+                    class="lg:hidden relative z-50 inline-flex items-center justify-center p-2 rounded-md text-tone-300 hover:text-tone-max hover:bg-tone-max/10 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-tone-max transition-colors"
                     aria-controls="mobile-menu"
                     aria-expanded="false"
                     id="mobile-menu-button"
@@ -300,7 +323,7 @@ const flatNavLinks = [
                                 <button
                                         type="button"
                                         id={`mobile-menu-toggle-${index}`}
-                                        class="flex items-center justify-center text-2xl font-semibold transition-colors w-full text-center py-3 rounded-lg text-surface-300 hover:bg-white/10 hover:text-white"
+                                        class="flex items-center justify-center text-2xl font-semibold transition-colors w-full text-center py-3 rounded-lg text-tone-300 hover:bg-tone-max/10 hover:text-tone-max"
                                         aria-expanded="false"
                                         aria-controls={`mobile-submenu-${index}`}
                                 >
@@ -317,7 +340,7 @@ const flatNavLinks = [
                                                     class={`block text-xl font-medium transition-colors w-full text-center py-2 rounded-lg ${
                                                         currentPath === subLink.href
                                                             ? "bg-primary/20 text-primary-light"
-                                                            : "text-surface-400 hover:bg-white/10 hover:text-white"
+                                                            : "text-tone-400 hover:bg-tone-max/10 hover:text-tone-max"
                                                     }`}
                                             >
                                                 {subLink.label}
@@ -331,7 +354,7 @@ const flatNavLinks = [
                                     class={`block text-2xl font-semibold transition-colors w-full text-center py-3 rounded-lg ${
                                         currentPath === link.href
                                             ? "bg-primary/20 text-primary-light"
-                                            : "text-surface-300 hover:bg-white/10 hover:text-white"
+                                            : "text-tone-300 hover:bg-tone-max/10 hover:text-tone-max"
                                     }`}
                             >
                                 {link.label}
@@ -379,7 +402,7 @@ const flatNavLinks = [
                             class={`block text-2xl font-semibold transition-colors w-full text-center py-3 rounded-lg ${
                                 currentPath === link.href
                                     ? "bg-primary/20 text-primary-light"
-                                    : "text-surface-300 hover:bg-white/10 hover:text-white"
+                                    : "text-tone-300 hover:bg-tone-max/10 hover:text-tone-max"
                             }`}
                         >
                             {link.label}
@@ -472,7 +495,7 @@ const flatNavLinks = [
        panel's exact surface and blur, so the two paint as one plate, and this
        state wins over the lighter scrolled tint above by source order. */
     html[data-menu-open] .site-header {
-        background-color: color-mix(in oklab, var(--color-surface-950) 95%, transparent);
+        background-color: color-mix(in oklab, var(--tone-950) 95%, transparent);
         -webkit-backdrop-filter: blur(24px);
         backdrop-filter: blur(24px);
     }

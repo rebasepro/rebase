@@ -17,17 +17,17 @@ import { useTranslatedPath } from '../../i18n/ui';
 const translatePath = useTranslatedPath(lang);
 
 // Whitespace matters inside <pre>, so the samples live in frontmatter.
-const tableCode = `<span class="text-primary-light">export const</span> <span class="text-white">orders</span> = <span class="text-blue-300">defineTable</span>(<span class="text-green-400">"orders"</span>, {
+const tableCode = `<span class="text-primary-light">export const</span> <span class="text-tone-max">orders</span> = <span class="text-blue-300">defineTable</span>(<span class="text-green-400">"orders"</span>, {
   <span class="text-blue-300">columns</span>: {
     <span class="text-blue-300">reference</span>: col.<span class="text-blue-300">text</span>().<span class="text-blue-300">notNull</span>(),
     <span class="text-blue-300">status</span>:    col.<span class="text-blue-300">enum</span>([<span class="text-green-400">"paid"</span>, <span class="text-green-400">"refunded"</span>]),
     <span class="text-blue-300">total</span>:     col.<span class="text-blue-300">numeric</span>({ <span class="text-blue-300">precision</span>: <span class="text-amber-500">10</span>, <span class="text-blue-300">scale</span>: <span class="text-amber-500">2</span> }),
-    <span class="text-surface-500">// …</span>
+    <span class="text-tone-500">// …</span>
   },
   <span class="text-blue-300">rls</span>: <span class="text-green-400">"admin-only"</span>,
 });`;
 
-const customizationCode = `<span class="text-primary-light">export const</span> <span class="text-white">ordersCms</span> = <span class="text-blue-300">customizeTable</span>&lt;<span class="text-primary-light">typeof</span> <span class="text-white">orders</span>&gt;(<span class="text-green-400">"orders"</span>, {
+const customizationCode = `<span class="text-primary-light">export const</span> <span class="text-tone-max">ordersCms</span> = <span class="text-blue-300">customizeTable</span>&lt;<span class="text-primary-light">typeof</span> <span class="text-tone-max">orders</span>&gt;(<span class="text-green-400">"orders"</span>, {
   <span class="text-blue-300">icon</span>: <span class="text-green-400">"ShoppingCart"</span>,
   <span class="text-blue-300">group</span>: <span class="text-green-400">"E-Commerce"</span>,
   <span class="text-blue-300">defaultViewMode</span>: <span class="text-green-400">"table"</span>,
@@ -39,9 +39,9 @@ const customizationCode = `<span class="text-primary-light">export const</span> 
 const customComponentCode = `<span class="text-blue-300">fields</span>: {
   <span class="text-blue-300">status</span>: {
     <span class="text-blue-300">enumLabels</span>: { <span class="text-blue-300">paid</span>: <span class="text-green-400">"Paid"</span>, <span class="text-blue-300">refunded</span>: <span class="text-green-400">"Refunded"</span> },
-    <span class="text-surface-500">// your own React components, imported like any other</span>
-    <span class="text-blue-300">Field</span>: <span class="text-white">StatusPicker</span>,
-    <span class="text-blue-300">Preview</span>: <span class="text-white">StatusChip</span>,
+    <span class="text-tone-500">// your own React components, imported like any other</span>
+    <span class="text-blue-300">Field</span>: <span class="text-tone-max">StatusPicker</span>,
+    <span class="text-blue-300">Preview</span>: <span class="text-tone-max">StatusChip</span>,
   },
 },`;
 
@@ -68,13 +68,13 @@ import ChapterRule from "../ChapterRule.astro";
 
         <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
             <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>Ships with the backend · React 19 · Bring your own components</span></div>
-            <h1 class="mb-6 text-display-2 text-white">
+            <h1 class="mb-6 text-display-2 text-tone-max">
                 Rebase CMS.<br/>{t("cmspage.hero.tagline")}
             </h1>
-            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
+            <p class="mb-10 text-lg leading-8 text-tone-300 lg:text-xl">
                 A complete admin panel, generated from the tables your backend already serves. It is a layer
                 on top — a client of the same API your own code calls, under the same policies. Your team works
-                in it from the first <code class="font-mono text-surface-200">rebase dev</code>, and you customize it in your own frontend.
+                in it from the first <code class="font-mono text-tone-200">rebase dev</code>, and you customize it in your own frontend.
             </p>
             <div class="flex flex-wrap items-center justify-start gap-x-6 gap-y-3">
                 <a href={DEMO_URL} target="_blank" rel="noopener noreferrer"
@@ -88,7 +88,7 @@ import ChapterRule from "../ChapterRule.astro";
                     </svg>
                 </a>
                 <a href={translatePath("/backend")}
-                   class="inline-flex items-center gap-x-2 text-white hover:text-primary-light transition-colors font-semibold">
+                   class="inline-flex items-center gap-x-2 text-tone-max hover:text-primary-light transition-colors font-semibold">
                     {t("cmspage.link.backend")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -103,7 +103,7 @@ import ChapterRule from "../ChapterRule.astro";
     <!-- Real back offices, running -->
     <section class="relative z-0 pb-16 sm:pb-24 overflow-hidden">
         <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-8">
-            <p class="text-center text-sm text-surface-500">{t("cmspage.marquee.caption")}</p>
+            <p class="text-center text-sm text-tone-500">{t("cmspage.marquee.caption")}</p>
         </div>
         <div class="h-72">
             <ScreenshotsMarquee/>
@@ -117,10 +117,10 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <h2 class="text-3xl sm:text-4xl text-white">
+                <h2 class="text-3xl sm:text-4xl text-tone-max">
                     {t("cmspage.work.title")}
                 </h2>
-                <p class="mt-lead text-lg leading-8 text-surface-400">
+                <p class="mt-lead text-lg leading-8 text-tone-400">
                     Everything below is generated from the same table definitions your API is served from.
                     Nobody drew these screens.
                 </p>
@@ -141,15 +141,15 @@ import ChapterRule from "../ChapterRule.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                 <div class="lg:col-span-5">
-                    <h2 class="text-3xl sm:text-4xl text-white mb-8">
+                    <h2 class="text-3xl sm:text-4xl text-tone-max mb-8">
                         {t("cmspage.work.sub")}
                     </h2>
                     <div class="space-y-5">
                         {capabilities.map(item => (
                                 <div class="flex gap-3">
                                     <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60"></span>
-                                    <p class="text-sm text-surface-400 leading-relaxed">
-                                        <span class="text-white">{item.title}.</span> {item.desc}
+                                    <p class="text-sm text-tone-400 leading-relaxed">
+                                        <span class="text-tone-max">{item.title}.</span> {item.desc}
                                     </p>
                                 </div>
                         ))}
@@ -170,7 +170,7 @@ import ChapterRule from "../ChapterRule.astro";
 
                 <div class="lg:col-span-7">
                     <StorageViewDemo client:visible/>
-                    <p class="mt-4 text-sm text-surface-500">
+                    <p class="mt-4 text-sm text-tone-500">
                         {t("cmspage.storage.note")}
                     </p>
                 </div>
@@ -187,13 +187,13 @@ import ChapterRule from "../ChapterRule.astro";
     <!-- Full-width interactive Notion editor hero -->
  <section class="relative z-0 pb-16 sm:pb-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
-        <div class="rounded-2xl overflow-hidden border border-surface-800/80 bg-surface-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55),0_24px_120px_rgba(0,0,0,0.65)]">
+        <div class="rounded-2xl overflow-hidden border border-tone-800/80 bg-tone-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55),0_24px_120px_rgba(0,0,0,0.65)]">
           <!-- Browser Chrome -->
-          <div class="px-4 py-3 border-b border-surface-800/80 flex items-center gap-2 bg-surface-900/50 backdrop-blur-md">
+          <div class="px-4 py-3 border-b border-tone-800/80 flex items-center gap-2 bg-tone-900/50 backdrop-blur-md">
             <div class="flex gap-1.5 w-16">
             </div>
             <div class="flex-1 flex justify-center">
-              <div class="bg-surface-950/80 border border-surface-800/80 rounded-lg px-3 py-1 text-2xs font-mono text-surface-500 flex items-center gap-1.5">
+              <div class="bg-tone-950/80 border border-tone-800/80 rounded-lg px-3 py-1 text-2xs font-mono text-tone-500 flex items-center gap-1.5">
                 <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                 admin.yourdomain.com/posts/new
               </div>
@@ -205,7 +205,7 @@ import ChapterRule from "../ChapterRule.astro";
             <RichTextEditorDemo client:only="react" />
           </div>
         </div>
-        <p class="mt-4 text-center text-xs sm:text-sm text-surface-500">{t("cmspage.rte.caption")}</p>
+        <p class="mt-4 text-center text-xs sm:text-sm text-tone-500">{t("cmspage.rte.caption")}</p>
       </div>
     </section>
 
@@ -228,9 +228,9 @@ import ChapterRule from "../ChapterRule.astro";
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-sky-500/10 text-sky-400 ring-1 ring-inset ring-sky-500/20">
               Markdown
             </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("cmspage.md.title")}</h2>
-            <p class="text-lg text-surface-400 mb-6">{t("cmspage.md.body")}</p>
-            <ul class="space-y-3 text-surface-300">
+            <h2 class="text-3xl sm:text-4xl text-tone-max mb-4">{t("cmspage.md.title")}</h2>
+            <p class="text-lg text-tone-400 mb-6">{t("cmspage.md.body")}</p>
+            <ul class="space-y-3 text-tone-300">
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.md.f1")}</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.md.f2")}</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.md.f3")}</li>
@@ -252,15 +252,15 @@ import ChapterRule from "../ChapterRule.astro";
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/20">
               Kanban
             </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("cmspage.kanban.title")}</h2>
-            <p class="text-lg text-surface-400 mb-6" set:html={t("cmspage.kanban.body")}></p>
-            <ul class="space-y-3 text-surface-300">
+            <h2 class="text-3xl sm:text-4xl text-tone-max mb-4">{t("cmspage.kanban.title")}</h2>
+            <p class="text-lg text-tone-400 mb-6" set:html={t("cmspage.kanban.body")}></p>
+            <ul class="space-y-3 text-tone-300">
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.kanban.f1")}</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.kanban.f2")}</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.kanban.f3")}</li>
             </ul>
           </div>
-          <div class="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl" style="height:260px">
+          <div class="rounded-2xl overflow-hidden ring-1 ring-tone-700 bg-tone-950 shadow-2xl" style="height:260px">
             <KanbanDemo client:only="react" />
           </div>
         </div>
@@ -276,16 +276,16 @@ import ChapterRule from "../ChapterRule.astro";
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-cyan-500/10 text-cyan-400 ring-1 ring-inset ring-cyan-500/20">
               Spreadsheet View
             </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("cmspage.sheet.title")}</h2>
-            <p class="text-lg text-surface-400 mb-6">{t("cmspage.sheet.body")}</p>
-            <ul class="space-y-3 text-surface-300">
+            <h2 class="text-3xl sm:text-4xl text-tone-max mb-4">{t("cmspage.sheet.title")}</h2>
+            <p class="text-lg text-tone-400 mb-6">{t("cmspage.sheet.body")}</p>
+            <ul class="space-y-3 text-tone-300">
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.sheet.f1")}</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.sheet.f2")}</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.sheet.f3")}</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.sheet.f4")}</li>
             </ul>
           </div>
-          <div className="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl h-[400px]">
+          <div className="rounded-2xl overflow-hidden ring-1 ring-tone-700 bg-tone-950 shadow-2xl h-[400px]">
             <SpreadsheetDemo client:only="react" />
           </div>
         </div>
@@ -301,12 +301,12 @@ import ChapterRule from "../ChapterRule.astro";
  <section class="py-chapter">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">{t("cmspage.formats.title")}</h2>
-          <p class="mt-lead text-surface-400 text-lg">{t("cmspage.formats.body")}</p>
+          <h2 class="text-3xl sm:text-4xl text-tone-max">{t("cmspage.formats.title")}</h2>
+          <p class="mt-lead text-tone-400 text-lg">{t("cmspage.formats.body")}</p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-8">
 
-          <div class="relative rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 overflow-hidden flex flex-col">
+          <div class="relative rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800 overflow-hidden flex flex-col">
             <div class="aspect-[16/10] overflow-hidden">
               <img src="/img/blog_example.webp" width="2336" height="1168" alt="Blog entry editor with preview panel showing rich content" class="w-full h-full object-cover object-top" loading="lazy"/>
             </div>
@@ -334,13 +334,13 @@ import ChapterRule from "../ChapterRule.astro";
 </svg>
 
                 </div>
-                <h3 class="text-base text-white">{t("cmspage.persona.content.title")}</h3>
+                <h3 class="text-base text-tone-max">{t("cmspage.persona.content.title")}</h3>
               </div>
-              <p class="text-sm text-surface-400 leading-relaxed">{t("cmspage.persona.content.body")}</p>
+              <p class="text-sm text-tone-400 leading-relaxed">{t("cmspage.persona.content.body")}</p>
             </div>
           </div>
 
-          <div class="relative rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 overflow-hidden flex flex-col">
+          <div class="relative rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800 overflow-hidden flex flex-col">
             <div class="aspect-[16/10] overflow-hidden">
               <img src="/img/users_table.png" width="2430" height="992" alt="Users table view with inline editing, relations, and entity actions" class="w-full h-full object-cover object-top" loading="lazy"/>
             </div>
@@ -367,13 +367,13 @@ import ChapterRule from "../ChapterRule.astro";
 </svg>
 
                 </div>
-                <h3 class="text-base text-white">{t("cmspage.persona.ops.title")}</h3>
+                <h3 class="text-base text-tone-max">{t("cmspage.persona.ops.title")}</h3>
               </div>
-              <p class="text-sm text-surface-400 leading-relaxed">{t("cmspage.persona.ops.body")}</p>
+              <p class="text-sm text-tone-400 leading-relaxed">{t("cmspage.persona.ops.body")}</p>
             </div>
           </div>
 
-          <div class="relative rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 overflow-hidden flex flex-col">
+          <div class="relative rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800 overflow-hidden flex flex-col">
             <div class="aspect-[16/10] overflow-hidden">
               <img src="/img/product_details_view.png" width="1266" height="1478" alt="Product detail view with Custom Preview tab showing product images and rich description — dark mode" class="w-full h-full object-cover object-top" loading="lazy"/>
             </div>
@@ -398,9 +398,9 @@ import ChapterRule from "../ChapterRule.astro";
 </svg>
 
                 </div>
-                <h3 class="text-base text-white">{t("cmspage.persona.dev.title")}</h3>
+                <h3 class="text-base text-tone-max">{t("cmspage.persona.dev.title")}</h3>
               </div>
-              <p class="text-sm text-surface-400 leading-relaxed">{t("cmspage.persona.dev.body")}</p>
+              <p class="text-sm text-tone-400 leading-relaxed">{t("cmspage.persona.dev.body")}</p>
             </div>
           </div>
 
@@ -415,29 +415,29 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <h2 class="text-3xl sm:text-4xl text-white">
+                <h2 class="text-3xl sm:text-4xl text-tone-max">
                     {t("cmspage.extend.title")}
                 </h2>
-                <p class="mt-lead text-lg leading-8 text-surface-400" set:html={t("cmspage.extend.body")}></p>
+                <p class="mt-lead text-lg leading-8 text-tone-400" set:html={t("cmspage.extend.body")}></p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                 <div class="frame overflow-hidden flex flex-col">
-                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                        <span class="font-mono text-xs text-surface-400">{t("cmspage.code.customComponent")}</span>
+                    <div class="px-4 py-3 border-b border-tone-800/80 bg-tone-900/50">
+                        <span class="font-mono text-xs text-tone-400">{t("cmspage.code.customComponent")}</span>
                     </div>
-                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={customComponentCode}></code></pre>
+                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-tone-300"><code set:html={customComponentCode}></code></pre>
                     <div class="px-5 pb-5 mt-auto">
                         <div inert aria-hidden="true">
                             <ReactExtMiniDemo client:visible/>
                         </div>
-                        <p class="text-sm text-surface-400 -mt-2">{t("cmspage.00")}</p>
+                        <p class="text-sm text-tone-400 -mt-2">{t("cmspage.00")}</p>
                     </div>
                 </div>
 
                 <div class="frame overflow-hidden flex flex-col">
-                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                        <span class="font-mono text-xs text-surface-400">{t("cmspage.01")}</span>
+                    <div class="px-4 py-3 border-b border-tone-800/80 bg-tone-900/50">
+                        <span class="font-mono text-xs text-tone-400">{t("cmspage.01")}</span>
                     </div>
                     {/* The demo renders 449px of content; at 420 it spilled out of the frame and
                          over the caption underneath. `overflow-hidden` keeps a future content
@@ -446,7 +446,7 @@ import ChapterRule from "../ChapterRule.astro";
                         <CustomFieldsDemo client:visible/>
                     </div>
                     <div class="px-5 pb-5">
-                        <p class="text-sm text-surface-400">{t("cmspage.02")}</p>
+                        <p class="text-sm text-tone-400">{t("cmspage.02")}</p>
                     </div>
                 </div>
             </div>
@@ -472,40 +472,40 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14">
-                <h2 class="text-3xl sm:text-4xl text-white">{t("cmspage.04")}</h2>
-                <p class="mt-lead text-lg leading-8 text-surface-400" set:html={t("cmspage.05")}></p>
+                <h2 class="text-3xl sm:text-4xl text-tone-max">{t("cmspage.04")}</h2>
+                <p class="mt-lead text-lg leading-8 text-tone-400" set:html={t("cmspage.05")}></p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 <div class="frame overflow-hidden">
-                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                        <span class="font-mono text-xs text-surface-400">backend/schema/orders.ts</span>
+                    <div class="px-4 py-3 border-b border-tone-800/80 bg-tone-900/50">
+                        <span class="font-mono text-xs text-tone-400">backend/schema/orders.ts</span>
                     </div>
-                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={tableCode}></code></pre>
-                    <p class="px-5 pb-5 text-sm text-surface-400" set:html={t("cmspage.06")}></p>
+                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-tone-300"><code set:html={tableCode}></code></pre>
+                    <p class="px-5 pb-5 text-sm text-tone-400" set:html={t("cmspage.06")}></p>
                 </div>
 
                 <div class="frame overflow-hidden">
-                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                        <span class="font-mono text-xs text-surface-400">{t("cmspage.07")}</span>
+                    <div class="px-4 py-3 border-b border-tone-800/80 bg-tone-900/50">
+                        <span class="font-mono text-xs text-tone-400">{t("cmspage.07")}</span>
                     </div>
-                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={customizationCode}></code></pre>
-                    <p class="px-5 pb-5 text-sm text-surface-400">{t("cmspage.08")}</p>
+                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-tone-300"><code set:html={customizationCode}></code></pre>
+                    <p class="px-5 pb-5 text-sm text-tone-400">{t("cmspage.08")}</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                    <h3 class="text-lg text-white mb-2">{t("cmspage.09")}</h3>
-                    <p class="text-sm text-surface-400">{t("cmspage.10")}</p>
+                <div class="p-7 rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800">
+                    <h3 class="text-lg text-tone-max mb-2">{t("cmspage.09")}</h3>
+                    <p class="text-sm text-tone-400">{t("cmspage.10")}</p>
                 </div>
-                <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                    <h3 class="text-lg text-white mb-2">{t("cmspage.11")}</h3>
-                    <p class="text-sm text-surface-400">{t("cmspage.12")}</p>
+                <div class="p-7 rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800">
+                    <h3 class="text-lg text-tone-max mb-2">{t("cmspage.11")}</h3>
+                    <p class="text-sm text-tone-400">{t("cmspage.12")}</p>
                 </div>
-                <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                    <h3 class="text-lg text-white mb-2">{t("cmspage.13")}</h3>
-                    <p class="text-sm text-surface-400" set:html={t("cmspage.14")}></p>
+                <div class="p-7 rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800">
+                    <h3 class="text-lg text-tone-max mb-2">{t("cmspage.13")}</h3>
+                    <p class="text-sm text-tone-400" set:html={t("cmspage.14")}></p>
                 </div>
             </div>
         </div>
@@ -518,25 +518,25 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <h2 class="text-3xl sm:text-4xl text-white">{t("cmspage.16")}</h2>
+                <h2 class="text-3xl sm:text-4xl text-tone-max">{t("cmspage.16")}</h2>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <a href={translatePath("/backend")}
-                   class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
-                    <p class="text-xs font-mono text-surface-500 mb-2">{t("cmspage.layer.backend")}</p>
-                    <h3 class="text-lg text-white mb-2">{t("cmspage.21")}</h3>
-                    <p class="text-sm text-surface-400">{t("cmspage.17")}</p>
+                   class="p-7 rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800 hover:ring-primary/30 transition-all duration-300 block">
+                    <p class="text-xs font-mono text-tone-500 mb-2">{t("cmspage.layer.backend")}</p>
+                    <h3 class="text-lg text-tone-max mb-2">{t("cmspage.21")}</h3>
+                    <p class="text-sm text-tone-400">{t("cmspage.17")}</p>
                 </a>
-                <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-primary/30">
-                    <p class="text-xs font-mono text-surface-500 mb-2">{t("cmspage.18")}</p>
-                    <h3 class="text-lg text-white mb-2">{t("cmspage.22")}</h3>
-                    <p class="text-sm text-surface-400" set:html={t("cmspage.19")}></p>
+                <div class="p-7 rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-primary/30">
+                    <p class="text-xs font-mono text-tone-500 mb-2">{t("cmspage.18")}</p>
+                    <h3 class="text-lg text-tone-max mb-2">{t("cmspage.22")}</h3>
+                    <p class="text-sm text-tone-400" set:html={t("cmspage.19")}></p>
                 </div>
                 <a href={translatePath("/studio")}
-                   class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
-                    <p class="text-xs font-mono text-surface-500 mb-2">{t("cmspage.layer.panel")}</p>
-                    <h3 class="text-lg text-white mb-2">{t("cmspage.23")}</h3>
-                    <p class="text-sm text-surface-400">{t("cmspage.20")}</p>
+                   class="p-7 rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800 hover:ring-primary/30 transition-all duration-300 block">
+                    <p class="text-xs font-mono text-tone-500 mb-2">{t("cmspage.layer.panel")}</p>
+                    <h3 class="text-lg text-tone-max mb-2">{t("cmspage.23")}</h3>
+                    <p class="text-sm text-tone-400">{t("cmspage.20")}</p>
                 </a>
             </div>
         </div>

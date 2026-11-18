@@ -37,8 +37,8 @@ import ChapterRule from "../ChapterRule.astro";
 
         <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
             <div class="hero-badge mb-8"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t("productpage.00")}</span></div>
-            <h1 class="mb-6 text-display-2 text-white" set:html={t("productpage.01")}></h1>
-            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("productpage.02")}</p>
+            <h1 class="mb-6 text-display-2 text-tone-max" set:html={t("productpage.01")}></h1>
+            <p class="mb-10 text-lg leading-8 text-tone-300 lg:text-xl">{t("productpage.02")}</p>
             <div class="flex items-center justify-start gap-x-4">
                 <a href={DEMO_URL} target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
@@ -50,7 +50,7 @@ import ChapterRule from "../ChapterRule.astro";
                         <path d="m12 5 7 7-7 7"/>
                     </svg>
                 </a>
-                <a href="/docs" class="inline-flex items-center gap-x-2 text-white hover:text-primary-light transition-colors font-semibold"
+                <a href="/docs" class="inline-flex items-center gap-x-2 text-tone-max hover:text-primary-light transition-colors font-semibold"
                    data-track id="product-hero-docs">
                     {t("cta.button.docs")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -77,9 +77,9 @@ import ChapterRule from "../ChapterRule.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start mb-14">
                 <div class="lg:col-span-5">
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("productpage.03")}</h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">{t("productpage.04")}</p>
-                    <p class="text-base text-surface-400 leading-relaxed mb-6">{t("productpage.05")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-tone-max mb-5">{t("productpage.03")}</h2>
+                    <p class="text-base text-tone-400 leading-relaxed mb-4">{t("productpage.04")}</p>
+                    <p class="text-base text-tone-400 leading-relaxed mb-6">{t("productpage.05")}</p>
                     <div class="flex flex-col items-start gap-3">
                         <a href={translatePath("/backend")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary-light hover:text-primary/80 transition-colors">
@@ -105,12 +105,12 @@ import ChapterRule from "../ChapterRule.astro";
                 </div>
 
                 <div class="lg:col-span-7">
-                    <div class="rounded-2xl border border-surface-800/80 bg-surface-950/60 p-7">
-                        <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-5">{t("productpage.06")}</p>
+                    <div class="rounded-2xl border border-tone-800/80 bg-tone-950/60 p-7">
+                        <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-tone-500 mb-5">{t("productpage.06")}</p>
                         <ul class="space-y-3">
                             {replaced.map(n => (
-                                    <li class="flex gap-3 text-sm text-surface-400 leading-relaxed">
-                                        <svg class="mt-0.5 h-4 w-4 shrink-0 text-surface-600" viewBox="0 0 24 24"
+                                    <li class="flex gap-3 text-sm text-tone-400 leading-relaxed">
+                                        <svg class="mt-0.5 h-4 w-4 shrink-0 text-tone-600" viewBox="0 0 24 24"
                                              fill="none" stroke="currentColor" stroke-width="2"
                                              stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M18 6 6 18"/>
@@ -133,10 +133,10 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
-                <h2 class="mt-4 text-display-2 text-white">
+                <h2 class="mt-4 text-display-2 text-tone-max">
                     {t("mosaic.title")}
                 </h2>
-                <p class="mt-lead text-surface-400 text-base sm:text-lg leading-relaxed">
+                <p class="mt-lead text-tone-400 text-base sm:text-lg leading-relaxed">
                     {t("mosaic.subtitle")}
                 </p>
             </div>
@@ -155,15 +155,15 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <h2 class="text-3xl sm:text-4xl text-white">{t("productpage.07")}</h2>
-                <p class="mt-lead text-lg leading-8 text-surface-400">{t("productpage.08")}</p>
+                <h2 class="text-3xl sm:text-4xl text-tone-max">{t("productpage.07")}</h2>
+                <p class="mt-lead text-lg leading-8 text-tone-400">{t("productpage.08")}</p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <a href={translatePath("/ai")}
-                   class="group p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
-                    <h3 class="text-lg text-white mb-2">{t("productpage.19")}</h3>
-                    <p class="text-sm text-surface-400 mb-4">{t("productpage.09")}</p>
+                   class="group p-7 rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800 hover:ring-primary/30 transition-all duration-300 block">
+                    <h3 class="text-lg text-tone-max mb-2">{t("productpage.19")}</h3>
+                    <p class="text-sm text-tone-400 mb-4">{t("productpage.09")}</p>
                     <span class="inline-flex items-center gap-2 text-sm font-medium text-primary-light">
                         {t("productpage.link.ai")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -175,9 +175,9 @@ import ChapterRule from "../ChapterRule.astro";
                     </span>
                 </a>
                 <a href={translatePath("/security")}
-                   class="group p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
-                    <h3 class="text-lg text-white mb-2">{t("productpage.10")}</h3>
-                    <p class="text-sm text-surface-400 mb-4" set:html={t("productpage.11")}></p>
+                   class="group p-7 rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800 hover:ring-primary/30 transition-all duration-300 block">
+                    <h3 class="text-lg text-tone-max mb-2">{t("productpage.10")}</h3>
+                    <p class="text-sm text-tone-400 mb-4" set:html={t("productpage.11")}></p>
                     <span class="inline-flex items-center gap-2 text-sm font-medium text-primary-light">
                         {t("productpage.link.rls")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -189,9 +189,9 @@ import ChapterRule from "../ChapterRule.astro";
                     </span>
                 </a>
                 <a href={translatePath("/developers")}
-                   class="group p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
-                    <h3 class="text-lg text-white mb-2">{t("productpage.20")}</h3>
-                    <p class="text-sm text-surface-400 mb-4">{t("productpage.12")}</p>
+                   class="group p-7 rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800 hover:ring-primary/30 transition-all duration-300 block">
+                    <h3 class="text-lg text-tone-max mb-2">{t("productpage.20")}</h3>
+                    <p class="text-sm text-tone-400 mb-4">{t("productpage.12")}</p>
                     <span class="inline-flex items-center gap-2 text-sm font-medium text-primary-light">
                         For developers
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -213,34 +213,34 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
-                <h2 class="text-3xl sm:text-4xl text-white">{t("productpage.14")}</h2>
-                <p class="mt-lead text-lg leading-8 text-surface-400">{t("productpage.15")}</p>
+                <h2 class="text-3xl sm:text-4xl text-tone-max">{t("productpage.14")}</h2>
+                <p class="mt-lead text-lg leading-8 text-tone-400">{t("productpage.15")}</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 <!-- Backend -->
-                <div class="relative overflow-hidden rounded-2xl border border-primary/25 bg-surface-950/70">
+                <div class="relative overflow-hidden rounded-2xl border border-primary/25 bg-tone-950/70">
                     <div class="pointer-events-none absolute inset-0" aria-hidden="true"
                          style="background: radial-gradient(600px 300px at 30% 0%, rgba(0,112,244,0.12), transparent 70%);"></div>
-                    <div class="relative px-7 py-6 border-b border-surface-800/80 flex items-baseline justify-between gap-4">
+                    <div class="relative px-7 py-6 border-b border-tone-800/80 flex items-baseline justify-between gap-4">
                         <div>
-                            <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-1">Layer 01</p>
-                            <h3 class="text-2xl text-white">{t("productpage.21")}</h3>
+                            <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-tone-500 mb-1">Layer 01</p>
+                            <h3 class="text-2xl text-tone-max">{t("productpage.21")}</h3>
                         </div>
-                        <span class="text-xs text-surface-500 shrink-0">{t("productpage.layer1.state")}</span>
+                        <span class="text-xs text-tone-500 shrink-0">{t("productpage.layer1.state")}</span>
                     </div>
-                    <ul class="relative divide-y divide-surface-800/60">
+                    <ul class="relative divide-y divide-tone-800/60">
                         {backendParts.map(part => (
                                 <li class="px-7 py-4">
                                     <div class="flex items-baseline justify-between gap-4">
-                                        <span class="text-sm font-semibold text-white">{t(`productpage.be.${part.k}.name`)}</span>
-                                        <code class="font-mono text-2xs text-surface-500 shrink-0">{part.meta}</code>
+                                        <span class="text-sm font-semibold text-tone-max">{t(`productpage.be.${part.k}.name`)}</span>
+                                        <code class="font-mono text-2xs text-tone-500 shrink-0">{part.meta}</code>
                                     </div>
-                                    <p class="mt-1 text-sm text-surface-400 leading-relaxed">{t(`productpage.be.${part.k}.note`)}</p>
+                                    <p class="mt-1 text-sm text-tone-400 leading-relaxed">{t(`productpage.be.${part.k}.note`)}</p>
                                 </li>
                         ))}
                     </ul>
-                    <div class="relative px-7 py-5 border-t border-surface-800/80">
+                    <div class="relative px-7 py-5 border-t border-tone-800/80">
                         <a href={translatePath("/backend")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary-light hover:text-primary/80 transition-colors">
                             {t("productpage.link.backendDemos")}
@@ -255,29 +255,29 @@ import ChapterRule from "../ChapterRule.astro";
                 </div>
 
                 <!-- Admin panel -->
-                <div class="relative overflow-hidden rounded-2xl border border-surface-800/80 bg-surface-950/50">
-                    <div class="px-7 py-6 border-b border-surface-800/80 flex items-baseline justify-between gap-4">
+                <div class="relative overflow-hidden rounded-2xl border border-tone-800/80 bg-tone-950/50">
+                    <div class="px-7 py-6 border-b border-tone-800/80 flex items-baseline justify-between gap-4">
                         <div>
-                            <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-1">Layer 02</p>
-                            <h3 class="text-2xl text-white">{t("productpage.22")}</h3>
+                            <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-tone-500 mb-1">Layer 02</p>
+                            <h3 class="text-2xl text-tone-max">{t("productpage.22")}</h3>
                         </div>
-                        <span class="text-xs text-surface-500 shrink-0">{t("productpage.layer2.state")}</span>
+                        <span class="text-xs text-tone-500 shrink-0">{t("productpage.layer2.state")}</span>
                     </div>
-                    <ul class="divide-y divide-surface-800/60">
+                    <ul class="divide-y divide-tone-800/60">
                         {adminParts.map(part => (
                                 <li class="px-7 py-4">
                                     <div class="flex items-baseline justify-between gap-4">
-                                        <span class="text-sm font-semibold text-white">{t(`productpage.panel.${part.k}.name`)}</span>
-                                        <code class="font-mono text-2xs text-surface-500 shrink-0">{part.meta}</code>
+                                        <span class="text-sm font-semibold text-tone-max">{t(`productpage.panel.${part.k}.name`)}</span>
+                                        <code class="font-mono text-2xs text-tone-500 shrink-0">{part.meta}</code>
                                     </div>
-                                    <p class="mt-1 text-sm text-surface-400 leading-relaxed">{t(`productpage.panel.${part.k}.note`)}</p>
+                                    <p class="mt-1 text-sm text-tone-400 leading-relaxed">{t(`productpage.panel.${part.k}.note`)}</p>
                                 </li>
                         ))}
                     </ul>
-                    <div class="px-7 py-4 bg-surface-900/30 border-t border-surface-800/60">
-                        <p class="text-sm text-surface-400 leading-relaxed">{t("productpage.16")}</p>
+                    <div class="px-7 py-4 bg-tone-900/30 border-t border-tone-800/60">
+                        <p class="text-sm text-tone-400 leading-relaxed">{t("productpage.16")}</p>
                     </div>
-                    <div class="px-7 py-5 border-t border-surface-800/80">
+                    <div class="px-7 py-5 border-t border-tone-800/80">
                         <a href={translatePath("/cms")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary-light hover:text-primary/80 transition-colors">
                             {t("productpage.link.panel")}

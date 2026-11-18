@@ -18,98 +18,98 @@
 const rule = "─".repeat(88);
 ---
 
-<div class="rounded-2xl overflow-hidden ring-1 ring-white/10 bg-[#09090b] shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-    <div class="px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-900/50">
+<div class="rounded-2xl overflow-hidden ring-1 ring-tone-max/10 bg-[#09090b] island-dark shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+    <div class="px-4 py-2.5 border-b border-tone-max/5 flex items-center gap-2 bg-tone-900/50">
         <div class="flex gap-1.5">
             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
         </div>
-        <div class="ml-4 text-xs font-mono text-surface-500">rls-check · production</div>
+        <div class="ml-4 text-xs font-mono text-tone-500">rls-check · production</div>
     </div>
 
     <div class="p-5 sm:p-6 overflow-x-auto">
-        <pre class="font-mono text-2xs sm:text-xs leading-[1.65] text-surface-300 min-w-[46rem]"><span class="text-white">$</span> npx @rebasepro/rls-check --role app_reader
+        <pre class="font-mono text-2xs sm:text-xs leading-[1.65] text-tone-300 min-w-[46rem]"><span class="text-tone-max">$</span> npx @rebasepro/rls-check --role app_reader
 
-<span class="text-white">rls-check 0.33.2</span><span class="text-surface-600">  ·  read-only Row-Level Security audit</span>
-<span class="text-surface-700">{rule}</span>
+<span class="text-tone-max">rls-check 0.33.2</span><span class="text-tone-600">  ·  read-only Row-Level Security audit</span>
+<span class="text-tone-700">{rule}</span>
 
-<span class="text-surface-600">Database  </span>db.acme.internal:5432/production
-<span class="text-surface-600">Server    </span>PostgreSQL 16.4
-<span class="text-surface-600">Platform  </span>PostgreSQL (no platform markers)
-<span class="text-surface-600">Exposed   </span>PUBLIC, app_reader (add yours with --role)
-<span class="text-surface-600">Scanned   </span>1 schema · 3 tables · 2 policies · 15 checks
+<span class="text-tone-600">Database  </span>db.acme.internal:5432/production
+<span class="text-tone-600">Server    </span>PostgreSQL 16.4
+<span class="text-tone-600">Platform  </span>PostgreSQL (no platform markers)
+<span class="text-tone-600">Exposed   </span>PUBLIC, app_reader (add yours with --role)
+<span class="text-tone-600">Scanned   </span>1 schema · 3 tables · 2 policies · 15 checks
 
-<span class="text-amber-400">Note</span>  <span class="text-surface-400">This scan connected as a role that row-level security cannot constrain — a
+<span class="text-amber-400">Note</span>  <span class="text-tone-400">This scan connected as a role that row-level security cannot constrain — a
       superuser, a table owner, or a role with BYPASSRLS. That is why it can read the
       true catalog, and it is also why nothing below describes what this connection
       experiences. The findings are about what OTHER roles get.</span>
 
-<span class="text-rose-400">CRITICAL</span><span class="text-surface-600">  ·  3 findings</span>
-<span class="text-surface-700">{rule}</span>
+<span class="text-rose-400">CRITICAL</span><span class="text-tone-600">  ·  3 findings</span>
+<span class="text-tone-700">{rule}</span>
 
-  <span class="text-rose-400">[critical]</span> <span class="text-white">view-bypasses-rls</span>  <span class="text-cyan-300">public.billing_overview</span>
+  <span class="text-rose-400">[critical]</span> <span class="text-tone-max">view-bypasses-rls</span>  <span class="text-cyan-300">public.billing_overview</span>
       View public.billing_overview reads public.ledger without security_invoker and is
       readable by app_reader
 
-      <span class="text-surface-500">The view is owned by postgres and `security_invoker` is not set, so its query
+      <span class="text-tone-500">The view is owned by postgres and `security_invoker` is not set, so its query
       executes with postgres's privileges rather than the caller's. Row-level security
       on public.ledger is evaluated for postgres, not for the role that selected from
       the view.</span>
-      <span class="text-white">Impact</span>  If this view is reachable over an API as app_reader, a caller reads rows
+      <span class="text-tone-max">Impact</span>  If this view is reachable over an API as app_reader, a caller reads rows
               from public.ledger that the policies on that table were written to
               withhold — the view is an unfiltered path around them.
-      <span class="text-white">Fix</span>
+      <span class="text-tone-max">Fix</span>
           <span class="text-emerald-400">ALTER VIEW "public"."billing_overview" SET (security_invoker = true);</span>
           <span class="text-emerald-400">-- Callers then need their own SELECT privilege on public.ledger, and the</span>
           <span class="text-emerald-400">-- policies there apply to them.</span>
-      <span class="text-surface-600">Docs    https://rebase.pro/docs/rls-check#view-bypasses-rls</span>
+      <span class="text-tone-600">Docs    https://rebase.pro/docs/rls-check#view-bypasses-rls</span>
 
-  <span class="text-rose-400">[critical]</span> <span class="text-white">policy-always-true</span>  <span class="text-cyan-300">public.documents · policy "documents_read"</span>
+  <span class="text-rose-400">[critical]</span> <span class="text-tone-max">policy-always-true</span>  <span class="text-cyan-300">public.documents · policy "documents_read"</span>
       Policy "documents_read" on public.documents is USING (true) for app_reader
 
-      <span class="text-surface-500">This permissive SELECT policy's USING expression is a constant truth, so it
+      <span class="text-tone-500">This permissive SELECT policy's USING expression is a constant truth, so it
       matches every row for app_reader. Permissive policies are ORed together, so this
       one alone satisfies the table's row filter no matter how strict the others are.</span>
-      <span class="text-white">Impact</span>  If this table is reachable over an API as app_reader, a caller can read
+      <span class="text-tone-max">Impact</span>  If this table is reachable over an API as app_reader, a caller can read
               every row — the policy applies no scoping whatsoever.
-      <span class="text-white">Fix</span>
+      <span class="text-tone-max">Fix</span>
           <span class="text-emerald-400">-- Replace the constant with the scoping you intended, e.g.:</span>
           <span class="text-emerald-400">ALTER POLICY "documents_read" ON "public"."documents"</span>
           <span class="text-emerald-400">    USING (user_id = auth.uid());</span>
           <span class="text-emerald-400">-- or, if unconditional access really is intended, drop the policy and say so</span>
           <span class="text-emerald-400">-- with an explicit grant instead:</span>
           <span class="text-emerald-400">-- DROP POLICY "documents_read" ON "public"."documents";</span>
-      <span class="text-surface-600">Docs    https://rebase.pro/docs/rls-check#policy-always-true</span>
+      <span class="text-tone-600">Docs    https://rebase.pro/docs/rls-check#policy-always-true</span>
 
-  <span class="text-rose-400">[critical]</span> <span class="text-white">rls-disabled</span>  <span class="text-cyan-300">public.invoices</span>
+  <span class="text-rose-400">[critical]</span> <span class="text-tone-max">rls-disabled</span>  <span class="text-cyan-300">public.invoices</span>
       public.invoices has row-level security disabled and is granted to app_reader
 
-      <span class="text-surface-500">Row-level security is not enabled on this table, so Postgres applies no per-row
+      <span class="text-tone-500">Row-level security is not enabled on this table, so Postgres applies no per-row
       filter at all — policies, if any exist, are never consulted. app_reader holds
       DELETE, INSERT, SELECT and UPDATE on it.</span>
-      <span class="text-white">Impact</span>  If this table is reachable over an API that connects as app_reader, a
+      <span class="text-tone-max">Impact</span>  If this table is reachable over an API that connects as app_reader, a
               caller can read every row and delete, insert and update any row, with no
               tenant or owner scoping.
-      <span class="text-white">Fix</span>
+      <span class="text-tone-max">Fix</span>
           <span class="text-emerald-400">ALTER TABLE "public"."invoices" ENABLE ROW LEVEL SECURITY;</span>
           <span class="text-emerald-400">-- Enabling RLS with no policies denies every row to everyone but the owner,</span>
           <span class="text-emerald-400">-- so add the policy you intend in the same migration, for example:</span>
           <span class="text-emerald-400">-- CREATE POLICY "invoices_owner_select" ON "public"."invoices"</span>
           <span class="text-emerald-400">--     FOR SELECT TO "app_reader" USING (user_id = auth.uid());</span>
-      <span class="text-surface-600">Docs    https://rebase.pro/docs/rls-check#rls-disabled</span>
+      <span class="text-tone-600">Docs    https://rebase.pro/docs/rls-check#rls-disabled</span>
 
-<span class="text-surface-700">{rule}</span>
-<span class="text-white">Summary</span>
+<span class="text-tone-700">{rule}</span>
+<span class="text-tone-max">Summary</span>
 
-  <span class="text-rose-400">critical 3</span>   <span class="text-surface-600">high 0   medium 0   low 0   info 0</span>
-  <span class="text-surface-600">3 confirmed · 0 worth checking · 15 checks run against 3 tables in 1 schema</span>
-  <span class="text-surface-600">1 of 3 tables have row-level security disabled</span>
+  <span class="text-rose-400">critical 3</span>   <span class="text-tone-600">high 0   medium 0   low 0   info 0</span>
+  <span class="text-tone-600">3 confirmed · 0 worth checking · 15 checks run against 3 tables in 1 schema</span>
+  <span class="text-tone-600">1 of 3 tables have row-level security disabled</span>
 
-  <span class="text-white">Exit code 1</span> <span class="text-surface-600">— at least one finding is "high" or worse (--fail-on high).</span>
-  <span class="text-surface-600">Scanned 2026-09-05T09:14:02.881Z · read-only, and nothing left this machine.</span>
+  <span class="text-tone-max">Exit code 1</span> <span class="text-tone-600">— at least one finding is "high" or worse (--fail-on high).</span>
+  <span class="text-tone-600">Scanned 2026-09-05T09:14:02.881Z · read-only, and nothing left this machine.</span>
 
-<span class="text-surface-600">rls-check is free and maintained by the team behind Rebase — https://rebase.pro</span>
+<span class="text-tone-600">rls-check is free and maintained by the team behind Rebase — https://rebase.pro</span>
 </pre>
     </div>
 </div>

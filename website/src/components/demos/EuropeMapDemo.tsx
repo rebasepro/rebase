@@ -255,7 +255,7 @@ export function EuropeMapDemo({ s = {} }: { s?: Record<string, string> }) {
                             const { x, y } = project(l.lat, l.lon);
                             return (
                                 <text key={l.text} x={x} y={y} textAnchor="middle"
-                                      className="fill-surface-600 font-mono"
+                                      className="fill-tone-600 font-mono"
                                       style={{ fontSize: 9, letterSpacing: "0.14em" }}>
                                     {T(l.text)}
                                 </text>
@@ -301,7 +301,7 @@ export function EuropeMapDemo({ s = {} }: { s?: Record<string, string> }) {
                         })}
                     </svg>
 
-                    <p className="relative mt-1 text-center text-[11px] text-surface-500">
+                    <p className="relative mt-1 text-center text-[11px] text-tone-500">
                         {active
                             ? active.cities.length === 1
                                 ? T("em.caption.one", active.name, T(active.seat))
@@ -313,12 +313,12 @@ export function EuropeMapDemo({ s = {} }: { s?: Record<string, string> }) {
                 {/* ── The list ──────────────────────────────────────── */}
                 <div className="flex flex-col p-5 sm:p-6">
                     <div className="mb-4 flex items-baseline justify-between gap-3">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-tone-500">
                             {T("em.list.title")}
                         </span>
                         {active && (
                             <button type="button" onClick={() => setActiveId(null)}
-                                    className="text-[11px] text-surface-500 transition-colors hover:text-surface-200">
+                                    className="text-[11px] text-tone-500 transition-colors hover:text-tone-200">
                                 {T("em.showall")}
                             </button>
                         )}
@@ -335,7 +335,7 @@ export function EuropeMapDemo({ s = {} }: { s?: Record<string, string> }) {
                                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
                                     h.id === activeId
                                         ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/30"
-                                        : "text-surface-400 ring-1 ring-inset ring-surface-800 hover:text-surface-200 hover:ring-surface-700"
+                                        : "text-tone-400 ring-1 ring-inset ring-tone-800 hover:text-tone-200 hover:ring-tone-700"
                                 }`}>
                                 {h.name}
                             </button>
@@ -347,21 +347,21 @@ export function EuropeMapDemo({ s = {} }: { s?: Record<string, string> }) {
                         {active ? (
                             <>
                                 <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                                    <span className="text-base font-semibold text-white">{active.name}</span>
-                                    <span className="text-xs text-surface-500">{T("em.seatedin", T(active.seat))}</span>
+                                    <span className="text-base font-semibold text-tone-max">{active.name}</span>
+                                    <span className="text-xs text-tone-500">{T("em.seatedin", T(active.seat))}</span>
                                     {active.nonEu && (
                                         <span className="rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 ring-1 ring-inset ring-amber-500/25">
                                             {T("em.noneu")}
                                         </span>
                                     )}
                                 </div>
-                                <p className="mt-2.5 text-sm leading-relaxed text-surface-400">{T(active.note)}</p>
-                                <p className="mt-3 font-mono text-[11px] leading-relaxed text-surface-500">
+                                <p className="mt-2.5 text-sm leading-relaxed text-tone-400">{T(active.note)}</p>
+                                <p className="mt-3 font-mono text-[11px] leading-relaxed text-tone-500">
                                     {active.cities.map((c) => c.name).join(" · ")}
                                 </p>
                                 {active.url && (
                                     <a href={active.url} target="_blank" rel="noopener noreferrer"
-                                       className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-surface-500 transition-colors hover:text-primary">
+                                       className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-tone-500 transition-colors hover:text-primary">
                                         {T("em.pricing")}
                                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round"
@@ -372,17 +372,17 @@ export function EuropeMapDemo({ s = {} }: { s?: Record<string, string> }) {
                             </>
                         ) : (
                             <>
-                                <p className="text-sm leading-relaxed text-surface-300">
-                                    <b className="text-white">{T("em.idle.lead", allCities.length, HOSTS.length)}</b>
+                                <p className="text-sm leading-relaxed text-tone-300">
+                                    <b className="text-tone-max">{T("em.idle.lead", allCities.length, HOSTS.length)}</b>
                                 </p>
-                                <p className="mt-2.5 text-sm leading-relaxed text-surface-400">
+                                <p className="mt-2.5 text-sm leading-relaxed text-tone-400">
                                     {T("em.idle.body")}
                                 </p>
                             </>
                         )}
                     </div>
 
-                    <p className="mt-4 pt-4 text-[11px] leading-relaxed text-surface-500 lg:mt-auto">
+                    <p className="mt-4 pt-4 text-[11px] leading-relaxed text-tone-500 lg:mt-auto">
                         {T("em.footnote")}
                     </p>
                 </div>

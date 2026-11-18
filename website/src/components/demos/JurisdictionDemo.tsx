@@ -163,7 +163,7 @@ const TONES = {
         panel: "bg-primary/[0.04]",
         glow: "radial-gradient(340px 260px at 70% 0%, rgba(0,112,244,0.13), transparent 75%)",
         badge: "bg-primary/10 text-primary ring-primary/25",
-        operator: "text-white",
+        operator: "text-tone-max",
         chip: "bg-primary/10 text-primary ring-1 ring-inset ring-primary/25",
         verdict: "jd.verdict.none"
     },
@@ -202,7 +202,7 @@ export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
 
             {/* Vendor switch */}
             <div className="flex flex-wrap items-center gap-2 border-b border-hairline bg-surface-well/70 px-4 py-3 sm:px-6">
-                <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
+                <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-tone-500">
                     {T("jd.strip")}
                 </span>
                 {VENDORS.map((v) => (
@@ -214,7 +214,7 @@ export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
                         className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
                             v.id === active
                                 ? TONES[v.posture].button
-                                : "text-surface-400 ring-1 ring-inset ring-surface-800 hover:text-surface-200 hover:ring-surface-700"
+                                : "text-tone-400 ring-1 ring-inset ring-tone-800 hover:text-tone-200 hover:ring-tone-700"
                         }`}>
                         {T(v.label)}
                     </button>
@@ -233,12 +233,12 @@ export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
                         return (
                             <div key={row.key} className="px-5 py-5 sm:px-7">
                                 <div className="flex items-baseline justify-between gap-3">
-                                    <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
+                                    <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-tone-500">
                                         {T(row.label)}
                                     </span>
                                     {row.hint && (
                                         <span className={`text-[11px] transition-colors duration-300 ${
-                                            constant ? "text-surface-600" : "text-surface-500"
+                                            constant ? "text-tone-600" : "text-tone-500"
                                         }`}>
                                             {T(row.hint)}
                                         </span>
@@ -276,22 +276,22 @@ export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
                                             <span className={`text-lg font-semibold transition-colors duration-300 ${tone.operator}`}>
                                                 {T(vendor.operator)}
                                             </span>
-                                            <span className="text-sm text-surface-500">
+                                            <span className="text-sm text-tone-500">
                                                 {T(vendor.operatorSeat)}
                                             </span>
                                         </p>
                                     ) : constant ? (
                                         <>
-                                            <p className="text-base leading-relaxed text-surface-300">
+                                            <p className="text-base leading-relaxed text-tone-300">
                                                 {T("jd.constant")}
-                                                <span className="ml-2 inline-flex items-center rounded-md bg-white/[0.04] px-1.5 py-0.5 align-middle text-[11px] text-surface-500 ring-1 ring-inset ring-white/5">
+                                                <span className="ml-2 inline-flex items-center rounded-md bg-tone-max/[0.04] px-1.5 py-0.5 align-middle text-[11px] text-tone-500 ring-1 ring-inset ring-tone-max/5">
                                                     {T("jd.unchanged")}
                                                 </span>
                                             </p>
-                                            <p className="mt-1 font-mono text-xs text-surface-500">{T(value as string)}</p>
+                                            <p className="mt-1 font-mono text-xs text-tone-500">{T(value as string)}</p>
                                         </>
                                     ) : (
-                                        <p className="text-base leading-relaxed text-surface-400">{T(value as string)}</p>
+                                        <p className="text-base leading-relaxed text-tone-400">{T(value as string)}</p>
                                     )}
                                 </div>
                             </div>
@@ -325,29 +325,29 @@ export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
                             {T(tone.verdict)}
                         </span>
 
-                        <p className="mt-4 text-[15px] leading-relaxed text-surface-300">
+                        <p className="mt-4 text-[15px] leading-relaxed text-tone-300">
                             {T(vendor.note)}
                         </p>
                     </div>
 
                     {/* The one structural sentence the whole page rests on */}
                     <div className="frame relative p-4">
-                        <p className="text-[13px] leading-relaxed text-surface-400">
+                        <p className="text-[13px] leading-relaxed text-tone-400">
                             {vendor.posture === "none" ? (
                                 <>
-                                    <b className="text-surface-200">{T("jd.struct.none.lead")}</b>
+                                    <b className="text-tone-200">{T("jd.struct.none.lead")}</b>
                                     {T("jd.struct.none.rest")}
                                 </>
                             ) : vendor.posture === "eu" ? (
                                 <>
                                     {T("jd.struct.eu.a")}{" "}
-                                    <b className="text-surface-200">{T("jd.struct.eu.b")}</b>
+                                    <b className="text-tone-200">{T("jd.struct.eu.b")}</b>
                                     {T("jd.struct.eu.c")}
                                 </>
                             ) : (
                                 <>
                                     {T("jd.struct.us.a")}{" "}
-                                    <b className="text-surface-200">{T("jd.struct.us.b")}</b>
+                                    <b className="text-tone-200">{T("jd.struct.us.b")}</b>
                                     {T("jd.struct.us.c")} <i>{T("jd.struct.us.could")}</i>{" "}
                                     {T("jd.struct.us.d")}
                                 </>
@@ -357,7 +357,7 @@ export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
                 </div>
             </div>
 
-            <p className="border-t border-hairline bg-surface-well/60 px-5 py-3 text-[11px] leading-relaxed text-surface-500 sm:px-7">
+            <p className="border-t border-hairline bg-surface-well/60 px-5 py-3 text-[11px] leading-relaxed text-tone-500 sm:px-7">
                 {T("jd.footnote")}
             </p>
         </div>

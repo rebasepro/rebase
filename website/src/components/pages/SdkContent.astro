@@ -17,38 +17,38 @@ const initCode = `<span class="text-blue-400">import</span> { createRebaseClient
   baseUrl: <span class="text-emerald-400">"https://api.myapp.com"</span>,
 });
 
-<span class="text-surface-500">// Everything is dot-accessible:</span>
-rebase.<span class="text-amber-400">data</span>      <span class="text-surface-500">// → table queries</span>
-rebase.<span class="text-amber-400">auth</span>      <span class="text-surface-500">// → sign in, sign up, sessions</span>
-rebase.<span class="text-amber-400">admin</span>     <span class="text-surface-500">// → user/role management</span>
-rebase.<span class="text-amber-400">storage</span>   <span class="text-surface-500">// → file upload/download</span>
-rebase.<span class="text-amber-400">realtime</span>  <span class="text-surface-500">// → broadcast channels, presence</span>`;
+<span class="text-tone-500">// Everything is dot-accessible:</span>
+rebase.<span class="text-amber-400">data</span>      <span class="text-tone-500">// → table queries</span>
+rebase.<span class="text-amber-400">auth</span>      <span class="text-tone-500">// → sign in, sign up, sessions</span>
+rebase.<span class="text-amber-400">admin</span>     <span class="text-tone-500">// → user/role management</span>
+rebase.<span class="text-amber-400">storage</span>   <span class="text-tone-500">// → file upload/download</span>
+rebase.<span class="text-amber-400">realtime</span>  <span class="text-tone-500">// → broadcast channels, presence</span>`;
 
-const crudCode = `<span class="text-surface-500">// Find all published posts</span>
+const crudCode = `<span class="text-tone-500">// Find all published posts</span>
 <span class="text-blue-400">const</span> { data } = <span class="text-blue-400">await</span> rebase.data.posts.<span class="text-amber-400">find</span>({
   limit: <span class="text-amber-400">20</span>,
   orderBy: [<span class="text-emerald-400">"createdAt"</span>, <span class="text-emerald-400">"desc"</span>]
 });
 
-<span class="text-surface-500">// Get single post</span>
+<span class="text-tone-500">// Get single post</span>
 <span class="text-blue-400">const</span> post = <span class="text-blue-400">await</span> rebase.data.posts
   .<span class="text-amber-400">findById</span>(<span class="text-emerald-400">"abc-123"</span>);
 
-<span class="text-surface-500">// Create</span>
+<span class="text-tone-500">// Create</span>
 <span class="text-blue-400">await</span> rebase.data.posts.<span class="text-amber-400">create</span>({
   title: <span class="text-emerald-400">"Hello World"</span>,
   status: <span class="text-emerald-400">"draft"</span>
 });
 
-<span class="text-surface-500">// Update</span>
+<span class="text-tone-500">// Update</span>
 <span class="text-blue-400">await</span> rebase.data.posts.<span class="text-amber-400">update</span>(<span class="text-emerald-400">"abc-123"</span>, {
   status: <span class="text-emerald-400">"published"</span>
 });
 
-<span class="text-surface-500">// Delete</span>
+<span class="text-tone-500">// Delete</span>
 <span class="text-blue-400">await</span> rebase.data.posts.<span class="text-amber-400">delete</span>(<span class="text-emerald-400">"abc-123"</span>);`;
 
-const queryCode = `<span class="text-surface-500">// Chained queries</span>
+const queryCode = `<span class="text-tone-500">// Chained queries</span>
 <span class="text-blue-400">const</span> { data } = <span class="text-blue-400">await</span> rebase.data.posts
   .<span class="text-amber-400">where</span>(<span class="text-emerald-400">"status"</span>, <span class="text-emerald-400">"=="</span>, <span class="text-emerald-400">"published"</span>)
   .<span class="text-amber-400">where</span>(<span class="text-emerald-400">"views"</span>, <span class="text-emerald-400">"&gt;="</span>, <span class="text-amber-400">100</span>)
@@ -56,25 +56,25 @@ const queryCode = `<span class="text-surface-500">// Chained queries</span>
   .<span class="text-amber-400">limit</span>(<span class="text-amber-400">10</span>)
   .<span class="text-amber-400">find</span>();
 
-<span class="text-surface-500">// Include relations</span>
+<span class="text-tone-500">// Include relations</span>
 <span class="text-blue-400">const</span> { data: posts } = <span class="text-blue-400">await</span> rebase.data.posts
   .<span class="text-amber-400">include</span>(<span class="text-emerald-400">"author"</span>, <span class="text-emerald-400">"tags"</span>)
   .<span class="text-amber-400">find</span>();
 
-<span class="text-surface-500">// Full-text search</span>
+<span class="text-tone-500">// Full-text search</span>
 <span class="text-blue-400">const</span> results = <span class="text-blue-400">await</span> rebase.data.posts
   .<span class="text-amber-400">search</span>(<span class="text-emerald-400">"rebase tutorial"</span>)
   .<span class="text-amber-400">limit</span>(<span class="text-amber-400">5</span>)
   .<span class="text-amber-400">find</span>();
 
-<span class="text-surface-500">// Realtime listening</span>
+<span class="text-tone-500">// Realtime listening</span>
 <span class="text-blue-400">const</span> unsub = rebase.data.posts
   .<span class="text-amber-400">where</span>(<span class="text-emerald-400">"status"</span>, <span class="text-emerald-400">"=="</span>, <span class="text-emerald-400">"published"</span>)
   .<span class="text-amber-400">listen</span>(({ data }) =&gt; {
     console.log(<span class="text-emerald-400">"Live update:"</span>, data);
   });
 
-<span class="text-surface-500">// Broadcast channel</span>
+<span class="text-tone-500">// Broadcast channel</span>
 <span class="text-blue-400">const</span> channel = rebase.realtime.<span class="text-amber-400">channel</span>(<span class="text-emerald-400">"chat-room"</span>);
 
 channel.<span class="text-amber-400">onBroadcast</span>(<span class="text-emerald-400">"message"</span>, (payload) =&gt; {
@@ -83,49 +83,49 @@ channel.<span class="text-amber-400">onBroadcast</span>(<span class="text-emeral
 
 <span class="text-blue-400">await</span> channel.<span class="text-amber-400">join</span>();`;
 
-const authCode = `<span class="text-surface-500">// Sign in</span>
+const authCode = `<span class="text-tone-500">// Sign in</span>
 <span class="text-blue-400">await</span> rebase.auth.<span class="text-amber-400">signInWithEmail</span>(
   <span class="text-emerald-400">"user@app.com"</span>, <span class="text-emerald-400">"password"</span>
 );
 
-<span class="text-surface-500">// Google OAuth</span>
+<span class="text-tone-500">// Google OAuth</span>
 <span class="text-blue-400">await</span> rebase.auth.<span class="text-amber-400">signInWithGoogle</span>(idToken);
 
-<span class="text-surface-500">// Listen for auth changes</span>
+<span class="text-tone-500">// Listen for auth changes</span>
 rebase.auth.<span class="text-amber-400">onAuthStateChange</span>((event, session) =&gt; {
   console.log(event, session?.user);
 });
 
-<span class="text-surface-500">// Session management</span>
+<span class="text-tone-500">// Session management</span>
 <span class="text-blue-400">const</span> sessions = <span class="text-blue-400">await</span> rebase.auth.<span class="text-amber-400">getSessions</span>();
 <span class="text-blue-400">await</span> rebase.auth.<span class="text-amber-400">revokeSession</span>(sessionId);`;
 
-const adminCode = `<span class="text-surface-500">// User management</span>
+const adminCode = `<span class="text-tone-500">// User management</span>
 <span class="text-blue-400">const</span> { users } = <span class="text-blue-400">await</span> rebase.admin.<span class="text-amber-400">listUsers</span>();
 <span class="text-blue-400">await</span> rebase.admin.<span class="text-amber-400">createUser</span>({
   email: <span class="text-emerald-400">"new@app.com"</span>,
   roles: [<span class="text-emerald-400">"editor"</span>]
 });
 
-<span class="text-surface-500">// Role management</span>
+<span class="text-tone-500">// Role management</span>
 <span class="text-blue-400">const</span> { roles } = <span class="text-blue-400">await</span> rebase.admin.<span class="text-amber-400">listRoles</span>();
 
-<span class="text-surface-500">// File storage</span>
+<span class="text-tone-500">// File storage</span>
 <span class="text-blue-400">const</span> { key, bucket, storageUrl } = <span class="text-blue-400">await</span> rebase.storage.<span class="text-amber-400">putObject</span>({
   file: myFile,
   key: <span class="text-emerald-400">"uploads/avatar.jpg"</span>
 });
 
-<span class="text-surface-500">// short-lived signed URL, or a permanent one for public objects</span>
+<span class="text-tone-500">// short-lived signed URL, or a permanent one for public objects</span>
 <span class="text-blue-400">const</span> { url } = <span class="text-blue-400">await</span> rebase.storage
   .<span class="text-amber-400">getSignedUrl</span>(<span class="text-emerald-400">"uploads/avatar.jpg"</span>);
 
 <span class="text-blue-400">await</span> rebase.storage.<span class="text-amber-400">deleteObject</span>(<span class="text-emerald-400">"old.pdf"</span>);`;
 
-const sdkGenCode = `<span class="text-surface-500">$ rebase generate-sdk</span>
+const sdkGenCode = `<span class="text-tone-500">$ rebase generate-sdk</span>
 <span class="text-emerald-400">✓</span> Generated database.types.ts
 
-<span class="text-surface-500">// database.types.ts (auto-generated)</span>
+<span class="text-tone-500">// database.types.ts (auto-generated)</span>
 <span class="text-blue-400">export interface</span> Database {
   posts: {
     id: <span class="text-amber-400">string</span>;
@@ -151,8 +151,8 @@ import HeroBackdrop from "../HeroBackdrop.astro";
 
       <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
         <p class="hero-eyebrow mb-label" set:html={t("sdkpage.00")}></p>
-        <h1 class="mb-6 text-display-2 text-white" set:html={t("sdkpage.01")}></h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("sdkpage.02")}</p>
+        <h1 class="mb-6 text-display-2 text-tone-max" set:html={t("sdkpage.01")}></h1>
+        <p class="mb-10 text-lg leading-8 text-tone-300 lg:text-xl">{t("sdkpage.02")}</p>
       </div>
     </section>
 
@@ -162,11 +162,11 @@ import HeroBackdrop from "../HeroBackdrop.astro";
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20">{t("sdkpage.13")}</div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("sdkpage.03")}</h2>
-            <p class="text-lg text-surface-400 mb-6" set:html={t("sdkpage.04")}></p>
+            <h2 class="text-3xl sm:text-4xl text-tone-max mb-4">{t("sdkpage.03")}</h2>
+            <p class="text-lg text-tone-400 mb-6" set:html={t("sdkpage.04")}></p>
           </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-            <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={initCode}/></pre>
+          <div class="relative rounded-2xl overflow-hidden ring-1 ring-tone-800 bg-tone-900 p-6">
+            <pre class="text-sm font-mono overflow-x-auto"><code class="text-tone-300" set:html={initCode}/></pre>
           </div>
         </div>
       </div>
@@ -177,8 +177,8 @@ import HeroBackdrop from "../HeroBackdrop.astro";
  <section class="py-chapter">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-3xl text-center mb-12">
-          <h2 class="text-3xl sm:text-4xl text-white">{t("sdkpage.05")}</h2>
-          <p class="mt-lead text-lg text-surface-400" set:html={t("sdkpage.06")}></p>
+          <h2 class="text-3xl sm:text-4xl text-tone-max">{t("sdkpage.05")}</h2>
+          <p class="mt-lead text-lg text-tone-400" set:html={t("sdkpage.06")}></p>
         </div>
 
         {/* SITE-STORY §5: every page carries a live demo, and this is the page
@@ -186,8 +186,8 @@ import HeroBackdrop from "../HeroBackdrop.astro";
             /backend — which keeps the code sample and links across. */}
         <div class="mx-auto mb-12 max-w-3xl">
           <div class="frame overflow-hidden">
-            <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-              <span class="font-mono text-xs text-surface-400">app.ts</span>
+            <div class="px-4 py-3 border-b border-tone-800/80 bg-tone-900/50">
+              <span class="font-mono text-xs text-tone-400">app.ts</span>
             </div>
             <div class="h-[280px] w-full flex items-center justify-center overflow-hidden">
               <SdkMiniDemo client:visible/>
@@ -195,13 +195,13 @@ import HeroBackdrop from "../HeroBackdrop.astro";
           </div>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-            <div class="text-xs font-semibold text-surface-500 mb-3 uppercase tracking-wider">CRUD</div>
-            <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={crudCode}/></pre>
+          <div class="relative rounded-2xl overflow-hidden ring-1 ring-tone-800 bg-tone-900 p-6">
+            <div class="text-xs font-semibold text-tone-500 mb-3 uppercase tracking-wider">CRUD</div>
+            <pre class="text-sm font-mono overflow-x-auto"><code class="text-tone-300" set:html={crudCode}/></pre>
           </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-            <div class="text-xs font-semibold text-surface-500 mb-3 uppercase tracking-wider">{t("sdkpage.14")}</div>
-            <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={queryCode}/></pre>
+          <div class="relative rounded-2xl overflow-hidden ring-1 ring-tone-800 bg-tone-900 p-6">
+            <div class="text-xs font-semibold text-tone-500 mb-3 uppercase tracking-wider">{t("sdkpage.14")}</div>
+            <pre class="text-sm font-mono overflow-x-auto"><code class="text-tone-300" set:html={queryCode}/></pre>
           </div>
         </div>
       </div>
@@ -215,18 +215,18 @@ import HeroBackdrop from "../HeroBackdrop.astro";
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20">
               rebase.auth
             </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("sdkpage.07")}</h2>
-            <p class="text-lg text-surface-400 mb-6">{t("sdkpage.08")}</p>
-            <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-              <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={authCode}/></pre>
+            <h2 class="text-3xl sm:text-4xl text-tone-max mb-4">{t("sdkpage.07")}</h2>
+            <p class="text-lg text-tone-400 mb-6">{t("sdkpage.08")}</p>
+            <div class="relative rounded-2xl overflow-hidden ring-1 ring-tone-800 bg-tone-900 p-6">
+              <pre class="text-sm font-mono overflow-x-auto"><code class="text-tone-300" set:html={authCode}/></pre>
             </div>
           </div>
           <div>
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-purple-500/10 text-purple-400 ring-1 ring-inset ring-purple-500/20">{t("sdkpage.15")}</div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("sdkpage.09")}</h2>
-            <p class="text-lg text-surface-400 mb-6">{t("sdkpage.10")}</p>
-            <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-              <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={adminCode}/></pre>
+            <h2 class="text-3xl sm:text-4xl text-tone-max mb-4">{t("sdkpage.09")}</h2>
+            <p class="text-lg text-tone-400 mb-6">{t("sdkpage.10")}</p>
+            <div class="relative rounded-2xl overflow-hidden ring-1 ring-tone-800 bg-tone-900 p-6">
+              <pre class="text-sm font-mono overflow-x-auto"><code class="text-tone-300" set:html={adminCode}/></pre>
             </div>
           </div>
         </div>
@@ -241,17 +241,17 @@ import HeroBackdrop from "../HeroBackdrop.astro";
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/20">
               rebase generate-sdk
             </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("sdkpage.11")}</h2>
-            <p class="text-lg text-surface-400 mb-6" set:html={t("sdkpage.12")}></p>
-            <ul class="space-y-3 text-surface-300">
+            <h2 class="text-3xl sm:text-4xl text-tone-max mb-4">{t("sdkpage.11")}</h2>
+            <p class="text-lg text-tone-400 mb-6" set:html={t("sdkpage.12")}></p>
+            <ul class="space-y-3 text-tone-300">
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("sdkpage.f1")}</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("sdkpage.f2")} <code class="text-sm bg-surface-800 px-1 rounded">rebase.data.&lt;collection&gt;</code></li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("sdkpage.f2")} <code class="text-sm bg-tone-800 px-1 rounded">rebase.data.&lt;collection&gt;</code></li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("sdkpage.f3")}</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("sdkpage.f4")}</li>
             </ul>
           </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-            <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={sdkGenCode}/></pre>
+          <div class="relative rounded-2xl overflow-hidden ring-1 ring-tone-800 bg-tone-900 p-6">
+            <pre class="text-sm font-mono overflow-x-auto"><code class="text-tone-300" set:html={sdkGenCode}/></pre>
           </div>
         </div>
       </div>

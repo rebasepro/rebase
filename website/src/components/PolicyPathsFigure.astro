@@ -67,21 +67,21 @@ const AFTER: { path: string; role: string }[] = [
     <div class="frame-head">
         <span class="only-today truncate">{t("recognition.badge")}</span>
         <span class="only-rule truncate">schema/orders.ts · {t("recognition.oneNote")}</span>
-        <div class="ml-auto inline-flex overflow-hidden rounded-md border border-white/15 bg-black/30" role="group">
+        <div class="ml-auto inline-flex overflow-hidden rounded-md border border-tone-max/15 bg-black/30" role="group">
             <button type="button" data-paths-set="today" aria-pressed="true"
-                    class="cursor-pointer px-3 py-1 font-sans text-2xs font-medium text-surface-400 transition-colors aria-pressed:bg-rose-500/20 aria-pressed:text-rose-200 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                    class="cursor-pointer px-3 py-1 font-sans text-2xs font-medium text-tone-400 transition-colors aria-pressed:bg-rose-500/20 aria-pressed:text-rose-200 hover:text-tone-max focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 {t("recognition.five")}
             </button>
             <button type="button" data-paths-set="rule" aria-pressed="false"
-                    class="cursor-pointer px-3 py-1 font-sans text-2xs font-medium text-surface-400 transition-colors aria-pressed:bg-emerald-500/20 aria-pressed:text-emerald-200 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                    class="cursor-pointer px-3 py-1 font-sans text-2xs font-medium text-tone-400 transition-colors aria-pressed:bg-emerald-500/20 aria-pressed:text-emerald-200 hover:text-tone-max focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 {t("recognition.one")}
             </button>
         </div>
     </div>
 
-    <div class="relative bg-[#09090b] lg:h-[380px] overflow-hidden flex flex-col justify-between">
+    <div class="relative bg-[#09090b] island-dark lg:h-[380px] overflow-hidden flex flex-col justify-between">
         <div class="pane only-today">
-            <div class="mb-2 flex items-center justify-between border-b border-white/10 pb-2 font-mono text-[10px] uppercase tracking-wider text-surface-500">
+            <div class="mb-2 flex items-center justify-between border-b border-tone-max/10 pb-2 font-mono text-[10px] uppercase tracking-wider text-tone-500">
                 <span>Caller / Entrypoint</span>
                 <span class="hidden sm:inline">What runs against Postgres</span>
                 <span>Authorization</span>
@@ -98,11 +98,11 @@ const AFTER: { path: string; role: string }[] = [
                     <span><strong class="text-rose-300">4 of 5 paths</strong> bypass application middleware</span>
                     <span class="rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] text-rose-200">1 service key exposes every row</span>
                 </div>
-                <p class="mt-1.5 font-sans text-xs text-surface-300">
+                <p class="mt-1.5 font-sans text-xs text-tone-300">
                     When authorization lives in your route handler, every cron job, script, dashboard, and MCP agent has to remember to copy it.
                 </p>
                 <div class="mt-2 pt-2 border-t border-rose-500/20 flex items-center justify-between text-[10px] text-rose-300/80">
-                    <span>SELECT * FROM orders; <span class="text-surface-500">-- via DATABASE_URL</span></span>
+                    <span>SELECT * FROM orders; <span class="text-tone-500">-- via DATABASE_URL</span></span>
                     <span>→ 14,820 rows exposed across all tenants</span>
                 </div>
             </div>

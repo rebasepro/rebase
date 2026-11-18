@@ -3,7 +3,7 @@ import PitchSlide from '../PitchSlide.astro';
 const TOTAL = 12;
 
 const yesSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>`;
-const noSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-surface-400"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
+const noSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-tone-400"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
 const partialSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400"><path d="M5 12h14"/></svg>`;
 
 const y = yesSvg;
@@ -47,25 +47,25 @@ const rows = [
 ];
 ---
 <PitchSlide id="slide-competition" slideNumber={9} totalSlides={TOTAL}>
-    <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase mb-3">Competitive Landscape</p>
-    <h2 class="text-2xl font-semibold text-white mb-5">The only platform combining CMS, database admin, and full-stack tooling.</h2>
-    <div class="overflow-visible rounded-xl border border-surface-700">
+    <p class="text-xs font-semibold tracking-[0.25em] text-tone-500 uppercase mb-3">Competitive Landscape</p>
+    <h2 class="text-2xl font-semibold text-tone-max mb-5">The only platform combining CMS, database admin, and full-stack tooling.</h2>
+    <div class="overflow-visible rounded-xl border border-tone-700">
         <table class="w-full text-xs">
             <thead>
-                <tr class="bg-surface-900/60 text-left">
-                    <th class="px-2 py-1.5 text-surface-300 font-medium"></th>
+                <tr class="bg-tone-900/60 text-left">
+                    <th class="px-2 py-1.5 text-tone-300 font-medium"></th>
                     <th class="px-2 py-1.5 text-primary font-semibold"><a href="https://rebase.pro" target="_blank" rel="noopener" class="hover:underline">Rebase</a></th>
-                    <th class="px-2 py-1.5 text-surface-300 font-medium"><a href="https://supabase.com" target="_blank" rel="noopener" class="hover:text-white transition-colors">Supabase</a></th>
-                    <th class="px-2 py-1.5 text-surface-300 font-medium"><a href="https://retool.com" target="_blank" rel="noopener" class="hover:text-white transition-colors">Retool</a></th>
-                    <th class="px-2 py-1.5 text-surface-300 font-medium"><a href="https://strapi.io" target="_blank" rel="noopener" class="hover:text-white transition-colors">Strapi</a></th>
-                    <th class="px-2 py-1.5 text-surface-300 font-medium"><a href="https://directus.io" target="_blank" rel="noopener" class="hover:text-white transition-colors">Directus</a></th>
-                    <th class="px-2 py-1.5 text-surface-300 font-medium"><a href="https://payloadcms.com" target="_blank" rel="noopener" class="hover:text-white transition-colors">Payload</a></th>
+                    <th class="px-2 py-1.5 text-tone-300 font-medium"><a href="https://supabase.com" target="_blank" rel="noopener" class="hover:text-tone-max transition-colors">Supabase</a></th>
+                    <th class="px-2 py-1.5 text-tone-300 font-medium"><a href="https://retool.com" target="_blank" rel="noopener" class="hover:text-tone-max transition-colors">Retool</a></th>
+                    <th class="px-2 py-1.5 text-tone-300 font-medium"><a href="https://strapi.io" target="_blank" rel="noopener" class="hover:text-tone-max transition-colors">Strapi</a></th>
+                    <th class="px-2 py-1.5 text-tone-300 font-medium"><a href="https://directus.io" target="_blank" rel="noopener" class="hover:text-tone-max transition-colors">Directus</a></th>
+                    <th class="px-2 py-1.5 text-tone-300 font-medium"><a href="https://payloadcms.com" target="_blank" rel="noopener" class="hover:text-tone-max transition-colors">Payload</a></th>
                 </tr>
             </thead>
             <tbody>
                 {rows.map((row, i) => (
-                    <tr class={i % 2 === 0 ? "bg-surface-900/20" : ""}>
-                        <td class="px-2 py-1 text-surface-300 font-medium whitespace-nowrap">{row.feat}</td>
+                    <tr class={i % 2 === 0 ? "bg-tone-900/20" : ""}>
+                        <td class="px-2 py-1 text-tone-300 font-medium whitespace-nowrap">{row.feat}</td>
                         <td class="px-2 py-1" set:html={row.r}></td>
                         <td class="px-2 py-1" set:html={row.su}></td>
                         <td class="px-2 py-1" set:html={row.re}></td>

@@ -983,7 +983,7 @@ width: "100%" }}
                           <span className={`chip chip-xs ${statusChip(merged.status)}`}>
                             {merged.status}
                           </span>
-                          <span className="text-[10px] font-mono text-surface-400">#{entity.id}</span>
+                          <span className="text-[10px] font-mono text-tone-400">#{entity.id}</span>
                         </div>
                       </div>
                     </div>
@@ -1051,12 +1051,12 @@ width: "100%" }}
                                   </div>
                                 ) : (
                                   <div className="w-10 h-10 rounded-md bg-surface-raised shrink-0 mr-2 flex items-center justify-center">
-                                    <MI size={18} className="text-surface-400">sell</MI>
+                                    <MI size={18} className="text-tone-400">sell</MI>
                                   </div>
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <div className="line-clamp-2 text-sm font-medium text-surface-900 dark:text-white">{card.title}</div>
-                                  <div className="text-xs text-surface-500 font-mono truncate">{card.id}</div>
+                                  <div className="text-xs text-tone-500 font-mono truncate">{card.id}</div>
                                 </div>
                               </div>
                             </div>
@@ -1121,12 +1121,12 @@ width: "100%" }}
                         </div>
                       ) : (
                         <div className="w-10 h-10 rounded-md bg-surface-raised shrink-0 mr-2 flex items-center justify-center">
-                          <MI size={18} className="text-surface-400">sell</MI>
+                          <MI size={18} className="text-tone-400">sell</MI>
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="line-clamp-2 text-sm font-medium text-surface-900 dark:text-white">{draggedCard.title}</div>
-                        <div className="text-xs text-surface-500 font-mono truncate">{draggedCard.id}</div>
+                        <div className="text-xs text-tone-500 font-mono truncate">{draggedCard.id}</div>
                       </div>
                     </div>
                   </div>
@@ -1155,14 +1155,14 @@ width: "100%" }}
           <>
             {/* Panel top bar */}
             <div className="h-14 flex items-center px-3 border-b border-hairline shrink-0 gap-1">
-              <button aria-label="Close panel" className="p-1.5 rounded text-surface-400 hover:bg-surface-hover">
+              <button aria-label="Close panel" className="p-1.5 rounded text-tone-400 hover:bg-surface-hover">
                 <MI size={18}>close</MI>
               </button>
-              <button aria-label="Expand to full screen" className="p-1.5 rounded text-surface-400 hover:bg-surface-hover">
+              <button aria-label="Expand to full screen" className="p-1.5 rounded text-tone-400 hover:bg-surface-hover">
                 <MI size={16}>open_in_full</MI>
               </button>
               <div className="flex-1"/>
-              <button aria-label="View code" className="px-3 py-2 text-xs text-surface-500">
+              <button aria-label="View code" className="px-3 py-2 text-xs text-tone-500">
                 <MI size={16}>code</MI>
               </button>
               <button className="px-3 py-2 text-xs text-surface-900 dark:text-white font-medium border-b-2 border-primary">
@@ -1193,7 +1193,7 @@ width: "100%" }}
 
                 {/* Path */}
                 <div className="w-full rounded-md bg-surface-well px-3 py-1.5 mb-6">
-                  <code className="text-[11px] text-surface-500">
+                  <code className="text-[11px] text-tone-500">
                     products/{selectedEntityId}
                   </code>
                 </div>
@@ -1224,7 +1224,7 @@ width: "100%" }}
                         <img src={formValues.image} {...imgDims(formValues.image)} alt="" className="w-[100px] h-[100px] object-cover rounded-md"/>
                       ) : (
                         <div className="w-[100px] h-[100px] rounded-md bg-surface-raised flex items-center justify-center">
-                          <MI size={24} className="text-surface-400">image</MI>
+                          <MI size={24} className="text-tone-400">image</MI>
                         </div>
                       )}
                     </div>
@@ -1243,7 +1243,7 @@ width: "100%" }}
                         </span>
                       )}
                     </div>
-                    <MI size={20} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400">
+                    <MI size={20} className="absolute right-3 top-1/2 -translate-y-1/2 text-tone-400">
                       expand_more
                     </MI>
                   </div>
@@ -1260,9 +1260,9 @@ width: "100%" }}
                           {formValues.brand}
                         </span>
                       ) : (
-                        <span className="text-surface-400 text-sm">—</span>
+                        <span className="text-tone-400 text-sm">—</span>
                       )}
-                      <MI size={18} className="text-surface-400 flex-shrink-0">
+                      <MI size={18} className="text-tone-400 flex-shrink-0">
                         expand_more
                       </MI>
                     </div>
@@ -1279,12 +1279,12 @@ width: "100%" }}
                           {categoryLabel(formValues.category)}
                         </span>
                       ) : (
-                        <span className="text-surface-400 text-sm">
+                        <span className="text-tone-400 text-sm">
                           —
                         </span>
                       )}
                     </div>
-                    <MI size={20} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400">
+                    <MI size={20} className="absolute right-3 top-1/2 -translate-y-1/2 text-tone-400">
                       expand_more
                     </MI>
                   </div>
@@ -1318,10 +1318,10 @@ width: "100%" }}
             {/* Panel bottom bar */}
             <div className="flex items-center justify-between px-3 py-2.5 border-t border-hairline bg-surface-card shrink-0">
               <div className="flex items-center gap-1">
-                <button aria-label="Copy" className="p-1.5 rounded text-surface-500">
+                <button aria-label="Copy" className="p-1.5 rounded text-tone-500">
                   <MI size={16}>content_copy</MI>
                 </button>
-                <button aria-label="Delete" className="p-1.5 rounded text-surface-500">
+                <button aria-label="Delete" className="p-1.5 rounded text-tone-500">
                   <MI size={16}>delete</MI>
                 </button>
               </div>

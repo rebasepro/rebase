@@ -15,7 +15,7 @@ const Component = link ? 'a' : 'div';
 
 <Component
   href={link?.href}
-  class="group relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800 transition-all duration-300 hover:ring-primary/30 block animate-on-scroll scale-in"
+  class="group relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800 transition-all duration-300 hover:ring-primary/30 block animate-on-scroll scale-in"
   data-spotlight-card>
   <!-- Mouse spotlight effect -->
   <div class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" data-spotlight></div>
@@ -29,10 +29,10 @@ const Component = link ? 'a' : 'div';
     <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
       <Icon class="text-primary-light w-5 h-5" />
     </div>
-    <h3 class="text-xl text-white mb-4">{title}</h3>
-    <p class="text-surface-400 mb-6">{description}</p>
+    <h3 class="text-xl text-tone-max mb-4">{title}</h3>
+    <p class="text-tone-400 mb-6">{description}</p>
     {link && (
-      <span class="inline-flex items-center gap-x-2 text-primary-light group-hover:text-white font-semibold transition-colors">
+      <span class="inline-flex items-center gap-x-2 text-primary-light group-hover:text-tone-max font-semibold transition-colors">
         {link.text}
         
 <svg
