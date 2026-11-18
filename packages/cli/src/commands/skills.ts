@@ -971,7 +971,7 @@ ${chalk.green.bold("Examples")}
 export function reportRootPointers(result: RootPointerResult): void {
     const shown = (file: string) => path.relative(process.cwd(), file) || file;
     for (const file of result.changed) {
-        console.log(`  ${chalk.green("✓")} Rebase rules in ${chalk.gray(shown(file))}, for an assistant started at the repository root`);
+        console.log(`  ${chalk.green("✓")} Rebase rules in ${chalk.gray(shown(file))}, outside the project, for an assistant started at the repository root ${chalk.gray("(REBASE_ROOT_RULES=0 skips this)")}`);
     }
     for (const { file, reason } of result.untouched) {
         console.warn(`  ${chalk.yellow("!")} Left ${chalk.gray(shown(file))} as it is: ${reason}. Fix or remove them and run ${chalk.cyan("rebase skills install")} again.`);
