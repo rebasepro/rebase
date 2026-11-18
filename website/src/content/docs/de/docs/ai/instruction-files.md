@@ -1,17 +1,17 @@
 ---
-sourceHash: 5b835c7e865a4f8f
-title: KI-Anweisungsdateien
-sidebar_label: KI-Anweisungsdateien
-description: Jedes per Gerüst erstellte Rebase-Projekt liefert ai-instructions.md sowie Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md aus, die die fünf Regeln enthalten, die Assistenten am häufigsten verletzen – eine Single Source of Truth, viele Dateinamen.
+sourceHash: 4f52b1da35febe8d
+title: KI-Instruktionsdateien
+sidebar_label: KI-Instruktionsdateien
+description: Jedes per Scaffolding erstellte Rebase-Projekt enthält ai-instructions.md sowie Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md, die die fünf Regeln enthalten, gegen die Assistenten am häufigsten verstoßen – eine Single Source of Truth, viele Dateinamen.
 ---
 
 Jeder Assistent erwartet seine Regeln in einer anderen Datei. Claude Code liest
 `CLAUDE.md`, Cursor liest `.cursorrules`, Windsurf liest `.windsurfrules`,
-Copilot liest `.github/copilot-instructions.md`, und die anbieterübergreifende Konvention
-lautet `AGENTS.md`. Dieselben Anweisungen in fünf Dateien zu pflegen führt dazu, dass vier
-davon veralten.
+Copilot liest `.github/copilot-instructions.md` und die herstellerübergreifende Konvention
+lautet `AGENTS.md`. Dieselben Vorgaben in fünf Dateien zu pflegen führt unweigerlich dazu,
+dass vier davon veralten.
 
-`rebase init` schreibt alle fünf – als **Pointer auf eine einzige Datei, die Sie tatsächlich
+`rebase init` erstellt alle fünf – als **Pointer auf eine einzige Datei, die Sie tatsächlich
 bearbeiten**:
 
 ```text
@@ -25,7 +25,7 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Jede Pointer-Datei benennt die eigentliche Datei, gibt an, wo sich die Skills befinden, und enthält die fünf Regeln, die ein Assistent keinesfalls verletzen darf, selbst wenn er nie etwas anderes öffnet:
+Jede Pointer-Datei verweist auf die eigentliche Datei, gibt an, wo sich die Skills befinden, und enthält die fünf Regeln, gegen die ein Assistent keinesfalls verstoßen darf – selbst wenn er niemals etwas anderes öffnet:
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
@@ -40,22 +40,24 @@ These hold before you have opened ai-instructions.md, and in every session:
 - **Data goes through the SDK:** `rebase.dataAsAdmin.<table>` in functions and crons, `getDriver(c)` to act as the caller.
 - **A route in `backend/functions/` is public until you guard it** with `requireAuth` or `requireAdmin` from `@rebasepro/server/functions`.
 - **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).
+- **An admin, back-office or internal tool is built in the Rebase admin, never as a new app.** A dashboard, a review queue, a staff screen or a settings page is a custom view, the home page, a record tab or an action in `frontend/` (ai-instructions.md, "Admin UI", says how). A separate app is only for what the project's own users see.
 - **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
 
-Die anderen unterscheiden sich nur im Skills-Verzeichnis des Agenten und dessen `--agent`-Wert –
+Die anderen unterscheiden sich nur im Skills-Verzeichnis des Agenten und seinem `--agent`-Wert –
 `--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` – sowie im
 relativen Pfad, der in `.github/copilot-instructions.md` `../ai-instructions.md` und in
 `AGENTS.md` `ai-instructions.md` lautet. Die dritte Zeile ist konditional, da
-`rebase init --agent` die Skills möglicherweise bereits installiert hat, bevor der Assistent
-sie überhaupt liest.
+`rebase init --agent` die Skills möglicherweise bereits installiert hat, bevor der
+Assistent sie jemals liest.
 
-Dies geschieht bei jedem `rebase init`, für jedes Preset einschließlich `--headless`.
+Dies geschieht bei jedem `rebase init` für jedes Preset einschließlich `--headless`.
 Es gibt kein Flag und keine Eingabeaufforderung.
 
-`rebase init` schreibt auch `.mcp.json`, was Claude Code, Cursor und jeden anderen MCP-Client
-auf den [Rebase-MCP-Server](/docs/ai/mcp) verweist – die projekteigene Kopie, eine
-devDependency, die mit der CLI gepinnt ist (`npx --no rebase-mcp` in einem npm-Projekt):
+`rebase init` schreibt außerdem `.mcp.json`, was Claude Code, Cursor und
+jeden anderen MCP-Client auf den [Rebase-MCP-Server](/docs/ai/mcp) verweist – die
+projekteigene Kopie, eine devDependency, die mit der CLI gepinnt ist (`npx --no rebase-mcp`
+in einem npm-Projekt):
 
 ```json title=".mcp.json"
 {
@@ -71,94 +73,98 @@ devDependency, die mit der CLI gepinnt ist (`npx --no rebase-mcp` in einem npm-P
 }
 ```
 
-`REBASE_PROJECT_DIR` ist `"."`, kein absoluter Pfad: Der Client startet den Server im
-Projektstammverzeichnis, und ein absoluter Pfad ist die einzige Zeile dieser Datei, die
-nicht committet werden kann. Sie ist vorhanden, weil `~/.rebase/projects.json`
-maschinenweit gilt – ein Projekt, das kein eigenes Verzeichnis angibt, fällt auf das
-zurück, was das letzte Projekt auf diesem Rechner persistiert hat. Siehe
+`REBASE_PROJECT_DIR` ist `"."`, kein absoluter Pfad: Der Client startet den Server
+im Projekt-Root, und ein absoluter Pfad ist die eine Zeile dieser Datei, die nicht
+committet werden kann. Sie ist vorhanden, weil `~/.rebase/projects.json` maschinenweit
+gilt – ein Projekt, das kein eigenes Verzeichnis angibt, fällt auf das zurück, was
+das letzte Projekt auf dieser Maschine persistiert hat. Siehe
 [die Rangfolge](/docs/ai/mcp#which-directory-it-acts-on).
 
 ## Warum ein Pointer statt einer Kopie
 
-Die Pointer-Dateien enthalten fast nichts. Eine Datei, die die eigentliche Datei referenziert,
-behält die Konventionen an einem zentralen Ort und hat Eigenschaften, die eine Kopie nicht besitzt:
+Die Pointer-Dateien enthalten fast nichts. Eine Datei, die die eigentliche Datei
+referenziert, behält die Konventionen an einem zentralen Ort und hat Eigenschaften,
+die eine Kopie nicht besitzt:
 
-- **Nur eine Datei zum Bearbeiten.** Regeln können zwischen Assistenten nicht
+- **Eine einzige Datei zum Bearbeiten.** Regeln können zwischen Assistenten nicht
   auseinanderdriften, da es nur ein einziges Regelwerk gibt.
-- **Nur ein Diff zum Überprüfen.** Eine Änderung der Projektkonventionen ist eine
-  Änderung an einer Datei, nicht an fünf identischen, die ein Reviewer vergleichen muss.
-- **Einen Assistenten hinzuzufügen erfordert nur eine kleine Datei.** Ein neues Tool mit einem
-  neuen Dateinamen erhält einen Pointer, keine sechste Kopie Ihrer Konventionen.
+- **Ein einziger Diff zum Reviewen.** Eine Änderung der Projektkonventionen ist eine Änderung
+  an einer Datei und nicht an fünf identischen, die ein Reviewer vergleichen müsste.
+- **Einen Assistenten hinzuzufügen ist nur eine kleine Datei.** Ein neues Tool mit
+  neuem Dateinamen erhält einen Pointer und nicht eine sechste Kopie Ihrer Konventionen.
 
 Die einzige Ausnahme ist der Block **Before you write any code**. Ein Assistent folgt
-einem Link nicht zuverlässig: Einer, der mit einer Aufgabe beschäftigt ist, schreibt zuerst den
-Code, und ein Assistent, der im Root eines Repositorys gestartet wird, dessen Rebase-Projekt in einem
-Unterordner liegt, lädt diese Dateien überhaupt nicht. Daher werden die fünf Regeln, deren
-Verletzung den größten Schaden anrichtet (eine in SQL statt in `backend/schema` erstellte Tabelle,
-Daten, die am SDK vorbei gelesen und geschrieben werden, eine ungeschützte Route, ein Deployment,
-eine bearbeitete generierte Datei), identisch in jeden Pointer geschrieben. Eine Überprüfung in
-der CI sorgt dafür, dass die fünf Kopien synchron bleiben.
+einem Link nicht immer zuverlässig: Ist er mit einer Aufgabe beschäftigt, schreibt er
+zuerst den Code, und wird er im Root eines Repositories gestartet, dessen Rebase-Projekt
+in einem Unterordner liegt, lädt er diese Dateien überhaupt nicht. Daher werden die fünf
+Regeln, deren Missachtung den größten Schaden anrichtet (eine Tabelle, die in SQL statt
+in `backend/schema` erstellt wird, Daten, die am SDK vorbei gelesen oder geschrieben werden,
+eine ungesicherte Route, ein Deploy, eine bearbeitete generierte Datei), identisch in
+jeden Pointer geschrieben. Eine Prüfung in CI sorgt dafür, dass die fünf Kopien synchron bleiben.
 
-Dieses Muster lohnt sich beizubehalten, wenn Sie das Gerüst forken, und lohnt sich auch für
-Repositories zu übernehmen, die überhaupt keine Rebase-Projekte sind.
+Es lohnt sich, dieses Muster beizubehalten, wenn Sie das Scaffold forken, und es auch
+in Repositories zu übernehmen, die überhaupt keine Rebase-Projekte sind.
 
 ## Womit `ai-instructions.md` beginnt
 
-Die per Gerüst erstellte Datei ist bewusst kurz gehalten – sie verweist für Details auf
-[`rebase skills install`](/docs/ai/skills) und nennt dann die Regeln, die Assistenten so oft
-falsch machen, dass es sich lohnt, sie zu Beginn jeder Sitzung zu wiederholen:
+Die per Scaffolding erstellte Datei ist bewusst kurz gehalten – sie verweist für
+Details auf [`rebase skills install`](/docs/ai/skills) und benennt dann die Regeln,
+die Assistenten so oft missverstehen, dass es sich lohnt, sie zu Beginn jeder
+Sitzung zu wiederholen:
 
-1. **Schema als Code.** Eine Tabelle ist ein `defineTable` in `backend/schema/<table>.ts`,
+1. **Schema as Code.** Eine Tabelle ist ein `defineTable` in `backend/schema/<table>.ts`,
    exportiert aus `backend/schema/index.ts` – nur was der Index exportiert, wird
    bereitgestellt – mit einem erforderlichen `rls`. Bearbeiten Sie niemals das generierte
    Drizzle-Schema oder die Postgres-Tabellen manuell – siehe [Schema as Code](/docs/architecture/schema-as-code).
 2. **Das Anwenden einer Schemaänderung** hängt von der Datenbank ab. Während `pnpm dev`
-   läuft, reicht das Speichern einer Datei in `backend/schema/` vollkommen aus: Es generiert
-   das Drizzle-Schema und die SDK-Typen neu, und beim Booten werden die fehlenden Tabellen
-   und Spalten erstellt. `pnpm db:push` ist nur für das gedacht, was beim Booten bewusst
-   unangetastet bleibt – eine umbenannte Spalte, ein eingeschränkter Typ, eine entfernte
-   Spalte – sowohl in der Managed-Development-Datenbank als auch in Ihrem eigenen PostgreSQL.
-   Für die Produktion gilt `pnpm db:generate`, gefolgt von `pnpm db:migrate`.
-3. **Verwenden Sie das SDK.** Nutzen Sie `rebase.dataAsAdmin.<table>` für Aktionen als
-   Service-Identität oder `getDriver(c)` innerhalb einer Funktion, wenn der Lesevorgang als
-   der Aufrufer ausgeführt werden soll. Der Server-Client hat keinen einfachen `data`-Accessor.
-   Natives SQL und direkte Drizzle-Aufrufe umgehen Validierung, Hooks und RLS.
+   läuft, ist das Speichern einer Datei in `backend/schema/` bereits der gesamte Schritt: Es
+   generiert das Drizzle-Schema sowie die SDK-Typen neu, und beim Booten werden die
+   fehlenden Tabellen und Spalten erstellt. `pnpm db:push` ist nur für das gedacht, was beim
+   Booten bewusst unangetastet bleibt – eine umbenannte Spalte, ein eingeschränkter Typ,
+   eine entfernte Spalte – sowohl auf der gemanagten Entwicklungsdatenbank als auch auf
+   Ihrem eigenen PostgreSQL. Für die Produktion gilt `pnpm db:generate`, gefolgt von `pnpm db:migrate`.
+3. **Verwenden Sie das SDK.** Nutzen Sie `rebase.dataAsAdmin.<table>` für Operationen unter
+   der Service-Identität oder `getDriver(c)` innerhalb einer Funktion, wenn der Lesezugriff
+   im Kontext des Aufrufers erfolgen soll. Der Server-Client besitzt keinen einfachen `data`-Accessor.
+   Reines SQL und direkte Drizzle-Aufrufe umgehen Validierung, Hooks und RLS.
 4. **Sichern Sie jede benutzerdefinierte Route ab.** Routen in `backend/functions/` werden
    *ohne* Authentifizierung eingebunden. Verwenden Sie `requireAuth` / `requireAdmin` aus
-   `@rebasepro/server/functions` im eigenen Middleware-Slot der Route – das Auslesen von
-   `c.get("user")` ist kein Schutz, und `app.use()` nach der Route ebenfalls nicht.
+   `@rebasepro/server/functions` im Middleware-Slot der jeweiligen Route – das Auslesen von
+   `c.get("user")` ist keine Absicherung, und `app.use()` nach der Route ist es ebenso wenig.
 
-Der letzte Punkt ist besonders wichtig. Er macht den Unterschied zwischen einer Middleware,
-die ausgeführt wird, und einer, die nicht ausgeführt wird, und ein Assistent, dem dies nicht
-mitgeteilt wurde, wird verlässlich die Version schreiben, die nicht ausgeführt wird – siehe
-[Benutzerdefinierte Funktionen](/docs/backend/custom-functions).
+Dieser letzte Punkt ist besonders wichtig. Er macht den Unterschied zwischen einer Middleware,
+die ausgeführt wird, und einer, die es nicht wird – und ein Assistent, dem man dies nicht
+ausdrücklich sagt, schreibt verlässlich die Version, die nicht ausgeführt wird – siehe
+[Custom Functions](/docs/backend/custom-functions).
 
-`requireAdmin` lässt nur die Rolle `admin` zu. Wenn eine spezifischere Rolle oder ein
-API-Schlüssel eine Route aufrufen können soll, ist der hinzuzufügende Schutz `requireScope`
-mit einem Scope, den die App deklariert – siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/#app-scopes).
+`requireAdmin` gewährt nur der `admin`-Rolle Zugriff. Wenn eine spezifischere Rolle oder
+ein API-Schlüssel eine Route aufrufen können soll, ist `requireScope` der passende Guard
+mit einem Scope, den die App deklariert – siehe [Roles and scopes](/docs/backend/roles-and-scopes/#app-scopes).
 
-Nach den Regeln folgen zwei Abschnitte, die nur für manche Projekte gelten. **Backend-Runtime**
-listet auf, was die Managed-Runtime auf Rebase Cloud erlaubt: Pakete, Speicher und Zustand auf
-Modulebene, Timeouts, ausgehende Ports, Konfiguration und Speicherplatz für generierte Dateien.
-Der Abschnitt verlinkt auf [Managed Backend-Runtime](/docs/deployment/managed-runtime/), damit ein
-Assistent ein Backend-Feature anhand realer Limits plant, anstatt zu raten. **Admin-UI**
-enthält die `@rebasepro/ui`-Regeln. Sie gelten für Ansichten innerhalb des Admin-Panels, nicht
-für eine öffentliche Website oder eine statische App, die das Projekt ausliefert.
+Nach den Regeln folgen zwei Abschnitte, die nur für manche Projekte gelten. **Backend
+runtime** listet auf, was die gemanagte Runtime auf Rebase Cloud erlaubt: Pakete,
+Arbeitsspeicher und Status auf Modulebene, Timeouts, ausgehende Ports, Konfiguration und
+Speicher für generierte Dateien. Der Abschnitt verlinkt auf
+[Managed backend runtime](/docs/deployment/managed-runtime/), damit ein Assistent
+ein Backend-Feature anhand realer Limits plant, anstatt zu raten. **Admin UI**
+enthält die `@rebasepro/ui`-Regeln. Sie gelten für Views innerhalb des Admin-Panels, nicht
+für eine öffentliche Website oder statische App, die das Projekt bereitstellt.
 
-## Anpassung an Ihr Projekt
+## An Ihre Bedürfnisse anpassen
 
-`ai-instructions.md` ist Ihre Datei. Nichts generiert sie neu oder überschreibt sie – im
-Gegensatz zu [installierten Skills](/docs/ai/skills), die bei jedem `rebase skills install`
-ersetzt werden. Projektspezifische Konventionen gehören hierhin.
+`ai-instructions.md` ist Ihre Datei. Nichts regeneriert oder überschreibt sie – im
+Gegensatz zu [installierten Skills](/docs/ai/skills), die bei jedem
+`rebase skills install` ersetzt werden. Projektspezifische Konventionen gehören hierhin.
 
-Was hier seinen Platz verdient, ist das, was ein Assistent nicht aus dem Code ableiten kann:
-welche Tabellen veraltet (Legacy) sind, welcher Dienst welche Tabelle besitzt, die
-Namenskonvention, die nirgendwo erzwungen wird, die Migration, die nicht erneut ausgeführt
-werden darf. Halten Sie es kurz – Instruktionen, die bei jedem Request geladen werden,
-konkurrieren mit der eigentlichen Aufgabe um Aufmerksamkeit, und eine lange Datei wird von
-einem Assistenten nur überflogen.
+Einen Platz hier verdient alles, was ein Assistent nicht aus dem Code ableiten kann:
+welche Tabellen veraltet (Legacy) sind, welcher Service für welche Tabelle zuständig ist,
+Namenskonventionen, die nirgends erzwungen werden, oder die Migration, die keinesfalls
+erneut ausgeführt werden darf. Halten Sie sie kurz – Anweisungen, die in jeden Request
+geladen werden, konkurrieren mit der eigentlichen Aufgabe um Aufmerksamkeit, und eine
+lange Datei wird von einem Assistenten nur überflogen.
 
-Und behalten Sie die Grenzen im Blick: Diese Datei bestimmt, was ein Assistent *schreibt*.
-Sie hat keinen Einfluss darauf, was ein mit Ihrer Datenbank verbundener Agent *tun darf* – das
-wird durch die Zugangsdaten bestimmt, die er besitzt, und nichts in Markdown ändert das. Siehe
-[das Zugangsdaten-Modell des MCP-Servers](/docs/ai/mcp#what-the-server-can-reach).
+Und behalten Sie die Abgrenzung im Hinterkopf: Diese Datei bestimmt, was ein Assistent
+*schreibt*. Sie hat keinen Einfluss darauf, was ein mit Ihrer Datenbank verbundener
+Agent *tun* darf – dies wird durch die Credentials bestimmt, die er besitzt, und
+nichts in Markdown ändert daran etwas. Siehe
+[das Credential-Modell des MCP-Servers](/docs/ai/mcp#what-the-server-can-reach).

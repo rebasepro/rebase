@@ -14,6 +14,7 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ### Changed
 
+- **A scaffolded project's assistant builds an admin inside the Rebase admin.** The instruction files a new project ships (`ai-instructions.md`, `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.windsurfrules`, Copilot's) now say that a dashboard, a review queue, a staff screen or a settings page is a custom view, the home page, a record tab or an action in the admin, never a separate app, and that a separate app is for what the project's own users see. The rule was only in the `rebase-custom-views` skill, which an assistant reads only when it loads it.
 - **The tick in a checked checkbox, and in the relation picker's and multi-select's rows, is white in the dark theme**, as it already was in the light one. It used a near-black navy on the blue fill. Filled buttons, the editor's active formatting buttons, its link button and its table-size picker now draw from the brand colour too; the last three were hardcoded blue and ignored a rebrand.
 
 ### Fixed

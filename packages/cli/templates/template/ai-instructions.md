@@ -53,7 +53,9 @@
 - **Configuration:** the human sets variables with `rebase cloud env set NAME=value` (`--secret` makes a value write-only). A change applies at the next deploy. Read variables inside the handler, with `requireEnv(c, "NAME")`.
 - **Generated files** (audio, images, exports) go to storage: `rebase.storage.putObject({ file, key })`. A key under `public/` is served to anyone at `/api/storage/file/<key>`. Any other key needs a download token. The project needs `rebase cloud storage create` once, plus a `storageAuthorize` hook that allows the write.
 
-## Admin UI — only when you build it
+## Admin UI
+
+The Rebase admin is this project's admin. When the task is an admin, a back-office, an internal tool or a screen for staff (a dashboard, a review or approval queue, a dispatch board, a settings page, a bulk action), build it inside the admin: a custom view (`rebase generate view <name>`), the home page, a record tab (`entityViews` in `customizeTable`), or a record or toolbar action. Never scaffold a separate app or a second admin for it, and never rebuild in it what the admin already gives every table (lists, filters, forms, history, users and roles). If the admin cannot do what the task needs, tell the human what is missing.
 
 These rules apply to views inside the Rebase admin panel: custom views, home pages, dashboards and entity tabs. A public site or a static app this project serves (an `apps` entry with `"type": "static"`) is not the admin panel. Style it the way that app is already styled. It does not need `@rebasepro/ui`.
 
