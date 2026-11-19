@@ -11,8 +11,15 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+### Added
+
+- **Every socket's open and close is logged, and `/metrics` counts what sockets do.** A close left one debug line, and none in production, so a report of dropped connections had nothing to be read against. Each socket now logs `[WebSocket Server] Socket opened` (its `clientId`, `affinity` and opt-ins) and `[WebSocket Server] Socket closed` at info, with its `uid`, `closedBy` (`client`, `client_watchdog`, `network`, `no_pong`, `backlog`, `session`, `ceiling`, `shutdown`, `oversized_frame`, `server`), close `code` and `reason`, `ageMs`, channels, and frames and bytes in and out. `/metrics` gains `rebase_realtime_socket_opens_total`, `rebase_realtime_socket_closes_total{closed_by}`, `rebase_realtime_socket_close_codes_total{code}`, frames and bytes in and out, and `rebase_realtime_frames_refused_total{code}` (`RATE_LIMITED`, `CHANNEL_FORBIDDEN`, `CHANNEL_BUS_PAYLOAD_TOO_LARGE`, `FRAME_TOO_LARGE`, `AUTH_UNAVAILABLE`, `UNAUTHORIZED`). A channel frame refused because the auth store could not re-check its identity past the 60 s grace is now a warning.
+- **The SDK's `disconnect` event says what ended the socket**: `{ code, reason, cause, openForMs, silentForMs }`, where `cause` is `server` (a close or a dropped connection: read `code`), `heartbeat` or `probe` (the SDK gave up on a silent socket) or `client` (it closed one to sign in again). A socket the SDK gives up on is closed with 4003, so the server's log tells it from a network drop.
+
 ### Fixed
 
+- **A broadcast over 8 KB reaches every instance on the Postgres channel bus.** On an ephemeral channel the bus refused a frame over the NOTIFY limit: delivered on the sender's instance only, with a `CHANNEL_BUS_PAYLOAD_TOO_LARGE` error to the sender. A room whose members were on two instances heard its large messages only on the sender's. Such a frame now travels in parts, sent together in one statement and put back together by each instance, up to 1 MiB; only a larger one is refused. Instances on an older version drop the parts with a warning while a rolling deploy runs.
+- **A page that wakes no longer drops a healthy realtime socket.** The heartbeat watchdog ran on a timer that a locked phone, a frozen tab or a sleeping laptop does not run, and on waking it fired before the frames waiting on the socket were read: it saw minutes of silence and closed a socket the server had kept open, and every app on it saw a disconnect. A late tick is now a wake: the SDK sends a `ping` (a new opt-in the server answers at once with a heartbeat) and keeps the socket if anything arrives within 10 s; against a server without `ping`, the deadline starts over from the wake. Showing the tab again probes the same way.
 - **An npm project no longer warns about its own `.npmrc` on every run.** The scaffold's `.npmrc` carried `link-workspace-packages=true`, a pnpm setting that npm reports as "Unknown env config" and says will become an error. pnpm already reads it from `pnpm-workspace.yaml`, so the line is gone and nothing changes for pnpm.
 
 ## [0.34.1] - 2026-11-19
