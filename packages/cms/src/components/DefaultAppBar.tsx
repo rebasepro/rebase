@@ -71,6 +71,9 @@ export type DefaultAppBarProps<ADDITIONAL_PROPS = object> = {
 
     logo?: string;
 
+    /** The logo for the dark theme. Falls back to `logo`. */
+    logoDark?: string;
+
     user?: User;
 } & ADDITIONAL_PROPS;
 
@@ -91,16 +94,19 @@ export const DefaultAppBar = function DefaultAppBar({
     className,
     style,
     user: userProp,
-    logo: logoProp
+    logo: logoProp,
+    logoDark: logoDarkProp
 }: DefaultAppBarProps) {
 
     const {
         hasDrawer,
         drawerOpen,
-        logo: appLogo
+        logo: appLogo,
+        logoDark: appLogoDark
     } = useApp();
 
     const logo = logoProp ?? appLogo;
+    const logoDark = logoProp ? logoDarkProp : (logoDarkProp ?? appLogoDark);
 
     const navigation = useUrlController();
 
@@ -169,9 +175,17 @@ export const DefaultAppBar = function DefaultAppBar({
                 >
                     <div className={"flex flex-row gap-4"}>
                         {!hasDrawer && (logo
-                            ? <img src={logo}
-                                alt="Logo"
-                                className={cls("w-[32px] h-[32px] object-contain")}/>
+                            // Written out rather than shared with the drawer: this
+                            // part stays copyable with package imports only. With
+                            // `logoDark`, the `dark` class on <html> picks the image.
+                            ? <>
+                                <img src={logo}
+                                    alt="Logo"
+                                    className={cls("w-[32px] h-[32px] object-contain", logoDark && "dark:hidden")}/>
+                                {logoDark && <img src={logoDark}
+                                    alt="Logo"
+                                    className="w-[32px] h-[32px] object-contain hidden dark:block"/>}
+                            </>
                             : <RebaseLogo width={"32px"} height={"32px"}/>)}
 
                         {typeof title === "string"
@@ -184,7 +198,10 @@ export const DefaultAppBar = function DefaultAppBar({
                 </Link>
             </div>}
 
-            <div className="mr-8 hidden lg:block">
+            {/* Only when there are breadcrumbs. Rendered empty it still took
+                its `mr-8` and a flex gap, pushing whatever the app put in
+                `startAdornment` 40px right of where a title starts. */}
+            {breadcrumbs.breadcrumbs.length > 0 && <div className="mr-8 hidden lg:block">
                 <nav aria-label="Breadcrumb">
                 <div className={"flex flex-row gap-2 items-center"}>
                     {breadcrumbs.breadcrumbs.map((breadcrumb, index) => {
@@ -209,7 +226,7 @@ export const DefaultAppBar = function DefaultAppBar({
                     })}
                 </div>
                 </nav>
-            </div>
+            </div>}
             {startAdornment}
 
             {globalSearch}

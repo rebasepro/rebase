@@ -35,6 +35,7 @@ import {
     requireCloudRow
 } from "./context";
 import { dbConnect } from "./db-connect";
+import { dbQuery } from "./db-query";
 import { dbAccessCommand } from "./db-access";
 
 interface DatabaseRow {
@@ -89,6 +90,9 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
             break;
         case "connect":
             await dbConnect(rawArgs);
+            break;
+        case "query":
+            await dbQuery(rawArgs);
             break;
         case "access":
             await dbAccessCommand(rawArgs);
@@ -884,6 +888,13 @@ description: "List databases attached to the project" },
                     ["--port <n>", "Local port to listen on. Default: 5432"],
                     ["--reveal", "Print the password in the connection URL"]
                 ]
+            },
+            {
+                action: "query",
+                section: "Database",
+                args: "[sql]",
+                description: "Run SQL on the project's database (owner or admin), with no local psql",
+                flags: [["--file <path>", "Run the statements in a file, stopping at the first error"]]
             },
             { action: "test",
 section: "Database",

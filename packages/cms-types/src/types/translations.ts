@@ -886,6 +886,8 @@ export interface RebaseTranslations {
     auth_email_change_continue?: string;
     auth_email_change_unavailable?: string;
     auth_signing_in_with_link?: string;
+    auth_continue_with_platform?: string;
+    auth_platform_signin_hint?: string;
     auth_magic_link_failed_title?: string;
     auth_magic_link_unavailable?: string;
     reset_mfa_title?: string;
@@ -1915,6 +1917,8 @@ export interface RebaseTranslations {
     insights_change_none?: string;
     /** In place of a chart that has no values to draw. */
     insights_no_data?: string;
+    /** A `TimeBars` bucket in which nothing was recorded — a gap, which is not a zero. */
+    insights_nothing_recorded?: string;
 
     // ─── Icon button names ───────────────────────────────────────
     add_to_favourites?: string;

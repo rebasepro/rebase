@@ -146,6 +146,7 @@ were props the component never read:
 | `collectionViews` | Custom collection view modes, available to any collection by `key` |
 | `entityActions` | Entity actions, available to any table that names their `key` in its `entityActions` |
 | `effectiveRoleController` | Simulate a different role while dev mode is on |
+| `simulateAccess` | Show "Simulate access", the administrator's control that runs every data view as a role, a user or a service key, read-only, against the real row-level security policies. Off unless `true` |
 | `modeController` | Hand Rebase the host app's light/dark mode; Rebase then never touches `<html>`, `prefers-color-scheme` or localStorage — see [Styling](#styling) |
 | `translations` | Override or extend any UI string, keyed by locale — see [Translations](/docs/frontend/i18n) |
 | `components` | Replace built-in components — see [Component Overrides](/docs/frontend/component-overrides) |

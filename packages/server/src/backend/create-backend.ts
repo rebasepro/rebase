@@ -161,7 +161,7 @@ import {
     StorageController,
     StorageRegistry
 } from "../storage";
-import { storageRateLimitCost } from "../storage/routes";
+import { readOnlyAuthorizeData, storageRateLimitCost } from "../storage/routes";
 import type { ApiKeyStore } from "../auth/api-keys/api-key-store";
 import { createApiKeyStore } from "../auth/api-keys/api-key-store";
 import { createApiKeyRoutes, createPersonalKeyRoutes } from "../auth/api-keys/api-key-routes";
@@ -1474,7 +1474,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const capabilities = await authAdapter!.getCapabilities();
         return c.json({
             ...capabilities,
-            storage: Boolean(storageRegistry || storageController)
+            storage: Boolean(storageRegistry || storageController),
+            // Only where the door is mounted: the built-in adapter, with the
+            // platform's key set.
+            ...(platformTokens && authAdapter?.id === "rebase-builtin"
+                ? { platformSignIn: platformTokens.signInUrl ? { url: platformTokens.signInUrl } : {} }
+                : {})
         } satisfies AuthConfigDocument);
     };
 
@@ -1620,7 +1625,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 requireEmailVerification: safeAuthConfig.requireEmailVerification ?? false,
                 refreshTokenReuseIntervalSeconds: safeAuthConfig.refreshTokenReuseIntervalSeconds,
                 refreshTokenReuse: safeAuthConfig.refreshTokenReuse,
-                magicLinkCreatesUsers: safeAuthConfig.magicLinkCreatesUsers ?? false
+                magicLinkCreatesUsers: safeAuthConfig.magicLinkCreatesUsers ?? false,
+                // The platform's sign-in door, on whenever the platform set
+                // its key (`auth/platform-signin-routes.ts`). A spent token is
+                // remembered where this backend counts its rate limits —
+                // across replicas when that store is shared.
+                platformSignIn: platformTokens ? { tokens: platformTokens, usedTokens: rateLimitStore } : undefined
             });
 
             // A requirement nobody can meet is a backend nobody can sign in
@@ -3085,10 +3095,17 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     const resolveAccessor = createAccessorSlugResolver(() => tableRegistry.list());
     const defaultData = buildSdkData(scopedDefaultDriver, { resolveAccessor });
 
-    // Hand the storage authorize hook its trusted reader. Scoped as the service
-    // identity, so an ownership lookup is not itself filtered by the caller's
-    // permissions — the hook IS the permission decision.
-    storageAuthorizeData.current = defaultData as import("@rebasepro/types").StorageAuthorizeData;
+    // Hand the storage authorize hook its trusted reader: the unscoped driver,
+    // on the owner connection, so row-level security does not apply — what
+    // `StorageAuthorizeContext.data` and the scaffold have always promised.
+    // It was the service identity, which policies DO apply to: on a table whose
+    // only policy is `owner_id = rebase.uid()` (what introspecting a Supabase
+    // schema produces) every ownership lookup found nothing, and every upload
+    // was refused with a bare 403. Read-only by construction: only `find` and
+    // `findById` are reachable through it.
+    storageAuthorizeData.current = readOnlyAuthorizeData(
+        buildSdkData(defaultDriver, { resolveAccessor }) as import("@rebasepro/types").StorageAuthorizeData
+    );
 
     // Multi-database: scope and wrap each non-default delegate so
     // rebase.data on a collection routed to another database reaches its driver.

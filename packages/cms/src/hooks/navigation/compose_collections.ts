@@ -52,8 +52,9 @@ function describe(collection: PanelCollection): string {
 }
 
 /**
- * The collections the panel registers, in navigation order: the served tables,
- * then the external ones.
+ * The collections the panel registers, in navigation order: the served tables
+ * (in `tableCustomizations` order, then the rest as served), then the external
+ * ones.
  *
  * - **Tables**: every served table projected (`collectionsFromTables`), with
  *   its `customizeTable` folded in (`applyTableCustomizations`), then the
@@ -91,6 +92,7 @@ export function composeCollections({ tables, tableCustomizations, externalCollec
         : [];
 
     for (const collection of projected) composedBySlug.set(collection.slug, collection);
+    const ordered = inCustomizationOrder(projected, tableCustomizations);
     const tableSlugs = new Map(projected.map(collection => [collection.slug, collection]));
 
     const external = new Map<string, AdminCollection>();
@@ -112,5 +114,30 @@ export function composeCollections({ tables, tableCustomizations, externalCollec
         external.set(collection.slug, collection);
     }
 
-    return [...projected, ...external.values()];
+    return [...ordered, ...external.values()];
+}
+
+/**
+ * The tables in the order the project declares them: the order of
+ * `tableCustomizations`, then the tables without a customization, in the
+ * order served.
+ *
+ * The served order is no declaration: the server collects the tables from the
+ * `backend/schema/index` module namespace, which lists exports sorted by name.
+ * `tableCustomizations` is an array the project wrote in order (the codemod
+ * heads it "in the order the panel lists them"), so it decides. Navigation
+ * groups follow, since a group sits where its first table does;
+ * `navigationGroupMappings`, when given, still overrides both.
+ */
+function inCustomizationOrder(collections: readonly TableCollection[], tableCustomizations: readonly TableCustomization[]): TableCollection[] {
+    const rank = new Map<string, number>();
+    tableCustomizations.forEach((customization, index) => {
+        if (!rank.has(customization.table)) rank.set(customization.table, index);
+    });
+    if (rank.size === 0) return [...collections];
+    const customized = collections
+        .filter(collection => rank.has(collection.slug))
+        .sort((a, b) => (rank.get(a.slug) ?? 0) - (rank.get(b.slug) ?? 0));
+    const rest = collections.filter(collection => !rank.has(collection.slug));
+    return [...customized, ...rest];
 }

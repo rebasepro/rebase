@@ -374,6 +374,19 @@ export interface AuthAdapterCapabilities {
      * Only applicable for built-in auth.
      */
     needsSetup?: boolean;
+
+    /**
+     * Sign-in methods the backend was told to enable and cannot offer, with
+     * why. `magicLink: "EMAIL_NOT_CONFIGURED"` is `AUTH_MAGIC_LINK=true` on a
+     * backend with no email service: `magicLink` above is `false` and the
+     * route answers 503, which for an app whose only sign-in is the magic
+     * link means nobody can sign in. Absent when nothing is missing, and on
+     * a backend that predates the field.
+     */
+    unavailable?: {
+        magicLink?: "EMAIL_NOT_CONFIGURED";
+        emailOtp?: "EMAIL_NOT_CONFIGURED";
+    };
 }
 
 /**
@@ -395,6 +408,15 @@ export interface AuthConfigDocument extends AuthAdapterCapabilities {
      * `GET /storage/sources` there.
      */
     storage?: boolean;
+    /**
+     * Present when the platform hosting this backend can sign its project's
+     * owners in (Rebase Cloud sets it at deploy). The admin panel then offers
+     * "Continue with Rebase Cloud" instead of leaving an owner at a login form
+     * they hold no credentials for. `url` is where that button goes: the
+     * project's page in the platform's console, which signs the owner in and
+     * comes back. Absent on a self-hosted backend.
+     */
+    platformSignIn?: { url?: string };
 }
 
 // ─── User Management ────────────────────────────────────────────────────────
@@ -606,7 +628,7 @@ export interface TransformAuthResponseContext {
     /** The authenticated user's ID. */
     uid: string;
     /** The auth method that triggered this response. */
-    method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "otp" | "mfa" | "device";
+    method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "otp" | "mfa" | "device" | "platform";
     /** The raw HTTP request (for reading headers, IP, etc.). */
     request: Request;
 }

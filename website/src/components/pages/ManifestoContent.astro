@@ -14,10 +14,10 @@ import HeroBackdrop from "../HeroBackdrop.astro";
 
       <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
         <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t("manifesto.badge")}</span></div>
-        <h1 class="mb-6 text-display-2 text-white">
+        <h1 class="mb-6 text-display-2 text-tone-max">
           {t("manifesto.hero.title")}
         </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
+        <p class="mb-10 text-lg leading-8 text-tone-300 lg:text-xl">
           {t("manifesto.hero.subtitle")}
         </p>
       </div>
@@ -31,16 +31,16 @@ import HeroBackdrop from "../HeroBackdrop.astro";
              this page no competitor could have written, and it was previously
              sitting below a problem statement any of them could have published. -->
         <div class="mb-16">
-          <h2 class="text-2xl sm:text-3xl text-white mb-6 border-l-2 border-primary pl-4">
+          <h2 class="text-2xl sm:text-3xl text-tone-max mb-6 border-l-2 border-primary pl-4">
             {t("manifesto.origin.title")}
           </h2>
-          <div class="prose prose-lg prose-invert max-w-none space-y-5">
-            <p class="text-lg text-surface-300 leading-relaxed" set:html={t("manifesto.origin.p1")}>
+          <div class="prose prose-lg dark:prose-invert max-w-none space-y-5">
+            <p class="text-lg text-tone-300 leading-relaxed" set:html={t("manifesto.origin.p1")}>
             </p>
-            <p class="text-lg text-surface-300 leading-relaxed">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.origin.p2")}
             </p>
-            <p class="text-lg text-surface-300 leading-relaxed">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.origin.p3")}
             </p>
           </div>
@@ -48,17 +48,17 @@ import HeroBackdrop from "../HeroBackdrop.astro";
 
         <!-- The Problem -->
         <div class="mb-16">
-          <h2 class="text-2xl sm:text-3xl text-white mb-6 border-l-2 border-primary pl-4">
+          <h2 class="text-2xl sm:text-3xl text-tone-max mb-6 border-l-2 border-primary pl-4">
             {t("manifesto.problem.title")}
           </h2>
-          <div class="prose prose-lg prose-invert max-w-none space-y-5">
-            <p class="text-lg text-surface-300 leading-relaxed">
+          <div class="prose prose-lg dark:prose-invert max-w-none space-y-5">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.problem.p1")}
             </p>
-            <p class="text-lg text-surface-300 leading-relaxed">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.problem.p2")}
             </p>
-            <p class="text-lg text-surface-300 leading-relaxed">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.problem.p3")}
             </p>
           </div>
@@ -66,49 +66,49 @@ import HeroBackdrop from "../HeroBackdrop.astro";
 
         <!-- What We Believe -->
         <div class="mb-16">
-          <h2 class="text-2xl sm:text-3xl text-white mb-6 border-l-2 border-primary pl-4">
+          <h2 class="text-2xl sm:text-3xl text-tone-max mb-6 border-l-2 border-primary pl-4">
             {t("manifesto.beliefs.title")}
           </h2>
           <div class="space-y-6">
-            <div class="border-l border-surface-800 pl-5">
-              <h3 class="text-xl text-white mb-2">{t("manifesto.beliefs.b1.title")}</h3>
-              <p class="text-surface-400 leading-relaxed">{t("manifesto.beliefs.b1.desc")}</p>
+            <div class="border-l border-tone-800 pl-5">
+              <h3 class="text-xl text-tone-max mb-2">{t("manifesto.beliefs.b1.title")}</h3>
+              <p class="text-tone-400 leading-relaxed">{t("manifesto.beliefs.b1.desc")}</p>
             </div>
-            <div class="border-l border-surface-800 pl-5">
-              <h3 class="text-xl text-white mb-2">{t("manifesto.beliefs.b2.title")}</h3>
-              <p class="text-surface-400 leading-relaxed">{t("manifesto.beliefs.b2.desc")}</p>
+            <div class="border-l border-tone-800 pl-5">
+              <h3 class="text-xl text-tone-max mb-2">{t("manifesto.beliefs.b2.title")}</h3>
+              <p class="text-tone-400 leading-relaxed">{t("manifesto.beliefs.b2.desc")}</p>
             </div>
-            <div class="border-l border-surface-800 pl-5">
-              <h3 class="text-xl text-white mb-2">{t("manifesto.beliefs.b3.title")}</h3>
-              <p class="text-surface-400 leading-relaxed">{t("manifesto.beliefs.b3.desc")}</p>
+            <div class="border-l border-tone-800 pl-5">
+              <h3 class="text-xl text-tone-max mb-2">{t("manifesto.beliefs.b3.title")}</h3>
+              <p class="text-tone-400 leading-relaxed">{t("manifesto.beliefs.b3.desc")}</p>
             </div>
-            <div class="border-l border-surface-800 pl-5">
-              <h3 class="text-xl text-white mb-2">{t("manifesto.beliefs.b4.title")}</h3>
-              <p class="text-surface-400 leading-relaxed">{t("manifesto.beliefs.b4.desc")}</p>
+            <div class="border-l border-tone-800 pl-5">
+              <h3 class="text-xl text-tone-max mb-2">{t("manifesto.beliefs.b4.title")}</h3>
+              <p class="text-tone-400 leading-relaxed">{t("manifesto.beliefs.b4.desc")}</p>
             </div>
-            <div class="border-l border-surface-800 pl-5">
-              <h3 class="text-xl text-white mb-2">{t("manifesto.beliefs.b5.title")}</h3>
-              <p class="text-surface-400 leading-relaxed">{t("manifesto.beliefs.b5.desc")}</p>
+            <div class="border-l border-tone-800 pl-5">
+              <h3 class="text-xl text-tone-max mb-2">{t("manifesto.beliefs.b5.title")}</h3>
+              <p class="text-tone-400 leading-relaxed">{t("manifesto.beliefs.b5.desc")}</p>
             </div>
           </div>
         </div>
 
         <!-- Who Is Rebase For -->
         <div class="mb-16">
-          <h2 class="text-2xl sm:text-3xl text-white mb-6 border-l-2 border-primary pl-4">
+          <h2 class="text-2xl sm:text-3xl text-tone-max mb-6 border-l-2 border-primary pl-4">
             {t("manifesto.audience.title")}
           </h2>
-          <div class="prose prose-lg prose-invert max-w-none space-y-5">
-            <p class="text-lg text-surface-300 leading-relaxed">
+          <div class="prose prose-lg dark:prose-invert max-w-none space-y-5">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.audience.p1")}
             </p>
-            <ul class="space-y-3 text-surface-300 list-none pl-0">
+            <ul class="space-y-3 text-tone-300 list-none pl-0">
               <li class="flex gap-3 items-start"><svg class="h-4 w-4 text-primary-light mt-1.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg> <span>{t("manifesto.audience.l1")}</span></li>
               <li class="flex gap-3 items-start"><svg class="h-4 w-4 text-primary-light mt-1.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg> <span>{t("manifesto.audience.l2")}</span></li>
               <li class="flex gap-3 items-start"><svg class="h-4 w-4 text-primary-light mt-1.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg> <span>{t("manifesto.audience.l3")}</span></li>
               <li class="flex gap-3 items-start"><svg class="h-4 w-4 text-primary-light mt-1.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg> <span>{t("manifesto.audience.l4")}</span></li>
             </ul>
-            <p class="text-lg text-surface-300 leading-relaxed">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.audience.p2")}
             </p>
           </div>
@@ -116,41 +116,41 @@ import HeroBackdrop from "../HeroBackdrop.astro";
 
         <!-- Built for Three Worlds -->
         <div class="mb-16">
-          <h2 class="text-2xl sm:text-3xl text-white mb-6 border-l-2 border-primary pl-4">
+          <h2 class="text-2xl sm:text-3xl text-tone-max mb-6 border-l-2 border-primary pl-4">
             {t("manifesto.threeworlds.title")}
           </h2>
-          <div class="prose prose-lg prose-invert max-w-none space-y-5">
-            <p class="text-lg text-surface-300 leading-relaxed">
+          <div class="prose prose-lg dark:prose-invert max-w-none space-y-5">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.threeworlds.p1")}
             </p>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
-            <div class="text-center p-5 rounded-xl bg-surface-900/30 ring-1 ring-inset ring-surface-800/50">
+            <div class="text-center p-5 rounded-xl bg-tone-900/30 ring-1 ring-inset ring-tone-800/50">
               <div class="mx-auto h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
                 <svg class="h-5 w-5 text-primary-light" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </div>
-              <h3 class="text-white mb-1">{t("manifesto.threeworlds.w1.title")}</h3>
-              <p class="text-surface-400 text-sm">{t("manifesto.threeworlds.w1.desc")}</p>
+              <h3 class="text-tone-max mb-1">{t("manifesto.threeworlds.w1.title")}</h3>
+              <p class="text-tone-400 text-sm">{t("manifesto.threeworlds.w1.desc")}</p>
             </div>
-            <div class="text-center p-5 rounded-xl bg-surface-900/30 ring-1 ring-inset ring-surface-800/50">
+            <div class="text-center p-5 rounded-xl bg-tone-900/30 ring-1 ring-inset ring-tone-800/50">
               <div class="mx-auto h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
                 <svg class="h-5 w-5 text-primary-light" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="m16 18 6-6-6-6" /><path d="m8 6-6 6 6 6" />
                 </svg>
               </div>
-              <h3 class="text-white mb-1">{t("manifesto.threeworlds.w2.title")}</h3>
-              <p class="text-surface-400 text-sm">{t("manifesto.threeworlds.w2.desc")}</p>
+              <h3 class="text-tone-max mb-1">{t("manifesto.threeworlds.w2.title")}</h3>
+              <p class="text-tone-400 text-sm">{t("manifesto.threeworlds.w2.desc")}</p>
             </div>
-            <div class="text-center p-5 rounded-xl bg-surface-900/30 ring-1 ring-inset ring-surface-800/50">
+            <div class="text-center p-5 rounded-xl bg-tone-900/30 ring-1 ring-inset ring-tone-800/50">
               <div class="mx-auto h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
                 <svg class="h-5 w-5 text-primary-light" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" />
                 </svg>
               </div>
-              <h3 class="text-white mb-1">{t("manifesto.threeworlds.w3.title")}</h3>
-              <p class="text-surface-400 text-sm">{t("manifesto.threeworlds.w3.desc")}</p>
+              <h3 class="text-tone-max mb-1">{t("manifesto.threeworlds.w3.title")}</h3>
+              <p class="text-tone-400 text-sm">{t("manifesto.threeworlds.w3.desc")}</p>
             </div>
           </div>
         </div>
@@ -160,17 +160,17 @@ import HeroBackdrop from "../HeroBackdrop.astro";
              section rather than a clause inside the licence belief, because the
              no-paywall promise is the part a reader actually checks us on. -->
         <div class="mb-16">
-          <h2 class="text-2xl sm:text-3xl text-white mb-6 border-l-2 border-primary pl-4">
+          <h2 class="text-2xl sm:text-3xl text-tone-max mb-6 border-l-2 border-primary pl-4">
             {t("manifesto.money.title")}
           </h2>
-          <div class="prose prose-lg prose-invert max-w-none space-y-5">
-            <p class="text-lg text-surface-300 leading-relaxed">
+          <div class="prose prose-lg dark:prose-invert max-w-none space-y-5">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.money.p1")}
             </p>
-            <p class="text-lg text-surface-300 leading-relaxed">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.money.p2")}
             </p>
-            <p class="text-lg text-surface-300 leading-relaxed">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.money.p3")}
             </p>
           </div>
@@ -178,28 +178,28 @@ import HeroBackdrop from "../HeroBackdrop.astro";
 
         <!-- The Promise -->
         <div class="mb-16">
-          <h2 class="text-2xl sm:text-3xl text-white mb-6 border-l-2 border-primary pl-4">
+          <h2 class="text-2xl sm:text-3xl text-tone-max mb-6 border-l-2 border-primary pl-4">
             {t("manifesto.promise.title")}
           </h2>
-          <div class="prose prose-lg prose-invert max-w-none space-y-5">
-            <p class="text-lg text-surface-300 leading-relaxed">
+          <div class="prose prose-lg dark:prose-invert max-w-none space-y-5">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.promise.p1")}
             </p>
-            <p class="text-lg text-surface-300 leading-relaxed">
+            <p class="text-lg text-tone-300 leading-relaxed">
               {t("manifesto.promise.p2")}
             </p>
           </div>
         </div>
 
         <!-- Closing / Signature -->
-        <div class="mt-20 pt-12 border-t border-surface-800/50">
-          <p class="text-lg text-surface-300 leading-relaxed italic mb-8">
+        <div class="mt-20 pt-12 border-t border-tone-800/50">
+          <p class="text-lg text-tone-300 leading-relaxed italic mb-8">
             {t("manifesto.closing")}
           </p>
-          <p class="text-white font-medium">
+          <p class="text-tone-max font-medium">
             {t("manifesto.signature")}
           </p>
-          <p class="text-surface-500 text-sm mt-1">
+          <p class="text-tone-500 text-sm mt-1">
             {t("manifesto.signatureSubtitle")}
           </p>
         </div>

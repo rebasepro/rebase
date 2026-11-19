@@ -36,21 +36,21 @@ const translatePath = useTranslatedPath(lang);
 
 <div
     id="manifesto-banner"
-    class="relative w-full bg-[#0070f4] border-b border-white/10 z-50 text-white select-none py-3"
+    class="island-dark relative w-full bg-[#0070f4] border-b border-tone-max/10 z-50 text-tone-max select-none py-3"
     role="complementary"
     aria-label="Rebase Manifesto"
 >
     <div class="absolute inset-0 banner-grid-pattern pointer-events-none opacity-30"></div>
 
     <div class="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 flex items-center justify-center gap-x-4 gap-y-1 flex-wrap pr-12 text-center">
-        <p class="text-sm sm:text-base leading-6 text-white">
+        <p class="text-sm sm:text-base leading-6 text-tone-max">
             <span set:html={t("banner.title.control")} />
         </p>
 
         <a
             href={translatePath("/manifesto")}
             id="manifesto-banner-cta"
-            class="inline-flex items-center gap-1.5 text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white transition-colors whitespace-nowrap"
+            class="inline-flex items-center gap-1.5 text-sm font-semibold text-tone-max underline decoration-tone-max/40 underline-offset-4 hover:decoration-tone-max transition-colors whitespace-nowrap"
         >
             {t("banner.cta")}
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"
@@ -63,7 +63,7 @@ const translatePath = useTranslatedPath(lang);
     <button
         id="manifesto-banner-close"
         type="button"
-        class="absolute top-1/2 -translate-y-1/2 right-3 sm:right-5 text-white/70 hover:text-white hover:bg-white/15 p-1.5 rounded-full transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white outline-none focus:outline-none cursor-pointer z-50"
+        class="absolute top-1/2 -translate-y-1/2 right-3 sm:right-5 text-tone-max/70 hover:text-tone-max hover:bg-tone-max/15 p-1.5 rounded-full transition-all duration-200 focus-visible:ring-2 focus-visible:ring-tone-max outline-none focus:outline-none cursor-pointer z-50"
         aria-label="Dismiss banner"
     >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"

@@ -22,6 +22,8 @@
  *     answers it. Rebase is named where it is genuinely the answer and absent
  *     where it is not. On the Firebase page the first reason — "we need SQL" —
  *     does not point at us.
+ *     No row answers with the incumbent itself: the "Stay." rows were removed
+ *     on 2026-11-18 (Francesco: "do not limit ourselves ever").
  *  2. **Every entry gets its best case, including the incumbent.** The
  *     description says what a tool is good at and who should pick it. A page
  *     that only lists weaknesses tells the reader nothing they can act on.
@@ -446,11 +448,6 @@ export const ALTERNATIVES_PAGES: AlternativesPage[] = [
                 reason: "alt.page.retool.r4.reason",
                 answer: "Metabase",
                 why: "alt.page.retool.r4.why"
-            },
-            {
-                reason: "alt.page.retool.r5.reason",
-                answer: "Retool",
-                why: "alt.page.retool.r5.why"
             }
         ],
         alternatives: [
@@ -509,11 +506,6 @@ export const ALTERNATIVES_PAGES: AlternativesPage[] = [
                 reason: "alt.page.directus.r3.reason",
                 answer: "Strapi",
                 why: "alt.page.directus.r3.why"
-            },
-            {
-                reason: "alt.page.directus.r4.reason",
-                answer: "Directus",
-                why: "alt.page.directus.r4.why"
             },
             {
                 reason: "alt.page.directus.r5.reason",
@@ -577,16 +569,6 @@ export const ALTERNATIVES_PAGES: AlternativesPage[] = [
                 reason: "alt.page.strapi.r3.reason",
                 answer: "Payload",
                 why: "alt.page.strapi.r3.why"
-            },
-            {
-                reason: "alt.page.strapi.r4.reason",
-                answer: "Strapi",
-                why: "alt.page.strapi.r4.why"
-            },
-            {
-                reason: "alt.page.strapi.r5.reason",
-                answer: "Strapi",
-                why: "alt.page.strapi.r5.why"
             }
         ],
         alternatives: [
@@ -646,11 +628,6 @@ export const ALTERNATIVES_PAGES: AlternativesPage[] = [
                 reason: "alt.page.hasura.r3.reason",
                 answer: "Nhost",
                 why: "alt.page.hasura.r3.why"
-            },
-            {
-                reason: "alt.page.hasura.r4.reason",
-                answer: "Hasura",
-                why: "alt.page.hasura.r4.why"
             }
         ],
         alternatives: [

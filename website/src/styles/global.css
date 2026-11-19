@@ -8,6 +8,146 @@
 @import "@rebasepro/ui/theme.css";
 @import "@rebasepro/ui/index.css" layer(base);
 
+/* ── Tone: the site's theme-aware ramp (2026-11-18) ───────────────────────────
+   The site was dark-only, and every page spelled its copy, rules and wells in
+   the FIXED ramp: `text-white`, `text-surface-400`, `border-surface-800`,
+   `bg-surface-900`. `surface-N` does not move with the theme (it is the kit's
+   raw scale; the kit itself pairs it with a `dark:` twin), so a light page
+   built from those classes is grey type on a grey ground.
+
+   `tone-*` is the same scale, named by the ROLE a step plays against the page
+   ground rather than by its lightness:
+
+     tone-max   was `white`   the furthest step from the ground (headings)
+     tone-50 … tone-950       was `surface-50 … surface-950`
+     tone-min   was `black`   the step past the ground
+
+   In dark mode every tone IS the value it replaced, so the dark site is
+   pixel-identical. In light mode each step is reflected around the light
+   ground (`--surface-frame`, #eff0f3): a step that sat N rungs ABOVE the dark
+   ground sits about N rungs BELOW the light one. So `bg-tone-900` stays level
+   with the ground, `border-tone-800` stays a faint rule, `text-tone-500`
+   stays the muted tier and clears AA on the light ground (#646a71, 4.8:1).
+
+   `@theme inline` is load-bearing: the utility must emit `var(--tone-*)` at
+   the element, so a `[data-theme="dark"]` island inside a light page (the
+   chroma slabs, code wells) resolves the dark values — exactly how the kit's
+   own surface roles work (see the note above `--color-surface-frame` in
+   ui/theme.css).
+
+   A class string that already carries `dark:` twins is kit-style and keeps
+   `surface-N`; a colour on a SOLID fill (white type on the primary button)
+   keeps `white`. Everything else on the marketing site uses `tone-*`. */
+@theme inline {
+    --color-tone-max: var(--tone-max);
+    --color-tone-50: var(--tone-50);
+    --color-tone-100: var(--tone-100);
+    --color-tone-200: var(--tone-200);
+    --color-tone-300: var(--tone-300);
+    --color-tone-400: var(--tone-400);
+    --color-tone-500: var(--tone-500);
+    --color-tone-600: var(--tone-600);
+    --color-tone-700: var(--tone-700);
+    --color-tone-800: var(--tone-800);
+    --color-tone-900: var(--tone-900);
+    --color-tone-950: var(--tone-950);
+    --color-tone-min: var(--tone-min);
+    --color-page-ink: var(--page-ink);
+    --color-page-copy: var(--page-copy);
+}
+
+:root,
+[data-theme="dark"],
+:is(.island-dark, .ground-chroma),
+:has(> pre):not(.prose),
+html[data-theme="light"]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header {
+    --tone-max: #ffffff;
+    --tone-50: #f9fafb;
+    --tone-100: #f4f5f7;
+    --tone-200: #e3e5e9;
+    --tone-300: #d1d4d9;
+    --tone-400: #9ea4ab;
+    --tone-500: #747a81;
+    --tone-600: #3c4046;
+    --tone-700: #23262b;
+    --tone-800: #0f1114;
+    --tone-900: #090a0c;
+    --tone-950: #000000;
+    --tone-min: #000000;
+    /* The same two values as channels, for the hand-written rules below that
+       need an alpha (`rgb(var(--tone-max-rgb) / 0.07)`). */
+    --tone-max-rgb: 255 255 255;
+    --tone-min-rgb: 0 0 0;
+    --page-ink: #f6f7f8;
+    --page-copy: #aeb3ba;
+    /* The raised ground's muted tier (see `.ground-raised .eyebrow`). */
+    --tone-muted-raised: #797f87;
+    --shadow-rgb: 0 0 0;
+    --shadow-k: 1;
+    color-scheme: dark;
+}
+
+[data-theme="light"] {
+    --tone-max: #090a0c;
+    --tone-50: #0f1114;
+    --tone-100: #16181c;
+    --tone-200: #23262b;
+    --tone-300: #3c4046;
+    --tone-400: #50565d;
+    --tone-500: #646a71;
+    --tone-600: #a3a9b0;
+    --tone-700: #d3d6db;
+    --tone-800: #e4e6ea;
+    --tone-900: #eff0f3;
+    --tone-950: #ffffff;
+    --tone-min: #ffffff;
+    --tone-max-rgb: 9 10 12;
+    --tone-min-rgb: 255 255 255;
+    --page-ink: #0f1114;
+    --page-copy: #4a5057;
+    /* On the light sheet (#f8f9fa) surface-500's mirror already clears AA. */
+    --tone-muted-raised: #60666d;
+    --shadow-rgb: 15 17 20;
+    /* Shadows tuned for black-on-black read as smudges on a light ground. */
+    --shadow-k: 0.22;
+    /* Link and accent TEXT. #359aff is the dark ground's accessible blue and
+       measures 2.8:1 here; the primary's dark tint clears 5.6:1. */
+    --color-primary-light: #0061c2;
+    color-scheme: light;
+}
+
+/* ── Dark islands ────────────────────────────────────────────────────────────
+   Regions that stay dark when the page is light: the two chroma slabs (their
+   ink is hand-measured against the slab, see "The close, inverted") and
+   anything marked `.island-dark` — terminals, editors and figures drawn on a
+   fixed dark fill — and every code panel (`:has(> pre)`, outside `.prose`):
+   their syntax colours are the -300/-400 stops, written for a dark well, and
+   on a light card they read at 1.5-2:1. The tone block above already lists both; this restates the
+   kit's surface roles for them, since those are declared in ui/theme.css
+   under `.dark, [data-theme="dark"]`. The same two selectors appear in the
+   tone block and the `dark` variant. A `.frame` is NOT an island: it is the
+   site's card as well as its product window, and follows the page. */
+:is(.island-dark, .ground-chroma),
+:has(> pre):not(.prose) {
+    --surface-frame: #090a0c;
+    --surface-sheet: #111316;
+    --surface-card: #16181c;
+    --surface-card-hover: #1b1d21;
+    --surface-raised: #212429;
+    --surface-raised-hover: #292c32;
+    --surface-lifted: #292c32;
+    --surface-field: rgb(255 255 255 / 0.065);
+    --surface-field-hover: rgb(255 255 255 / 0.095);
+    --surface-hover: rgb(255 255 255 / 0.06);
+    --surface-active: rgb(255 255 255 / 0.09);
+    --surface-scrim: rgb(0 0 0 / 0.6);
+    --surface-well: #090a0c;
+    --hairline: rgb(255 255 255 / 0.08);
+    --hairline-strong: rgb(255 255 255 / 0.14);
+    --color-primary-light: #359aff;
+    color-scheme: dark;
+}
+
 
 
 /* ── Page system (2026-08 rework) ─────────────────────────────────────────────
@@ -43,8 +183,8 @@
     /* Graphite (packages/ui/src/theme.css): ink and copy on the system's one
        neutral hue. Copy is the same value as the panel's secondary text, which
        until 2026-10-14 was a different grey (#a0a0a9 there, #b4b8bd here). */
-    --color-page-ink: #f6f7f8;
-    --color-page-copy: #aeb3ba;
+    /* --color-page-ink / --color-page-copy are theme-aware now: declared in
+       the `@theme inline` tone block at the top of this file. */
 
     /* The height of the sticky site header. A token rather than a measurement
        because two places need to agree on it: the header pins its nav to this
@@ -138,7 +278,7 @@
     position: relative;
     z-index: 1;
     border-radius: 14px;
-    border: 1px solid rgb(255 255 255 / 0.1);
+    border: 1px solid rgb(var(--tone-max-rgb) / 0.1);
     /* One step above whichever ground this landed on — see `--ground-lift`.
        Was `--color-surface-950` (#000000), which is below every ground on the
        site, so a frame was a hole cut into its own section and the card headers
@@ -146,9 +286,9 @@
     background: var(--ground-lift);
     overflow: hidden;
     box-shadow:
-        inset 0 1px 0 rgb(255 255 255 / 0.05),
-        0 2px 8px rgb(0 0 0 / 0.5),
-        0 32px 72px -16px rgb(0 0 0 / 0.85);
+        inset 0 1px 0 rgb(var(--tone-max-rgb) / 0.05),
+        0 2px 8px rgb(var(--shadow-rgb) / calc(0.5 * var(--shadow-k))),
+        0 32px 72px -16px rgb(var(--shadow-rgb) / calc(0.85 * var(--shadow-k)));
 }
 
 @utility frame-head {
@@ -156,10 +296,10 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.6rem 0.9rem;
-    border-bottom: 1px solid rgb(255 255 255 / 0.07);
+    border-bottom: 1px solid rgb(var(--tone-max-rgb) / 0.07);
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
-    color: var(--color-surface-500);
+    color: var(--tone-500);
 }
 
 /* Demos animate; an auto-height container resizes the page on every frame. */
@@ -175,7 +315,7 @@
     font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.22em;
-    color: var(--color-surface-500);
+    color: var(--tone-500);
 }
 
 @utility accent-link {
@@ -390,12 +530,12 @@
    muted value is only muted RELATIVE to something, and the whole tier has to
    move when the ground does. */
 .ground-raised .eyebrow {
-    color: #797f87;
+    color: var(--tone-muted-raised);
 }
 
 @utility chapter {
     position: relative;
-    --hue: var(--color-surface-700);
+    --hue: var(--tone-700);
 }
 
 /* ── The drafted shell ───────────────────────────────────────────────────────
@@ -423,7 +563,7 @@
    The tick is an SVG data URL; its colour is baked in, so it is restated
    here rather than read from a variable. */
 :root {
-    --rail: rgb(255 255 255 / 0.07);
+    --rail: rgb(var(--tone-max-rgb) / 0.07);
     --shell-pad: 1.5rem;
     /* How far inside the shell's edge the rail runs. The rail sits at
        max(0.75rem, 50% − 36rem) and the 72rem shell's edge at
@@ -432,6 +572,21 @@
     --rail-in: calc(max(0.75rem, 50vw - 36rem) - max(0px, 50vw - 36rem));
     /* A 7px diamond, outline only: it marks a crossing without covering it,
        so the two lines read straight through it. */
+    --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7'%3E%3Cpath d='M3.5 .6 6.4 3.5 3.5 6.4 .6 3.5Z' fill='none' stroke='%23ffffff' stroke-opacity='.3' stroke-width='.9'/%3E%3C/svg%3E");
+}
+
+[data-theme="light"] {
+    --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7'%3E%3Cpath d='M3.5 .6 6.4 3.5 3.5 6.4 .6 3.5Z' fill='none' stroke='%23090a0c' stroke-opacity='.3' stroke-width='.9'/%3E%3C/svg%3E");
+}
+/* A frame on a light page: a hairline that reads on the light ladder, and the
+   black-on-black lift shadow redrawn for a light ground. */
+[data-theme="light"] .frame:not(.ground-chroma .frame) {
+    border-color: rgb(9 10 12 / 0.1);
+    box-shadow:
+        0 1px 2px rgb(15 17 20 / 0.05),
+        0 24px 56px -20px rgb(15 17 20 / 0.18);
+}
+[data-theme="light"] :is(.island-dark, .ground-chroma) {
     --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7'%3E%3Cpath d='M3.5 .6 6.4 3.5 3.5 6.4 .6 3.5Z' fill='none' stroke='%23ffffff' stroke-opacity='.3' stroke-width='.9'/%3E%3C/svg%3E");
 }
 
@@ -543,14 +698,14 @@
     font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.22em;
-    color: var(--color-surface-500);
+    color: var(--tone-500);
     font-variant-numeric: tabular-nums;
 }
 
-.ground-raised .chapter-index { color: #797f87; }
+.ground-raised .chapter-index { color: var(--tone-muted-raised); }
 /* Over the hero's glow the muted grey disappears into the bright field. */
 .hero-home .chapter-index,
-section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
+section:has(> .hero-backdrop) .chapter-index { color: rgb(var(--tone-max-rgb) / 0.72); }
 
 /* A status dot: hue as a 6px mark, never a fill (Instatic's rule). Its colour
    is `currentColor`, so a text utility on it picks the hue. */
@@ -571,7 +726,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
     gap: 0.625rem;
     max-width: 100%;
     border-radius: 9999px;
-    border: 1px solid rgb(255 255 255 / 0.12);
+    border: 1px solid rgb(var(--tone-max-rgb) / 0.12);
     background: color-mix(in srgb, var(--surface-frame) 75%, transparent);
     backdrop-filter: blur(4px);
     padding: 0.5rem 1rem;
@@ -579,7 +734,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
     font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.2em;
-    color: var(--color-surface-100);
+    color: var(--tone-100);
 }
 
 /* A drafted hero's eyebrow line (a breadcrumb, a section of the site): mono,
@@ -593,7 +748,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
     font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.22em;
-    color: rgb(255 255 255 / 0.72);
+    color: rgb(var(--tone-max-rgb) / 0.72);
 }
 
 .hero-eyebrow::before {
@@ -619,7 +774,9 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
 }
 
 /* The spec bar under the home hero: four cells like a drawing's title block,
-   each a mono label beside its value, divided by hairlines. */
+   each a mono label over its value, divided by hairlines. Stacked, not side by
+   side: label-beside-value read as two columns of text running into each
+   other, and the long values wrapped against a 6rem label column. */
 .spec-bar {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -632,29 +789,26 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
 
 .spec-bar > div {
     display: flex;
-    align-items: center;
-    gap: 1.25rem;
+    flex-direction: column;
+    gap: 0.375rem;
     padding: 0.25rem 1.5rem;
     min-width: 0;
 }
 
 .spec-bar > div + div { border-left: 1px solid var(--rail); }
 .spec-bar > div:first-child { padding-left: 0; }
-.spec-bar > div:last-child { justify-content: space-between; }
 
 @media (max-width: 63.99rem) {
     .spec-bar > div:nth-child(3) { border-left: 0; padding-left: 0; }
 }
 
 .spec-bar dt {
-    flex: none;
-    max-width: 6rem;
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
     line-height: 1.6;
     text-transform: uppercase;
     letter-spacing: 0.2em;
-    color: var(--color-surface-500);
+    color: var(--tone-500);
 }
 
 .spec-bar dd {
@@ -663,7 +817,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
     font-family: var(--font-mono);
     font-size: 0.8125rem;
     line-height: 1.55;
-    color: var(--color-surface-300);
+    color: var(--tone-300);
     overflow-wrap: anywhere;
 }
 
@@ -676,8 +830,8 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
 .hero-drafting {
     --grid-cell: calc(min(72rem, 100cqw - 1.5rem) / 12);
     background-image:
-        linear-gradient(rgb(255 255 255 / 0.045) 1px, transparent 1px),
-        linear-gradient(90deg, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+        linear-gradient(rgb(var(--tone-max-rgb) / 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(var(--tone-max-rgb) / 0.045) 1px, transparent 1px);
     background-size: var(--grid-cell) var(--grid-cell);
     background-position: max(0.75rem, calc(50cqw - 36rem)) 0;
     -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 95%);
@@ -688,7 +842,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
    bright inside the sentence. */
 .hero-sub strong {
     font-weight: 500;
-    color: #fff;
+    color: var(--tone-max);
 }
 
 /* ── Chapter guarantee ───────────────────────────────────────────────────────
@@ -748,7 +902,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
 @utility ground-chroma {
     position: relative;
     overflow: hidden;
-    --hue: var(--color-surface-700);
+    --hue: var(--tone-700);
     /* The one ground where the lift goes DOWN. A slab is a colour, and a
        product demo on it has to read as a dark screen laid on that colour, not
        as a lighter patch of it — so the frame takes the ladder's bottom rung
@@ -776,9 +930,9 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
     --slab-c: 1.15;
     --ground: oklch(from var(--hue) var(--slab-l) calc(c * var(--slab-c)) h);
     background: var(--ground);
-    border-top: 1px solid rgb(255 255 255 / 0.14);
-    border-bottom: 1px solid rgb(255 255 255 / 0.14);
-    color: rgb(255 255 255 / 0.82);
+    border-top: 1px solid rgb(var(--tone-max-rgb) / 0.14);
+    border-bottom: 1px solid rgb(var(--tone-max-rgb) / 0.14);
+    color: rgb(var(--tone-max-rgb) / 0.82);
 }
 
 /* `:not(.frame *)` is load-bearing on every ink rule below.
@@ -789,10 +943,10 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
    on its headings. Without the exclusion the bright slab turned the agent
    console's own h3 near-black on a near-black panel. */
 .ground-claim :is(h1, h2, h3):not(.frame *) { color: #fff; }
-.ground-claim .eyebrow:not(.frame *) { color: rgb(255 255 255 / 0.66); }
+.ground-claim .eyebrow:not(.frame *) { color: rgb(var(--tone-max-rgb) / 0.66); }
 /* The chapter index and the drafted rails speak the eyebrow's ink on a slab. */
-.ground-claim .chapter-index:not(.frame *) { color: rgb(255 255 255 / 0.66); }
-.ground-claim { --rail: rgb(255 255 255 / 0.14); }
+.ground-claim .chapter-index:not(.frame *) { color: rgb(var(--tone-max-rgb) / 0.66); }
+.ground-claim { --rail: rgb(var(--tone-max-rgb) / 0.14); }
 
 /* Bright ground, dark ink — the inversion, and the only way coral stays coral.
    Near-black rather than pure black so it sits in the page's own family instead
@@ -810,7 +964,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
 
 /* The frame is a dark panel wherever it sits, so inside one the copy returns to
    the page's own ink rather than inheriting the slab's. */
-.ground-chroma .frame { color: var(--color-page-copy); }
+.ground-chroma .frame { color: var(--page-copy); }
 
 /* Opaque, not the 0.7 the dark slab can afford. An 11px label at 0.7 alpha on
    coral measured 4.11:1 and failed AA — small text has no headroom to spend on
@@ -869,7 +1023,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
    Placed BEFORE the button rules on purpose. `.ground-close a:not(.frame *)`
    and `.ground-close a[class*="bg-primary"]` are both (0,2,1), so source order
    is what decides, and the buttons must win. */
-.ground-claim a:not(.frame *) { color: rgb(255 255 255 / 0.66); }   /* 5.21:1 */
+.ground-claim a:not(.frame *) { color: rgb(var(--tone-max-rgb) / 0.66); }   /* 5.21:1 */
 .ground-close a:not(.frame *) { color: rgb(10 10 10 / 0.78); }      /* 4.69:1 */
 
 /* `hover:text-white` is right on the deep blue (10.57:1) and is the single
@@ -886,14 +1040,14 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
 .ground-chroma .frame {
     border-color: rgb(10 10 10 / 0.4);
     box-shadow:
-        inset 0 1px 0 rgb(255 255 255 / 0.05),
-        0 2px 8px rgb(0 0 0 / 0.3),
-        0 40px 80px -20px rgb(0 0 0 / 0.6);
+        inset 0 1px 0 rgb(var(--tone-max-rgb) / 0.05),
+        0 2px 8px rgb(var(--shadow-rgb) / calc(0.3 * var(--shadow-k))),
+        0 40px 80px -20px rgb(var(--shadow-rgb) / calc(0.6 * var(--shadow-k)));
 }
 
 .ground-close .frame {
     border-color: rgb(10 10 10 / 0.55);
-    box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.55);
+    box-shadow: 0 30px 60px -20px rgb(var(--shadow-rgb) / calc(0.55 * var(--shadow-k)));
 }
 
 /* ── The close, inverted ─────────────────────────────────────────────────────
@@ -908,7 +1062,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
    gains a new element, it needs a line here, not a hand-tuned class. */
 
 /* Hairlines. `white/10` is invisible on coral; the same weight in near-black. */
-.ground-close :is([class*="border-white"], .border-y, .border-t, .border-r) {
+.ground-close :is([class*="border-white"], [class*="border-tone-max"], .border-y, .border-t, .border-r) {
     border-color: rgb(10 10 10 / 0.22);
 }
 
@@ -948,7 +1102,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
    ground (`rgb(10 10 10 / 0.1)` on coral resolves to #e3495d) 0.8 measures
    4.17:1 and fails, and this is 10px uppercase mono — the same reasoning as the
    eyebrow above: small text has no headroom to spend on translucency. */
-.ground-close :is(.bg-white\/10, .bg-amber-400\/15) {
+.ground-close :is(.bg-white\/10, .bg-tone-max\/10, .bg-amber-400\/15) {
     background: rgb(10 10 10 / 0.1);
     color: #090a0c;                     /* 5.07:1 on the tinted ground */
 }
@@ -976,12 +1130,12 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
 }
 
 /* The secondary button was a white hairline outline. */
-.ground-close a[class*="border-white"] {
+.ground-close :is(a[class*="border-white"], a[class*="border-tone-max"]) {
     border-color: rgb(10 10 10 / 0.35);
     color: #090a0c;
 }
 
-.ground-close a[class*="border-white"]:hover {
+.ground-close :is(a[class*="border-white"], a[class*="border-tone-max"]):hover {
     border-color: rgb(10 10 10 / 0.6);
 }
 
@@ -1050,13 +1204,13 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
     height: 26px;
     flex: none;
     border-radius: 9999px;
-    background: rgb(255 255 255 / 0.09);      /* --surface-active, dark */
-    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.14), 0 1px 2px rgb(0 0 0 / 0.05); /* --hairline-strong */
+    background: rgb(var(--tone-max-rgb) / 0.09);      /* --surface-active, dark */
+    box-shadow: 0 0 0 1px rgb(var(--tone-max-rgb) / 0.14), 0 1px 2px rgb(var(--shadow-rgb) / calc(0.05 * var(--shadow-k))); /* --hairline-strong */
 }
 
 @utility switch-track-on {
     background: var(--color-primary);
-    box-shadow: 0 0 0 1px var(--color-primary), 0 1px 2px rgb(0 0 0 / 0.05);
+    box-shadow: 0 0 0 1px var(--color-primary), 0 1px 2px rgb(var(--shadow-rgb) / calc(0.05 * var(--shadow-k)));
 }
 
 @utility switch-knob {
@@ -1066,7 +1220,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
     width: 20px;
     height: 20px;
     border-radius: 9999px;
-    background: var(--color-surface-400);
+    background: var(--tone-400);
     translate: 3px 0;
     transition: translate 100ms ease-out, background-color 100ms ease-out;
 }
@@ -1074,7 +1228,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
 @utility switch-knob-on {
     background: #fff;
     translate: 21px 0;
-    box-shadow: 0 1px 3px rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    box-shadow: 0 1px 3px rgb(var(--shadow-rgb) / calc(0.1 * var(--shadow-k))), 0 1px 2px -1px rgb(var(--shadow-rgb) / calc(0.1 * var(--shadow-k)));
 }
 
 /* Chip — the enum value drawn inside a collection cell or a form field.
@@ -1239,7 +1393,7 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
         display: none;
     }
     .hero-home h1 {
-        text-shadow: 0 2px 30px rgb(0 0 0 / 0.45);
+        text-shadow: 0 2px 30px rgb(var(--shadow-rgb) / calc(0.45 * var(--shadow-k)));
     }
     .hero-glow {
         -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 78%);
@@ -1258,7 +1412,9 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
     content: none;
 }
 
-@custom-variant dark (&:is([data-theme=dark], [data-theme=dark] *));
+/* `.island-dark` is a region that stays dark on a light page (see the tone
+   block at the top of this file), so the kit's `dark:` twins resolve there too. */
+@custom-variant dark (&:is([data-theme=dark], [data-theme=dark] *, .island-dark, .island-dark *, .ground-chroma, .ground-chroma *));
 
 
 
@@ -1696,7 +1852,7 @@ video, iframe, img.feature-img {
 
 .btn-glow:hover {
     filter: brightness(1.1);
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+    box-shadow: 0 4px 6px -1px rgb(var(--shadow-rgb) / calc(0.1 * var(--shadow-k))), 0 2px 4px -2px rgb(var(--shadow-rgb) / calc(0.1 * var(--shadow-k))) !important;
 }
 
 .btn-glow.bg-primary:hover {
@@ -1734,3 +1890,123 @@ html.banner-dismissed-instant #manifesto-banner {
 
 /* Neat gradient dividers were removed 2026-11-09 with the instrument style:
    the drafted rails and chapter rules mark the breaks between sections. */
+
+/* The theme switch shows the mode a click goes TO. */
+.theme-toggle .theme-icon-moon { display: none; }
+/* Logos on a LIGHT page. The wall mixes white artwork (drawn for the dark site)
+   with dark artwork; on the light ground the white marks vanished. Every logo
+   becomes an even dark silhouette, the way the dark site shows them all as one
+   grey. `.logo-ink` marks a third-party logo; every file has an alpha channel,
+   so none turns into a black box. Dark regions keep the artwork as drawn. */
+[data-theme="light"] .logo-ink:not(:is(.island-dark, .ground-chroma) *) {
+    filter: grayscale(1) brightness(0);
+}
+
+/* Shadows on a LIGHT page. The frames' arbitrary shadows were tuned for a near-
+   black page (black at 45-80%, 50-120px blur), which on the light ground read as
+   a dark smear under every demo. In light mode each of them is one soft frame
+   shadow instead. The selector matches the arbitrary black shadows by their
+   class text, so a new one written the same way is covered too. */
+[data-theme="light"] :is([class*="shadow-[0_"][class*="rgba(0,0,0"], [class*="shadow-black/"]) {
+    --tw-shadow-color: rgb(15 17 20 / 0.12);
+    box-shadow: 0 1px 2px rgb(15 17 20 / 0.06), 0 16px 40px -16px rgb(15 17 20 / 0.22);
+}
+
+[data-theme="light"] .theme-toggle .theme-icon-sun { display: none; }
+[data-theme="light"] .theme-toggle .theme-icon-moon { display: block; }
+
+/* Chips on a LIGHT page: CHIP_COLORS[hue].tintColor / tintText, the light half of
+   the same palette (regenerate with the command above, printing tintColor and
+   tintText). Inside a dark island the dark values above still apply. */
+[data-theme="light"] .chip-blue:not(:is(.island-dark, .ground-chroma) *) { background: rgba(45, 127, 249, 0.1); color: #2750ae; }
+[data-theme="light"] .chip-cyan:not(:is(.island-dark, .ground-chroma) *) { background: rgba(24, 191, 255, 0.1); color: #0b74b3; }
+[data-theme="light"] .chip-teal:not(:is(.island-dark, .ground-chroma) *) { background: rgba(32, 217, 210, 0.1); color: #057d79; }
+[data-theme="light"] .chip-green:not(:is(.island-dark, .ground-chroma) *) { background: rgba(32, 201, 51, 0.1); color: #2f7f15; }
+[data-theme="light"] .chip-yellow:not(:is(.island-dark, .ground-chroma) *) { background: rgba(252, 180, 0, 0.1); color: #9b6203; }
+[data-theme="light"] .chip-orange:not(:is(.island-dark, .ground-chroma) *) { background: rgba(255, 111, 44, 0.1); color: #bd4421; }
+[data-theme="light"] .chip-red:not(:is(.island-dark, .ground-chroma) *) { background: rgba(248, 43, 96, 0.1); color: #ba1e45; }
+[data-theme="light"] .chip-pink:not(:is(.island-dark, .ground-chroma) *) { background: rgba(255, 8, 194, 0.1); color: #b2158b; }
+[data-theme="light"] .chip-purple:not(:is(.island-dark, .ground-chroma) *) { background: rgba(139, 70, 255, 0.1); color: #6b1cb0; }
+[data-theme="light"] .chip-gray:not(:is(.island-dark, .ground-chroma) *) { background: rgba(98, 103, 110, 0.1); color: #40444a; }
+[data-theme="light"] .chip-indigo:not(:is(.island-dark, .ground-chroma) *) { background: rgba(99, 102, 241, 0.1); color: #4f46e5; }
+[data-theme="light"] .chip-violet:not(:is(.island-dark, .ground-chroma) *) { background: rgba(139, 92, 246, 0.1); color: #7c3aed; }
+[data-theme="light"] .chip-fuchsia:not(:is(.island-dark, .ground-chroma) *) { background: rgba(217, 70, 239, 0.1); color: #b424c6; }
+[data-theme="light"] .chip-rose:not(:is(.island-dark, .ground-chroma) *) { background: rgba(244, 63, 94, 0.1); color: #cf1b42; }
+[data-theme="light"] .chip-emerald:not(:is(.island-dark, .ground-chroma) *) { background: rgba(16, 185, 129, 0.1); color: #047e58; }
+
+/* A dark island inherits its INK from the page, and on a light page that is
+   dark ink on a dark panel. Restate the dark page's ink (`main` sets
+   `text-page-ink`) so un-classed text inside reads exactly as it does on the
+   dark site. Layered, so a text utility on the island element itself wins. */
+@layer components {
+    [data-theme="light"] :is(.island-dark, .ground-chroma, [data-theme="dark"], :has(> pre):not(.prose)) {
+        color: var(--page-ink);
+    }
+}
+
+/* ── The bar over the hero, before the page moves ────────────────────────────
+   At the top of a route the header has no fill (Header.astro) and sits on the
+   hero's Neat glow, which is the SAME saturated field in both themes: it only
+   fades into the page ground further down (`.hero-glow`'s mask). Dark ink on
+   that blue read as mud, so until the page scrolls the bar is a dark island in
+   light mode too, once the glow has actually painted (`data-painted`, set by
+   NeatBackground; no WebGL or a software renderer means no glow and no mark): white links and controls, exactly as the dark site draws
+   them. The tone block at the top of this file lists this selector; this rule
+   carries the rest of the island (link blue, ink). Once scrolled, the bar gets
+   its plate and follows the page theme again. Not while a menu is open: the
+   menus paint their own plate in the page theme. */
+html[data-theme="light"]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header {
+    --color-primary-light: #359aff;
+    color: var(--page-ink);
+    color-scheme: dark;
+}
+
+/* Over the painted glow, in BOTH themes: the field runs from deep indigo to
+   bright cyan and coral, and the bar's usual greys (and the blue active link)
+   wash out on the bright end. So the bar's ink goes white, links at 88% and
+   full white on hover, with a soft shadow that holds the letterforms on cyan.
+   The active page is marked by an underline rather than by a blue that the
+   coral eats. Same specificity as the light-mode island rule above, and
+   later, so it wins there too. */
+html[data-theme]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header {
+    --tone-300: rgb(255 255 255 / 0.88);
+    --tone-max: #ffffff;
+    --color-primary-light: #ffffff;
+}
+html[data-theme]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header :is(nav > div:first-child a, nav > div:first-child button, .theme-toggle, .gh-star, rebase-lang-select) {
+    text-shadow: 0 1px 10px rgb(0 0 0 / 0.28);
+}
+html[data-theme]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header [aria-current="page"] {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+}
+html[data-theme]:not([data-scrolled], [data-menu-open]):has(.hero-under-nav .hero-backdrop canvas[data-painted]):not(:has(#mobile-menu:not(.hidden), #mobile-menu-flat:not(.hidden))) .site-header :is(.theme-toggle, .gh-star, [title="Change language"], #mobile-menu-button) svg {
+    filter: drop-shadow(0 1px 5px rgb(0 0 0 / 0.3));
+}
+
+/* ── The hero glow on a light page ───────────────────────────────────────────
+   In dark mode the glow fades into a dark ground over most of the hero, and
+   white type reads on all of it. On a light page that same 30%→78% fade put
+   the headline across the transition: its first lines dark on saturated
+   indigo or coral, its copy and CTA on the light ground, with no single ink
+   right for both. So in light mode the field finishes fading before the copy
+   starts: fully saturated behind the bar (whose white ink is drawn for it,
+   see "The bar over the hero"), gone by the headline, so every line of the
+   hero sits on the light ground in the page's own ink. The fade scales with
+   the viewport because the hero's top padding does: 6rem on a phone, 13rem
+   at desktop width. */
+[data-theme="light"] .hero-glow {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 var(--header-h), transparent calc(var(--header-h) + clamp(6rem, 2rem + 12vw, 13rem)));
+    mask-image: linear-gradient(to bottom, #000 0, #000 var(--header-h), transparent calc(var(--header-h) + clamp(6rem, 2rem + 12vw, 13rem)));
+}
+
+/* An island's own lift. `--ground-lift` is resolved where it is declared (the
+   page root, or a section's ground utility), so a `.frame` that is itself an
+   island would paint the LIGHT sheet behind dark ink. Restated against the
+   island's dark ladder. Light mode only: on the dark page the inherited lift is
+   already right, and a frame on a raised ground lifts to the card step. Not on
+   the chroma slabs: they declare their own. */
+[data-theme="light"] :is(.island-dark, :has(> pre):not(.prose)) {
+    --ground-lift: var(--surface-sheet);
+}

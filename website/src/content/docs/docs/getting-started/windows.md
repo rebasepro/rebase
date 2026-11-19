@@ -4,8 +4,8 @@ sidebar_label: Windows
 description: Install a Rebase project and use its database commands on Windows.
 ---
 
-Rebase projects run on Windows. Since Rebase 0.34, the scaffold installs Ptah Compat, including
-its Windows executable, through the package manager. You do not need to
+Rebase projects run on Windows. Since Rebase 0.35, the scaffold installs
+Ptah Compat and its Windows executable through the package manager. You do not need to
 download a database migration tool separately.
 
 ## Create a project
@@ -32,11 +32,11 @@ reinstall the project's dependencies with optional dependencies enabled.
 
 ## Upgrade an older project
 
-See [Upgrade a PostgreSQL project to Rebase 0.34](/docs/cli/#upgrade-a-postgresql-project-to-rebase-034) for the package switch.
+See [Upgrade a PostgreSQL project to Rebase 0.35](/docs/cli/#upgrade-a-postgresql-project-to-rebase-035) for the package switch.
 
-## Rebase 0.33 and earlier
+## Rebase 0.34 and earlier
 
-### 3. Install Atlas for the schema commands
+### Install Atlas for the schema commands
 
 Install Atlas for the schema commands while your PostgreSQL driver still uses it.
 

@@ -52,6 +52,11 @@ CREATE FUNCTION public.orders_touch() RETURNS trigger LANGUAGE plpgsql AS $$ BEG
 CREATE TRIGGER orders_touch BEFORE UPDATE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.orders_touch();
 CREATE FUNCTION public.order_tax(amount numeric) RETURNS numeric LANGUAGE sql IMMUTABLE AS 'SELECT amount * 0.2';
 INSERT INTO public.orders (total, starts_at, ends_at) VALUES (10, 1, 5), (20, 10, 15);
+-- A foreign key over two columns, which no relation can declare: introspect
+-- lists it as not carried over, and the push must not drop it.
+CREATE TABLE public.order_lines (order_id integer NOT NULL REFERENCES public.orders (id), line integer NOT NULL, PRIMARY KEY (order_id, line));
+CREATE TABLE public.line_notes (id serial PRIMARY KEY, order_id integer NOT NULL, line integer NOT NULL, body text);
+ALTER TABLE public.line_notes ADD CONSTRAINT line_notes_line_fkey FOREIGN KEY (order_id, line) REFERENCES public.order_lines (order_id, line) ON DELETE CASCADE;
 `;
 
 function cleanEnv(connectionString: string): Record<string, string> {
@@ -150,6 +155,9 @@ describe("introspect, then push: CHECK and EXCLUDE constraints, triggers and fun
         expect(await insertFails("(5, 2, 4)")).toBe("23P01");          // exclusion_violation
         expect(await insertFails("(2000000, NULL, NULL)")).toBe("23514");
         expect(await insertFails("(5, 100, 110)")).toBeUndefined();
+        expect((await admin.query(
+            "SELECT 1 FROM pg_constraint WHERE conname = 'line_notes_line_fkey' AND contype = 'f'"
+        )).rowCount).toBe(1);
     }, 300_000);
 
     it("leaves the triggers and functions it cannot see alone", async () => {

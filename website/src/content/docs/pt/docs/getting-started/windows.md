@@ -1,11 +1,11 @@
 ---
-sourceHash: 79e9278ca30f0078
+sourceHash: f1a8ff20d10b3dbd
 title: Windows
 sidebar_label: Windows
 description: Instale um projeto Rebase e use seus comandos de banco de dados no Windows.
 ---
 
-**Rebase 0.34+**
+**Rebase 0.35+**
 
 Projetos Rebase funcionam no Windows. O scaffold instala o Ptah Compat,
 incluindo seu executável para Windows, pelo gerenciador de pacotes. Não é
@@ -33,17 +33,17 @@ O pacote oferece executáveis nativos para Windows x64 e Arm64. Se
 [`rebase doctor`](/docs/cli/#rebase-doctor) informar que falta o executável,
 reinstale as dependências do projeto com as dependências opcionais ativadas.
 
-## Atualizar um projeto PostgreSQL para o Rebase 0.34
+## Atualizar um projeto PostgreSQL para o Rebase 0.35
 
-Execute a CLI do Rebase 0.34 na raiz do projeto no Linux, macOS ou Windows. Ela
+Execute a CLI do Rebase 0.35 na raiz do projeto no Linux, macOS ou Windows. Ela
 substitui `@ariga/atlas` por `@stokaro/ptah-compat` no backend PostgreSQL. Os
 arquivos de migração, o `atlas.sum` e as revisões registradas são preservados.
 
 ```bash
-pnpm dlx @rebasepro/cli@0.34.0 upgrade --to 0.34.0 # version-pin: ignore
+pnpm dlx @rebasepro/cli@0.35.0 upgrade --to 0.35.0 # version-pin: ignore
 ```
 
-## Rebase 0.33 e anteriores
+## Rebase 0.34 e anteriores
 
 ```powershell
 $dir = "$env:LOCALAPPDATA\Programs\atlas"

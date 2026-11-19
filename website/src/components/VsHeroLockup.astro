@@ -14,14 +14,14 @@ import { imgDims } from "../utils/imageDimensions";
 <div class="mb-8 flex items-center justify-center gap-5 sm:gap-7 animate-on-scroll fade-in">
     <div class="flex h-10 items-center gap-2.5">
         <img src="/img/rebase_logo.svg" width="306" height="306" alt="" aria-hidden="true" class="h-7 sm:h-8 w-auto max-w-none"/>
-        <span class="text-xl sm:text-2xl text-white">Rebase</span>
+        <span class="text-xl sm:text-2xl text-tone-max">Rebase</span>
     </div>
 
-    <span class="text-2xs font-semibold uppercase tracking-[0.2em] text-surface-500">vs</span>
+    <span class="text-2xs font-semibold uppercase tracking-[0.2em] text-tone-500">vs</span>
 
     <div class="flex h-10 items-center">
         {logo
-            ? <img src={logo} {...imgDims(logo)} alt={name} class={`w-auto max-w-none opacity-70 ${logoClass}`}/>
-            : <span class="text-xl sm:text-2xl font-semibold tracking-tight text-surface-300">{name}</span>}
+            ? <img src={logo} {...imgDims(logo)} alt={name} class={`logo-ink w-auto max-w-none opacity-70 ${logoClass}`}/>
+            : <span class="text-xl sm:text-2xl font-semibold tracking-tight text-tone-300">{name}</span>}
     </div>
 </div>

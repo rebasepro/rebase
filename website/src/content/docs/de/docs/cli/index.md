@@ -1,13 +1,13 @@
 ---
-sourceHash: d0327f13212ae542
+sourceHash: 0dca906999fefc66
 title: CLI-Referenz
 sidebar_label: CLI
-description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
+description: Rebase-CLI-Befehle für die Projektinitialisierung, Schema-Generierung, Datenbankmigrationen und SDK-Generierung.
 ---
 
 ## Übersicht
 
-Die Rebase CLI (`rebase`) verwaltet Ihr Projekt vom Scaffolding bis zum Deployment.
+Die Rebase-CLI (`rebase`) verwaltet Ihr Projekt vom Scaffolding bis zum Deployment.
 
 ## Installation
 
@@ -19,7 +19,7 @@ Oder führen Sie jeden Befehl aus, ohne ihn zu installieren: `pnpm dlx @rebasepr
 
 ## Maschinenlesbare Ausgabe
 
-`--json` ist der Schalter, und außerhalb der `cloud`-Befehlsfamilie ist es der einzige: `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` und `rebase verify` geben dann genau einen JSON-Wert auf stdout aus — das Ergebnis oder einen `{"error": {"message", "code", "hint", "issues"}}`-Umschlag bei einem Exit-Code ungleich null — und zwar bei **jedem** Beenden des Befehls, sodass ein Aufrufer stdout bedingungslos parsen kann. Ohne diesen Schalter schreiben sie menschenlesbaren Text und Fehler gehen an stderr. `rebase cloud` verwendet denselben Umschlag und ist die einzige Ausnahme von dieser Regel: Es schaltet JSON auch automatisch ein, wenn stdout kein TTY ist oder wenn `REBASE_JSON=1` gesetzt ist. Daher ist `rebase cloud status | cat` JSON, während `rebase status | cat` es nicht ist — übergeben Sie in einem Skript explizit `--json`, anstatt sich auf eine der beiden Regeln zu verlassen.
+`--json` ist der Schalter, und außerhalb der `cloud`-Befehlsfamilie der einzige: `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` und `rebase verify` geben dann genau einen JSON-Wert auf stdout aus — das Ergebnis oder einen `{"error": {"message", "code", "hint", "issues"}}`-Umschlag mit einem Exit-Code ungleich null — und zwar bei **jedem** Beenden des Befehls, sodass ein Aufrufer stdout bedingungslos parsen kann. Ohne diesen Schalter schreiben sie menschenlesbaren Text und Fehler gehen nach stderr. `rebase cloud` verwendet denselben Umschlag und bildet die einzige Ausnahme: Es schaltet JSON von selbst ein, wenn stdout kein TTY ist oder wenn `REBASE_JSON=1` gesetzt ist. Daher liefert `rebase cloud status | cat` JSON, während `rebase status | cat` dies nicht tut — übergeben Sie in einem Skript explizit `--json`, anstatt sich auf eine der Regeln zu verlassen.
 
 ## Befehle
 
@@ -31,21 +31,21 @@ Initialisiert ein neues Rebase-Projekt:
 rebase init [directory]
 ```
 
-Richtet ein `backend/` (die Tabellen in `backend/schema/`) und ein `frontend/` (das Admin-Panel mit seinen Tabellenanpassungen in `frontend/src/cms/`) ein; `--headless` erstellt nur das Gerüst für `backend/`, ohne `backend/schema/`. [Projektstruktur](/docs/getting-started/project-structure/) zeigt beide Verzeichnisbäume.
+Richtet ein `backend/` (die Tabellen in `backend/schema/`) und ein `frontend/` (das Admin-Panel mit seinen Tabellenanpassungen in `frontend/src/cms/`) ein; `--headless` erstellt nur das Gerüst für das `backend/`, ohne `backend/schema/`. [Projektstruktur](/docs/getting-started/project-structure/) zeigt beide Verzeichnisbäume.
 
-| Flag | Funktion |
+| Flag | Beschreibung |
 |---|---|
-| `-t, --template <preset>` | `blog`, `ecommerce` oder `blank`. Standard: `blog` |
-| `--headless` | Nur Backend — kein Admin-Panel und kein `backend/schema/`: Der Server stellt die eigenen Tabellen der Datenbank bereit. `--template` hat keine Auswirkung, da keine Tabellen für Seeds vorhanden sind |
-| `-y, --yes` | Niemals nachfragen. **Erforderlich überall dort, wo kein Terminal zum Antworten vorhanden ist**, wie z. B. in CI. Überspringt Git-Init und die Installation von Abhängigkeiten — die interaktiven Standardeinstellungen bejahen beides, übergeben Sie also `--git` / `--install`, wenn Sie dies wünschen |
-| `-i, --install` | Abhängigkeiten nach dem Scaffolding installieren. Ohne dieses Flag fragt init nach (Standard: Ja); unter `--yes` wird nichts installiert |
-| `--no-install` | Nichts installieren und nicht nachfragen |
-| `-g, --git` | Ein Repository initialisieren und den ersten Commit erstellen. Ohne dieses Flag fragt init nach (Standard: Ja); unter `--yes` wird kein Repository erstellt |
-| `--database-url <url>` | Eine bestehende Datenbank anstelle der verwalteten verwenden. Es muss eine `postgres://`- oder `postgresql://`-URL sein: Alles andere wird abgelehnt, bevor eine Datei geschrieben wird, und die interaktive Eingabeaufforderung fragt erneut nach |
-| `--introspect` | `backend/schema` aus dieser Datenbank generieren. Impliziert `--template blank` und erfordert `--install` |
-| `--project <slug>` | Das Gerüst mit einem Rebase Cloud-Projekt verknüpfen |
+| `-t, --template <preset>` | `blog`, `ecommerce` oder `blank`. Standard ist `blog` |
+| `--headless` | Nur Backend — kein Admin-Panel und kein `backend/schema/`: Der Server stellt die eigenen Tabellen der Datenbank bereit. `--template` hat keine Auswirkung, da keine Tabellen mit Beispieldaten befüllt werden |
+| `-y, --yes` | Niemals nachfragen. **Erforderlich überall dort, wo kein Terminal zur Beantwortung vorhanden ist**, wie z. B. in CI. Überspringt Git-Init und die Installation von Abhängigkeiten — die interaktiven Standardeinstellungen bejahen beides, übergeben Sie also `--git` / `--install`, wenn Sie dies wünschen |
+| `-i, --install` | Installiert Abhängigkeiten nach dem Scaffolding. Ohne Flag fragt init nach (Standard: Ja); unter `--yes` wird nichts installiert |
+| `--no-install` | Installiert nichts und fragt nicht nach |
+| `-g, --git` | Initialisiert ein Repository und erstellt den ersten Commit. Ohne Flag fragt init nach (Standard: Ja); unter `--yes` wird kein Repository erstellt |
+| `--database-url <url>` | Verwendet eine bestehende Datenbank anstelle der verwalteten. Es muss eine `postgres://`- oder `postgresql://`-URL sein: Alles andere wird abgelehnt, bevor eine Datei geschrieben wird, und die interaktive Eingabeaufforderung fragt erneut nach |
+| `--introspect` | Generiert `backend/schema` aus dieser Datenbank. Impliziert `--template blank` und erfordert `--install` |
+| `--project <slug>` | Verknüpft das Gerüst mit einem Rebase Cloud-Projekt |
 | `--setup-key <key>` | Der Einmalschlüssel, der diese Verknüpfung authentifiziert |
-| `-a, --agent <name>` | KI-Coding-Agents einrichten: die [Skills](/docs/ai/skills) und den [MCP-Server](/docs/ai/mcp). Wiederholbar oder kommagetrennt — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` oder `all`. Ohne dieses Flag fragt `init` nach und wählt die auf dem Rechner installierten Agents vorab aus; unter `--yes` keine |
+| `-a, --agent <name>` | Richtet KI-Coding-Agents ein: die [Skills](/docs/ai/skills) und den [MCP-Server](/docs/ai/mcp). Wiederholbar oder kommagetrennt — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` oder `all`. Ohne Flag fragt `init` nach und wählt auf dem System installierte Agents vorab aus; unter `--yes` keine |
 
 ### `rebase dev`
 
@@ -55,13 +55,15 @@ Startet den Entwicklungsserver:
 rebase dev
 ```
 
-Startet sowohl Frontend als auch Backend mit Hot Reloading und generiert das Drizzle-Schema sowie die SDK-Typen (`generated/sdk/`) beim Start und bei jedem Speichern unter `backend/schema/` neu.
+Startet sowohl Frontend als auch Backend mit Hot-Reloading und generiert das Drizzle-Schema sowie die SDK-Typen (`generated/sdk/`) beim Start und bei jedem Speichern unter `backend/schema/` neu.
 
-Beide Ports werden aus dem Pfad des Projekts abgeleitet, sodass mehrere Rebase-Projekte nebeneinander laufen können. Verwenden Sie die URLs, die `rebase dev` ausgibt. Einen Port fest pinnen mit `rebase dev --port 3001`.
+Beide Ports werden vom Pfad des Projekts abgeleitet, sodass mehrere Rebase-Projekte nebeneinander ausgeführt werden können. Verwenden Sie die URLs, die `rebase dev` ausgibt. Einen Port können Sie mit `rebase dev --port 3001` festlegen.
 
-Eine Bearbeitung von `.env` startet das Backend neu, welches die Datei erneut einliest, genau wie das Admin-Panel. Was `rebase dev` selbst setzt, bleibt bis zum Neustart erhalten: `PORT` sowie `DATABASE_URL`, wenn die verwaltete Datenbank oder Docker verwendet wird.
+Eine statische App in `rebase.json` ohne Build-Schritt (kein `build`, und `output` ist ihr `root`, wie etwa eine reine HTML-Website) wird vom Backend aus diesem Verzeichnis unter ihrem `path` bereitgestellt, so wie `rebase start` sie aus dem Bundle bereitstellt, und `FRONTEND_URL` wird darauf gesetzt (auf dem Port des Backends), damit per E-Mail versendete Links dort landen. Eine App mit einem Build-Schritt läuft in Vite auf ihrem eigenen Port, und `FRONTEND_URL` entspricht dem von Vite.
 
-Mit `--database-url` prüft `rebase dev` zuerst, ob unter diesem Host und Port etwas antwortet. Wenn nicht, meldet es dies unter Nennung des Flags und beendet sich mit `1`, ohne etwas gestartet zu haben; außerdem lässt es die Datenbank-Namen in `.env` unberührt und startet niemals seinen Compose-Container.
+Eine Bearbeitung von `.env` startet das Backend neu, wodurch die Datei wie beim Admin-Panel erneut eingelesen wird. Was `rebase dev` selbst setzt, bleibt bis zum Neustart erhalten: `PORT` und `DATABASE_URL`, wenn die verwaltete Datenbank oder Docker genutzt wird.
+
+Mit `--database-url` prüft `rebase dev` zuerst, ob unter diesem Host und Port etwas antwortet. Wenn nicht, meldet der Befehl dies unter Nennung des Flags und beendet sich mit `1`, ohne etwas gestartet zu haben; er lässt auch die Datenbank-Variablennamen in `.env` unberührt und startet niemals seinen Compose-Container.
 
 ### `rebase build`
 
@@ -76,33 +78,33 @@ Das Bundle ist das Artefakt, das Sie deployen — das Runtime-Image lädt es, so
 | Flag | Wirkung |
 |------|--------|
 | `--output <dir>` (oder `--out`) | Schreibt das Bundle an einen anderen Ort als `dist-bundle/` (eine App nach der anderen) |
-| `--vendor` | Immer die Abhängigkeiten des Bundles installieren und mitliefern |
+| `--vendor` | Installiert und liefert immer die Abhängigkeiten des Bundles mit aus |
 | `--no-vendor` | Niemals vendoren; der Pod installiert sie bei jedem Start |
-| `--skip-type-check` | Typprüfung überspringen (schneller, weniger sicher) |
-| `--no-static` | Das Frontend nicht in das Backend-Bundle einbinden (jede statische App erhält weiterhin ihr eigenes Bundle) |
-| `--skip-static-build` | Das Frontend als bereits gebaut einbinden, ohne dessen Build-Befehl auszuführen |
+| `--skip-type-check` | Überspringt die Typprüfung (schneller, weniger sicher) |
+| `--no-static` | Bindet das Frontend nicht in das Backend-Bundle ein (jede statische App erhält dennoch ihr eigenes Bundle) |
+| `--skip-static-build` | Bindet das Frontend im bereits gebauten Zustand ein, ohne dessen Build-Befehl auszuführen |
 
-Ein Frontend — jede statische App aus `rebase.json` mit einer Vite-Konfiguration —, dessen Konfiguration nicht `rebaseBackendGuard()` (aus `@rebasepro/app/vitePlugin`) verwendet, wird abgelehnt: Dies hält Servercode aus dem Browser-Bundle fern und verhindert, dass Vite eine Backend-Datei als `data:`-URL inline einbindet (es schlägt beim Build fehl und benennt sich selbst, wenn ein anderes Plugin sein `build.assetsInlineLimit` ersetzt). `frontend/src/cms/ui-config.json` wird als `entry.uiConfig` in das Bundle übernommen – die Workspace-Präsentation, die ein bereitgestelltes Backend ausliefert.
+Ein Frontend — jede statische App in `rebase.json` mit einer Vite-Konfiguration —, dessen Konfiguration nicht `rebaseBackendGuard()` (aus `@rebasepro/app/vitePlugin`) verwendet, wird abgelehnt: Dies hält Servercode aus dem Browser-Bundle fern und verhindert, dass Vite eine Backend-Datei als `data:`-URL inlined (der Build schlägt unter Angabe des Plugins fehl, wenn ein anderes Plugin sein `build.assetsInlineLimit` ersetzt). `frontend/src/cms/ui-config.json` wird als `entry.uiConfig` in das Bundle übernommen — die Workspace-Präsentation, die ein deploytes Backend bereitstellt.
 
-Abhängigkeiten werden standardmäßig gebündelt (gevendort), damit eine neue Instanz nicht 35–55 Sekunden für die Installation aufbringen muss. Ein Verzeichnisbaum, der auf der Festplatte über 2 GB anwächst, wird stattdessen verworfen, da das Upload-Limit komprimiert 1 GB beträgt.
+Abhängigkeiten werden standardmäßig gevendort, damit eine neue Instanz nicht 35–55 Sekunden Installationszeit in Anspruch nimmt. Ein Verzeichnisbaum, der auf der Festplatte über 2 GB wächst, wird stattdessen verworfen, da das Upload-Limit komprimiert 1 GB beträgt.
 
-Jede statische App, die das Bundle enthält, erhält eine Brotli- (`.br`) und eine Gzip- (`.gz`) Kopie neben jedem inhaltsgehashten Asset von 1 KB oder mehr — den Dateien, die ein Browser ein Jahr lang im Cache speichert. Die Runtime sendet die Variante, die der Browser akzeptiert, sodass diese Dateien keine Komprimierungsarbeit pro Anfrage kosten, einschließlich des ersten Besuchs nach einem Deployment. Browser, die Brotli unterstützen, erhalten dieses (bei den JavaScript-Dateien des Admins etwa 11 % kleiner als Gzip). Die Build-Ausgabe Ihres Frontends bleibt unverändert; nur die Kopie im Bundle ändert sich. Bei der Beispiel-App verlängert dies den Build um weniger als eine Sekunde und vergrößert das Bundle um etwa 2,4 MB.
+Jede statische App, die das Bundle enthält, erhält neben jedem Content-gehashten Asset ab 1 KB — den Dateien, die ein Browser ein Jahr lang zwischenspeichert — eine Brotli- (`.br`) und eine Gzip-Kopie (`.gz`). Die Runtime sendet die Variante, die der Browser akzeptiert, sodass diese Dateien keine Komprimierungsarbeit pro Anfrage verursachen, einschließlich des ersten Besuchs nach einem Deployment, und Browser, die Brotli akzeptieren, dieses erhalten (bei JavaScript des Admins ca. 11 % kleiner als Gzip). Die eigene Build-Ausgabe Ihres Frontends bleibt unverändert; nur die Kopie im Bundle ändert sich. Bei der Beispiel-App verlängert dies den Build um weniger als eine Sekunde und vergrößert das Bundle um etwa 2,4 MB.
 
 ### `rebase upgrade`
 
-Aktualisiert jedes vom Projekt festgelegte `@rebasepro/*`-Paket auf ein gemeinsames Release und installiert dann mit dem Paketmanager, den die Lockfile vorgibt. `rebase upgrade` wählt die Version `latest`; `--to 0.21.0` eine exakte Version ohne Registry-Lookup; `--to canary` einen Dist-Tag. Jedes Pinning in `dependencies`, `devDependencies` und `optionalDependencies` in jeder `package.json` des Projekts behält sein `^` oder `~`, und nichts anderes in der Datei ändert sich. `peerDependencies` sowie `workspace:`, `link:`, `file:`, Git- und Tag-Spezifikationen werden aufgelistet und unberührt gelassen. Overrides in `pnpm-workspace.yaml` und `package.json` werden ebenfalls aktualisiert, aber ein `link:`- oder `file:`-Override hat Vorrang vor jedem Pin: Dies wird gemeldet, und `--drop-local-overrides` entfernt es. `--dry-run` schreibt nichts, `--no-install` überspringt die Installation und `--json` gibt ein einzelnes Dokument aus.
+Aktualisiert jedes vom Projekt festgelegte `@rebasepro/*`-Paket auf ein Release und installiert es mit dem Paketmanager, den seine Lockdatei vorsieht. `rebase upgrade` wählt die neueste Version; `--to 0.21.0` eine exakte Version ohne Registry-Lookup; `--to canary` einen Dist-Tag. Jeder Eintrag in `dependencies`, `devDependencies` und `optionalDependencies` in jeder `package.json` des Projekts behält sein `^` oder `~`, und sonst ändert sich nichts an der Datei. `peerDependencies` sowie `workspace:`, `link:`, `file:`, Git- und Tag-Spezifikationen werden aufgelistet und unberührt gelassen. Overrides in `pnpm-workspace.yaml` und `package.json` werden ebenfalls aktualisiert, aber ein `link:`- oder `file:`-Override sticht jede Versionsbindung aus: Dies wird gemeldet, und `--drop-local-overrides` entfernt ihn. `--dry-run` schreibt nichts, `--no-install` überspringt die Installation und `--json` gibt ein einzelnes Dokument aus.
 
-Ein Projekt, das auf einem Vorab-Release wie Canary basiert, bleibt auf diesem Channel, es sei denn, `latest` ist neuer. Ein Dist-Tag, der ein Pinning herabstufen würde, wird abgelehnt (`downgrade_refused` unter `--json`), es sei denn, Sie übergeben `--allow-downgrade`; ein exaktes `--to` wird angewendet und als Downgrade gekennzeichnet. Ein `--dry-run` eines Upgrades, das der reale Lauf ablehnen würde, zeigt an, was geändert werden würde, und beendet sich mit 0. Unter `--json` enthält das Dokument die Ablehnung als `wouldRefuse` (`{ code, message, hint }`).
+Ein Projekt auf einem Vorab-Release, wie einem Canary, bleibt auf seinem Kanal, es sei denn, `latest` ist neuer. Ein Dist-Tag, der eine festgelegte Version zurückstufen würde, wird abgelehnt (`downgrade_refused` unter `--json`), es sei denn, Sie übergeben `--allow-downgrade`; ein exaktes `--to` wird angewendet und als Downgrade gekennzeichnet. Ein `--dry-run` eines Upgrades, das der eigentliche Lauf verweigern würde, zeigt, was verschoben werden würde, und beendet sich mit 0; unter `--json` enthält das Dokument die Verweigerung als `wouldRefuse` (`{ code, message, hint }`).
 
-#### PostgreSQL-Projekt auf Rebase 0.34 aktualisieren
+#### PostgreSQL-Projekt auf Rebase 0.35 aktualisieren
 
 Führen Sie im Projektverzeichnis unter Linux, macOS oder Windows die CLI von Rebase
-0.34 aus. Sie ersetzt `@ariga/atlas` im PostgreSQL-Backend durch
+0.35 aus. Sie ersetzt `@ariga/atlas` im PostgreSQL-Backend durch
 `@stokaro/ptah-compat`. Migrationsdateien, `atlas.sum` und erfasste Revisionen
 bleiben erhalten.
 
 ```bash
-pnpm dlx @rebasepro/cli@0.34.0 upgrade --to 0.34.0 # version-pin: ignore
+pnpm dlx @rebasepro/cli@0.35.0 upgrade --to 0.35.0 # version-pin: ignore
 ```
 
 ### `rebase start`
@@ -113,9 +115,9 @@ Führt das erstellte Bundle so aus, wie es bei einem Deployment ausgeführt wird
 rebase start
 ```
 
-Liest im Gegensatz zu `rebase dev` den `PORT` und den Rest von `.env` in der darin festgelegten `NODE_ENV` aus. Eine generierte `.env` enthält `development`, sodass das erste registrierte Konto weiterhin zum Administrator wird, was `rebase start` ganz oben anzeigt; setzen Sie `NODE_ENV=production` für einen Produktionsserver. `rebase start --bundle ./dist-bundle` führt ein Bundle an einem anderen Ort aus.
+Liest im Gegensatz zu `rebase dev` den `PORT` und den Rest von `.env` in dem dort gesetzten `NODE_ENV` aus. Ein generiertes `.env` steht auf `development`, daher wird der erste registrierte Account weiterhin zum Admin, und `rebase start` meldet dies oben; setzen Sie `NODE_ENV=production` für einen Produktionsserver. `rebase start --bundle ./dist-bundle` führt ein Bundle an einem anderen Ort aus.
 
-`rebase start` startet keine Datenbank, und die `.env` des Scaffolds enthält keine `DATABASE_URL`. Ein lokaler Lauf auf der von `rebase dev` genutzten Datenbank lautet daher `DATABASE_URL="$(rebase db url)" rebase start`. Wenn keine vorhanden ist, gibt der Befehl diese Zeile vor dem Booten aus.
+`rebase start` startet keine Datenbank, und das `.env` des Scaffolds enthält keine `DATABASE_URL`. Ein lokaler Lauf auf der von `rebase dev` verwendeten Datenbank lautet daher `DATABASE_URL="$(rebase db url)" rebase start`. Ohne diese Angabe wird diese Zeile vor dem Booten ausgegeben.
 
 ### `rebase apps list`
 
@@ -125,31 +127,31 @@ Zeigt die Apps an, die dieses Repository deklariert:
 rebase apps list
 ```
 
-Ein Repository kann mehr als eine deploybare App deklarieren — beispielsweise ein Backend und eine Marketing-Website. So sehen Sie, worauf sich `rebase build` und das Deployment auswirken.
+Ein Repository kann mehr als eine deploybare App deklarieren – beispielsweise ein Backend und eine Marketing-Website. So sehen Sie, worauf sich `rebase build` und das Deployment auswirken werden.
 
 ### `rebase eject`
 
-Übernehmen Sie die volle Kontrolle über den Serverprozess und dessen Image:
+Übernehmen Sie die Kontrolle über den Serverprozess und sein Image:
 
 ```bash
 rebase eject
 ```
 
-Schreibt den Backend-Einstiegspunkt und ein `Dockerfile` in das Projekt und stellt dessen Backend um, sodass das Repository sein eigenes Image baut, anstatt die veröffentlichte Runtime auszuführen. Von da an **greifen Plattform-Runtime-Upgrades nicht mehr**, und CORS, Auth-Verdrahtung, Speicher und Shutdown müssen von Ihnen selbst konfiguriert werden.
+Schreibt den Backend-Einstiegspunkt und eine `Dockerfile` in das Projekt und stellt dessen Backend um, sodass das Repository sein eigenes Image baut, anstatt die veröffentlichte Runtime auszuführen. Von da an **erreichen Plattform-Runtime-Upgrades das Projekt nicht mehr**, und CORS, Auth-Verdrahtung, Storage und Shutdown müssen von Ihnen selbst konfiguriert werden.
 
-Erstellen Sie eine Vorschau mit `rebase eject --dry-run`, wodurch aufgelistet wird, was sich ändern würde, ohne Änderungen vorzunehmen. `--force` ersetzt eine vorhandene `backend/src/index.ts` oder `env.ts` und behält die aktuelle Datei als `<name>.bak` bei.
+Sehen Sie sich die Vorschau mit `rebase eject --dry-run` an, was auflistet, was sich ändern würde, und nichts verändert. `--force` ersetzt ein vorhandenes `backend/src/index.ts` oder `env.ts` und behält die aktuelle Datei als `<name>.bak`.
 
-Der ausgeklinkte (ejected) Server speichert lokale Uploads im Verzeichnis `uploads/` des Projekts, unabhängig davon, ob er aus dem Quellcode oder kompiliert ausgeführt wird, genau wie `rebase dev`. Er läuft in `backend/`, daher wird ein relativer `STORAGE_PATH` dort von `backend/` aus gelesen.
+Der ausgekoppelte ("ejected") Server speichert lokale Uploads im `uploads/`-Ordner des Projekts, unabhängig davon, ob er aus dem Quellcode oder kompiliert ausgeführt wird, genau wie `rebase dev`. Er läuft in `backend/`, daher wird ein relativer `STORAGE_PATH` dort ausgehend von `backend/` gelesen.
 
 ### `rebase schema generate` / `rebase schema stale`
 
 ```bash
 rebase schema generate       # backend/schema → backend/src/schema.generated.ts
-rebase schema stale          # benennt Abweichungen von den Tabellen, Exit 1 bei Abweichungen
+rebase schema stale          # benennt Abweichungen von den Tabellen, Exit 1 falls vorhanden
 rebase schema stale --fix    # generiert die Datei stattdessen neu
 ```
 
-Jeder Befehl, der das Schema liest, akzeptiert `--schema-dir <dir>` für Projekte, die es an einem anderen Ort aufbewahren; `--collections` wurde entfernt. `rebase dev` hält die Datei aktuell, daher ist `stale` die Prüfung für einen Build oder CI. Siehe [Schemagenerierung](/docs/cli/schema/).
+Jeder Befehl, der das Schema liest, akzeptiert `--schema-dir <dir>` für Projekte, die es an anderer Stelle aufbewahren; `--collections` wurde entfernt. `rebase dev` hält die Datei aktuell, daher ist `stale` die Prüfung für einen Build oder CI. Siehe [Schema-Generierung](/docs/cli/schema/).
 
 ### `rebase db`
 
@@ -157,33 +159,33 @@ Jeder Befehl, der das Schema liest, akzeptiert `--schema-dir <dir>` für Projekt
 rebase db push                 # Tabellen auf die Datenbank anwenden (Entwicklung)
 rebase db generate             # eine SQL-Migrationsdatei schreiben
 rebase db migrate              # ausstehende Migrationen anwenden
-rebase db url                  # den von diesem Projekt verwendeten Verbindungsstring ausgeben
+rebase db url                  # den von diesem Projekt verwendeten Connection-String ausgeben
 rebase db pull --from <url>    # eine andere Datenbank in die lokale kopieren
-rebase db backup               # pg_dump; db backups list und db restore stehen ebenfalls bereit
-rebase db branch create <name> # eine Arbeitskopie erstellen; auch switch, list und prune sind verfügbar
+rebase db backup               # pg_dump; db backups list und db restore daneben
+rebase db branch create <name> # eine Arbeitskopie erstellen; auch switch, list und prune
 rebase db stop                 # die verwaltete Entwicklungsdatenbank stoppen
-rebase db reset                # diese löschen und von vorne beginnen
+rebase db reset                # sie löschen und von vorne beginnen
 rebase db request-role migrate --to <role> # Anfragen auf eine andere Postgres-Rolle umstellen
-rebase db provision --print    # das SQL zur Einrichtung der Request-Rolle, für einen DBA
+rebase db provision --print    # das SQL, das die Request-Rolle einrichtet, für einen DBA
 ```
 
-Jeder dieser Befehle wird unter [Datenbankbefehle](/docs/cli/database/) beschrieben, einschließlich der Reihenfolge, in der ein Befehl seine Datenbank auswählt; `push`, `generate` und `migrate` werden unter [Schemagenerierung](/docs/cli/schema/) ausführlich behandelt.
+Jeder Befehl wird unter [Datenbank-Befehle](/docs/cli/database/) beschrieben, zusammen mit der Reihenfolge, in der ein Befehl seine Datenbank auswählt; `push`, `generate` und `migrate` werden unter [Schema-Generierung](/docs/cli/schema/) ausführlich behandelt.
 
 ### `rebase console`
 
-Eine Node-REPL mit geöffneten Projektdaten oder Ausführung eines einzelnen Snippets mit `-e`:
+Eine Node-REPL mit geöffneten Projektdaten oder ein einzelnes Codefragment, das mit `-e` ausgeführt wird:
 
 ```bash
 rebase console
 rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
 ```
 
-`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) und `tables` (die Tabellen des Projekts, geladen aus `backend/schema`) befinden sich im Scope, und Top-Level-`await` funktioniert. Die Datenbank wird so aufgelöst, wie `rebase db push` sie auflöst, und das Öffnen der Konsole ändert nichts daran. Mit `-e` wird das per `await` abgewartete Ergebnis als JSON auf stdout ausgegeben, und bei Fehlern beendet sich der Prozess mit `1`. Flags: `--eval`/`-e`, `--schema-dir`, `--database-url`, `--docker`. Siehe [Skripte und die Konsole](/docs/backend/scripts/).
+`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) und `tables` (die aus `backend/schema` geladenen Tabellen des Projekts) befinden sich im Scope, und Top-Level-`await` funktioniert. Die Datenbank wird so aufgelöst, wie `rebase db push` sie auflöst, und das Öffnen ändert nichts an ihr. Mit `-e` wird das erwartete Ergebnis als JSON auf stdout ausgegeben, und ein Fehler führt zum Exit-Code `1`. Flags: `--eval`/`-e`, `--schema-dir`, `--database-url`, `--docker`. Siehe [Skripte und die Konsole](/docs/backend/scripts/).
 
 ### `rebase migrate`
 
-Einweg-Migrationen von Layouts, die von diesem Release nicht mehr unterstützt werden:
-`rebase migrate collections-to-tables` (`config/collections` → `backend/schema` und `frontend/src/cms`) und `rebase migrate sdk-calls` (`data.collection("x")` → `data.table("x")` in Ihrem eigenen Code). Deren Flags, was sie schreiben und der Abschnitt „Vor dem Deployment prüfen“ finden sich unter [Schemagenerierung](/docs/cli/schema/#rebase-migrate).
+Einweg-Migrationen von einem Layout, das dieses Release nicht mehr liest:
+`rebase migrate collections-to-tables` (`config/collections` → `backend/schema` und `frontend/src/cms`) und `rebase migrate sdk-calls` (`data.collection("x")` → `data.table("x")` in Ihrem eigenen Code). Deren Flags, was sie schreiben und der Abschnitt "Vor dem Deployment prüfen" sind unter [Schema-Generierung](/docs/cli/schema/#rebase-migrate) zu finden.
 
 ### `rebase apps init` / `rebase apps config`
 
@@ -193,11 +195,11 @@ rebase apps init             # eine aus diesem Projekt abgeleitete rebase.json s
 rebase apps config <app>     # die Client-Konfiguration für eine App
 ```
 
-`apps init` akzeptiert keinen Namen: Es leitet jede App aus dem Projekt ab, schreibt die gesamte `rebase.json` und weigert sich, eine bestehende Datei zu überschreiben, es sei denn, Sie übergeben `--force`.
+`apps init` nimmt keinen Namen entgegen: Es leitet jede App aus dem Projekt ab, schreibt die gesamte `rebase.json` und verweigert das Ersetzen einer vorhandenen Datei, sofern Sie nicht `--force` übergeben.
 
-Ein Namensargument wird abgelehnt. `--force` behält bei, was die automatische Erkennung aus der ersetzten Datei nicht wissen kann: den Namen jeder App, ihren `path` und ihre `cms`-Route. Alles andere wird erneut abgeleitet, und eine deklarierte App, die nicht mehr gefunden wird, wird als entfernt gekennzeichnet, sodass bei einem Gerüst wieder die `rebase.json` geschrieben wird, mit der das Gerüst ausgeliefert wurde. Der Build-Befehl der statischen App verwendet den Paketmanager des Projekts.
+Ein Namensargument wird abgelehnt. `--force` behält bei, was die Ableitung aus der ersetzten Datei nicht wissen kann: den Namen jeder App, ihren `path` und ihre `cms`-Route. Alles andere wird erneut abgeleitet, und eine deklarierte App, die nicht mehr gefunden wird, wird als entfernt gekennzeichnet, sodass bei einem Scaffold die `rebase.json` wiederhergestellt wird, die mit dem Scaffold ausgeliefert wurde. Der Build-Befehl der statischen App verwendet den Paketmanager des Projekts.
 
-Bei einem Checkout, der nicht mit einem Cloud-Projekt verknüpft ist, meldet `apps config`, dass keine Verknüpfung besteht (unabhängig davon, ob `rebase dev` ausgeführt wird oder nicht), und gibt die URL des Backends so an, wie `rebase dev` sie bereitstellt.
+Bei einem Checkout, der nicht mit einem Cloud-Projekt verknüpft ist, meldet `apps config`, dass keine Verknüpfung besteht (unabhängig davon, ob `rebase dev` läuft oder nicht), und gibt die Backend-URL so an, wie `rebase dev` sie bereitstellt.
 
 ### `rebase status`
 
@@ -222,15 +224,15 @@ rebase status --json        # maschinenlesbar
       └ declared, not configured — uploads here answer 501 STORAGE_SOURCE_NOT_CONFIGURED
 ```
 
-Drei Dateien bestimmen, was ein Backend erreichen kann, und dieser Befehl gibt alle drei zusammen aus: `rebase.json` gibt an, wo sich Ihr Code befindet und wer den Server betreibt, `backend/resources.ts` legt fest, was das Projekt benötigt, und die Umgebung gibt an, wie die einzelnen Komponenten erreichbar sind. Alles andere — `rebase.resources.json`, das Bundle-Manifest — wird aus der mittleren Datei für Ausleseprozesse generiert, die Ihren Code nicht ausführen können; Sie schreiben diese Datei nie selbst.
+Drei Dateien bestimmen, was ein Backend erreichen kann, und dieser Befehl gibt alle drei zusammen aus: `rebase.json` gibt an, wo sich Ihr Code befindet und wer den Server ausführt, `backend/resources.ts` deklariert, was das Projekt benötigt, und die Umgebung gibt an, wie jedes Element erreicht werden kann. Alles andere — `rebase.resources.json`, das Bundle-Manifest — wird aus der mittleren Datei für Ausleser generiert, die Ihren Code nicht ausführen können, und wird von Ihnen niemals manuell geschrieben.
 
-Ein `○` markiert den Zustand, den man besser vor als nach einem Deployment kennen sollte: deklariert, aber nicht konfiguriert. Ein `✗` bedeutet, dass die Umgebung etwas *falsch* setzt, was den Bootvorgang verhindert, anstatt die Funktionalität nur herabzusetzen.
+Ein `○` markiert den Zustand, den man besser vor als nach einem Deployment kennen sollte: deklariert, nicht konfiguriert. Ein `✗` bedeutet, dass die Umgebung etwas *falsch* setzt, was den Systemstart verweigert, anstatt in einen reduzierten Modus überzugehen.
 
-Eine `rebase.resources.json`, die nicht mehr mit den Deklarationen übereinstimmt, erhält eine `○`-Zeile. Eine Datei, die noch gar nicht geschrieben wurde, erhält keine: `rebase build` schreibt sie bei jedem Build, sodass ein Projekt, das noch nie gebaut wurde (z. B. ein frisches Gerüst), nichts zu korrigieren hat.
+Eine `rebase.resources.json`, die nicht mehr mit den Deklarationen übereinstimmt, erhält eine `○`-Zeile. Eine, die noch nicht geschrieben wurde, tut dies nicht: `rebase build` schreibt sie bei jedem Build, sodass ein Projekt, das noch nie gebaut wurde (wie ein frischer Scaffold), nichts zu beheben hat.
 
 ### `rebase resources`
 
-Was dieses Projekt laut Deklaration benötigt — die Datenbanken, Buckets, Topics und Queues, die `backend/resources.ts` anfordert, sowie die Cronjobs und Funktionen, die seine Dateien definieren:
+Was dieses Projekt an Ressourcen deklariert — die Datenbanken, Buckets, Topics und Queues, die `backend/resources.ts` anfordert, sowie die Crons und Funktionen, die seine Dateien definieren:
 
 ```bash
 rebase resources            # auflisten
@@ -239,15 +241,15 @@ rebase resources --check    # fehlschlagen, wenn der committete Graph veraltet i
 rebase resources --json     # maschinenlesbar
 ```
 
-`rebase resources --check` ist das Flag, das ein CI-Job verwendet, um fehlzuschlagen, wenn `rebase.resources.json` nicht mehr mit `backend/resources.ts` übereinstimmt. `--json` lässt sich damit kombinieren: Bei Abweichungen beendet sich `rebase resources --check --json` mit Exit-Code 1 und einem Fehlerumschlag (`resource_graph_missing` oder `resource_graph_stale`), und bei Erfolg enthält der Graph `check.status`. `--write --json` schreibt die Datei und meldet `written.changed`.
+`rebase resources --check` ist das Flag, das ein CI-Job verwendet, um bei einer `rebase.resources.json` fehlzuschlagen, die nicht mehr mit `backend/resources.ts` übereinstimmt. `--json` lässt sich damit kombinieren: Bei Abweichungen beendet sich `rebase resources --check --json` mit Exit-Code 1 und einem Fehler-Umschlag (`resource_graph_missing` oder `resource_graph_stale`), und bei Erfolg enthält der Graph `check.status`. `--write --json` schreibt die Datei und meldet `written.changed`.
 
-Eine Ressource wird in `backend/resources.ts` deklariert — `database("analytics")`, `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — oder ist eine Datei unter `backend/crons` oder `backend/functions`. Sie wird niemals manuell in `rebase.resources.json` geschrieben, da diese Datei aus diesen Deklarationen generiert wird, damit ein Host auslesen kann, was ein Projekt benötigt, ohne es bauen zu müssen. Jeder Eintrag dokumentiert, wer ihn verwendet (`table:events`, `column:posts.cover`, `function:report`).
+Eine Ressource wird in `backend/resources.ts` deklariert — `database("analytics")`, `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — oder ist eine Datei unter `backend/crons` oder `backend/functions`. Sie wird niemals manuell in `rebase.resources.json` geschrieben, da diese Datei aus jenen Deklarationen generiert wird, damit ein Host auslesen kann, was ein Projekt benötigt, ohne es bauen zu müssen. Jeder Eintrag zeichnet auf, wer ihn verwendet (`table:events`, `column:posts.cover`, `function:report`).
 
-Ein Backend verfügt außerdem über eine Standarddatenbank und eine Standard-Speicherquelle, die niemand explizit deklariert. Beide werden hier mit der Kennzeichnung `implicit` aufgeführt und keine von beiden wird in `rebase.resources.json` geschrieben — der Host stellt sie bereit, sodass ein Eintrag dazu führen würde, dass etwas bereitgestellt wird, was niemand angefordert hat. Die Deklaration einer benannten Ressource, wie z. B. `bucket("media")`, belässt den Standard unverändert, sodass beide aufgeführt werden. Nur die Deklaration des Standards selbst oder das Markieren eines Buckets mit `default: true` ersetzt diesen.
+Ein Backend verfügt außerdem über eine Standarddatenbank und eine Standard-Storage-Quelle, die niemand deklariert. Beide werden hier aufgeführt, als `implicit` markiert und keine von beiden wird in `rebase.resources.json` geschrieben — der Host stellt sie bereit, sodass ihre Erfassung das Provisionieren von etwas anfordern würde, nach dem niemand gefragt hat. Das Deklarieren einer benannten Ressource wie `bucket("media")` belässt den Standard dort, wo er ist, sodass beide aufgeführt werden. Nur das Deklarieren des Standards selbst oder das Markieren eines Buckets mit `default: true` ersetzt diesen.
 
-Um zu sehen, was die Plattform für ein Projekt im Vergleich zu den Deklarationen im Code vorhält, und um eine bereitgestellte Datenbank zu entfernen, die der Code nicht mehr nennt, siehe [`rebase cloud resources`](/docs/cli/cloud#resources).
+Um zu sehen, was die Plattform für ein Projekt im Vergleich zu dem vorhält, was ihr Code deklariert, und um eine provisionierte Datenbank zu entfernen, die der Code nicht mehr nennt, siehe [`rebase cloud resources`](/docs/cli/cloud#resources).
 
-`rebase cloud` — alle Befehle für Rebase Cloud: Authentifizierung, Projektverknüpfung, Deployments, Konfiguration, Datenbanken, Ressourcen, Compute und mehr — hat [eine eigene Seite](/docs/cli/cloud).
+`rebase cloud` — jeder Befehl für Rebase Cloud: Authentifizierung, Projektverknüpfung, Deployments, Konfiguration, Datenbanken, Ressourcen, Compute und mehr — hat [eine eigene Seite](/docs/cli/cloud).
 
 ### `rebase generate-sdk`
 
@@ -255,7 +257,7 @@ Um zu sehen, was die Plattform für ein Projekt im Vergleich zu den Deklaratione
 rebase generate-sdk
 ```
 
-Schreibt einen typisierten Client für die Tabellen, die `backend/schema/index.ts` exportiert, nach `generated/sdk/`, mit `TableName` und `tablesDictionary`; `--from <link|url>` liest stattdessen den Vertrag eines laufenden Backends. `--register` typisiert auch serverseitige Daten: Es schreibt die Typen und die `Register`-Deklaration nach `backend/generated/` und vermerkt dies in `rebase.json` (`registerDatabase`). Siehe [Typisierte serverseitige Daten](/docs/backend/typed-server-data) und [Schemagenerierung](/docs/cli/schema/#rebase-generate-sdk).
+Schreibt einen typisierten Client für die von `backend/schema/index.ts` exportierten Tabellen nach `generated/sdk/`, mit `TableName` und `tablesDictionary`; `--from <link|url>` liest stattdessen den Vertrag eines laufenden Backends. `--register` typisiert auch serverseitige Daten: Es schreibt die Typen und die `Register`-Deklaration nach `backend/generated/` und vermerkt dies in `rebase.json` (`registerDatabase`). Siehe [Typisierte serverseitige Daten](/docs/backend/typed-server-data) und [Schema-Generierung](/docs/cli/schema/#rebase-generate-sdk).
 
 ### `rebase doctor`
 
@@ -263,38 +265,38 @@ Schreibt einen typisierten Client für die Tabellen, die `backend/schema/index.t
 rebase doctor
 ```
 
-Der Befehl, den man ausführt, wenn etwas nicht stimmt und man noch nicht weiß, was es ist. Er berichtet nur und ändert niemals etwas, sodass er bedenkenlos auf jede erreichbare Datenbank angewendet werden kann.
+Der Befehl, den Sie ausführen sollten, wenn etwas nicht stimmt und Sie noch nicht wissen, was es ist. Er berichtet nur und ändert niemals etwas, sodass er für jede Datenbank, die Sie erreichen können, sicher ist.
 
-**Ohne Datenbank.** Diese Prüfungen laufen zuerst, da alles, was ein Projekt komplett am Starten hindert, auftritt, bevor überhaupt eine Tabelle verglichen werden kann:
+**Ohne Datenbank.** Diese Prüfungen laufen zuerst, da alles, was ein Projekt daran hindert, überhaupt zu funktionieren, passiert, bevor eine Tabelle verglichen werden kann:
 
-| Prüfung | Grund |
+| Prüfung | Warum |
 | --- | --- |
-| Node-Version | Abgleich mit dem von der CLI deklarierten Bereich. Eine zu alte Version wird nicht als „nicht unterstütztes Node“ gemeldet, sondern äußert sich als Syntaxfehler innerhalb einer Abhängigkeit. |
-| Paketmanager | Zwei Lockfiles in einem Projekt. `npm install` in einem pnpm-Workspace schreibt `node_modules` in ein Layout um, das pnpm nicht erwartet; das Symptom ist Stunden später ein `Cannot find module`. |
-| Doppelte Slugs | Zwei Tabellen deklarieren denselben Slug. Das Schema bricht beim Kompilieren ab, und diese Prüfung nennt beide. |
-| `.env`-Plausibilität | Ein `JWT_SECRET`, das kürzer als 32 Zeichen ist (womit die Produktion den Start verweigert), und `NODE_ENV=production` ohne `CORS_ORIGINS` oder `FRONTEND_URL`. Werte werden niemals ausgegeben. |
-| Versionsunterschiede bei `@rebasepro/*` | Dasselbe Paket ist über die `package.json`-Dateien des Projekts hinweg auf unterschiedliche Versionen festgelegt. Zwei Kopien beschädigen `instanceof` untereinander, was dazu führt, dass ein Type Guard seinen eigenen Typ zurückweist. |
-| Verbindungsstrings | Ein nicht-encodiertes `=` in einem URL-Parameter, dessen Parsing die PostgreSQL-eigenen Werkzeuge verweigern — Backups und `psql` schlagen fehl, während die App weiterläuft. |
-| Benutzerdefinierte Funktionen | Was jede Funktion von ihrem Host benötigt und welche davon nicht auf einer Edge-Runtime laufen würden. |
+| Node-Version | Abgleich mit dem Bereich, den die CLI deklariert. Eine zu alte Version wird nicht als "nicht unterstütztes Node" gemeldet — sie äußert sich als Syntaxfehler innerhalb einer Abhängigkeit. |
+| Paketmanager | Zwei Lockdateien in einem Projekt. `npm install` in einem pnpm-Workspace schreibt `node_modules` in ein Layout um, mit dem pnpm nicht übereinstimmt; das Symptom ist Stunden später `Cannot find module`. |
+| Doppelte Slugs | Zwei Tabellen, die denselben Slug deklarieren. Das Schema verweigert die Kompilierung, und dies benennt beide. |
+| `.env`-Plausibilität | Ein `JWT_SECRET`, das kürzer als 32 Zeichen ist (wodurch die Produktion den Start verweigert), und `NODE_ENV=production` ohne `CORS_ORIGINS` oder `FRONTEND_URL`. Werte werden niemals ausgegeben. |
+| Versionsabweichung bei `@rebasepro/*` | Dasselbe Paket ist in verschiedenen `package.json`-Dateien des Projekts auf unterschiedliche Versionen festgelegt. Zwei Kopien beschädigen `instanceof` zwischen ihnen, was als Type-Guard fehlschlägt und seinen eigenen Typ ablehnt. |
+| Connection-Strings | Ein nicht-encodetes `=` in einem URL-Parameter, dessen Parsing die PostgreSQL-eigenen Tools verweigern — Backups und `psql` schlagen fehl, während die App weiter funktioniert. |
+| Eigene Funktionen | Was jede Funktion von ihrem Host benötigt und welche davon auf einer Edge-Runtime nicht laufen würden. |
 
-**Gegen die Datenbank** — die projekteigene Datenbank, aufgelöst wie von `rebase db url`; bei einem frischen Gerüst ist dies die verwaltete Datenbank, die `doctor` startet:
+**Gegen die Datenbank** — die eigene des Projekts, aufgelöst wie von `rebase db url`; bei einem frischen Scaffold ist dies die verwaltete Datenbank, die `doctor` startet:
 
-| Prüfung | Grund |
+| Prüfung | Warum |
 | --- | --- |
 | Tabellen → generiertes Schema | Ob `schema.generated.ts` veraltet ist. |
-| Tabellen → Datenbank | Fehlende Tabellen, Spalten, Enums, Fremdschlüssel und Junctions. |
-| Erforderliche Extensions | Eine `col.vector()`-Spalte benötigt pgvector, welches Rebase nur dort installiert, wo ein Projekt dies deklariert hat. |
-| Schema-Stempel | Ob diese Datenbank aus diesen Tabellen bereitgestellt wurde. Ein Hash, der aussagt, dass beide nicht übereinstimmen, aber nie, welche Version neuer ist. Ein `v1:`-Stempel aus einer Runtime vor Version 0.31 wird einmalig gemeldet, zusammen mit dem Befehl zur Neuerstellung: `rebase db push`. |
+| Tabellen → Datenbank | Fehlende Tabellen, Spalten, Enums, Fremdschlüssel und Verknüpfungen (Junctions). |
+| Erforderliche Extensions | Eine `col.vector()`-Spalte benötigt pgvector, das Rebase nur dort installiert, wo ein Projekt es deklariert hat. |
+| Schema-Stamp | Ob diese Datenbank aus diesen Tabellen provisioniert wurde. Ein Hash, der aussagt, dass beide nicht übereinstimmen, aber nie, welches weiter fortgeschritten ist. Ein `v1:`-Stamp von einer Runtime vor 0.31 wird einmalig gemeldet, zusammen mit dem Befehl zur Neuerstellung: `rebase db push`. |
 | Tabellen → SDK-Typen | Ob das generierte typisierte SDK veraltet ist. |
-| RLS-Richtlinien | Ob die Richtlinien der Datenbank mit dem deklarierten `rls` übereinstimmen und ob eine Richtlinie eine Rolle nennt, die dieser Server nicht verwenden kann. |
+| RLS-Policies | Ob die Policies der Datenbank mit dem von Ihnen deklarierten `rls` übereinstimmen und ob eine Policy eine Rolle nennt, die dieser Server nicht verwenden kann. |
 
-Ist die Datenbank nicht erreichbar, werden deren Phasen unter Angabe des Grundes als übersprungen gemeldet und der Rest läuft weiter — siehe [Fehlerbehebung](/docs/troubleshooting/).
+Ist die Datenbank nicht erreichbar, werden deren Phasen als übersprungen mit Angabe des Grundes gemeldet und der Rest läuft weiter — siehe [Fehlerbehebung](/docs/troubleshooting/).
 
-Beendet sich mit einem Exit-Code ungleich null, wenn eine Prüfung einen Fehler findet oder wenn eine Phase nicht ausgeführt werden konnte, weil die angegebene Datenbank Verbindungen ablehnt. Eine Phase, die übersprungen wurde, weil keine Datenbank ermittelt werden konnte, gilt nicht als Fehler.
+Beendet sich mit einem Exit-Code ungleich null, wenn eine Prüfung einen Fehler findet oder wenn eine Phase nicht ausgeführt werden konnte, weil die angegebene Datenbank Verbindungen ablehnt. Eine Phase, die übersprungen wurde, weil keine Datenbank aufgelöst werden konnte, gilt nicht als Fehler.
 
-`rebase doctor --policies` führt nur die RLS-Prüfungen durch — kein Schema-Diff, keine SDK-Typen — und schlägt bei Fehlern strikt fehl (Fail-Closed). Daher eignet es sich ideal als CI-Gate gegen eine Produktivdatenbank.
+`rebase doctor --policies` führt nur die RLS-Prüfungen aus — kein Schema-Diff, keine SDK-Typen — und schlägt im Zweifelsfall fehl ("fails closed"), was es zur idealen Variante als CI-Gate gegen eine deployte Datenbank macht.
 
-`rebase doctor --database` führt nur den Datenbank-Preflight aus: ob die Rolle existiert, unter der angemeldete Anfragen laufen, ob sie eingeschränkt ist und zu ihr gewechselt werden kann, welche anderen Logins zu ihr wechseln dürfen, ob jede Rolle eine Verbindung herstellen darf und welche Tabellen, Grants und Richtlinien Rebase mit anderen Rollen teilen würde. Jedes Ergebnis nennt das SQL, das als Administrator auszuführen ist, die `rls`-Einstellung, die Rebase stattdessen an die Datenbank anpasst, oder beides. Es liest den Katalog, ändert nichts und beendet sich mit 1, wenn ein Befund ein Fehler ist. Dies funktioniert auch bei einem Headless-Projekt. Siehe [Ausführung auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/).
+`rebase doctor --database` führt nur den Datenbank-Preflight aus: ob die Rolle, unter der authentifizierte Anfragen laufen, existiert, eingeschränkt ist und zu ihr gewechselt werden kann; welche anderen Logins zu ihr wechseln können; ob jede Rolle eine Verbindung herstellen darf; und welche Tabellen, Grants und Policies Rebase mit anderen Rollen teilen würde. Jeder Befund nennt das SQL, das als Administrator ausgeführt werden muss, die `rls`-Einstellung, die Rebase stattdessen an die Datenbank anpasst, oder beides. Der Befehl liest den Katalog, ändert nichts und beendet sich mit 1, wenn ein Befund ein Fehler ist. Er funktioniert auch bei einem Headless-Projekt. Siehe [Ausführung auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/).
 
 ### `rebase verify`
 
@@ -305,23 +307,23 @@ rebase verify --live
 rebase verify --live --database-url postgresql://…
 ```
 
-Prüft in einem schnellen Befehl für CI und für Hooks von KI-Agents, ob die Tabellen sicher für das Deployment sind. Standardmäßig offline, und ändert niemals etwas.
+Prüft in einem schnellen Befehl für CI und für Hooks von KI-Agents, ob die Tabellen sicher für das Release sind. Standardmäßig offline und ändert niemals etwas.
 
-| Schritt | Was zum Fehlschlagen führt |
+| Schritt | Was ihn fehlschlagen lässt |
 | --- | --- |
-| Tabellendefinitionen (`schema`) | `backend/schema` lädt nicht oder kompiliert nicht über den Loader, von dem das Backend bootet: Eine Relation zu einer Tabelle, die der Index nicht exportiert, `rls: "inherit"` ohne `defaultRls`, eine Tabelle ohne Primärschlüssel — ein Befund pro Problem. Eine Tabelle ohne `rls` ist einer davon. |
-| RLS-Abdeckung (`rls`) | Eine Tabelle mit einer Spalte `user_id`, `owner_id`, `organization_id` oder `tenant_id`, deren Regeln — eigene oder das geerbte `defaultRls` — einer Rolle erlauben, jede Zeile ungeachtet dessen zu lesen. Eine Warnung. `rls-policy-recursion`: Eine Regel, die ihre eigene Tabelle in einer Unterabfrage liest, oder zwei Tabellen, deren Regeln sich gegenseitig lesen, was Postgres nicht auflösen kann, sodass jedes dadurch geschützte Statement mit `42P17 infinite recursion detected in policy` fehlschlägt; der Befund nennt die gelesene Tabelle und die Lösung (Auslagern des Lesevorgangs in eine `SECURITY DEFINER`-Funktion). Ein Fehler oder eine Warnung, wenn die Schleife nicht eindeutig feststeht. |
-| Aktualität der Migrationen (`migrations`) | Eine von den Tabellen deklarierte Tabelle oder Spalte, die von keiner Datei in `backend/drizzle/migrations` erstellt wird, oder eine gelöschte, die von einer Migration immer noch erstellt wird. Wird für Projekte übersprungen, die noch keine Migrationen haben. |
-| CMS-Anpassungen (`cms`) | Ein `customizeTable(...)` in `frontend/src/cms` (oder im `src/cms` einer statischen App in `rebase.json`), das statisch ausgelesen nicht zu den Tabellen passt — die Module werden nicht ausgeführt. `cms-unknown-table`: Der Slug nennt keine Tabelle, daher ignoriert das Panel ihn (der ähnlichste Slug wird vorgeschlagen). `cms-unknown-field`: Ein Schlüssel unter `fields` ist weder eine Spalte noch eine Relation (der SQL-Name einer Spalte wird mit ihrem Schlüssel beantwortet). `cms-hidden-required`: Ein im Formular ausgeblendetes Feld (`hiddenInForm`, `readOnly`, `disabled`), dessen Spalte `NOT NULL` ohne Standardwert ist und vom Server nicht befüllt wird, sodass das Erstellen eines Datensatzes über das Panel immer fehlschlägt; eine Warnung, wenn ein `beforeSave`-Hook oder Transform es möglicherweise füllt, und unterdrückt durch `filledByServer`. `cms-duplicate-customization`: Ein Slug wurde zweimal angepasst. `cms-not-static` (eine Warnung): Ein Aufruf, dessen Slug, Optionen oder `fields` keine Literale oder `const` in derselben Datei sind, sodass nichts darin geprüft werden konnte. `cms-ui-config-not-mounted` (eine Warnung): `frontend/src/cms/ui-config.json` existiert, wird `<RebaseCMS>` jedoch nicht als `uiConfig` übergeben. `cms-backend-guard-missing`: Die Vite-Konfiguration des Frontends verwendet `rebaseBackendGuard()` nicht, weshalb `rebase build` dies verweigern würde. Ein Headless-Projekt hat kein `frontend/src/cms` und überspringt diesen Schritt. |
-| Live-RLS-Audit (`live`) | Mit `--live`: Der [`rls-check`](/docs/rls-check)-Katalog gegen die Datenbank des Projekts und Prüfung, ob jede Migration angewendet wurde. Die Datenbank wird wie bei den `db`-Befehlen aufgelöst — `--database-url`, `DATABASE_URL`, `--docker`, andernfalls die verwaltete Entwicklungsdatenbank. Eine Datenbank, die nicht konfiguriert ist oder nicht antwortet, führt zu einem Fehler, nicht zu einem Überspringen: Das Audit wurde explizit angefordert. Eine aus einer `access: "public"`-Regel kompilierte `USING (true)`-Lese-Richtlinie ist eine Warnung, solange die API ein Token verlangt (`AUTH_REQUIRE`, standardmäßig aktiviert) — jeder angemeldete Benutzer liest jede Zeile — und ein Fehler bei `AUTH_REQUIRE=false`, wo die Zeilen anonym zugänglich sind. |
+| Tabellendefinitionen (`schema`) | `backend/schema` lädt nicht oder kompiliert nicht über den Loader, von dem aus das Backend bootet: eine Relation zu einer Tabelle, die der Index nicht exportiert, `rls: "inherit"` ohne `defaultRls`, eine Tabelle ohne Primärschlüssel — ein Befund pro Problem. Eine Tabelle ohne `rls` ist eines davon. |
+| RLS-Abdeckung (`rls`) | Eine Tabelle mit einer Spalte `user_id`, `owner_id`, `organization_id` oder `tenant_id`, deren Regeln — die eigenen oder das geerbte `defaultRls` — einer Rolle erlauben, jede Zeile ungeachtet dessen zu lesen. Eine Warnung. `rls-policy-recursion`: eine Regel, die ihre eigene Tabelle in einer Unterabfrage liest, oder zwei Tabellen, deren Regeln sich gegenseitig lesen, was Postgres nicht expandieren kann, sodass jede geschützte Anweisung mit `42P17 infinite recursion detected in policy` fehlschlägt; der Befund benennt die gelesene Tabelle und den Fix, nämlich das Verschieben des Lesevorgangs in eine `SECURITY DEFINER`-Funktion. Ein Fehler oder eine Warnung, wenn die Schleife nicht sicher ist. |
+| Migrations-Aktualität (`migrations`) | Eine von den Tabellen deklarierte Tabelle oder Spalte, die keine Datei in `backend/drizzle/migrations` erstellt, oder eine gelöschte, die eine Migration immer noch erstellt. Wird bei einem Projekt ohne bisherige Migrationen übersprungen. |
+| CMS-Anpassungen (`cms`) | Ein `customizeTable(...)` in `frontend/src/cms` (oder dem `src/cms` einer statischen App in `rebase.json`), das nicht zu den Tabellen passt, statisch gelesen — die Module werden nicht ausgeführt. `cms-unknown-table`: Der Slug nennt keine Tabelle, daher ignoriert das Panel ihn (der ähnlichste Slug wird vorgeschlagen). `cms-unknown-field`: Ein Schlüssel unter `fields` ist weder eine Spalte noch eine Relation (der SQL-Name einer Spalte wird mit ihrem Schlüssel beantwortet). `cms-hidden-required`: Ein vom Formular ferngehaltenes Feld (`hiddenInForm`, `readOnly`, `disabled`), dessen Spalte `NOT NULL` ohne Standardwert ist und vom Server nicht befüllt wird, sodass das Erstellen eines Datensatzes über das Panel immer fehlschlägt; eine Warnung, wenn ein `beforeSave`-Hook oder Transform es möglicherweise füllt, und unterdrückt durch `filledByServer`. `cms-duplicate-customization`: Ein Slug wurde zweimal angepasst. `cms-not-static` (eine Warnung): Ein Aufruf, dessen Slug, Optionen oder `fields` keine Literale oder ein `const` derselben Datei sind, sodass darin nichts geprüft wurde. `cms-ui-config-not-mounted` (eine Warnung): `frontend/src/cms/ui-config.json` existiert, wird aber `<RebaseCMS>` nicht als `uiConfig` übergeben. `cms-backend-guard-missing`: Die Vite-Konfiguration des Frontends verwendet `rebaseBackendGuard()` nicht, daher würde `rebase build` sie ablehnen. Ein Headless-Projekt hat kein `frontend/src/cms` und überspringt diesen Schritt. |
+| Live-RLS-Audit (`live`) | Mit `--live`: Der [`rls-check`](/docs/rls-check)-Katalog gegen die Datenbank des Projekts und die Prüfung, ob jede Migration angewendet wurde. Die Datenbank wird so aufgelöst wie bei den `db`-Befehlen — `--database-url`, `DATABASE_URL`, `--docker`, ansonsten die verwaltete Entwicklungsdatenbank. Eine Datenbank, die nicht konfiguriert ist oder nicht antwortet, ist ein Fehler, kein Überspringen: Das Audit wurde explizit angefordert. Eine aus einer `access: "public"`-Regel kompilierte `USING (true)`-Lese-Policy ist eine Warnung, solange die API ein Token verlangt (`AUTH_REQUIRE`, standardmäßig aktiv) — jeder angemeldete Benutzer liest jede Zeile — und ein Fehler bei `AUTH_REQUIRE=false`, wo die Zeilen anonym sind. |
 
-`--json` gibt ein einzelnes Objekt aus: `{ ok, schemaDir, steps, findings, summary }`. Jeder Schritt besteht aus `{ id, title, status, detail? }` (`status` ist `passed`, `failed`, `warnings` oder `skipped`), und jeder Befund enthält `step`, `check` (ein stabiler Kebab-Case-Typ), `severity`, `message` und, sofern zutreffend, `fix`, `table`, `file`, `line` und den durch Punkte getrennten `path` in die Tabelle (`posts.rls[0]`) — damit ein Agent reparieren kann, was er beschädigt hat. `summary` zählt `errors` und `warnings`. `--quiet` gibt nichts aus, wenn alles erfolgreich durchläuft. Beendet sich bei einem Fehler mit einem Exit-Code ungleich null; Warnungen führen nicht zum Fehlschlagen.
+`--json` gibt ein einzelnes Objekt aus, `{ ok, schemaDir, steps, findings, summary }`: Jeder Schritt ist `{ id, title, status, detail? }` (`status` ist `passed`, `failed`, `warnings` oder `skipped`), und jeder Befund enthält `step`, `check` (ein stabiler Kebab-Case-Typ), `severity`, `message` und, falls zutreffend, `fix`, `table`, `file`, `line` sowie den gepunkteten `path` in die Tabelle (`posts.rls[0]`) — sodass ein Agent reparieren kann, was er beschädigt hat. `summary` zählt `errors` und `warnings`. `--quiet` gibt nichts aus, wenn alles erfolgreich durchläuft. Beendet sich bei einem Fehler ungleich null; Warnungen führen nicht zum Fehlschlagen.
 
-Ein per Scaffold erstelltes Projekt führt dies nach jeder Bearbeitung unter `backend/schema/` für Claude Code aus: siehe [`rebase skills install`](#rebase-skills-install).
+Ein gescaffoldetes Projekt führt diesen Befehl für Claude Code nach jeder Bearbeitung unter `backend/schema/` aus: siehe [`rebase skills install`](#rebase-skills-install).
 
 ### Befehle für eine laufende App
 
-`rebase api`, `rebase data`, `rebase users`, `rebase cron`, `rebase logs`, `rebase functions`, `rebase rls simulate`, `rebase auth login` und `rebase storage ls|cp|rm|url|stat` wirken über deren API auf eine laufende Anwendung: das lokale `rebase dev`, einen mit `--url` angegebenen Server oder ein Rebase Cloud-Projekt mit `--project`. Siehe [Eine laufende App](/docs/cli/project/).
+`rebase api`, `rebase data`, `rebase users`, `rebase cron`, `rebase logs`, `rebase functions`, `rebase rls simulate`, `rebase auth login` und `rebase storage ls|cp|rm|url|stat` agieren über die API auf eine laufende App: das lokale `rebase dev`, einen Server, den Sie mit `--url` angeben, oder ein Rebase Cloud-Projekt mit `--project`. Siehe [Eine laufende App](/docs/cli/project/).
 
 ### `rebase auth`
 
@@ -343,24 +345,24 @@ rebase api-keys create --name "Ops" --full-access --roles admin --expires-at 202
 rebase api-keys revoke abc123-def456
 ```
 
-`--scopes` benennt kommagetrennt oder wiederholt, was der Schlüssel tun darf; `--full-access` verleiht ihm jeden Scope, den der Service-Schlüssel besitzt, außer `keys:*`. `--roles` fügt RLS-Rollen neben `service` hinzu, `--expires-in` akzeptiert Tage und `--expires-at` ein ISO-Datum. `rebase api-keys scopes` listet jeden Scope auf, den das Backend kennt. Ein Schlüssel wird nur einmal angezeigt. Sowohl die Scopes des Schlüssels als auch die Row-Level Security der Identität, als die er agiert, finden Anwendung. Siehe [API-Schlüssel](/docs/backend/api-keys/).
+`--scopes` benennt kommagetrennt oder wiederholt, was der Schlüssel tun darf; `--full-access` gewährt ihm jeden Scope, den der Service-Key besitzt, mit Ausnahme von `keys:*`. `--roles` fügt RLS-Rollen neben `service` hinzu, `--expires-in` akzeptiert Tage und `--expires-at` ein ISO-Datum. `rebase api-keys scopes` listet alle Scopes auf, die dem Backend bekannt sind. Ein Schlüssel wird einmalig angezeigt. Sowohl die Scopes des Schlüssels als auch die Row-Level Security der Identität, als die er agiert, finden Anwendung. Siehe [API-Schlüssel](/docs/backend/api-keys/).
 
 ### `rebase storage`
 
-Umfassende Wartung gespeicherter Dateien über das laufende Backend mit `REBASE_SERVICE_KEY` aus `.env`:
+Gesamtspeicher-Wartung gespeicherter Dateien über das laufende Backend mit `REBASE_SERVICE_KEY` aus `.env`:
 
 ```bash
 rebase storage orphans                         # Dateien, die von keiner Zeile referenziert werden
-rebase storage orphans --source media --delete # und diese nach Bestätigung löschen
+rebase storage orphans --source media --delete # und nach Bestätigung löschen
 rebase storage move --from "(default)" --to media --prefix avatars
 rebase storage move --from "(default)" --to media --prefix avatars --delete-source
 ```
 
-`orphans` liest jede Zeile jeder Tabelle im gespeicherten Zustand (einschließlich Soft-Deleted-Zeilen, unter Umgehung aller `beforeQuery`- und `afterRead`-Hooks) und jeden [History](/docs/backend/history/)-Eintrag, da ein Revert dessen Inhalt wiederherstellt. Es listet die Dateien einer Quelle auf (`--source`, standardmäßig die Standardquelle, wenn weggelassen), die von keinem String in diesen Datensätzen referenziert werden: weder als Schlüssel noch als URL oder als `rebase-storage:`-Referenz in einem Text. Dateien, die neuer als `--older-than` Stunden sind (standardmäßig 24), werden ausgelassen, da das Admin-Panel eine Datei hochlädt, bevor die Zeile gespeichert wird, die sie referenziert. Der Scan läuft im Hintergrund auf dem Backend, sodass auch ein Projekt, das zu groß ist, um innerhalb eines einzelnen Requests gescannt zu werden (hinter einem Ingress mit Timeout), erfolgreich abgeschlossen wird. Die CLI startet den Scan und zeigt dann den Fortschritt an (aufgelistete Dateien, gelesene Zeilen, abgeschlossene Tabellen und solche, die nicht gelesen werden konnten), bis er beendet ist. Bei aktivierter [Job-Queue](/docs/backend/jobs/) ist der Scan ein `storage.orphans`-Job, den die Job-Worker ausführen. Ohne diese läuft der Scan innerhalb des angefragten Serverprozesses, worauf die CLI hinweist: Ein Neustart dieses Prozesses stoppt den Scan. Ein Scan entspricht einem Job-Versuch, begrenzt durch `jobs.timeoutMs` (standardmäßig 15 Minuten). Erhöhen Sie diesen Wert oder setzen Sie ihn auf 0 für Quellen, die länger benötigen. `--json` gibt denselben Bericht wie zuvor aus, ergänzt um die `scanId`.
+`orphans` liest jede Zeile jeder Tabelle so aus, wie sie gespeichert ist (einschließlich Soft-Deleted-Zeilen, unter Umgehung aller `beforeQuery`- und `afterRead`-Hooks) sowie jeden [History](/docs/backend/history/)-Eintrag, da ein Revert dessen Inhalt wiederherstellt. Es listet die Dateien einer Quelle auf (`--source`, standardmäßig die Standardquelle), die von keinem String in diesen Datensätzen benannt werden: ein Schlüssel, eine URL, eine `rebase-storage:`-Referenz in einem Text. Dateien, die neuer als `--older-than` Stunden sind (standardmäßig 24), werden ausgelassen, da das Admin-Panel eine Datei hochlädt, bevor die Zeile gespeichert wird, die sie referenziert. Der Scan läuft im Hintergrund auf dem Backend, sodass auch ein Projekt fertiggestellt werden kann, das zu groß ist, um innerhalb einer einzelnen Anfrage gescannt zu werden (hinter einem Ingress, der ein Timeout auslösen würde). Die CLI startet ihn und zeigt dann seinen Fortschritt an (aufgelistete Dateien, gelesene Zeilen, abgeschlossene Tabellen und solche, die nicht gelesen werden konnten), bis er abgeschlossen ist. Bei aktiver [Job-Queue](/docs/backend/jobs/) ist der Scan ein `storage.orphans`-Job, den die Job-Worker ausführen. Ohne diese läuft der Scan innerhalb des angefragten Serverprozesses, und die CLI weist darauf hin: Ein Neustart dieses Prozesses stoppt den Scan. Ein Scan ist ein einzelner Job-Versuch, begrenzt durch `jobs.timeoutMs` (standardmäßig 15 Minuten). Erhöhen Sie diesen Wert oder setzen Sie ihn auf 0 für Quellen, die länger benötigen. `--json` gibt denselben Bericht wie zuvor aus, zuzüglich seiner `scanId`.
 
-`--delete` fragt vor dem Löschen nach (`--yes` überspringt die Abfrage und ist ohne Terminal erforderlich). Es löscht nur auf Basis des gerade ausgegebenen Scans und nur innerhalb von 15 Minuten nach dessen Abschluss. Es wird nichts gelöscht, solange eine Tabelle nicht gelesen werden kann: Eine Tabelle mit Read-Hooks auf einer Datenbank, deren Treiber diese nicht umgehen kann, gilt als ungelesen. Vor dem Löschen liest der Server jede Zeile und jeden History-Eintrag erneut gegen die aufgelisteten Dateien ab. Anschließend fragt er unmittelbar vor dem Löschen jede Datei nochmals ab. Eine Datei, die inzwischen von einer Zeile referenziert wird, die seit dem Scan erneut hochgeladen wurde oder die nicht mehr existiert, wird beibehalten, und die CLI führt sie als beibehalten auf. Dateien, die nur von Tabellen referenziert werden, die Rebase nicht verwaltet, wirken ungenutzt: Prüfen Sie dies vor dem Löschen. Bei einem Backend der Version 0.25.1 oder älter scannt die CLI nach der alten Methode innerhalb einer einzigen Anfrage.
+`--delete` fragt vor dem Löschen nach (`--yes` überspringt die Frage und ist ohne Terminal erforderlich). Es löscht nur aus dem gerade ausgegebenen Scan und nur innerhalb von 15 Minuten nach dessen Abschluss. Es wird nichts gelöscht, solange eine Tabelle nicht gelesen werden kann: Eine Tabelle mit Read-Hooks auf einer Datenbank, deren Treiber diese nicht umgehen kann, gilt als ungelesen. Bevor etwas gelöscht wird, liest der Server jede Zeile und jeden History-Eintrag erneut gegen die aufgelisteten Dateien ab. Anschließend fragt er jede Datei unmittelbar vor dem Löschen erneut ab. Eine Datei, die jetzt von einer Zeile referenziert wird, die seit dem Scan erneut hochgeladen wurde oder die bereits verschwunden ist, wird beibehalten, und die CLI führt sie als beibehalten auf. Dateien, die nur von Tabellen referenziert werden, die Rebase nicht bereitstellt, wirken ungenutzt: Prüfen Sie dies vor dem Löschen. Bei einem Backend von 0.25.1 oder früher scannt die CLI auf die alte Weise innerhalb einer einzelnen Anfrage.
 
-`move` kopiert die Dateien unter `--prefix` seitenweise unter denselben Schlüsseln in eine andere Quelle. Eine Datei, die am Zielort bereits in gleicher Größe vorhanden ist, wird übersprungen, sodass ein abgebrochener Verschiebevorgang durch erneutes Ausführen fortgesetzt werden kann. `--delete-source` löscht jede Datei aus der Quelle, sobald das Ziel sie enthält, und wird verweigert, wenn beide Quellen denselben Bucket oder dasselbe Verzeichnis verwenden. Sobald der Verschiebevorgang abgeschlossen ist, listet die CLI die Quelle erneut durch einen frischen Durchlauf auf und nennt jede Datei, die nicht verschoben wurde: mit `--delete-source` jede Datei, die noch in der Quelle verblieben ist; ohne dieses Flag jede Datei, von der das Ziel keine Kopie mit gleicher Größe besitzt. Der Befehl beendet sich mit 1, wenn eine solche Datei existiert; ein erneutes Ausführen greift diese auf. `--json` gibt diese als `notMoved` aus. Das Lesen des Scan-Berichts erfordert `database:read`. Das Starten eines Scans, das Löschen und das Verschieben erfordern `database:write`, worüber der Service-Schlüssel verfügt.
+`move` kopiert die Dateien unter `--prefix` seitenweise unter denselben Schlüsseln zu einer anderen Quelle. Eine Datei, die das Ziel bereits in derselben Größe enthält, wird übersprungen, sodass ein unterbrochener Vorgang durch erneutes Ausführen fortgesetzt werden kann; `--delete-source` löscht jede Datei aus der Quelle, sobald das Ziel sie enthält, und wird verweigert, wenn beide Quellen im selben Bucket oder Verzeichnis speichern. Sobald das Verschieben abgeschlossen ist, listet die CLI die Quelle mit einem erneuten Durchlauf wieder auf und benennt jede Datei, die beim Vorgang nicht verschoben wurde: mit `--delete-source` jede Datei, die sich noch in der Quelle befindet; ohne dieses Flag jede Datei, von der das Ziel keine Kopie derselben Größe besitzt. Der Befehl beendet sich mit 1, falls eine solche Datei vorhanden ist, und ein erneutes Ausführen desselben Verschiebevorgangs greift diese auf. `--json` gibt diese als `notMoved` aus. Das Lesen des Berichts eines Scans erfordert `database:read`. Das Starten eines Scans, Löschen und Verschieben erfordert `database:write`, worüber der Service-Key verfügt.
 
 ### `rebase skills install`
 
@@ -373,13 +375,13 @@ rebase skills install --agent all
 rebase skills --hooks
 ```
 
-Siehe [Agent Skills](/docs/ai/skills) für die vollständige Liste und die Speicherorte der geschriebenen Dateien.
+Unter [Agent-Skills](/docs/ai/skills) finden Sie die vollständige Liste und die Speicherorte der geschriebenen Dateien.
 
-`--hooks` installiert das Claude Code-Guardrail, das `rebase init` mit jedem Projekt ausliefert: `.claude/hooks/post-edit-collection.sh`, registriert als `PostToolUse`-Hook in `.claude/settings.json`. Dieser führt nach jeder Bearbeitung unter `backend/schema/` oder `frontend/src/cms/` den Befehl `rebase verify --quiet` aus und meldet etwaige Probleme an den Agent zurück. Bestehende Einstellungen und Hooks bleiben erhalten. `rebase skills --hooks` installiert ausschließlich den Hook.
+`--hooks` installiert das Claude Code Guardrail, das `rebase init` mit jedem Projekt ausliefert: `.claude/hooks/post-edit-collection.sh`, registriert als `PostToolUse`-Hook in `.claude/settings.json`, welcher `rebase verify --quiet` nach jeder Bearbeitung unter `backend/schema/` oder `frontend/src/cms/` ausführt und jedes Problem an den Agenten zurückgibt. Bestehende Einstellungen und Hooks bleiben erhalten. `rebase skills --hooks` installiert ausschließlich den Hook.
 
 ### `rebase telemetry`
 
-Anonyme Erfassung von Nutzungsdaten, standardmäßig deaktiviert, bis Sie zustimmen. Ein interaktives `rebase init` fragt am Ende nach, und die Vorgabe ist „Nein“, sodass nichts geteilt wird, es sei denn, Sie stimmen ausdrücklich zu. Die Antwort gilt pro Maschine (`~/.rebase/telemetry.json`): Nach einem „Ja“ fragt `init` nie wieder nach, nach einem „Nein“ fragt das nächste `init` erneut nach. Jeder Checkout erhält eine zufällige Projekt-ID, die in der git-ignorierten Datei `.rebase/telemetry-project.json` gespeichert wird.
+Anonyme Nutzungsdatenerfassung, standardmäßig deaktiviert, bis Sie zustimmen. Ein interaktives `rebase init` fragt am Ende nach, wobei die Eingabeaufforderung standardmäßig auf "Nein" steht; es wird also nichts geteilt, es sei denn, Sie antworten mit "Ja". Die Entscheidung gilt pro Rechner (`~/.rebase/telemetry.json`): Nach einem "Ja" fragt `init` nie wieder nach, nach einem "Nein" fragt das nächste `init` erneut nach. Jeder Checkout erhält eine zufällige Projekt-ID, die in seiner git-ignorierten `.rebase/telemetry-project.json` gespeichert wird.
 
 ```bash
 rebase telemetry status
@@ -388,10 +390,10 @@ rebase telemetry enable
 rebase telemetry disable
 ```
 
-`status` gibt die aktuelle Einstellung aus, `show` gibt exakt das aus, was gesendet werden würde — unabhängig davon, ob das Teilen aktiviert ist, sodass Sie die Nutzlast vor Ihrer Entscheidung prüfen können — und die beiden anderen Befehle ändern die Einstellung. Wenn Sie `init` noch nie ausgeführt haben, wurden zu keinem Zeitpunkt Daten erfasst.
+`status` gibt die aktuelle Einstellung aus, `show` gibt exakt das aus, was gesendet werden würde — unabhängig davon, ob das Teilen aktiviert ist, sodass Sie die Nutzdaten vor Ihrer Entscheidung prüfen können — und die beiden anderen ändern die Einstellung. Wenn Sie `init` nie ausgeführt haben, wurden zu keinem Zeitpunkt Daten erfasst.
 
 ## Nächste Schritte
 
-- **[Schemagenerierung](/docs/cli/schema/#production-workflow)** — Der Migrations-Workflow, von der Tabellenbearbeitung bis zur Produktion
-- **[Schema as Code](/docs/architecture/schema-as-code)** — Funktionsweise der Schemagenerierung
+- **[Schema-Generierung](/docs/cli/schema/#production-workflow)** — Der Migrations-Workflow, von der Tabellenänderung bis zur Produktion
+- **[Schema as Code](/docs/architecture/schema-as-code)** — Wie die Schema-Generierung funktioniert
 - **[Schnellstart](/docs/getting-started/quickstart)** — Erste Schritte

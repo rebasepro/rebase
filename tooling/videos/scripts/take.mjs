@@ -27,6 +27,12 @@
  *
  * The film then starts fifteen frames before the first word, as the
  * authored film does: the take's head is trimmed with `startFrom`.
+ *
+ * A TAKE FROM THE PHONE (live.json `video.latencyMs`): the picture came over
+ * Wi-Fi and reached the recorder that long after the Mac's microphone heard
+ * the same moment. The picture's head is cut by that much, so each frame
+ * meets the sound it was filmed with; the sound, and every time measured on
+ * it, stays exactly as recorded.
  */
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -221,10 +227,15 @@ export async function processTake(id, { log = console.log } = {}) {
 
     await mkdir(path.join(ROOT, "public", "takes"), { recursive: true });
     const video = path.join(ROOT, "public", "takes", `${id}.mp4`);
-    log(`${id}: encoding the take for the film…`);
+    /* The phone's picture arrived this late: move it back by as much. */
+    const lag = Number(live.video?.latencyMs);
+    const shift = Number.isFinite(lag) && lag > 0 && lag < 1000 ? lag / 1000 : 0;
+    log(`${id}: encoding the take for the film…${shift ? ` (the phone's picture moved ${Math.round(shift * 1000)} ms earlier to meet the sound)` : ""}`);
     await run([
         "-y", "-i", source,
-        "-vf", "fps=30,format=yuv420p",
+        ...(shift
+            ? ["-filter_complex", `[0:v]trim=start=${shift.toFixed(3)},setpts=PTS-${shift.toFixed(3)}/TB,fps=30,format=yuv420p[v]`, "-map", "[v]", "-map", "0:a"]
+            : ["-vf", "fps=30,format=yuv420p"]),
         "-c:v", "libx264", "-preset", "medium", "-crf", "17",
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-movflags", "+faststart",

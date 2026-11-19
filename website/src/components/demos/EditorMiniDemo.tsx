@@ -40,15 +40,15 @@ export function EditorMiniDemo() {
 
                 {step === 0 && <div className="flex items-center"><div className="w-[1px] h-3 bg-primary animate-pulse"></div></div>}
 
-                {step === 1 && <div className="text-[10px] font-mono text-surface-400 flex items-center">/im<div className="w-[1px] h-3 bg-primary animate-pulse ml-[1px]"></div></div>}
+                {step === 1 && <div className="text-[10px] font-mono text-tone-400 flex items-center">/im<div className="w-[1px] h-3 bg-primary animate-pulse ml-[1px]"></div></div>}
 
                 {step === 2 && (
                     <div className="relative">
-                        <div className="text-[10px] font-mono text-surface-400 flex items-center">/image<div className="w-[1px] h-3 bg-primary animate-pulse ml-[1px]"></div></div>
+                        <div className="text-[10px] font-mono text-tone-400 flex items-center">/image<div className="w-[1px] h-3 bg-primary animate-pulse ml-[1px]"></div></div>
                         <div className="absolute top-4 left-0 bg-surface-raised border border-hairline-strong rounded shadow-lg p-1 w-24">
                             <div className="bg-surface-raised-hover rounded flex items-center p-1 gap-1">
-                                <svg className="w-3 h-3 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                <span className="text-[8px] text-surface-300">Image</span>
+                                <svg className="w-3 h-3 text-tone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                <span className="text-[8px] text-tone-300">Image</span>
                             </div>
                         </div>
                     </div>
@@ -56,12 +56,12 @@ export function EditorMiniDemo() {
 
                 {(step === 3 || step === 4) && (
                     <div className="w-full h-12 bg-surface-raised rounded border border-hairline border-dashed flex items-center justify-center relative overflow-hidden">
-                        <svg className="w-4 h-4 text-surface-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
+                        <svg className="w-4 h-4 text-tone-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-tone-max/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
                     </div>
                 )}
 
-                {step === 4 && <div className="text-[9px] text-surface-400 mt-1 flex items-center">Visual editor integration.<div className="w-[1px] h-3 bg-primary animate-pulse ml-[1px]"></div></div>}
+                {step === 4 && <div className="text-[9px] text-tone-400 mt-1 flex items-center">Visual editor integration.<div className="w-[1px] h-3 bg-primary animate-pulse ml-[1px]"></div></div>}
             </div>
         </div>
     );

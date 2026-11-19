@@ -9,14 +9,14 @@ import ChapterRule from "./ChapterRule.astro";
     <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <ChapterRule label={t('roadmap.badge')} dot="text-cyan-300" />
         <div class="mt-lead max-w-2xl mb-20 animate-on-scroll fade-in-up">
-            <h2 class="text-3xl sm:text-4xl text-white">{t('roadmap.title')}</h2>
-            <p class="mt-lead text-surface-400 text-lg">{t('roadmap.subtitle')}</p>
+            <h2 class="text-3xl sm:text-4xl text-tone-max">{t('roadmap.title')}</h2>
+            <p class="mt-lead text-tone-400 text-lg">{t('roadmap.subtitle')}</p>
         </div>
 
         <div class="relative max-w-3xl mx-auto">
             <!-- Connecting Vertical Lines -->
             <!-- Background dashed line -->
-            <div class="absolute left-[27px] sm:left-[39px] top-8 bottom-8 w-px border-l-[2px] border-dashed border-surface-800"></div>
+            <div class="absolute left-[27px] sm:left-[39px] top-8 bottom-8 w-px border-l-[2px] border-dashed border-tone-800"></div>
             <!-- Glowing gradient line filling part of the timeline -->
             <div class="absolute left-[27px] sm:left-[39px] top-8 h-[60%] w-[2px] bg-linear-to-b from-emerald-500 via-primary to-transparent blur-[3px]"></div>
             <div class="absolute left-[28px] sm:left-[40px] top-8 h-[55%] w-[1px] bg-linear-to-b from-emerald-400 via-primary to-transparent"></div>
@@ -31,7 +31,7 @@ import ChapterRule from "./ChapterRule.astro";
                 
                 <div class="frame relative p-6 sm:p-8 hover:border-emerald-500/30 transition-all duration-300 group">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-                        <h3 class="text-2xl text-white">{t('roadmap.now.title')}</h3>
+                        <h3 class="text-2xl text-tone-max">{t('roadmap.now.title')}</h3>
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 text-xs font-medium ring-1 ring-emerald-500/20 w-fit">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                             {t('roadmap.now.badge')}
@@ -40,47 +40,47 @@ import ChapterRule from "./ChapterRule.astro";
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.now.item1')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.now.item1')}</span>
                         </div>
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.now.item2')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.now.item2')}</span>
                         </div>
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.now.item3')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.now.item3')}</span>
                         </div>
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.now.item4')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.now.item4')}</span>
                         </div>
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.now.item5')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.now.item5')}</span>
                         </div>
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.now.item6')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.now.item6')}</span>
                         </div>
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.now.item7')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.now.item7')}</span>
                         </div>
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.now.item8')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.now.item8')}</span>
                         </div>
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.now.item9')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.now.item9')}</span>
                         </div>
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.now.item10')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.now.item10')}</span>
                         </div>
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.now.item11')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.now.item11')}</span>
                         </div>
                     </div>
                 </div>
@@ -89,15 +89,15 @@ import ChapterRule from "./ChapterRule.astro";
             <!-- Phase 2: Next -->
             <div class="relative pl-16 sm:pl-24 pb-16 animate-on-scroll fade-in-up delay-100">
                 <!-- Highlight Dot -->
-                <div class="absolute left-[16px] sm:left-[28px] top-5 flex h-6 w-6 items-center justify-center rounded-full bg-surface-950 ring-2 ring-primary z-10">
+                <div class="absolute left-[16px] sm:left-[28px] top-5 flex h-6 w-6 items-center justify-center rounded-full bg-tone-950 ring-2 ring-primary z-10">
                     <span class="h-2 w-2 rounded-full bg-primary shadow-[0_0_10px_rgba(var(--color-primary-rgb),1)] animate-pulse"></span>
                 </div>
 
-                <div class="relative rounded-2xl bg-gradient-to-br from-surface-900/80 to-surface-950/70 border border-primary/30 p-6 sm:p-8 shadow-[0_10px_30px_rgba(var(--color-primary-rgb),0.12)] hover:border-primary/50 transition-all duration-300 group">
+                <div class="relative rounded-2xl bg-gradient-to-br from-tone-900/80 to-tone-950/70 border border-primary/30 p-6 sm:p-8 shadow-[0_10px_30px_rgba(var(--color-primary-rgb),0.12)] hover:border-primary/50 transition-all duration-300 group">
                     <div class="absolute -top-px left-10 right-10 h-px bg-linear-to-r from-transparent via-primary/70 to-transparent"></div>
                     
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-                        <h3 class="text-2xl text-white">{t('roadmap.next.title')}</h3>
+                        <h3 class="text-2xl text-tone-max">{t('roadmap.next.title')}</h3>
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 text-primary-light text-xs font-medium ring-1 ring-primary/30 w-fit">
                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             {t('roadmap.next.badge')}
@@ -106,15 +106,15 @@ import ChapterRule from "./ChapterRule.astro";
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-primary-light shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-                            <span class="text-white font-medium text-sm">{t('roadmap.next.item1')}</span>
+                            <span class="text-tone-max font-medium text-sm">{t('roadmap.next.item1')}</span>
                         </div>
                         <div class="flex items-start gap-3">
-                            <svg class="h-4.5 w-4.5 text-surface-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.next.item2')}</span>
+                            <svg class="h-4.5 w-4.5 text-tone-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" /></svg>
+                            <span class="text-tone-300 text-sm">{t('roadmap.next.item2')}</span>
                         </div>
                         <div class="flex items-start gap-3">
-                            <svg class="h-4.5 w-4.5 text-surface-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.next.item3')}</span>
+                            <svg class="h-4.5 w-4.5 text-tone-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
+                            <span class="text-tone-300 text-sm">{t('roadmap.next.item3')}</span>
                         </div>
                     </div>
                 </div>
@@ -123,33 +123,33 @@ import ChapterRule from "./ChapterRule.astro";
             <!-- Phase 3: Later -->
             <div class="relative pl-16 sm:pl-24 animate-on-scroll fade-in-up delay-200">
                 <!-- Inactive Dot -->
-                <div class="absolute left-[19px] sm:left-[31px] top-6 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-surface-950 ring-2 ring-surface-700 z-10">
-                    <span class="h-1.5 w-1.5 rounded-full bg-surface-600"></span>
+                <div class="absolute left-[19px] sm:left-[31px] top-6 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-tone-950 ring-2 ring-tone-700 z-10">
+                    <span class="h-1.5 w-1.5 rounded-full bg-tone-600"></span>
                 </div>
 
-                <div class="frame relative p-6 sm:p-8 opacity-80 hover:opacity-100 hover:border-surface-700 transition-all duration-300 group">
+                <div class="frame relative p-6 sm:p-8 opacity-80 hover:opacity-100 hover:border-tone-700 transition-all duration-300 group">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-                        <h3 class="text-2xl text-white">{t('roadmap.later.title')}</h3>
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-800/50 text-surface-400 text-xs font-medium ring-1 ring-surface-700 w-fit">
+                        <h3 class="text-2xl text-tone-max">{t('roadmap.later.title')}</h3>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-tone-800/50 text-tone-400 text-xs font-medium ring-1 ring-tone-700 w-fit">
                             {t('roadmap.later.badge')}
                         </span>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                         <div class="flex items-start gap-3">
                             <svg class="h-4.5 w-4.5 text-primary/70 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
-                            <span class="text-surface-300 text-sm">{t('roadmap.later.item1')}</span>
+                            <span class="text-tone-300 text-sm">{t('roadmap.later.item1')}</span>
                         </div>
                         <div class="flex items-start gap-3">
-                            <svg class="h-4.5 w-4.5 text-surface-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
-                            <span class="text-surface-400 text-sm">{t('roadmap.later.item2')}</span>
+                            <svg class="h-4.5 w-4.5 text-tone-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
+                            <span class="text-tone-400 text-sm">{t('roadmap.later.item2')}</span>
                         </div>
                         <div class="flex items-start gap-3">
-                            <svg class="h-4.5 w-4.5 text-surface-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>
-                            <span class="text-surface-400 text-sm">{t('roadmap.later.item3')}</span>
+                            <svg class="h-4.5 w-4.5 text-tone-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>
+                            <span class="text-tone-400 text-sm">{t('roadmap.later.item3')}</span>
                         </div>
                         <div class="flex items-start gap-3">
-                            <svg class="h-4.5 w-4.5 text-surface-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
-                            <span class="text-surface-400 text-sm">{t('roadmap.later.item4')}</span>
+                            <svg class="h-4.5 w-4.5 text-tone-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                            <span class="text-tone-400 text-sm">{t('roadmap.later.item4')}</span>
                         </div>
                     </div>
                 </div>

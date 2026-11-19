@@ -12,6 +12,7 @@
  */
 import React, { useState } from "react";
 import {
+    StatusDot,
     Autocomplete,
     AutocompleteItem,
     Badge,
@@ -469,8 +470,19 @@ const VIRTUAL_COLUMNS: VirtualTableColumn[] = [
 
 export function DataDisplaySection() {
     return (
-        <SectionBlock id="data-display" title="Data display — Badge, InfoLabel, Markdown, VirtualTable">
+        <SectionBlock id="data-display" title="Data display — StatusDot, Badge, InfoLabel, Markdown, VirtualTable">
             <div className="grid grid-cols-12 gap-6">
+                <div className="col-span-12 flex flex-col gap-3">
+                    <SpecimenLabel>StatusDot · ok, busy (pulses), bad, idle — medium in a list, small beside a value, inherit as a value</SpecimenLabel>
+                    <div className="flex flex-wrap items-center gap-6">
+                        <StatusDot tone="ok">Running</StatusDot>
+                        <StatusDot tone="busy">Deploying</StatusDot>
+                        <StatusDot tone="bad">Failed</StatusDot>
+                        <StatusDot tone="idle">Stopped</StatusDot>
+                        <StatusDot tone="ok" size="small">Live</StatusDot>
+                        <Typography variant="h5" component="span"><StatusDot tone="ok" size="inherit">Healthy</StatusDot></Typography>
+                    </div>
+                </div>
                 <div className="col-span-12 sm:col-span-6 flex flex-col gap-3">
                     <SpecimenLabel>Badge · primary, secondary, warning, error, invisible</SpecimenLabel>
                     <div className="flex items-center gap-6">

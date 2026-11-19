@@ -66,6 +66,7 @@ import {
     type DeployedApp,
     type LiveCheck
 } from "./deploy-summary";
+import { readAuthConfig, resolveBlockedState } from "./resources";
 import { listContextFiles, MAX_SOURCE_UPLOAD_BYTES, packSource, prepareRebuildSource, type RebuildSource } from "./rebuild-source";
 import {
     PREVIEW_DEPLOYMENTS_COLLECTION,
@@ -837,6 +838,13 @@ async function reportDeployed(o: {
     }
     const verdict = liveVerdict(live, o.liveTimeoutMs);
     const elapsedMs = Date.now() - o.startedAt;
+    // Live is not the same as usable: an app whose sign-in is the magic link,
+    // deployed with no email service, answers on every address and lets
+    // nobody in. Asked only when the new version is confirmed live.
+    const blocked = verdict.live === true && host
+        ? resolveBlockedState({ database: {}, lastDeploy: { status: "success" }, authConfig: await readAuthConfig(host) })
+        : undefined;
+    const blockedOn = blocked?.blockedOn ? blocked : undefined;
 
     emit(
         () => {
@@ -850,6 +858,11 @@ async function reportDeployed(o: {
             });
             // The way back, under the verdict that says whether it is needed.
             if (o.undo) lines.splice(lines.length - 1, 0, chalk.gray(`  ${o.undo}`));
+            if (blockedOn) {
+                lines.splice(lines.length - 1, 0,
+                    chalk.yellow(`  ⚠ Live, but nobody can sign in: magic-link sign-in is on and the app has no email service (${blockedOn.blockedOn}).`),
+                    chalk.gray(`    ${blockedOn.nextAction}`));
+            }
             for (const line of lines) console.log(line);
             printPendingHosts(hosts);
         },
@@ -859,7 +872,9 @@ apps,
 ...hostsField(hosts, o.registeredHosts),
 durationMs: elapsedMs,
 live: verdict.live,
-liveChecks: live ?? [] }
+liveChecks: live ?? [],
+blockedOn: blockedOn?.blockedOn ?? null,
+nextAction: blockedOn?.nextAction ?? null }
     );
 }
 

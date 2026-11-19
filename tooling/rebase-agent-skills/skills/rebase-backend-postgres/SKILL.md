@@ -25,7 +25,7 @@ tables, columns and enum types, and the tables' RLS policies
 renames or narrows — that is what step 2 is for.
 
 Both commands render the schema to `backend/.rebase/sql/schema.sql`. In Rebase
-0.34 and later, Ptah Compat plans the tables and their declared application
+0.35 and later, Ptah Compat plans the tables and their declared application
 objects together. Commit the migration history and `backend/drizzle/ptah-managed.json`.
 The generated files under `backend/.rebase/sql/` are Git-ignored.
 
@@ -536,7 +536,7 @@ In non-production mode, `loadEnv()` **auto-generates** `JWT_SECRET` and `REBASE_
 ## Migrations with Ptah Compat
 
 A Rebase project has no `drizzle.config.ts` and runs no `drizzle-kit`.
-From Rebase 0.34, the PostgreSQL backend uses `@stokaro/ptah-compat` for
+From Rebase 0.35, the PostgreSQL backend uses `@stokaro/ptah-compat` for
 `db push`, `db generate`, and `db migrate`.
 
 - Ptah reads the declared schema from `.rebase/sql/schema.sql`. Commit

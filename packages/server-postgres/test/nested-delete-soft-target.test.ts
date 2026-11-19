@@ -102,11 +102,14 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
     const orm = pgliteNodePg(pglite, {
         schema: { posts: postsTable, tags: tagsTable, labels: labelsTable, comments: commentsTable, posts_tags: postsTagsTable, posts_labels: postsLabelsTable }
     });
+    // Overridden on the instance, not with `jest.spyOn`: jest keeps a spy's
+    // target until the file ends, and this one reaches the test's PGlite, so
+    // every test's database stayed alive (see spg-b-pglite-node-pg.ts).
     const history = new HistoryService(pgliteNodePg(pglite));
-    jest.spyOn(history, "assertRecordable").mockImplementation(() => undefined);
-    jest.spyOn(history, "recordHistory").mockImplementation(async (p) => {
+    history.assertRecordable = () => undefined;
+    history.recordHistory = async (p) => {
         recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
-    });
+    };
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, undefined, undefined, history);
 }
 

@@ -58,10 +58,10 @@ const INTRINSIC: Record<string, [number, number]> = {
 // the wide logos, where `max-w-full` clamps width against a fixed inline height
 // and would otherwise squash the artwork (viscap wants 242px at h-42, cell is 144).
 const LOGO_TEXT_CLASSES =
-    "font-semibold text-center text-surface-200 opacity-60 hover:opacity-100 hover:text-white transition-all duration-500";
+    "font-semibold text-center text-tone-200 opacity-60 hover:opacity-100 hover:text-tone-max transition-all duration-500";
 
 const LOGO_IMG_CLASSES =
-    "max-w-full w-auto h-auto object-contain grayscale opacity-60 hover:opacity-100 transition-all duration-500";
+    "logo-ink max-w-full w-auto h-auto object-contain grayscale opacity-60 hover:opacity-100 transition-all duration-500";
 
 // `product` records which of our two tools a company actually ships on.
 //

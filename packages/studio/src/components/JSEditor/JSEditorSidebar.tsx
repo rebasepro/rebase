@@ -173,7 +173,7 @@ export const JSEditorSidebar = ({
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                                         </svg>
                                     </div>
-                                    <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-[10px] leading-tight">
+                                    <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-xs leading-tight">
                                         {ref.description}
                                     </Typography>
                                 </div>
@@ -258,7 +258,7 @@ export const JSEditorSidebar = ({
                                         <svg className="w-3 h-3 mt-1 mr-2 text-text-disabled dark:text-text-disabled-dark group-hover:text-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                         </svg>
-                                        <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark group-hover:text-text-primary dark:group-hover:text-text-primary-dark text-[11px] line-clamp-2 leading-tight flex-grow font-mono">
+                                        <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark group-hover:text-text-primary dark:group-hover:text-text-primary-dark text-xs line-clamp-2 leading-tight flex-grow font-mono">
                                             {code.length > 120 ? code.substring(0, 120) + "…" : code}
                                         </Typography>
                                     </div>
@@ -317,7 +317,7 @@ function CollectionItem({ collection, onInsertCode }: { collection: TableInfo; o
                             onClick={() => onInsertCode(`"${prop}"`)}
                         >
                             <svg className="w-3 h-3 mr-1.5 text-text-disabled dark:text-text-disabled-dark shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 4.5v15m6-15v15m-10.5-1.5h15c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125h-15c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125Z"/></svg>
-                            <Typography variant="caption" className="text-text-primary dark:text-text-primary-dark text-[11px] truncate flex-grow font-mono">{prop}</Typography>
+                            <Typography variant="caption" className="text-text-primary dark:text-text-primary-dark text-xs truncate flex-grow font-mono">{prop}</Typography>
                         </div>
                     ))}
                 </div>
@@ -336,7 +336,7 @@ function SnippetItem({ snippet, onSelect, onDelete }: { snippet: JSSnippet; onSe
             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-[13px] truncate pr-6">
                 {snippet.name}
             </Typography>
-            <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[10px] block mt-1 truncate font-mono">
+            <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-xs block mt-1 truncate font-mono">
                 {snippet.code}
             </Typography>
             <IconButton aria-label={t("delete")}

@@ -151,6 +151,7 @@ answers.
 | `REBASE_SERVICE_KEY` | Static admin API key. Bypasses normal JWT auth for server-to-server calls when passed as `Authorization: Bearer <key>`. (Auto-generated in development). | — |
 | `REBASE_PLATFORM_TOKEN_KEY` | The hosting platform's public key (PEM, EC P-256) that `rpt_` platform tokens are verified against; several PEM blocks during a key rotation. The platform sets it at deploy, and it holds nothing secret. Together with `REBASE_PLATFORM_TOKEN_AUDIENCE` it lets the admin gate accept a platform token for `cron:read`, and for nothing else. | — |
 | `REBASE_PLATFORM_TOKEN_AUDIENCE` | The project id a platform token's `aud` must equal, so a token minted for another project is refused. With only one of the two variables set, the server boots, logs a warning, and answers every `rpt_` token with `401 PLATFORM_TOKENS_OFF`. | — |
+| `REBASE_PLATFORM_SIGNIN_URL` | Where the admin panel's **Continue with Rebase Cloud** goes: the project's page in the platform's console, which signs the project's owners in and comes back. The platform sets it at deploy with the two above; with them, `POST /api/auth/platform-signin` accepts the platform's one-minute `auth:admin-signin` token and opens an admin session. Without it the door still works from the console's **Open CMS**, and the login screen only explains it. | — |
 | `REBASE_RATE_LIMIT_STORE` | Where rate-limit counters live, for the auth routes and for `rateLimit` in custom functions: `memory` (per-process) or `sql` (shared across replicas). A process cannot see its own replica count, so a deployment with peers has to say so — three replicas on the default enforce three times the limit. Any other value **refuses to boot** rather than falling back, `postgres` included. | `memory` |
 | `AUTH_MAGIC_LINK` | Mount the passwordless sign-in-link flow. Needs an email service configured, or the link has nowhere to go. | `false` |
 | `AUTH_EMAIL_OTP` | Mount passwordless sign-in with a six-digit code sent by email. Same email requirement as above. | `false` |
@@ -192,6 +193,7 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `STORAGE_RENDITION_CACHE` | Cache generated image renditions (resizes, format conversions) instead of producing them per request. | `false` |
 
 ### Email (Optional)
+`MAGIC_LINK_URL`.
 
 | Variable | Description |
 |----------|-------------|
@@ -204,6 +206,7 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `SMTP_NAME` | Display name on the sender address |
 | `APP_NAME` | Product name used in email subjects and bodies (default: `Rebase`) |
 | `EMAIL_LOGO_URL` | Logo shown atop the default email templates. Absolute `http(s)` PNG or JPG — clients strip SVG and block `data:` URIs. Unset, an app still named `Rebase` gets the Rebase mark and a renamed one gets none |
+| `MAGIC_LINK_URL` | Where an emailed magic link points. A base gets `/auth/magic-link?token=…` appended; a URL containing `{token}` is the whole link, for a frontend that does not serve `/auth/magic-link`. Quote it in `.env`, where an unquoted `#` starts a comment: `MAGIC_LINK_URL="https://app.example.com/app.html#ml={token}"`. A value with a hash or a file path and no `{token}` is warned about at boot. Unset, the base is `FRONTEND_URL` |
 
 ### Database connection pool
 
@@ -400,10 +403,6 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `REBASE_ATLAS_DEV_URL` | Empty dev database for `db push` and `db generate`. The name remains for existing projects. Rebase does not manage a database set here and refuses the target URL. Managed PGlite gets a disposable in-memory dev database. Use this setting when `CREATE DATABASE` is unavailable; `db migrate` does not need it. | `<db>_dev_diff` |
 | `PTAH_TRUST_REPLAY_SQL` | Allows `db push` (including `--dry-run`) and `db generate` to replay trusted SQL on a shared PostgreSQL dev server. Set to `1` only if you trust the SQL to run with the dev connection's privileges. Roles it creates can remain on the server. | unset |
 | `PTAH_DEV_SERVER_DISPOSABLE` | Set to `1` only when the whole dev server is disposable. Rebase sets it automatically for its managed PGlite dev server. | unset |
-| `PTAH_ATLAS_ALLOW_UNMATCHED_EXCLUDE` | Set by Rebase so one exclusion list works when an object is absent. No manual setting is needed. | `1` during database commands |
-| `PTAH_ATLAS_MIGRATE_DIFF_EXCLUDE` | Set by Rebase from its protected object selectors during `db generate`. No manual setting is needed. | generated |
-| `PTAH_ATLAS_MIGRATE_DIFF_INCLUDE` | Set by Rebase from its declared object selectors during `db generate`. No manual setting is needed. | generated |
-| `REBASE_PTAH_DEV_PGLITE` | Internal marker for the managed PGlite dev connection. Rebase sets it automatically. | unset |
 | `REBASE_DEV_NO_DB` | `rebase dev` starts no database and provisions nothing — you bring your own. Same as `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Pins the frontend dev server's port, which `rebase dev` otherwise derives from the project's path. | — |
 | `REBASE_DEV_READY_TIMEOUT_MS` | How long `rebase dev` waits for the backend to announce itself before saying it has not started. `0` disables the report. | `30000` |

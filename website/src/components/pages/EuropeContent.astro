@@ -26,22 +26,22 @@ const surfaces = [
     { name: "MCP", detail: t("europe.s.mcp") },
 ];
 
-const composeSnippet = `<span class="text-surface-500">// docker-compose.yml — the whole deployment</span>
+const composeSnippet = `<span class="text-tone-500">// docker-compose.yml — the whole deployment</span>
 <span class="text-blue-300">services</span>:
   <span class="text-blue-300">db</span>:
     <span class="text-blue-300">image</span>: <span class="text-green-400">postgres:18-alpine</span>
 
   <span class="text-blue-300">api</span>:
-    <span class="text-blue-300">image</span>: <span class="text-green-400">rebasepro/server:0.33.2</span>
+    <span class="text-blue-300">image</span>: <span class="text-green-400">rebasepro/server:0.34.1</span>
     <span class="text-blue-300">volumes</span>:
       - <span class="text-green-400">./dist-bundle:/bundle:ro</span>
     <span class="text-blue-300">environment</span>:
       <span class="text-blue-300">DATABASE_URL</span>: <span class="text-green-400">postgres://…@db:5432/rebase</span>
       <span class="text-blue-300">JWT_SECRET</span>: <span class="text-green-400">\${JWT_SECRET}</span>
 
-<span class="text-surface-500">// that is the deployment. There is no application</span>
-<span class="text-surface-500">// image to build — the runtime is published, and</span>
-<span class="text-surface-500">// your project travels as a bundle.</span>`;
+<span class="text-tone-500">// that is the deployment. There is no application</span>
+<span class="text-tone-500">// image to build — the runtime is published, and</span>
+<span class="text-tone-500">// your project travels as a bundle.</span>`;
 import ClosingCta from "../ClosingCta.astro";
 import HeroBackdrop from "../HeroBackdrop.astro";
 import ChapterRule from "../ChapterRule.astro";
@@ -60,28 +60,28 @@ import ChapterRule from "../ChapterRule.astro";
         <div class="relative z-10 mx-auto max-w-6xl px-6 lg:px-8">
             <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t("europe.badge")}</span></div>
 
-            <h1 class="mb-6 text-display-2 text-white" set:html={t("europe.00")}></h1>
+            <h1 class="mb-6 text-display-2 text-tone-max" set:html={t("europe.00")}></h1>
 
             {/* Measures, not padding. This carried `sm:px-16 … xl:px-40`, so on a
                 wide screen 160px of left padding pushed the lead a third of the
                 way across the page while the headline above it stayed on the
                 shell edge — three different left edges in one block. §6's lead
                 measure does the same job without moving the edge. */}
-            <p class="mb-6 max-w-[38rem] text-lg leading-8 text-surface-300 lg:text-xl">{t("europe.01")}</p>
-            <p class="mb-10 max-w-[38rem] text-base leading-7 text-surface-400" set:html={t("europe.02")}></p>
+            <p class="mb-6 max-w-[38rem] text-lg leading-8 text-tone-300 lg:text-xl">{t("europe.01")}</p>
+            <p class="mb-10 max-w-[38rem] text-base leading-7 text-tone-400" set:html={t("europe.02")}></p>
 
             {/* Left-aligned with everything above it. Centred, it was the only
                 element in the hero not on the shell edge. */}
-            <div class="max-w-xl overflow-hidden rounded-xl border border-surface-800 bg-[#0c0d10] font-mono text-xs shadow-2xl">
-                <div class="flex items-center gap-1.5 border-b border-surface-800/80 bg-[#14151a] px-4 py-2.5">
+            <div class="max-w-xl overflow-hidden rounded-xl border border-tone-800 bg-[#0c0d10] island-dark font-mono text-xs shadow-2xl">
+                <div class="flex items-center gap-1.5 border-b border-tone-800/80 bg-[#14151a] island-dark px-4 py-2.5">
                     <span class="h-2.5 w-2.5 rounded-full bg-rose-500/80"></span>
                     <span class="h-2.5 w-2.5 rounded-full bg-amber-500/80"></span>
                     <span class="h-2.5 w-2.5 rounded-full bg-emerald-500/80"></span>
-                    <span class="ml-auto text-3xs font-semibold tracking-wide text-surface-500">zsh</span>
+                    <span class="ml-auto text-3xs font-semibold tracking-wide text-tone-500">zsh</span>
                 </div>
                 <div class="flex items-center gap-2 p-5 text-left">
                     <span class="select-none font-semibold text-primary-light">&gt;</span>
-                    <span class="select-all font-medium text-white">pnpm dlx @rebasepro/cli init</span>
+                    <span class="select-all font-medium text-tone-max">pnpm dlx @rebasepro/cli init</span>
                     <span class="inline-block h-4 w-1.5 animate-pulse bg-primary align-middle"></span>
                 </div>
             </div>
@@ -95,9 +95,9 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.04")}</h2>
-                <p class="text-base leading-relaxed text-surface-400" set:html={t("europe.05")}></p>
-                <p class="mt-4 text-base leading-relaxed text-surface-400" set:html={t("europe.06")}></p>
+                <h2 class="mb-5 text-3xl sm:text-4xl text-tone-max">{t("europe.04")}</h2>
+                <p class="text-base leading-relaxed text-tone-400" set:html={t("europe.05")}></p>
+                <p class="mt-4 text-base leading-relaxed text-tone-400" set:html={t("europe.06")}></p>
             </div>
 
             <div class="mx-auto max-w-6xl">
@@ -114,10 +114,10 @@ import ChapterRule from "../ChapterRule.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
                 <div class="lg:col-span-5">
-                    <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.08")}</h2>
-                    <p class="mb-4 text-base leading-relaxed text-surface-400">{t("europe.09")}</p>
-                    <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("europe.10")}></p>
-                    <p class="mb-6 text-base leading-relaxed text-surface-400">{t("europe.11")}</p>
+                    <h2 class="mb-5 text-3xl sm:text-4xl text-tone-max">{t("europe.08")}</h2>
+                    <p class="mb-4 text-base leading-relaxed text-tone-400">{t("europe.09")}</p>
+                    <p class="mb-4 text-base leading-relaxed text-tone-400" set:html={t("europe.10")}></p>
+                    <p class="mb-6 text-base leading-relaxed text-tone-400">{t("europe.11")}</p>
                     <a href="/docs/deployment/self-hosting"
                        class="inline-flex items-center gap-2 text-sm font-medium text-primary-light transition-colors hover:text-primary/80">
                         {t("europe.link.selfhost")}
@@ -136,16 +136,16 @@ import ChapterRule from "../ChapterRule.astro";
             <div class="mx-auto mt-14 grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
                 <div class="lg:col-span-7 lg:order-last">
                     <div class="frame overflow-hidden">
-                        <div class="border-b border-surface-800/80 bg-surface-900/50 px-4 py-3">
-                            <span class="font-mono text-xs text-surface-400">docker-compose.yml</span>
+                        <div class="border-b border-tone-800/80 bg-tone-900/50 px-4 py-3">
+                            <span class="font-mono text-xs text-tone-400">docker-compose.yml</span>
                         </div>
-                        <pre class="overflow-x-auto p-5 font-mono text-2xs leading-relaxed text-surface-300 sm:text-xs"><code set:html={composeSnippet}></code></pre>
+                        <pre class="overflow-x-auto p-5 font-mono text-2xs leading-relaxed text-tone-300 sm:text-xs"><code set:html={composeSnippet}></code></pre>
                     </div>
                 </div>
                 <div class="lg:col-span-5">
-                    <h3 class="mb-4 text-2xl text-white">{t("europe.12")}</h3>
-                    <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("europe.13")}></p>
-                    <p class="text-base leading-relaxed text-surface-400" set:html={t("europe.14")}></p>
+                    <h3 class="mb-4 text-2xl text-tone-max">{t("europe.12")}</h3>
+                    <p class="mb-4 text-base leading-relaxed text-tone-400" set:html={t("europe.13")}></p>
+                    <p class="text-base leading-relaxed text-tone-400" set:html={t("europe.14")}></p>
                 </div>
             </div>
         </div>
@@ -159,9 +159,9 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.15")}</h2>
-                <p class="text-base leading-relaxed text-surface-400">{t("europe.16")}</p>
-                <p class="mt-4 text-base leading-relaxed text-surface-400">{t("europe.17")}</p>
+                <h2 class="mb-5 text-3xl sm:text-4xl text-tone-max">{t("europe.15")}</h2>
+                <p class="text-base leading-relaxed text-tone-400">{t("europe.16")}</p>
+                <p class="mt-4 text-base leading-relaxed text-tone-400">{t("europe.17")}</p>
             </div>
 
             <div class="mx-auto max-w-6xl">
@@ -177,8 +177,8 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.19")}</h2>
-                <p class="text-base leading-relaxed text-surface-400">{t("europe.20")}</p>
+                <h2 class="mb-5 text-3xl sm:text-4xl text-tone-max">{t("europe.19")}</h2>
+                <p class="text-base leading-relaxed text-tone-400">{t("europe.20")}</p>
             </div>
 
             <div class="frame p-6 sm:p-8">
@@ -192,14 +192,14 @@ import ChapterRule from "../ChapterRule.astro";
                                 </svg>
                             </span>
                             <span class="min-w-0">
-                                <span class="block text-sm font-medium text-surface-200">{s.name}</span>
-                                <span class="block text-xs text-surface-500">{s.detail}</span>
+                                <span class="block text-sm font-medium text-tone-200">{s.name}</span>
+                                <span class="block text-xs text-tone-500">{s.detail}</span>
                             </span>
                         </div>
                     ))}
                 </div>
 
-                <p class="mt-8 border-t border-surface-800/60 pt-6 text-sm leading-relaxed text-surface-400">
+                <p class="mt-8 border-t border-tone-800/60 pt-6 text-sm leading-relaxed text-tone-400">
                     {t("europe.panelNote")}
                     <a href={translatePath("/cms")} class="ml-1 text-primary-light hover:underline">{t("europe.link.panel")}</a>.
                 </p>
@@ -214,8 +214,8 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.22")}</h2>
-                <p class="text-base leading-relaxed text-surface-400">{t("europe.23")}</p>
+                <h2 class="mb-5 text-3xl sm:text-4xl text-tone-max">{t("europe.22")}</h2>
+                <p class="text-base leading-relaxed text-tone-400">{t("europe.23")}</p>
             </div>
 
             <EuropeMapDemo client:visible s={Object.fromEntries(EUROPE_MAP_STRINGS.map((k) => [k, t(k)]))} />
@@ -229,40 +229,40 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
         <div class="mx-auto max-w-5xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.24")}</h2>
+                <h2 class="mb-5 text-3xl sm:text-4xl text-tone-max">{t("europe.24")}</h2>
             </div>
 
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <div class="rounded-2xl border border-surface-800 bg-surface-900/50 p-8">
+                <div class="rounded-2xl border border-tone-800 bg-tone-900/50 p-8">
                     <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
                         {t("europe.badge.selfhosted")}
                     </div>
-                    <h3 class="mb-4 text-xl text-white">{t("europe.25")}</h3>
-                    <ul class="space-y-3 text-sm text-surface-400">
+                    <h3 class="mb-4 text-xl text-tone-max">{t("europe.25")}</h3>
+                    <ul class="space-y-3 text-sm text-tone-400">
                         <li set:html={t("europe.26")}></li>
                         <li set:html={t("europe.27")}></li>
                         <li set:html={t("europe.28")}></li>
                     </ul>
                 </div>
 
-                <div class="rounded-2xl border border-surface-800 bg-surface-900/50 p-8">
+                <div class="rounded-2xl border border-tone-800 bg-tone-900/50 p-8">
                     <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-400 ring-1 ring-inset ring-amber-500/20">
                         {t("europe.badge.otherside")}
                     </div>
-                    <h3 class="mb-4 text-xl text-white">{t("europe.29")}</h3>
-                    <p class="mb-4 text-sm leading-relaxed text-surface-400">{t("europe.30")}</p>
-                    <ul class="space-y-3 text-sm text-surface-400">
+                    <h3 class="mb-4 text-xl text-tone-max">{t("europe.29")}</h3>
+                    <p class="mb-4 text-sm leading-relaxed text-tone-400">{t("europe.30")}</p>
+                    <ul class="space-y-3 text-sm text-tone-400">
                         <li set:html={t("europe.31")}></li>
                         <li set:html={t("europe.32")}></li>
                         <li set:html={t("europe.33")}></li>
                     </ul>
-                    <p class="mt-5 text-sm leading-relaxed text-surface-500" set:html={t("europe.34")}></p>
+                    <p class="mt-5 text-sm leading-relaxed text-tone-500" set:html={t("europe.34")}></p>
                 </div>
             </div>
 
-            <p class="mt-8 max-w-[38rem] text-xs leading-relaxed text-surface-500">
+            <p class="mt-8 max-w-[38rem] text-xs leading-relaxed text-tone-500">
                 {t("europe.legal")}{" "}
-                <a href={translatePath("/security")} class="text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary-light">{t("europe.link.security")}</a>{" "}
+                <a href={translatePath("/security")} class="text-tone-400 underline decoration-tone-700 underline-offset-2 hover:text-primary-light">{t("europe.link.security")}</a>{" "}
                 {t("europe.legal2")}
             </p>
         </div>

@@ -658,6 +658,12 @@ export function databaseEndpoint(url: string | null | undefined): string | null 
  */
 export interface DevStaticShape {
     declaresStaticApp: boolean;
+    /**
+     * The declared apps with no build step (`output` is `root`, no `build`):
+     * the dev backend serves them from their directory, at their path, as
+     * `rebase start` serves them from the bundle.
+     */
+    servedByBackend?: Array<{ appName: string; path: string }>;
     /** The declared app whose `root` is the `frontend/` that `rebase dev` runs, if one is. */
     served?: { appName: string; address: AppAddress };
     /** Where the CMS is, when an app declares one. */
@@ -670,6 +676,18 @@ export interface DevStaticShape {
         /** Whether the app serving it is the one `rebase dev` runs, so it has a local address. */
         servedLocally: boolean;
     };
+}
+
+/**
+ * Where the site the dev backend serves itself is, for `FRONTEND_URL`, or
+ * `undefined` when it serves none: the app at `/` when there is one, else the
+ * first. Exported for its test.
+ */
+export function devServedSiteUrl(shape: DevStaticShape, backendPort: number): string | undefined {
+    const apps = shape.servedByBackend ?? [];
+    const app = apps.find(candidate => candidate.path === "/") ?? apps[0];
+    if (!app || /^https?:\/\//i.test(app.path)) return undefined;
+    return `http://localhost:${backendPort}${app.path === "/" ? "" : app.path.replace(/\/+$/, "")}`;
 }
 
 /**
@@ -699,8 +717,12 @@ export function devStaticShape(
     }
 
     const mount = cmsMountOf(manifest);
+    const servedByBackend = statics
+        .filter(([, app]) => !app.build && path.resolve(projectRoot, app.root) === path.resolve(projectRoot, app.output))
+        .map(([appName, app]) => ({ appName, path: app.path ?? "/" }));
     return {
         declaresStaticApp: statics.length > 0,
+        ...(servedByBackend.length > 0 ? { servedByBackend } : {}),
         ...(served ? { served } : {}),
         ...(mount
             ? {
@@ -1851,6 +1873,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // case never reaches here, and there the .env value is still right.
         if (!backendOnly && frontendDir) {
             env.FRONTEND_URL = `http://localhost:${frontendPort}`;
+        } else {
+            // No Vite, and the backend serves a no-build site itself: that
+            // site, on the backend's port, is where emailed links have to land.
+            // The `.env` value named the port of some earlier setup (:3082),
+            // which the comment in the scaffold's `.env` says dev replaces.
+            const served = devServedSiteUrl(staticShape, startPort);
+            if (served) env.FRONTEND_URL = served;
         }
 
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);
@@ -2367,6 +2396,10 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // Start frontend immediately if backend-only mode or no backend
     if (!backendOnly && frontendDir && (frontendOnly || !backendDir)) {
         startFrontend(null);
+    } else if (!backendOnly && !frontendDir && staticShape.servedByBackend?.length) {
+        for (const app of staticShape.servedByBackend) {
+            console.log(chalk.gray(`  Static app "${app.appName}" has no build step: the backend serves it at ${app.path}.`));
+        }
     } else if (!backendOnly && !frontendDir && declaresStaticApp) {
         console.warn(chalk.yellow("  ⚠ No frontend/ directory found, skipping frontend."));
     }

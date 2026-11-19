@@ -96,6 +96,24 @@ export function buildBuiltinAuthCapabilities(
         anonymousLogin: isAnonymousAuthOpen({ allowAnonymous, disableSelfRegistration }),
         enabledProviders,
         ...(providerClientIds && Object.keys(providerClientIds).length > 0 ? { providerClientIds } : {}),
-        needsSetup
+        needsSetup,
+        ...unavailableSignIn({ enableMagicLink, enableEmailOtp, emailConfigured })
     };
+}
+
+/**
+ * The sign-in methods switched on that cannot work, as `GET /auth/config`
+ * reports them (`unavailable`). Spread into the capabilities only when one is
+ * missing, so the document stays the same for every backend that is fine.
+ */
+export function unavailableSignIn(inputs: {
+    enableMagicLink?: boolean;
+    enableEmailOtp?: boolean;
+    emailConfigured: boolean;
+}): { unavailable?: NonNullable<AuthAdapterCapabilities["unavailable"]> } {
+    if (inputs.emailConfigured) return {};
+    const unavailable: NonNullable<AuthAdapterCapabilities["unavailable"]> = {};
+    if (inputs.enableMagicLink) unavailable.magicLink = "EMAIL_NOT_CONFIGURED";
+    if (inputs.enableEmailOtp) unavailable.emailOtp = "EMAIL_NOT_CONFIGURED";
+    return Object.keys(unavailable).length > 0 ? { unavailable } : {};
 }

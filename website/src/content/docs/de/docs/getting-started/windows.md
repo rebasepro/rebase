@@ -1,11 +1,11 @@
 ---
-sourceHash: 79e9278ca30f0078
+sourceHash: f1a8ff20d10b3dbd
 title: Windows
 sidebar_label: Windows
 description: Ein Rebase-Projekt unter Windows installieren und seine Datenbankbefehle verwenden.
 ---
 
-**Rebase 0.34+**
+**Rebase 0.35+**
 
 Rebase-Projekte laufen unter Windows. Das Scaffold installiert Ptah Compat
 mit der Windows-Datei über den Paketmanager. Du musst kein Werkzeug für
@@ -34,18 +34,18 @@ Das Paket stellt ausführbare Dateien für Windows x64 und Arm64 bereit. Falls
 installiere die Projektabhängigkeiten mit aktivierten optionalen
 Abhängigkeiten erneut.
 
-## PostgreSQL-Projekt auf Rebase 0.34 aktualisieren
+## PostgreSQL-Projekt auf Rebase 0.35 aktualisieren
 
 Führen Sie im Projektverzeichnis unter Linux, macOS oder Windows die CLI von Rebase
-0.34 aus. Sie ersetzt `@ariga/atlas` im PostgreSQL-Backend durch
+0.35 aus. Sie ersetzt `@ariga/atlas` im PostgreSQL-Backend durch
 `@stokaro/ptah-compat`. Migrationsdateien, `atlas.sum` und erfasste Revisionen
 bleiben erhalten.
 
 ```bash
-pnpm dlx @rebasepro/cli@0.34.0 upgrade --to 0.34.0 # version-pin: ignore
+pnpm dlx @rebasepro/cli@0.35.0 upgrade --to 0.35.0 # version-pin: ignore
 ```
 
-## Rebase 0.33 und früher
+## Rebase 0.34 und früher
 
 ```powershell
 $dir = "$env:LOCALAPPDATA\Programs\atlas"

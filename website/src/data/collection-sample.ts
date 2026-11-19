@@ -12,10 +12,10 @@
  */
 
 /** backend/schema/products.ts — the only file written by hand; the admin panel derives its defaults from it. */
-export const COLLECTION_CODE_HTML = `<span class="text-primary-light">import</span> { <span class="text-white">defineTable</span>, <span class="text-white">col</span> }
+export const COLLECTION_CODE_HTML = `<span class="text-primary-light">import</span> { <span class="text-tone-max">defineTable</span>, <span class="text-tone-max">col</span> }
   <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/server/schema"</span>;
 
-<span class="text-primary-light">export const</span> <span class="text-white">products</span> = <span class="text-blue-300">defineTable</span>(<span class="text-green-400">"products"</span>, {
+<span class="text-primary-light">export const</span> <span class="text-tone-max">products</span> = <span class="text-blue-300">defineTable</span>(<span class="text-green-400">"products"</span>, {
   <span class="text-blue-300">columns</span>: {
     <span class="text-blue-300">id</span>:         col.<span class="text-blue-300">uuid</span>().<span class="text-blue-300">primaryKey</span>().<span class="text-blue-300">defaultRandom</span>(),
     <span class="text-blue-300">name</span>:       col.<span class="text-blue-300">text</span>().<span class="text-blue-300">notNull</span>(),
@@ -35,48 +35,48 @@ export const COLLECTION_CODE_HTML = `<span class="text-primary-light">import</sp
 });`;
 
 /** What `rebase db push` writes for it. */
-export const SQL_HTML = `<span class="text-primary-light">CREATE TABLE</span> <span class="text-white">"products"</span> (
-  <span class="text-blue-300">"id"</span>         <span class="text-white">uuid PRIMARY KEY</span>
-                 <span class="text-white">DEFAULT gen_random_uuid()</span>,
-  <span class="text-blue-300">"name"</span>       <span class="text-white">text NOT NULL</span>,
-  <span class="text-blue-300">"category"</span>   <span class="text-white">text</span>,
-  <span class="text-blue-300">"price"</span>      <span class="text-white">numeric(10,2)</span>,
-  <span class="text-blue-300">"in_stock"</span>   <span class="text-white">boolean</span>
-                 <span class="text-white">DEFAULT false</span>,
-  <span class="text-blue-300">"image_url"</span>  <span class="text-white">text</span>,
-  <span class="text-blue-300">"created_at"</span> <span class="text-white">timestamptz</span>
-                 <span class="text-white">DEFAULT now()</span>
+export const SQL_HTML = `<span class="text-primary-light">CREATE TABLE</span> <span class="text-tone-max">"products"</span> (
+  <span class="text-blue-300">"id"</span>         <span class="text-tone-max">uuid PRIMARY KEY</span>
+                 <span class="text-tone-max">DEFAULT gen_random_uuid()</span>,
+  <span class="text-blue-300">"name"</span>       <span class="text-tone-max">text NOT NULL</span>,
+  <span class="text-blue-300">"category"</span>   <span class="text-tone-max">text</span>,
+  <span class="text-blue-300">"price"</span>      <span class="text-tone-max">numeric(10,2)</span>,
+  <span class="text-blue-300">"in_stock"</span>   <span class="text-tone-max">boolean</span>
+                 <span class="text-tone-max">DEFAULT false</span>,
+  <span class="text-blue-300">"image_url"</span>  <span class="text-tone-max">text</span>,
+  <span class="text-blue-300">"created_at"</span> <span class="text-tone-max">timestamptz</span>
+                 <span class="text-tone-max">DEFAULT now()</span>
 );
-<span class="text-surface-500">-- plus RLS on, and one policy per rule</span>`;
+<span class="text-tone-500">-- plus RLS on, and one policy per rule</span>`;
 
 /** The typed client, against the same table. */
-export const SDK_HTML = `<span class="text-primary-light">import</span> <span class="text-white">{ createRebaseClient }</span> <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/client"</span>;
-<span class="text-primary-light">import</span> <span class="text-white">{ tablesDictionary, type Database }</span> <span class="text-primary-light">from</span> <span class="text-green-400">"./generated/sdk/database.types"</span>;
+export const SDK_HTML = `<span class="text-primary-light">import</span> <span class="text-tone-max">{ createRebaseClient }</span> <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/client"</span>;
+<span class="text-primary-light">import</span> <span class="text-tone-max">{ tablesDictionary, type Database }</span> <span class="text-primary-light">from</span> <span class="text-green-400">"./generated/sdk/database.types"</span>;
 
-<span class="text-primary-light">const</span> <span class="text-white">client</span> <span class="text-primary-light">=</span> <span class="text-blue-300">createRebaseClient</span>&lt;Database&gt;({
+<span class="text-primary-light">const</span> <span class="text-tone-max">client</span> <span class="text-primary-light">=</span> <span class="text-blue-300">createRebaseClient</span>&lt;Database&gt;({
   <span class="text-blue-300">baseUrl</span>: <span class="text-blue-300">import.meta.env.VITE_API_URL</span>,
-  <span class="text-blue-300">tables</span>: <span class="text-white">tablesDictionary</span>
+  <span class="text-blue-300">tables</span>: <span class="text-tone-max">tablesDictionary</span>
 });
 
-<span class="text-surface-500">// Fully typed queries</span>
-<span class="text-primary-light">const</span> <span class="text-white">{ data }</span> <span class="text-primary-light">=</span> <span class="text-primary-light">await</span> <span class="text-white">client</span>.data.products.<span class="text-blue-300">find</span>({
+<span class="text-tone-500">// Fully typed queries</span>
+<span class="text-primary-light">const</span> <span class="text-tone-max">{ data }</span> <span class="text-primary-light">=</span> <span class="text-primary-light">await</span> <span class="text-tone-max">client</span>.data.products.<span class="text-blue-300">find</span>({
   <span class="text-blue-300">where</span>: {
     <span class="text-blue-300">category</span>: [<span class="text-green-400">"=="</span>, <span class="text-green-400">"electronics"</span>],
     <span class="text-blue-300">in_stock</span>: [<span class="text-green-400">"=="</span>, <span class="text-primary-light">true</span>]
   }
 });
 
-<span class="text-surface-500">// Type-safe inserts</span>
-<span class="text-primary-light">await</span> <span class="text-white">client</span>.data.products.<span class="text-blue-300">create</span>({
+<span class="text-tone-500">// Type-safe inserts</span>
+<span class="text-primary-light">await</span> <span class="text-tone-max">client</span>.data.products.<span class="text-blue-300">create</span>({
   <span class="text-blue-300">name</span>: <span class="text-green-400">"Camera"</span>,
   <span class="text-blue-300">price</span>: <span class="text-amber-500">299</span>,
   <span class="text-blue-300">category</span>: <span class="text-green-400">"electronics"</span>
 });
 
-<span class="text-surface-500">// Realtime, over the same table</span>
-<span class="text-primary-light">const</span> <span class="text-white">unsubscribe</span> = <span class="text-white">client</span>.data.products.<span class="text-blue-300">listen</span>(
+<span class="text-tone-500">// Realtime, over the same table</span>
+<span class="text-primary-light">const</span> <span class="text-tone-max">unsubscribe</span> = <span class="text-tone-max">client</span>.data.products.<span class="text-blue-300">listen</span>(
   { <span class="text-blue-300">where</span>: { <span class="text-blue-300">in_stock</span>: [<span class="text-green-400">"=="</span>, <span class="text-primary-light">true</span>] } },
-  (<span class="text-white">res</span>) =&gt; <span class="text-white">setRows</span>(<span class="text-white">res</span>.<span class="text-blue-300">data</span>)
+  (<span class="text-tone-max">res</span>) =&gt; <span class="text-tone-max">setRows</span>(<span class="text-tone-max">res</span>.<span class="text-blue-300">data</span>)
 );`;
 
 /** The rows the admin panel's table view shows. `catColor` pairs with the `chip` utilities. */

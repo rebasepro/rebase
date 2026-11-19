@@ -52,6 +52,12 @@ list. `:slug` is a table's slug (its name, unless `defineTable` sets `slug`).
 | `GET` | `/api/data/:slug/:id/history` | RLS | [Entity History](/docs/backend/history/) |
 | `POST` | `/api/data/:slug/:id/history/:historyId/revert` | RLS | [Entity History](/docs/backend/history/) |
 
+`:id` is the row's key. On a table with a composite key it is every key
+column's value, in the key's order, joined by `:::` (each part URL-encoded):
+a table keyed on `(agency_id, id)` addresses a row as
+`/api/data/proposals/<agency_id>:::<id>`. An address with the wrong number of
+parts is refused with `400 COMPOSITE_KEY_ADDRESS`, naming the key columns.
+
 Counting and aggregation are routes of their own, registered before `/:id` so
 that `aggregate` is not read as an entity id. `?select=` and `?groupBy=` are
 their parameters, and `select` is required on `/aggregate`.
@@ -295,6 +301,7 @@ inventory of a deployment's custom endpoints is not public.
 | `GET` | `/api/meta/contract` | `schema:read` | `{ schemaVersion, runtime: { version, contract }, tables }` — every table as an administrator sees it, the input of `rebase generate-sdk --from`. `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` when set | The recorded series behind the Studio charts. `501` on a runtime with no backend |
+| `GET` | `/metrics/history/batch` | `REBASE_METRICS_TOKEN` when set | Up to 16 recorded series at once, `?series=<a>,<b>&minutes=<n>&bucket=<1\|5\|30\|180>`, bucketed. Includes per-minute requests and errors per surface. `501` on a runtime with no backend |
 
 WebSocket connections arrive as an HTTP upgrade on the same server rather than at
 a path of their own — see [Realtime](/docs/backend/realtime/).

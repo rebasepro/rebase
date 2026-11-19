@@ -64,6 +64,21 @@ export default stripe;
         expect(env?.actionable).toBe(true);
     });
 
+    it("does not flag a module-scope read with a fallback, and gives one finding per file", () => {
+        const result = analyse(`
+const a = process.env.A ?? "";
+const b = process.env.B || "x";
+const c = process.env.C?.trim() ?? "";
+const d = process.env.D!;
+const e = process.env["E"];
+export default { a, b, c, d, e };
+        `.trim());
+        const env = result.issues.filter(i => i.kind === "module-scope-env");
+        expect(env).toHaveLength(1);
+        expect(env[0].line).toBe(4);
+        expect(env[0].message).toContain("lines 4, 5");
+    });
+
     it("does not flag process.env read inside a handler", () => {
         const result = analyse(`
 import { defineFunction } from "@rebasepro/server/functions";

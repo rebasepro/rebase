@@ -617,11 +617,15 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         }));
         recordDatabasePools(metrics.registry, meteredSources);
         stopDatabaseProbe = startDatabaseProbe(metrics.registry, meteredSources);
+        // The sampler records per-minute request deltas from this registry.
+        const registry = metrics.registry;
+        backend.metricsHistory?.countRequestsFrom(() => registry.requestTotalsBySurface());
         recordRealtimeCounts(metrics.registry, backend.realtimeService);
         app.route("/metrics", createMetricsRoutes(
             metrics.registry,
             env.REBASE_METRICS_TOKEN,
-            backend.metricsHistory?.read
+            backend.metricsHistory?.read,
+            backend.metricsHistory?.readBatch
         ));
     }
 

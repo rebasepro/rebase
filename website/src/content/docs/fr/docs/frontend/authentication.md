@@ -1,5 +1,5 @@
 ---
-sourceHash: 118e606ac71718ef
+sourceHash: defb682f50c5fd28
 title: Authentification et connexion
 sidebar_label: Authentification et connexion
 description: Configurez le contrôleur d'authentification, la vue de connexion et la simulation de rôles dans votre frontend React Rebase.
@@ -87,7 +87,17 @@ Un rôle dans cette liste est un nom auquel vos [règles de sécurité](/docs/co
 
 ## Tester les accès : Simuler l'accès
 
-Pour vérifier ce qu'un rôle, un utilisateur ou une clé de service peut lire, un administrateur utilise **Simuler l'accès** (*Simulate access*), la pastille située au-dessus de votre avatar dans le tiroir du panneau d'administration (dans la barre d'application sur un petit écran, ou lorsque le shell ne comporte pas de tiroir). Choisissez un rôle (avec un identifiant utilisateur optionnel, qui n'a pas besoin d'être un compte réel), un utilisateur ou une clé de service active.
+Pour vérifier ce qu'un rôle, un utilisateur ou une clé de service peut lire, un administrateur utilise **Simuler l'accès** (*Simulate access*). Il est désactivé par défaut ; activez-le là où vous montez l'application :
+
+```tsx
+<Rebase client={rebaseClient} authController={authController} simulateAccess>
+    <RebaseAuth/>
+    <RebaseCMS/>
+    <RebaseShell title="Admin"/>
+</Rebase>
+```
+
+C'est alors la pastille située au-dessus de votre avatar dans le tiroir du panneau d'administration (dans la barre d'application sur un petit écran, ou lorsque le shell ne comporte pas de tiroir). Choisissez un rôle (avec un identifiant utilisateur optionnel, qui n'a pas besoin d'être un compte réel), un utilisateur ou une clé de service active.
 Chaque vue de données, ainsi que l'onglet Historique d'un enregistrement, lit alors les données à travers le serveur sous cette identité, en appliquant les véritables politiques de sécurité au niveau des lignes (*RLS*) : une grille affiche exactement les lignes qu'elle peut lire, les champs que ses rôles ne peuvent pas lire sont masqués, et la bannière compte les tables dans lesquelles elle ne voit rien. Le serveur vérifie à chaque requête que vous êtes bien administrateur.
 
 L'accès simulé est en lecture seule. Lorsqu'il est actif, les vues ne proposent aucune action de création, de modification, de suppression ou de restauration d'historique, et le serveur refuse toute écriture associée à une simulation avec `403 SIMULATION_READ_ONLY`, afin que rien ne soit enregistré sous l'identité de quelqu'un d'autre. Quittez le mode de simulation pour apporter des modifications.

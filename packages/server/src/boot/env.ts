@@ -34,6 +34,14 @@ export const bootEnvExtension = z.object({
      * way a managed tenant, which ships no code of its own, can set its own.
      */
     EMAIL_LOGO_URL: z.string().optional(),
+    /**
+     * Where an emailed magic link points. A base (`https://app.example.com`)
+     * gets `/auth/magic-link?token=…` appended, as `FRONTEND_URL` does; a URL
+     * with `{token}` in it is the whole link (`https://app.example.com/app.html#ml={token}`),
+     * for a frontend that does not serve `/auth/magic-link`. Unset, the base is
+     * `FRONTEND_URL`.
+     */
+    MAGIC_LINK_URL: z.string().optional(),
 
     // ── Runtime behaviour ────────────────────────────────────────────────────
     /**

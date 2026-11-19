@@ -64,7 +64,7 @@ function PropertyField({
                     <div className="flex flex-row w-full cursor-pointer">
                         <div className={`${indent > 0 ? "ml-16" : "m-4"} ${indent === 0 ? "" : "m-4"} relative`}>
                             <div
-                                className="h-8 w-8 flex items-center justify-center rounded-full shadow text-white"
+                                className="h-8 w-8 flex items-center justify-center rounded-full shadow text-tone-max"
                                 style={{ background: isDisabled ? "rgb(107, 114, 128)" : iconColor }}
                             >
                                 <Icon iconKey={icon} size={20} className="select-none" />
@@ -126,7 +126,7 @@ function PropertyTypeOption({
             className="border border-opacity-40 rounded-md bg-surface-frame dark:border-opacity-40 border-hairline hover:bg-surface-accent-100 dark:hover:bg-surface-accent-800 hover:ring-2 hover:ring-primary cursor-pointer flex flex-row items-center px-4 py-2 m-1">
             <div className="flex flex-row items-center text-base min-h-[48px]">
                 <div className="mr-8">
-                    <div className="h-8 w-8 flex items-center justify-center rounded-full shadow text-white"
+                    <div className="h-8 w-8 flex items-center justify-center rounded-full shadow text-tone-max"
                          style={{ background: iconColor }}>
                         <Icon iconKey={icon} size={20} className="select-none" />
                     </div>
@@ -418,7 +418,7 @@ export function SchemaEditorDemo() {
                                 <div className="flex flex-row w-full cursor-pointer">
                                     <div className="m-4">
                                         <div
-                                            className="h-8 w-8 flex items-center justify-center rounded-full shadow text-white"
+                                            className="h-8 w-8 flex items-center justify-center rounded-full shadow text-tone-max"
                                             style={{ background: "rgb(255, 148, 8)" }}>
                                             <Icon iconKey="ListTodo" size={20} className="select-none" />
                                         </div>
@@ -478,7 +478,7 @@ export function SchemaEditorDemo() {
                                 <div className="flex items-center">
                                     <div className="mr-8">
                                         <div
-                                            className="h-8 w-8 flex items-center justify-center rounded-full shadow text-white"
+                                            className="h-8 w-8 flex items-center justify-center rounded-full shadow text-tone-max"
                                             style={{ background: "rgb(45, 127, 249)" }}>
                                             <Icon iconKey="Type" size={20} className="select-none" />
                                         </div>

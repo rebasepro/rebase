@@ -8,8 +8,10 @@ import type { TableDescriptor } from "@rebasepro/types";
 import { col, defineTable } from "@rebasepro/types";
 import { compileTables } from "@rebasepro/common";
 import { composeCollections } from "../../src/hooks/navigation/compose_collections";
+import { registeredCollection } from "../../src/hooks/navigation/registered_collection";
 import { composeCollectionsInput } from "../../src/hooks/navigation/compose_collections_input";
 import { customizeTable } from "../../src/tables/customize_table";
+import { computeNavigationGroups } from "../../src/hooks/navigation/utils";
 import { fakeAuthController, fakeSdkData } from "../helpers/fakes";
 
 const posts = defineTable("posts", {
@@ -89,6 +91,40 @@ describe("composeCollections", () => {
             tables,
             tableCustomizations: [customizeTable("posts", { icon: "A" }), customizeTable("posts", { icon: "B" })]
         })).toThrow("Two `customizeTable(\"posts\", …)` results");
+    });
+});
+
+describe("composeCollections: navigation order", () => {
+    // Served alphabetically, as the server reads them off the schema index
+    // module namespace; the project declares another order.
+    const articles = defineTable("articles", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
+    const audit = defineTable("audit_log", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
+    const songs = defineTable("songs", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
+    const users = defineTable("users", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
+    const served: TableDescriptor[] = compileTables([articles, audit, songs, users]);
+    const declared = [
+        customizeTable<typeof songs>("songs", { group: "Music" }),
+        customizeTable<typeof articles>("articles", { group: "Content" }),
+        customizeTable<typeof audit>("audit_log", { group: "System" })
+    ];
+
+    it("lists the tables in tableCustomizations order, the uncustomized after them in served order", () => {
+        const out = composeCollections({ ...NONE, tables: served, tableCustomizations: declared, externalCollections: [events] });
+        expect(out.map(c => c.slug)).toEqual(["songs", "articles", "audit_log", "users", "fs_events"]);
+    });
+
+    it("puts the groups in that order", () => {
+        const collections = composeCollections({ ...NONE, tables: served, tableCustomizations: declared }).map(registeredCollection);
+        expect(computeNavigationGroups({ collections }).map(g => g.name)).toEqual(["Music", "Content", "System", "Views"]);
+    });
+
+    it("still lets navigationGroupMappings decide the groups", () => {
+        const collections = composeCollections({ ...NONE, tables: served, tableCustomizations: declared }).map(registeredCollection);
+        const groups = computeNavigationGroups({
+            collections,
+            navigationGroupMappings: [{ name: "System", entries: ["audit_log"] }, { name: "Content", entries: ["articles"] }]
+        });
+        expect(groups.map(g => g.name)).toEqual(["System", "Content", "Music", "Views"]);
     });
 });
 

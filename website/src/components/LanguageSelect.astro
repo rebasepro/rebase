@@ -13,8 +13,8 @@ const { iconOnly = false } = Astro.props;
 ---
 
 {iconOnly ? (
-    <div class="relative w-9 h-9 flex items-center justify-center rounded-md hover:bg-white/10 transition-colors cursor-pointer" title="Change language">
-        <svg class="w-4 h-4 text-surface-300 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <div class="relative w-9 h-9 flex items-center justify-center rounded-md hover:bg-tone-max/10 transition-colors cursor-pointer" title="Change language">
+        <svg class="w-4 h-4 text-tone-300 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
         </svg>
         <rebase-lang-select>
@@ -38,12 +38,12 @@ const { iconOnly = false } = Astro.props;
 <div class="inline-flex relative">
     <rebase-lang-select>
         <div class="relative items-center">
-            <svg class="absolute left-2.5 top-1/2 -mt-2 w-4 h-4 text-surface-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg class="absolute left-2.5 top-1/2 -mt-2 w-4 h-4 text-tone-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
             </svg>
             <select
                     aria-label="Change language"
-                    class="appearance-none bg-surface-card border border-hairline text-surface-400 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full outline-none pl-9 pr-8 py-2 hover:bg-surface-card-hover transition-colors cursor-pointer"
+                    class="appearance-none bg-surface-card border border-hairline text-tone-400 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full outline-none pl-9 pr-8 py-2 hover:bg-surface-card-hover transition-colors cursor-pointer"
             >
                 {Object.entries(languages).map(([code, label]) => (
                         <option
@@ -55,7 +55,7 @@ const { iconOnly = false } = Astro.props;
                         </option>
                 ))}
             </select>
-            <svg class="absolute right-2.5 top-1/2 -mt-2 w-4 h-4 text-surface-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg class="absolute right-2.5 top-1/2 -mt-2 w-4 h-4 text-tone-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
         </div>

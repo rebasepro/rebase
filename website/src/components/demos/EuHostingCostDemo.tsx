@@ -177,15 +177,15 @@ const EN: Record<string, string> = {
     "ehc.box.free.mau": "no per-user pricing exists",
     "ehc.box.free.db": "%1 GB of the %2 GB you already rented",
     "ehc.box.free.egress": "%1 of the %2 the plan includes",
-    "ehc.box.note": "One machine, so no failover: this is the price of a box that <i>can hold</i> the workload, not of a highly available cluster. And the line no invoice shows — <b class=\"text-surface-400\">you patch it, back it up and get paged for it.</b> If nobody on the team wants that job, the managed bill is buying something real and you should pay it.",
-    "ehc.read.included": "<b class=\"text-white\">At this size, this is not an argument.</b> You are inside the included tier, the managed bill is %1, and paying it is the right call. Drag the sliders to where you are going, not where you are.",
-    "ehc.read.wins": "<b class=\"text-white\">Here the managed bill wins.</b> A workload this small does not need much of a plan, but %1 of files still needs a disk to sit on, and one box big enough costs €%2 against %3 managed. Self-hosting is not a discount at every size, and this is one of the sizes where it is not.",
-    "ehc.read.multiple": "the price, for the same application — and <b class=\"text-white\">%1</b> a year of the difference.",
-    "ehc.read.dominant": "Almost all of that is <b class=\"text-surface-200\">%1</b> — %2 of a %3 bill. Egress and per-user pricing are where managed platforms and European VPS plans genuinely diverge; the rest is close enough not to matter.",
+    "ehc.box.note": "One machine, so no failover: this is the price of a box that <i>can hold</i> the workload, not of a highly available cluster. And the line no invoice shows — <b class=\"text-tone-400\">you patch it, back it up and get paged for it.</b> If nobody on the team wants that job, the managed bill is buying something real and you should pay it.",
+    "ehc.read.included": "<b class=\"text-tone-max\">At this size, this is not an argument.</b> You are inside the included tier, the managed bill is %1, and paying it is the right call. Drag the sliders to where you are going, not where you are.",
+    "ehc.read.wins": "<b class=\"text-tone-max\">Here the managed bill wins.</b> A workload this small does not need much of a plan, but %1 of files still needs a disk to sit on, and one box big enough costs €%2 against %3 managed. Self-hosting is not a discount at every size, and this is one of the sizes where it is not.",
+    "ehc.read.multiple": "the price, for the same application — and <b class=\"text-tone-max\">%1</b> a year of the difference.",
+    "ehc.read.dominant": "Almost all of that is <b class=\"text-tone-200\">%1</b> — %2 of a %3 bill. Egress and per-user pricing are where managed platforms and European VPS plans genuinely diverge; the rest is close enough not to matter.",
     "ehc.bar.managed": "Managed",
     "ehc.bar.box": "Your box",
-    "ehc.ceiling": "<b class=\"text-surface-200\">The sliders stop here on purpose.</b> Past roughly this size you are no longer choosing between a box and a plan — you want object storage for the files, a replica so a single machine is not the whole company, and someone whose job that is. That is a real architecture and Rebase runs on it, but a two-column figure could not compare it to anything honestly, so it does not pretend to.",
-    "ehc.footnote": "The right-hand column is sized from the sliders — disk for the database plus 30% headroom and 20 GB for the system, RAM to cache a quarter of the database, a vCPU per 50k monthly actives — and the <b class=\"text-surface-400\">same rule sizes the compute add-on on the left</b>, so neither column gets to run this workload on hardware that could not hold it. Files sit in an S3-compatible bucket rather than on that disk, which is how Rebase's storage layer is deployed in practice. Those shapes and rates are indicative, not a quote. Dollars and euros are shown as they are billed and not converted — we are not going to track FX on a marketing page, and at present rates it does not change the shape. <a href=\"%1\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary\">Supabase's published prices</a> are the source for the left column; check your own provider for the right one. <b class=\"text-surface-400\">Firebase is not modelled here on purpose:</b> Firestore bills per document read, and nobody can tell you how many reads an app you have not written yet will do. That unpredictability is a cost too, it just does not fit in a slider."
+    "ehc.ceiling": "<b class=\"text-tone-200\">The sliders stop here on purpose.</b> Past roughly this size you are no longer choosing between a box and a plan — you want object storage for the files, a replica so a single machine is not the whole company, and someone whose job that is. That is a real architecture and Rebase runs on it, but a two-column figure could not compare it to anything honestly, so it does not pretend to.",
+    "ehc.footnote": "The right-hand column is sized from the sliders — disk for the database plus 30% headroom and 20 GB for the system, RAM to cache a quarter of the database, a vCPU per 50k monthly actives — and the <b class=\"text-tone-400\">same rule sizes the compute add-on on the left</b>, so neither column gets to run this workload on hardware that could not hold it. Files sit in an S3-compatible bucket rather than on that disk, which is how Rebase's storage layer is deployed in practice. Those shapes and rates are indicative, not a quote. Dollars and euros are shown as they are billed and not converted — we are not going to track FX on a marketing page, and at present rates it does not change the shape. <a href=\"%1\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-tone-400 underline decoration-tone-700 underline-offset-2 hover:text-primary\">Supabase's published prices</a> are the source for the left column; check your own provider for the right one. <b class=\"text-tone-400\">Firebase is not modelled here on purpose:</b> Firestore bills per document read, and nobody can tell you how many reads an app you have not written yet will do. That unpredictability is a cost too, it just does not fit in a slider."
 };
 
 export const EU_HOSTING_COST_STRINGS = Object.keys(EN);
@@ -290,7 +290,7 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
 
             {/* ── Sliders ───────────────────────────────────────────── */}
             <div className="border-b border-hairline bg-surface-well/60 px-5 py-6 sm:px-7">
-                <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
+                <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.15em] text-tone-500">
                     {T("ehc.sliders.title")}
                 </p>
                 <div className="grid grid-cols-1 gap-x-10 gap-y-5 sm:grid-cols-2">
@@ -310,8 +310,8 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                 {/* ── The managed invoice ───────────────────────────── */}
                 <div className="border-b border-hairline p-6 sm:p-7 lg:border-b-0 lg:border-r">
                     <div className="mb-5 flex items-baseline justify-between gap-3">
-                        <span className="text-sm font-semibold text-surface-200">{T("ehc.managed.title")}</span>
-                        <span className="rounded-md bg-white/[0.04] px-2 py-0.5 text-[11px] text-surface-500 ring-1 ring-inset ring-white/5">
+                        <span className="text-sm font-semibold text-tone-200">{T("ehc.managed.title")}</span>
+                        <span className="rounded-md bg-tone-max/[0.04] px-2 py-0.5 text-[11px] text-tone-500 ring-1 ring-inset ring-tone-max/5">
                             Supabase Pro
                         </span>
                     </div>
@@ -325,18 +325,18 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                                         shown ? "opacity-100" : "opacity-30"
                                     }`}>
                                     <span className="min-w-0">
-                                        <span className={`text-sm ${shown ? "text-surface-200" : "text-surface-600"}`}>
+                                        <span className={`text-sm ${shown ? "text-tone-200" : "text-tone-600"}`}>
                                             {item.label}
                                         </span>
                                         {shown && !item.always && (
-                                            <span className="block font-mono text-[11px] text-surface-500">{item.detail}</span>
+                                            <span className="block font-mono text-[11px] text-tone-500">{item.detail}</span>
                                         )}
                                         {item.always && (
-                                            <span className="block text-[11px] text-surface-500">{item.detail}</span>
+                                            <span className="block text-[11px] text-tone-500">{item.detail}</span>
                                         )}
                                     </span>
                                     <span className={`flex-none font-mono text-sm tabular-nums ${
-                                        item.amount > 0 && !item.always ? "text-amber-300" : shown ? "text-surface-300" : "text-surface-700"
+                                        item.amount > 0 && !item.always ? "text-amber-300" : shown ? "text-tone-300" : "text-tone-700"
                                     }`}>
                                         {shown ? money(item.amount, "$") : "—"}
                                     </span>
@@ -346,13 +346,13 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                     </ul>
 
                     <div className="mt-5 flex items-end justify-between gap-4 border-t border-hairline pt-5">
-                        <span className="text-sm text-surface-400">{T("ehc.permonth")}</span>
-                        <span className="font-mono text-3xl font-semibold tabular-nums text-white">
+                        <span className="text-sm text-tone-400">{T("ehc.permonth")}</span>
+                        <span className="font-mono text-3xl font-semibold tabular-nums text-tone-max">
                             {money(bill.total, "$")}
                         </span>
                     </div>
 
-                    <p className="mt-4 text-[11px] leading-relaxed text-surface-500"
+                    <p className="mt-4 text-[11px] leading-relaxed text-tone-500"
                        dangerouslySetInnerHTML={{ __html: T("ehc.managed.note", checked) }}/>
                 </div>
 
@@ -365,13 +365,13 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                     />
                     <div className="relative">
                         <div className="mb-5 flex items-baseline justify-between gap-3">
-                            <span className="text-sm font-semibold text-surface-200">{T("ehc.box.title")}</span>
+                            <span className="text-sm font-semibold text-tone-200">{T("ehc.box.title")}</span>
                             <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] text-primary ring-1 ring-inset ring-primary/20">
                                 Rebase
                             </span>
                         </div>
 
-                        <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
+                        <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-tone-500">
                             {T("ehc.box.pick")}
                         </p>
                         <div className="mb-2 flex flex-wrap gap-2">
@@ -391,8 +391,8 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                                             selected
                                                 ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/30"
                                                 : tooSmall
-                                                    ? "text-surface-700 line-through decoration-surface-700 ring-1 ring-inset ring-surface-800/60"
-                                                    : "text-surface-400 ring-1 ring-inset ring-surface-800 hover:text-surface-200 hover:ring-surface-700"
+                                                    ? "text-tone-700 line-through decoration-tone-700 ring-1 ring-inset ring-tone-800/60"
+                                                    : "text-tone-400 ring-1 ring-inset ring-tone-800 hover:text-tone-200 hover:ring-tone-700"
                                         }`}>
                                         €{t.price}
                                     </button>
@@ -400,7 +400,7 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                             })}
                         </div>
 
-                        <p className="mb-5 text-[11px] leading-relaxed text-surface-500">
+                        <p className="mb-5 text-[11px] leading-relaxed text-tone-500">
                             {sizedUp ? (
                                 <span className="text-amber-300/90">
                                     {T("ehc.box.sizedup", need.disk, need.ram, need.vcpu)}
@@ -412,24 +412,24 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
 
                         <ul className="space-y-2.5">
                             <li className="flex items-baseline justify-between gap-4">
-                                <span className="text-sm text-surface-200">
+                                <span className="text-sm text-tone-200">
                                     {T("ehc.box.vps")}
-                                    <span className="block font-mono text-[11px] text-surface-500">
+                                    <span className="block font-mono text-[11px] text-tone-500">
                                         {T("ehc.box.vps.spec", tier.vcpu, tier.ram, tier.disk)}
                                     </span>
                                 </span>
                                 {/* The machine alone — `box` also carries the bucket, which is its own line. */}
-                                <span className="flex-none font-mono text-sm tabular-nums text-surface-300">€{tier.price.toFixed(2)}</span>
+                                <span className="flex-none font-mono text-sm tabular-nums text-tone-300">€{tier.price.toFixed(2)}</span>
                             </li>
                             <li className="flex items-baseline justify-between gap-4">
-                                <span className="min-w-0 text-sm text-surface-200">
+                                <span className="min-w-0 text-sm text-tone-200">
                                     {T("ehc.box.object")}
-                                    <span className="block text-[11px] text-surface-500">
+                                    <span className="block text-[11px] text-tone-500">
                                         {T("ehc.box.object.detail", fmtGb(storageGb), OBJECT_STORAGE_EUR_PER_GB.toFixed(2))}
                                     </span>
                                 </span>
                                 <span className={`flex-none font-mono text-sm tabular-nums ${
-                                    objectStorage > 0 ? "text-surface-300" : "text-primary"
+                                    objectStorage > 0 ? "text-tone-300" : "text-primary"
                                 }`}>
                                     €{objectStorage.toFixed(2)}
                                 </span>
@@ -440,9 +440,9 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                                 [T("ehc.item.egress"), T("ehc.box.free.egress", fmtGb(egressGb), fmtGb(INCLUDED_TRAFFIC_GB))]
                             ].map(([label, detail]) => (
                                 <li key={label} className="flex items-baseline justify-between gap-4">
-                                    <span className="min-w-0 text-sm text-surface-200">
+                                    <span className="min-w-0 text-sm text-tone-200">
                                         {label}
-                                        <span className="block text-[11px] text-surface-500">{detail}</span>
+                                        <span className="block text-[11px] text-tone-500">{detail}</span>
                                     </span>
                                     <span className="flex-none font-mono text-sm tabular-nums text-primary">€0.00</span>
                                 </li>
@@ -450,13 +450,13 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                         </ul>
 
                         <div className="mt-5 flex items-end justify-between gap-4 border-t border-hairline pt-5">
-                            <span className="text-sm text-surface-400">{T("ehc.permonth")}</span>
-                            <span className="font-mono text-3xl font-semibold tabular-nums text-white">
+                            <span className="text-sm text-tone-400">{T("ehc.permonth")}</span>
+                            <span className="font-mono text-3xl font-semibold tabular-nums text-tone-max">
                                 €{box.toFixed(2)}
                             </span>
                         </div>
 
-                        <p className="mt-4 text-[11px] leading-relaxed text-surface-500"
+                        <p className="mt-4 text-[11px] leading-relaxed text-tone-500"
                            dangerouslySetInnerHTML={{ __html: T("ehc.box.note") }}/>
                     </div>
                 </div>
@@ -465,22 +465,22 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
             {/* ── The read-out ──────────────────────────────────────── */}
             <div className="border-t border-hairline bg-surface-well/70 px-5 py-6 sm:px-7">
                 {insideIncluded ? (
-                    <p className="text-[15px] leading-relaxed text-surface-300"
+                    <p className="text-[15px] leading-relaxed text-tone-300"
                        dangerouslySetInnerHTML={{ __html: T("ehc.read.included", money(PRICING.base, "$")) }}/>
                 ) : multiple < 1 ? (
                     /* A guard, not a branch anyone reaches today: with both columns sized by
                        the same rule, a sweep of every slider combination finds no case where
                        the managed bill is lower. It stays so that a future change to the
                        constants surfaces as an admission rather than a silent overclaim. */
-                    <p className="text-[15px] leading-relaxed text-surface-300"
+                    <p className="text-[15px] leading-relaxed text-tone-300"
                        dangerouslySetInnerHTML={{ __html: T("ehc.read.wins", fmtGb(storageGb), box.toFixed(2), money(bill.total, "$")) }}/>
                 ) : (
                     <>
                         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                            <span className="font-mono text-4xl font-semibold tabular-nums text-white">
+                            <span className="font-mono text-4xl font-semibold tabular-nums text-tone-max">
                                 {multiple >= 10 ? Math.round(multiple) : multiple.toFixed(1)}×
                             </span>
-                            <span className="text-[15px] text-surface-300"
+                            <span className="text-[15px] text-tone-300"
                                   dangerouslySetInnerHTML={{ __html: T("ehc.read.multiple", roundMoney(bill.total * 12 - box * 12, "$")) }}/>
                         </div>
 
@@ -488,7 +488,7 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                             line item is doing all the work, name it — the reader can then check
                             it against the invoice above instead of trusting the headline. */}
                         {dominant && (
-                            <p className="mt-3 text-[13px] leading-relaxed text-surface-400"
+                            <p className="mt-3 text-[13px] leading-relaxed text-tone-400"
                                dangerouslySetInnerHTML={{ __html: T("ehc.read.dominant", dominant.label.toLowerCase(), money(dominant.amount, "$"), money(bill.total, "$")) }}/>
                         )}
 
@@ -500,11 +500,11 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                 )}
 
                 {atCeiling && (
-                    <p className="frame mt-5 p-4 text-[13px] leading-relaxed text-surface-400"
+                    <p className="frame mt-5 p-4 text-[13px] leading-relaxed text-tone-400"
                        dangerouslySetInnerHTML={{ __html: T("ehc.ceiling") }}/>
                 )}
 
-                <p className="mt-6 text-[11px] leading-relaxed text-surface-500"
+                <p className="mt-6 text-[11px] leading-relaxed text-tone-500"
                    dangerouslySetInnerHTML={{ __html: T("ehc.footnote", PRICING.source) }}/>
             </div>
         </div>
@@ -522,9 +522,9 @@ function Slider({ label, value, idx, max, included, onChange }: {
     return (
         <label className="block">
             <span className="flex items-baseline justify-between gap-3">
-                <span className="text-sm text-surface-300">{label}</span>
+                <span className="text-sm text-tone-300">{label}</span>
                 <span className={`font-mono text-sm tabular-nums transition-colors duration-200 ${
-                    included ? "text-surface-400" : "text-primary"
+                    included ? "text-tone-400" : "text-primary"
                 }`}>
                     {value}
                 </span>
@@ -551,7 +551,7 @@ function Slider({ label, value, idx, max, included, onChange }: {
 function Bar({ label, width, value, tone }: { label: string; width: number; value: string; tone: "amber" | "primary" }) {
     return (
         <div className="flex items-center gap-3">
-            <span className="w-20 flex-none text-xs text-surface-500">{label}</span>
+            <span className="w-20 flex-none text-xs text-tone-500">{label}</span>
             <span className="relative h-7 flex-1 overflow-hidden rounded-lg bg-surface-raised">
                 <span
                     className={`absolute inset-y-0 left-0 rounded-lg transition-all duration-500 ease-out ${

@@ -1,5 +1,5 @@
 ---
-sourceHash: d90a1098b873980d
+sourceHash: 5c63339245fe85c9
 title: Vue d'ensemble du Frontend
 sidebar_label: Frontend
 description: "Construisez et personnalisez le panneau d'administration — Rebase CMS et Rebase Studio — avec React : contrôleurs, scaffold, routage et vues."
@@ -148,6 +148,7 @@ elles n'étaient jamais lues par le composant :
 | `collectionViews` | Modes de vue de collection personnalisés, disponibles pour toute collection par `key` |
 | `entityActions` | Actions d'entité, disponibles pour toute table qui mentionne leur `key` dans ses `entityActions` |
 | `effectiveRoleController` | Simuler un rôle différent lorsque le mode dev est activé |
+| `simulateAccess` | Affiche « Simuler l'accès », le contrôle de l'administrateur qui exécute chaque vue de données en tant que rôle, utilisateur ou clé de service, en lecture seule, contre les vraies politiques de sécurité au niveau des lignes. Désactivé sauf avec `true` |
 | `modeController` | Transmettre le mode clair/sombre de l'application hôte à Rebase ; Rebase ne touche alors jamais à `<html>`, `prefers-color-scheme` ou localStorage — voir [Style](#style) |
 | `translations` | Remplacer ou étendre n'importe quelle chaîne de l'interface, indexée par locale — voir [Traductions](/docs/frontend/i18n) |
 | `components` | Remplacer les composants intégrés — voir [Remplacement de composants](/docs/frontend/component-overrides) |

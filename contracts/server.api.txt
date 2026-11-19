@@ -14,7 +14,7 @@ class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list,
 class GCSStorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
 class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getObjectStream, getSignedUrl, getType, isCaseInsensitive, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
 class McpToolError
-class MetricsRegistry { incrementCounter, observe, onRender, recordRequest, render, setCounter, setGauge, startedAt }
+class MetricsRegistry { incrementCounter, observe, onRender, recordRequest, render, requestTotalsBySurface, setCounter, setGauge, startedAt }
 class ObjectTooLargeError { maxBytes }
 class PermanentJobError
 class RawHtml { toString, value }
@@ -210,6 +210,7 @@ function isDataException
 function isDatabaseAdapter
 function isDatabaseUnreachable
 function isDuplicateObjectRace
+function isErrorStatus
 function isLocalhostOrigin
 function isNodeRuntime
 function isSchemaLoadError
@@ -330,7 +331,7 @@ interface BackendServices { access, apiKeyStore, authAdapter, authLimiters, clie
 interface BackupRoutesConfig { getDestination, getSchedule, scheduledElsewhere, storageFor }
 interface BootOptions { bundle, bundleDir, bundleFallbackDir, handleSignals, listen, provisionSchema }
 interface BootedRuntime { app, backend, bundle, dataSources, env, port, server, shutdown }
-interface BuiltinAuthAdapterConfig { access, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, authTableHooks, captcha, cookieAuth, defaultRole, deviceLogin, disableSelfRegistration, emailConfig, emailService, enableEmailOtp, enableMagicLink, jwt, limiters, magicLinkCreatesUsers, oauthProviders, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireEmailVerification, serviceKey }
+interface BuiltinAuthAdapterConfig { access, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, authTableHooks, captcha, cookieAuth, defaultRole, deviceLogin, disableSelfRegistration, emailConfig, emailService, enableEmailOtp, enableMagicLink, jwt, limiters, magicLinkCreatesUsers, oauthProviders, platformSignIn, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireEmailVerification, serviceKey }
 interface BundleProjectExports { hooks, storageAuthorize }
 interface BundleSchema { enums, relations, tables }
 interface CapturedEmail { at, html, id, links, messageId, subject, text, to }
@@ -828,13 +829,13 @@ interface ApiKeysAPI { createKey, getKey, listKeys, revokeKey, updateKey }
 interface AppAddress { host, path }
 interface ArrayValidation { maxItems, minItems, requiredMessage, uniqueBy, uniqueItems }
 interface AuthAdapter { createAdminRoutes, createAuthRoutes, describeUserCreationContract, destroy, finalizeUserCreation, finalizeUserDeletions, getCapabilities, id, initialize, prepareUserCreation, prepareUserDeletions, prepareUserUpdates, resolveUser, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
-interface AuthAdapterCapabilities { adminPasswordReset, anonymousLogin, deviceLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, providerClientIds, registrationEnabled, sessionManagement }
+interface AuthAdapterCapabilities { adminPasswordReset, anonymousLogin, deviceLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, providerClientIds, registrationEnabled, sessionManagement, unavailable }
 interface AuthClaimPolicyOperand { kind, name }
 interface AuthClient { canRestoreSession, getAccessToken, getSession, getSessions, getUser, isInitialized, onAuthStateChange, refreshSession, revokeAllSessions, revokeSession, signOut }
 interface AuthCollectionContext { appName, emailConfigured, hashPassword, resetPasswordUrl, sendEmail }
 interface AuthCollectionCreateResult { invitationSent, temporaryPassword, values }
 interface AuthCollectionResetResult { invitationSent, temporaryPassword }
-interface AuthConfigDocument { adminPasswordReset, anonymousLogin, deviceLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, providerClientIds, registrationEnabled, sessionManagement, storage }
+interface AuthConfigDocument { adminPasswordReset, anonymousLogin, deviceLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, platformSignIn, profileUpdate, providerClientIds, registrationEnabled, sessionManagement, storage, unavailable }
 interface AuthCreateUserData { displayName, email, emailVerified, metadata, password, photoUrl }
 interface AuthResponsePayload { tokens, user }
 interface AuthRolesPolicyOperand { kind }

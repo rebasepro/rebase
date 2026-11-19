@@ -44,6 +44,8 @@ export interface UiLabels {
     lastDays: (days: number) => string;
     /** A chart with nothing to draw. */
     noData: string;
+    /** A `TimeBars` bucket in which nothing was recorded — a gap, which is not a zero. */
+    nothingRecorded: string;
     /** The heading of the dates column in a `TimeSeriesChart`'s screen-reader table. */
     date: string;
     /**
@@ -85,6 +87,7 @@ export const defaultUiLabels: UiLabels = {
     previousPeriodValue: (days, value) => (days === 1 ? `Previous day: ${value}` : `Previous ${days} days: ${value}`),
     lastDays: (days) => (days === 1 ? "Last day" : `Last ${days} days`),
     noData: "No data for this period",
+    nothingRecorded: "Nothing recorded",
     date: "Date",
     relativeTime: {
         justNow: "just now",

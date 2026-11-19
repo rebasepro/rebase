@@ -25,10 +25,14 @@ export function ChartCard({ title, icon, headline, action, className, children }
 }) {
     return (
         <Card className={cls("min-w-0 px-5 py-4 flex flex-col", className)}>
-            <div className="flex items-center gap-1.5 min-w-0">
+            {/* Wraps rather than truncates: in a narrow card (two columns at
+                phone width) "Functions" beside its error count lost its end.
+                The title breaks only between words; when the action has no
+                room beside it, the action takes the next line, right-aligned. */}
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
                 <HeaderIcon icon={icon}/>
-                <Typography variant="micro" color="secondary" component="h3" className="truncate grow">{title}</Typography>
-                {action}
+                <Typography variant="micro" color="secondary" component="h3" className="grow">{title}</Typography>
+                {action !== undefined && <div className="ml-auto shrink-0 whitespace-nowrap">{action}</div>}
             </div>
             {headline !== undefined && (
                 <Typography variant="h4" component="div" className="mt-2">{headline}</Typography>

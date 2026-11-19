@@ -4,8 +4,11 @@ import {
     CallToolRequestSchema,
     ListToolsRequestSchema,
     ListResourcesRequestSchema,
-    ReadResourceRequestSchema
+    ReadResourceRequestSchema,
+    RootsListChangedNotificationSchema,
+    type CallToolRequest
 } from "@modelcontextprotocol/sdk/types.js";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn, type ChildProcess } from "node:child_process";
 import { config as loadDotenv, parse as parseDotenv } from "dotenv";
 import { resolve, join, dirname, delimiter, sep } from "node:path";
@@ -13,6 +16,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, chmodS
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { decideProjectScope, findProjectRoot, readCloudLink, type CloudLink } from "./project-scope.js";
 import {
     CLOUD_LOGS_DEFAULT_TAIL,
     ToolArgumentError,
@@ -202,6 +206,20 @@ let registry: ProjectRegistryFile = { projects: {}, activeProject: null };
  * every other project on the machine reads.
  */
 let defaultIsDerived = false;
+
+/**
+ * Whether this server process chose the active project (`rebase_project_switch`,
+ * `rebase_project_use_cloud`), as opposed to reading it from the machine-wide
+ * registry an earlier session wrote. See `project-scope.ts`.
+ */
+let activeChosenThisRun = false;
+
+/**
+ * The project the tool call in progress acts on, resolved per call by
+ * `decideProjectScope`. Per call rather than a module variable because the
+ * transport does not serialise calls: two in flight must not retarget each other.
+ */
+const callScope = new AsyncLocalStorage<ProjectConfig>();
 
 /**
  * Load the project registry from disk. Creates the file if it doesn't exist.
@@ -659,7 +677,10 @@ function warnIfEnvIgnored(fromEnv: ReturnType<typeof envDeclaredProject>): void 
     if (!fromEnv) return;
     const def = registry.projects["default"];
     const mismatched: string[] = [];
-    if (fromEnv.projectDir && def?.projectDir !== fromEnv.projectDir) mismatched.push("REBASE_PROJECT_DIR");
+    // Resolved, as the `default` entry was built from it: the scaffolded
+    // `.mcp.json` sets `REBASE_PROJECT_DIR: "."`, and the raw "." never equals
+    // the absolute path, so every scaffolded project was told this was a bug.
+    if (fromEnv.projectDir && (def?.projectDir === undefined || resolve(def.projectDir) !== resolve(fromEnv.projectDir))) mismatched.push("REBASE_PROJECT_DIR");
     if (fromEnv.baseUrl && def?.baseUrl !== fromEnv.baseUrl) mismatched.push("REBASE_BASE_URL");
     if (fromEnv.token && def?.token !== fromEnv.token) mismatched.push("REBASE_API_TOKEN");
     if (mismatched.length) {
@@ -739,7 +760,7 @@ export const DEFAULT_BASE_URL = "http://localhost:3001";
 /** Get the active project config, with auto-discovery applied. */
 function getActiveProject(): ProjectConfig {
     const name = registry.activeProject || "default";
-    const project = registry.projects[name];
+    const project = callScope.getStore() ?? registry.projects[name];
     if (!project) {
         throw new Error(`No active project configured. Use rebase_project_add to register one.`);
     }
@@ -2198,15 +2219,31 @@ export function parseCloudToolArgs(name: string, args: unknown, selectedProject?
  */
 /** The cloud project `rebase_project_use_cloud` made active, or undefined. */
 function selectedCloudProjectId(): string | undefined {
-    const active = registry.activeProject ? registry.projects[registry.activeProject] : undefined;
+    const active = callScope.getStore() ?? (registry.activeProject ? registry.projects[registry.activeProject] : undefined);
     return active?.cloud?.projectId;
 }
 
 async function runCloudTool(name: string, args: unknown) {
     if (!isCloudCommandTool(name)) return { ...textResult(`No cloud tool named ${name}.`), isError: true };
+    // A deploy ships the directory the CLI runs in, which can only go to the
+    // project that directory is linked to. When the call resolved to another
+    // one, saying "deployed" would be about the wrong project either way.
+    const target = getActiveProject();
+    if (name === "rebase_cloud_deploy" && target.cloud) {
+        const dirLink = readCloudLink(getProjectDir());
+        if (dirLink && dirLink.projectId !== target.cloud.projectId) {
+            return {
+                ...textResult(
+                    `Refusing to deploy: this call resolved to the Cloud project ${target.cloud.projectId} ("${target.name}"), ` +
+                    `but the directory it would ship, ${dirLink.root}, is linked to ${dirLink.slug ?? dirLink.projectId}. Nothing was done.`
+                ),
+                isError: true
+            };
+        }
+    }
     let call: ReturnType<typeof cloudToolCall>;
     try {
-        call = cloudToolCall(name, cloudToolSchema(name), args, selectedCloudProjectId());
+        call = cloudToolCall(name, cloudToolSchema(name), args, selectedCloudProjectId(), target.name);
     } catch (err) {
         return { ...textResult(err instanceof Error ? err.message : String(err)), isError: true };
     }
@@ -2237,6 +2274,43 @@ async function runCloudTool(name: string, args: unknown) {
     };
 }
 
+/**
+ * Tools that do not act on a project: they manage the registry, list what the
+ * account can reach, create a project, or read this machine's dev log. Every
+ * other tool takes an optional `project` argument and is resolved per call.
+ */
+export const UNSCOPED_TOOLS = new Set<string>([
+    "rebase_project_list",
+    "rebase_project_switch",
+    "rebase_project_add",
+    "rebase_project_remove",
+    "rebase_project_current",
+    "rebase_project_use_cloud",
+    "rebase_cloud_projects_list",
+    "rebase_cloud_provision",
+    "rebase_dev_logs"
+]);
+
+/**
+ * The optional `project` argument every project-scoped tool takes. Resolved
+ * and checked against the session directory's Cloud link before the tool runs
+ * (`project-scope.ts`), then removed from the arguments the tool sees.
+ */
+const PROJECT_ARGUMENT = {
+    type: "string",
+    minLength: 1,
+    maxLength: 200,
+    description:
+        "The project to act on: a registered project's name (rebase_project_list), or a Rebase Cloud project's slug or id. " +
+        "Optional when the session's directory is linked to the intended project. Refused when it names a different project " +
+        "than the directory's link."
+};
+
+function withProjectArgument(tool: ToolDef): ToolDef {
+    if (UNSCOPED_TOOLS.has(tool.name)) return tool;
+    return { ...tool, inputSchema: { ...tool.inputSchema, properties: { ...tool.inputSchema.properties, project: PROJECT_ARGUMENT } } };
+}
+
 export const ALL_TOOLS: ToolDef[] = [
     ...CLI_TOOLS.map(({ cmd: _c, ...rest }) => rest),
     ...SCHEMA_TOOLS,
@@ -2248,7 +2322,7 @@ export const ALL_TOOLS: ToolDef[] = [
     ...FUNCTION_TOOLS,
     ...PROJECT_TOOLS,
     ...CLOUD_TOOLS
-];
+].map(withProjectArgument);
 
 // ── Tool Handlers ───────────────────────────────────────────────────────────
 
@@ -2569,7 +2643,7 @@ function untrustedTextResult(source: string, text: string, isError = false) {
     return { ...textResult(untrustedEnvelope(source, text)), ...(isError ? { isError: true } : {}) };
 }
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+async function handleToolCall(request: CallToolRequest) {
     try {
         const { name, arguments: args } = request.params;
 
@@ -2712,6 +2786,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 addedAt: new Date().toISOString()
             };
             registry.activeProject = entryName;
+            activeChosenThisRun = true;
             clearClientCache();
             saveRegistry();
             const state = (studio as { state?: string } | null)?.state;
@@ -2784,6 +2859,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 return textResult(`Project "${argsObj.name}" not found. Available: ${Object.keys(registry.projects).join(", ")}`);
             }
             registry.activeProject = argsObj.name;
+            activeChosenThisRun = true;
             clearClientCache();
             saveRegistry();
             const project = getActiveProject();
@@ -2876,13 +2952,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         case "rebase_project_current": {
             const project = getActiveProject();
+            const callerLink = readCloudLink(callerDirectory());
             return jsonResult({
                 name: project.name,
                 projectDir: project.projectDir || null,
                 baseUrl: project.baseUrl,
                 hasToken: !!project.token,
                 tokenPrefix: project.token ? project.token.substring(0, 8) + "..." : null,
-                addedAt: project.addedAt
+                cloudProjectId: project.cloud?.projectId ?? null,
+                addedAt: project.addedAt,
+                // What a project-scoped tool called without `project` checks
+                // the active project against (see project-scope.ts).
+                session: {
+                    directory: callerDirectory(),
+                    linkedCloudProject: callerLink ? { id: callerLink.projectId, slug: callerLink.slug ?? null } : null
+                }
             });
         }
 
@@ -3196,6 +3280,125 @@ roles });
             isError: true
         };
     }
+}
+
+// ── Per-call project scope ──────────────────────────────────────────────────
+
+export function isProjectScoped(toolName: string): boolean {
+    return !UNSCOPED_TOOLS.has(toolName) && ALL_TOOLS.some((t) => t.name === toolName);
+}
+
+/** The roots the client declared (file paths), when it supports them. */
+let clientRoots: string[] = [];
+
+/**
+ * The directory the session works in: the client's first root, else this
+ * process's working directory. A stdio server is spawned in the client's
+ * working directory, which is the session's even when `REBASE_PROJECT_DIR`
+ * points the server at its own install directory.
+ */
+export function callerDirectory(): string {
+    return clientRoots[0] ?? process.cwd();
+}
+
+async function refreshClientRoots(): Promise<void> {
+    if (!server.getClientCapabilities()?.roots) return;
+    try {
+        const { roots } = await server.listRoots();
+        clientRoots = roots
+            .filter((root) => root.uri.startsWith("file://"))
+            .map((root) => fileURLToPath(root.uri));
+    } catch {
+        // A client that advertised roots and then failed to list them leaves
+        // the working directory as the answer.
+    }
+}
+
+server.oninitialized = () => { void refreshClientRoots(); };
+server.setNotificationHandler(RootsListChangedNotificationSchema, async () => { await refreshClientRoots(); });
+
+/** A Cloud project the session's directory is linked to, as a registry-shaped entry for one call. */
+function linkedEntry(link: CloudLink): ProjectConfig {
+    const existing = Object.values(registry.projects).find((p) => p.cloud?.projectId === link.projectId);
+    const host = link.url ?? existing?.cloud?.host ?? "https://app.rebase.pro";
+    return {
+        name: existing?.name ?? `cloud:${link.slug ?? link.projectId}`,
+        // The CLI that mints the bearer, and that a deploy ships, is the linked checkout's.
+        projectDir: link.root,
+        baseUrl: studioProxyBaseUrl(host, link.projectId),
+        token: "",
+        cloud: { host, projectId: link.projectId },
+        addedAt: existing?.addedAt ?? new Date().toISOString()
+    };
+}
+
+/**
+ * The project one call acts on, or why it is refused. See `project-scope.ts`
+ * for the rules; this adds the I/O: the session directory's link, and a
+ * lookup when `project` names a Cloud project the registry does not hold yet.
+ */
+async function scopedProjectFor(toolName: string, requested: string | undefined): Promise<{ entry: ProjectConfig } | { refusal: string }> {
+    const dir = callerDirectory();
+    const callerLink = readCloudLink(dir);
+    const decision = decideProjectScope({
+        tool: toolName,
+        isWrite: gatedTargetFor(toolName) !== null || CLOUD_CONTROL_PLANE_TOOLS.has(toolName),
+        requested,
+        entries: registry.projects,
+        activeName: registry.activeProject,
+        activeChosenThisRun,
+        callerLink,
+        callerRoot: findProjectRoot(dir),
+        linkOf: readCloudLink
+    });
+    switch (decision.kind) {
+        case "refuse":
+            return { refusal: decision.message };
+        case "entry":
+            return { entry: registry.projects[decision.name] };
+        case "link":
+            return { entry: linkedEntry(decision.link) };
+        case "lookup": {
+            const { match, all } = await findCloudProject(decision.ref);
+            if (!match) {
+                return {
+                    refusal: `No project "${decision.ref}" is registered here or reachable by this account. ` +
+                        `Registered: ${Object.keys(registry.projects).join(", ") || "(none)"}. ` +
+                        `Cloud: ${all.map((p) => p.slug ?? p.id).join(", ") || "(none)"}.`
+                };
+            }
+            const { host } = await cloudAccessToken();
+            const entryName = `cloud:${match.slug ?? match.id}`;
+            registry.projects[entryName] = {
+                name: entryName,
+                projectDir: getProjectDir(),
+                baseUrl: studioProxyBaseUrl(host, match.id),
+                token: "",
+                cloud: { host, projectId: match.id },
+                addedAt: new Date().toISOString()
+            };
+            saveRegistry();
+            return { entry: registry.projects[entryName] };
+        }
+    }
+}
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const name = request.params.name;
+    if (!isProjectScoped(name)) return handleToolCall(request);
+    const { project: requested, ...rest } = request.params.arguments ?? {};
+    if (requested !== undefined && typeof requested !== "string") {
+        return { ...textResult("`project` must be a string: a registered project's name, or a Rebase Cloud project's slug or id."), isError: true };
+    }
+    let entry: ProjectConfig;
+    try {
+        const scoped = await scopedProjectFor(name, requested);
+        if ("refusal" in scoped) return { ...textResult(scoped.refusal), isError: true };
+        entry = scoped.entry;
+    } catch (err) {
+        return { ...textResult(`Error: ${explainToolError(err, undefined, name)}`), isError: true };
+    }
+    return callScope.run(entry, () => handleToolCall({ ...request, params: { ...request.params, arguments: rest } }));
 });
 
 // ── Resources ───────────────────────────────────────────────────────────────

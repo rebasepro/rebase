@@ -207,7 +207,7 @@ function SchemaBlock({ schema, spec, depth }: { schema: OpenApiSchema; spec: Ope
                                             {prop.enum.map((v) => (
                                                 <span
                                                     key={String(v)}
-                                                    className="px-1.5 py-0.5 rounded bg-surface-raised text-[10px] font-mono"
+                                                    className="px-1.5 py-0.5 rounded bg-surface-raised text-xs font-mono"
                                                 >
                                                     {String(v)}
                                                 </span>

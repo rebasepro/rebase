@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/cli",
-  "version": "0.33.2",
+  "version": "0.34.1",
   "description": "Developer tools for Rebase projects",
   "keywords": [
     "cli",

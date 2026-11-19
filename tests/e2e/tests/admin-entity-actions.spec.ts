@@ -164,8 +164,18 @@ test.describe("entity actions", () => {
         const row = await findOrderRow(page, orderNumber);
         await row.hover();
         await expect(row.getByRole("button", { name: "Mark as shipped", exact: true })).toBeDisabled();
-        await clickInTableRow(row, row.getByRole("button", { name: "More actions", exact: true }));
-        await expect(page.getByRole("menuitem", { name: /^Refund/ })).toBeDisabled();
+        // A click on the row's controls can land while the row re-renders and
+        // open nothing (CI run 44571572289). Opening the menu writes nothing,
+        // so retry it — but only while it is still closed, since a second
+        // click on an open menu closes it.
+        const refund = page.getByRole("menuitem", { name: /^Refund/ });
+        await expect(async () => {
+            if (!(await refund.isVisible())) {
+                await clickInTableRow(row, row.getByRole("button", { name: "More actions", exact: true }));
+            }
+            await expect(refund).toBeVisible({ timeout: 2_000 });
+        }).toPass({ timeout: 15_000 });
+        await expect(refund).toBeDisabled();
         await expect(page.getByRole("menuitem", { name: /^Refund/ })).toContainText("Nothing to refund: the order is not paid");
     });
 

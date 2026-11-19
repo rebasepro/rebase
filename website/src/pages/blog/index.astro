@@ -24,8 +24,8 @@ const breadcrumbs = [
 			<HeroBackdrop />
 			<div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
 				<p class="hero-eyebrow">Blog</p>
-				<h1 class="mt-4 text-display-2 text-white">Building on Postgres</h1>
-				<p class="mt-5 text-lg leading-8 text-surface-400 max-w-2xl">
+				<h1 class="mt-4 text-display-2 text-tone-max">Building on Postgres</h1>
+				<p class="mt-5 text-lg leading-8 text-tone-400 max-w-2xl">
 					Latest updates, tutorials, and insights about Rebase and building on Postgres
 				</p>
 			</div>
@@ -37,7 +37,7 @@ const breadcrumbs = [
 
 				<div class="mt-lead grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 					{posts.map((post) => (
-						<a href={`/blog/${post.id}/`} class="frame group flex flex-col transition-colors duration-300 hover:border-white/25">
+						<a href={`/blog/${post.id}/`} class="frame group flex flex-col transition-colors duration-300 hover:border-tone-max/25">
 							{/* The post's own field, held still on the seat its page's
 							    hero opens on (`poseKey` is that page's path), so the card
 							    and the page it opens show the same light. Masked into the
@@ -56,14 +56,14 @@ const breadcrumbs = [
 								)}
 							</div>
 							<div class="flex flex-1 flex-col px-6 pb-6 -mt-6 relative">
-								<p class="font-mono text-2xs uppercase tracking-[0.2em] text-surface-500">
+								<p class="font-mono text-2xs uppercase tracking-[0.2em] text-tone-500">
 									<FormattedDate date={post.data.pubDate} />
 								</p>
-								<h2 class="mt-3 text-xl text-white group-hover:text-primary-light transition-colors">
+								<h2 class="mt-3 text-xl text-tone-max group-hover:text-primary-light transition-colors">
 									{post.data.title}
 								</h2>
 								{post.data.description && (
-									<p class="mt-2 text-surface-400 text-sm line-clamp-3">
+									<p class="mt-2 text-tone-400 text-sm line-clamp-3">
 										{post.data.description}
 									</p>
 								)}
@@ -73,7 +73,7 @@ const breadcrumbs = [
 				</div>
 
 				{posts.length === 0 && (
-					<p class="mt-lead text-surface-400 text-lg">No blog posts yet. Check back soon!</p>
+					<p class="mt-lead text-tone-400 text-lg">No blog posts yet. Check back soon!</p>
 				)}
 			</div>
 		</section>

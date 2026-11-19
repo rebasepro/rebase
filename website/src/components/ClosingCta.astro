@@ -54,8 +54,8 @@ const [RUNNER, PACKAGE, VERB] = COMMAND.match(/^(\S+ \S+) (\S+) (\S+)$/)!.slice(
         <ChapterRule label={t("cta.eyebrow")} dot="text-cyan-300" />
         <div class="mt-lead grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-end">
             <div class="lg:col-span-6">
-                <h2 class="text-3xl sm:text-4xl text-white">{title}</h2>
-                <p class="mt-4 max-w-xl text-lg text-surface-400">{blurb}</p>
+                <h2 class="text-3xl sm:text-4xl text-tone-max">{title}</h2>
+                <p class="mt-4 max-w-xl text-lg text-tone-400">{blurb}</p>
             </div>
 
             <div class="lg:col-span-6 flex flex-col gap-5 lg:items-end">
@@ -64,13 +64,13 @@ const [RUNNER, PACKAGE, VERB] = COMMAND.match(/^(\S+ \S+) (\S+) (\S+)$/)!.slice(
                     data-track-copy={`${trackId}-cta`}
                     data-command={COMMAND}
                     data-copy-done-label={t("copy.command.done")}
-                    class="copy-btn group inline-flex max-w-full items-center gap-3 rounded-lg border border-white/12 bg-white/[0.03] px-5 min-h-(--control-large) font-mono text-sm text-surface-200 transition-colors hover:border-white/25 hover:bg-white/[0.06] data-copied:border-emerald-400/60 data-copied:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    class="copy-btn group inline-flex max-w-full items-center gap-3 rounded-lg border border-tone-max/12 bg-tone-max/[0.03] px-5 min-h-(--control-large) font-mono text-sm text-tone-200 transition-colors hover:border-tone-max/25 hover:bg-tone-max/[0.06] data-copied:border-emerald-400/60 data-copied:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     aria-label={`Copy "${COMMAND}" to the clipboard`}
                     title="Copy to clipboard"
                 >
-                    <span class="select-none text-surface-500">$</span>
-                    <span class="truncate"><span class="text-emerald-400">{RUNNER}</span> <span class="text-primary-light">{PACKAGE}</span> <span class="text-white">{VERB}</span></span>
-                    <span data-copy-label class="ml-2 rounded-md border border-white/10 bg-white/[0.06] px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.14em] text-surface-400">{t("copy.command")}</span>
+                    <span class="select-none text-tone-500">$</span>
+                    <span class="truncate"><span class="text-emerald-400">{RUNNER}</span> <span class="text-primary-light">{PACKAGE}</span> <span class="text-tone-max">{VERB}</span></span>
+                    <span data-copy-label class="ml-2 rounded-md border border-tone-max/10 bg-tone-max/[0.06] px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.14em] text-tone-400">{t("copy.command")}</span>
                 </button>
 
                 <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -85,7 +85,7 @@ const [RUNNER, PACKAGE, VERB] = COMMAND.match(/^(\S+ \S+) (\S+) (\S+)$/)!.slice(
                         </svg>
                     </a>
                     <a href={translatePath("/docs")}
-                       class="inline-flex items-center gap-x-2 text-white hover:text-primary-light transition-colors font-semibold"
+                       class="inline-flex items-center gap-x-2 text-tone-max hover:text-primary-light transition-colors font-semibold"
                        data-track id={`${trackId}-cta-docs`}>
                         {t("cta.button.docs")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none"

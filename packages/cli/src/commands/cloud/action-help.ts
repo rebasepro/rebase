@@ -194,6 +194,30 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
+    "db query": {
+        command: "cloud db query",
+        usage: "cloud db query [sql] [--file <path>]",
+        summary:
+            "Run SQL on the project's managed database and print what it answered. It opens the tunnel "
+            + "`db connect` opens, for the length of one query, and connects with the CLI's own Postgres "
+            + "driver, so nothing else needs to be installed. A file of several statements (functions, "
+            + "triggers, DO blocks) runs as one script and stops at the first error.",
+        flags: [
+            ["--file <path>", "Run the statements in a file instead of the argument"]
+        ],
+        examples: [
+            "rebase cloud db query \"select count(*) from rebase.users\"",
+            "rebase cloud db query --file sql/extras.sql --project shop",
+            "rebase cloud db query \"select * from orders limit 5\" --json"
+        ],
+        notes: [
+            "Requires the organization's owner or admin role, as `db connect --reveal` does.",
+            "No transaction is added: wrap the file in BEGIN/COMMIT to make it all-or-nothing.",
+            "`COPY … FROM STDIN` (psql's \\copy) is refused; it needs a client-side stream.",
+            "With --json it prints `{ projectId, results: [{ command, rowCount, rows }] }`, one entry per statement."
+        ]
+    },
+
     "db connect": {
         command: "cloud db connect",
         usage: "cloud db connect [--port <n>] [--reveal]",
@@ -1450,7 +1474,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         flags: [
             ["--runtime", "Requests, errors, error rate and mean latency, from the app's own counters"],
             ["--history", "A recorded series over a window instead of the live figures"],
-            ["--series <name>", "With --history: cpu_millicores (default), memory_bytes or event_loop_delay_ms"],
+            ["--series <name>", "With --history: cpu_millicores (default), memory_bytes, event_loop_delay_ms, or requests_<surface> / errors_<surface> for data, auth, storage, functions, app"],
             ["--minutes <n>", "With --history: how far back, 1 to 20160 (fourteen days). Default: 60"]
         ],
         examples: [

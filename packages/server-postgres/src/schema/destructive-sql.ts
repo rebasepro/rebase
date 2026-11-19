@@ -431,18 +431,29 @@ function describeConstraintDrops(statement: string, constraints: readonly Existi
     const [schema, table] = alter[2] ? [unquote(alter[1]), unquote(alter[2])] : [undefined, unquote(alter[1])];
 
     const lost: string[] = [];
-    for (const clause of splitClauses(alter[3])) {
+    const clauses = splitClauses(alter[3]);
+    // A foreign key dropped and added back under its name in the same
+    // statement is a changed key (its `ON DELETE`, its target), not a lost one.
+    const readded = new Set(clauses.flatMap(clause => {
+        const added = /^ADD\s+CONSTRAINT\s+("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)/i.exec(clause.trim());
+        return added ? [unquote(added[1])] : [];
+    }));
+    for (const clause of clauses) {
         const drop = DROP_CONSTRAINT_RE.exec(clause);
         if (!drop) continue;
         const name = unquote(drop[1]);
         const constraint = constraints.find(c => c.table === table && c.name === name
-            && (schema === undefined || c.schema === schema));
-        if (constraint) lost.push(`${constraint.kind === "check" ? "CHECK" : "EXCLUDE"} "${name}"`);
+            && (schema === undefined || c.schema === schema)
+            && !(c.kind === "foreign key" && readded.has(name)));
+        if (constraint) lost.push(`${constraint.kind === "check" ? "CHECK" : constraint.kind === "foreign key" ? "FOREIGN KEY" : "EXCLUDE"} "${name}"`);
     }
     if (lost.length === 0) return undefined;
     const subject = schema ? `${schema}.${table}` : table;
     return `${subject} loses ${lost.join(", ")}: no row is lost, and the database accepts every row ` +
-        `${lost.length === 1 ? "it refuses" : "they refuse"} today`;
+        `${lost.length === 1 ? "it refuses" : "they refuse"} today` +
+        (lost.some(item => item.startsWith("FOREIGN KEY"))
+            ? ". A one-column foreign key is a relation's: it goes when its relation is removed from the table; keep the relation to keep the key"
+            : "");
 }
 
 /**
@@ -546,7 +557,8 @@ function modifierWidens(base: string, from: number[] | undefined, to: number[] |
  *    `timestamptz(3)` → `timestamptz`);
  *  - `smallint` → `integer` → `bigint`, and any of them to a `numeric` with
  *    room for all their digits;
- *  - `varchar(n)` → `text`, and `text` → an unbounded `varchar`.
+ *  - `varchar(n)` → `text`, and `text` → an unbounded `varchar`;
+ *  - `uuid` → `text` (or a `varchar` of 36 or more), its one exact spelling.
  *
  * Arrays follow their element type, and never gain or lose a dimension.
  */
@@ -568,7 +580,26 @@ export function isLosslessTypeChange(from: string, to: string): boolean {
     }
     if (a.base === "varchar" && b.base === "text") return true;
     if (a.base === "text" && b.base === "varchar") return b.args === undefined;
+    // A uuid has one exact text form, 36 characters: Supabase's user-id
+    // columns move to text this way, because Rebase's user ids are text.
+    if (a.base === "uuid") return b.base === "text" || (b.base === "varchar" && (b.args === undefined || b.args[0] >= 36));
     return false;
+}
+
+/**
+ * What a set of findings does, for the line above them: how many destroy data
+ * and how many only drop a constraint the database enforces. A dropped CHECK
+ * or foreign key loses no row, and a header saying "DESTROY data" above a line
+ * saying "no row is lost" read as a contradiction.
+ */
+export function describeDestructiveFindings(found: readonly DestructiveStatement[]): string {
+    const constraintsOnly = found.filter(item => item.kind === "DROP CONSTRAINT").length;
+    const destroying = found.length - constraintsOnly;
+    const parts = [
+        destroying > 0 ? `${destroying} destroy${destroying === 1 ? "s" : ""} data` : undefined,
+        constraintsOnly > 0 ? `${constraintsOnly} remove${constraintsOnly === 1 ? "s" : ""} a constraint the database enforces` : undefined
+    ].filter(Boolean);
+    return parts.join(", and ");
 }
 
 export type PushDecision = "apply" | "confirm" | "refuse";

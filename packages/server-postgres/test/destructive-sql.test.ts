@@ -238,7 +238,10 @@ describe("isLosslessTypeChange", () => {
         ["timestamp without time zone", "timestamp(6)"],
         ["text[]", "text[]"],
         ["character varying(20)[]", "text[]"],
-        ["\"public\".\"posts_status\"", "\"public\".\"posts_status\""]
+        ["\"public\".\"posts_status\"", "\"public\".\"posts_status\""],
+        // A Supabase user-id column moving to text, as Rebase's user ids are.
+        ["uuid", "text"],
+        ["uuid", "character varying(36)"]
     ])("%s → %s keeps every value", (from, to) => {
         expect(isLosslessTypeChange(from, to)).toBe(true);
     });
@@ -263,7 +266,9 @@ describe("isLosslessTypeChange", () => {
         ["text", "integer"],
         ["character(10)", "text"],
         ["text[]", "text"],
-        ["text", "\"public\".\"posts_status\""]
+        ["text", "\"public\".\"posts_status\""],
+        ["uuid", "character varying(20)"],
+        ["text", "uuid"]
     ])("%s → %s needs a confirmation", (from, to) => {
         expect(isLosslessTypeChange(from, to)).toBe(false);
     });

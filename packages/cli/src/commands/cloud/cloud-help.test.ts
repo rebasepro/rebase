@@ -146,6 +146,14 @@ describe("rebase cloud <group> --help", () => {
         expect(context.requireProjectRef).not.toHaveBeenCalled();
     });
 
+    it("keeps `deploy --help` in the family's piped mode: deploy's human-when-piped is for its result, not its help", async () => {
+        vi.mocked(context.initOutputMode).mockClear();
+        await cloudCommand("deploy", argv("deploy", "--help"));
+        expect(vi.mocked(context.initOutputMode).mock.calls.some(([, opts]) => opts?.whenPiped === "human")).toBe(false);
+        await cloudCommand("deploy", argv("deploy"));
+        expect(vi.mocked(context.initOutputMode).mock.calls.some(([, opts]) => opts?.whenPiped === "human")).toBe(true);
+    });
+
     it("honours -h as well as --help", async () => {
         await cloudCommand("env", argv("env", "-h"));
         expect(env.printEnvHelp).toHaveBeenCalledTimes(1);

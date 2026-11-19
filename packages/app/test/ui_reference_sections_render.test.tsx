@@ -36,7 +36,7 @@ describe("UI reference component chapters", () => {
             <DisclosureLayoutSection/>
             <DataDisplaySection/>
         </>);
-        for (const title of ["More form controls", "Overlays — Dialog, Sheet, Popover, Menubar", "Disclosure and layout", "Data display — Badge, InfoLabel, Markdown, VirtualTable"]) {
+        for (const title of ["More form controls", "Overlays — Dialog, Sheet, Popover, Menubar", "Disclosure and layout", "Data display — StatusDot, Badge, InfoLabel, Markdown, VirtualTable"]) {
             expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
         }
         expect(screen.getByRole("separator", { name: "Resize the list" })).toBeInTheDocument();

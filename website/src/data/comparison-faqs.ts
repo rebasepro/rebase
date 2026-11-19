@@ -1,5 +1,5 @@
 /**
- * The six questions a buyer actually asks on each comparison page.
+ * The questions a buyer actually asks on each comparison page.
  *
  * ── Why this is data and not markup ──────────────────────────────────────────
  * Each comparison page is several hundred lines of hand-built layout, and that
@@ -9,11 +9,11 @@
  * same voice instead of drifting apart one edit at a time.
  *
  * ── The rules these answers follow ───────────────────────────────────────────
- *  1. **Every set concedes something.** There is a "when is X the better
- *     choice?" question on every page, and its answer is real. A comparison
- *     that never gives ground reads as a brochure, and a brochure is not
- *     quoted by anyone — not by a reader deciding, and not by a model
- *     assembling an answer from the pages it trusts.
+ *  1. **No answer sends the reader to the competitor.** The "when is X the
+ *     better choice?" question was removed from every set on 2026-11-18
+ *     (Francesco: "do not limit ourselves ever"). State a difference as a
+ *     fact about the architecture; a gap is something built with
+ *     customization, not a reason to stay where they are.
  *  2. **No numbers we cannot stand behind.** No benchmarks, no competitor
  *     prices (they change, and a stale price is a lie with a date on it), no
  *     "10x faster". Every claim here is about architecture, which is checkable.
@@ -47,10 +47,6 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
             a: "cfaq.supabase.2.a"
         },
         {
-            q: "cfaq.supabase.3.q",
-            a: "cfaq.supabase.3.a"
-        },
-        {
             q: "cfaq.supabase.4.q",
             a: "cfaq.supabase.4.a"
         },
@@ -69,10 +65,6 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
         {
             q: "cfaq.firebase.2.q",
             a: "cfaq.firebase.2.a"
-        },
-        {
-            q: "cfaq.firebase.3.q",
-            a: "cfaq.firebase.3.a"
         },
         {
             q: "cfaq.firebase.4.q",
@@ -95,10 +87,6 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
             a: "cfaq.appwrite.2.a"
         },
         {
-            q: "cfaq.appwrite.3.q",
-            a: "cfaq.appwrite.3.a"
-        },
-        {
             q: "cfaq.appwrite.4.q",
             a: "cfaq.appwrite.4.a"
         },
@@ -117,10 +105,6 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
         {
             q: "cfaq.directus.2.q",
             a: "cfaq.directus.2.a"
-        },
-        {
-            q: "cfaq.directus.3.q",
-            a: "cfaq.directus.3.a"
         },
         {
             q: "cfaq.directus.4.q",
@@ -143,10 +127,6 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
             a: "cfaq.strapi.2.a"
         },
         {
-            q: "cfaq.strapi.3.q",
-            a: "cfaq.strapi.3.a"
-        },
-        {
             q: "cfaq.strapi.4.q",
             a: "cfaq.strapi.4.a"
         },
@@ -167,10 +147,6 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
             a: "cfaq.payload.2.a"
         },
         {
-            q: "cfaq.payload.3.q",
-            a: "cfaq.payload.3.a"
-        },
-        {
             q: "cfaq.payload.4.q",
             a: "cfaq.payload.4.a"
         },
@@ -189,10 +165,6 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
         {
             q: "cfaq.retool.2.q",
             a: "cfaq.retool.2.a"
-        },
-        {
-            q: "cfaq.retool.3.q",
-            a: "cfaq.retool.3.a"
         },
         {
             q: "cfaq.retool.4.q",
@@ -218,10 +190,6 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
             q: "cfaq.hasura.3.q",
             a: "cfaq.hasura.3.a"
         },
-        {
-            q: "cfaq.hasura.4.q",
-            a: "cfaq.hasura.4.a"
-        },
         HOSTING
     ],
 
@@ -237,10 +205,6 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
         {
             q: "cfaq.django.2.q",
             a: "cfaq.django.2.a"
-        },
-        {
-            q: "cfaq.django.3.q",
-            a: "cfaq.django.3.a"
         },
         {
             q: "cfaq.django.4.q",

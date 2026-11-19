@@ -170,6 +170,13 @@ export interface AuthControllerExtended<USER extends User = User, ExtraData = un
      * among them — is recorded in `authProviderError`, as every sign-in's is.
      */
     magicLinkLogin?(token: string): Promise<void>;
+    /**
+     * Present when the platform hosting the backend signs its project's owners
+     * in (Rebase Cloud). The login view then offers "Continue with Rebase
+     * Cloud", which goes to `url`: the project's page in the platform's
+     * console, which comes back here signed in.
+     */
+    platformSignIn?: { url?: string };
     /** Change password for the authenticated user */
     changePassword?(oldPassword: string, newPassword: string): Promise<void>;
     /**

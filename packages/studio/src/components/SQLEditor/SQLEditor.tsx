@@ -1382,7 +1382,7 @@ id: String(ra.entityId) })}
                 onDoubleClick={() => handleDoubleClick(rowIndex, column.key, displayValue, rowData ?? {})}
             >
                 <div className="truncate flex-grow" title={displayValue}>
-                    {value === null || value === undefined ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-[11px]">NULL</span> : displayValue}
+                    {value === null || value === undefined ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-xs">NULL</span> : displayValue}
                 </div>
             </div>
         );
@@ -1412,7 +1412,7 @@ id: String(ra.entityId) })}
             return (
                 <div className="flex-grow flex items-center justify-center text-text-disabled dark:text-text-disabled-dark">
                     <div className="text-center">
-                        <DatabaseIcon size={48} strokeWidth={1} className="mx-auto mb-4 opacity-50"/>
+                        <DatabaseIcon size={48} strokeWidth={1} className="mx-auto mb-4 opacity-50 stroke-keep"/>
                         <Typography variant="body2">{t("studio_sql_run_query_placeholder")}</Typography>
                     </div>
                 </div>
@@ -1486,11 +1486,11 @@ id: String(ra.entityId) })}
                     <div className="flex space-x-4">
                         <div className="flex items-center gap-2">
                             <Typography variant="caption" color="secondary">{t("studio_sql_rows")}</Typography>
-                            <Typography variant="mono" className="text-[11px]">{results.length}</Typography>
+                            <Typography variant="mono" className="text-xs">{results.length}</Typography>
                         </div>
                         <div className="flex items-center gap-2">
                             <Typography variant="caption" color="secondary">{t("studio_sql_time")}</Typography>
-                            <Typography variant="mono" className="text-[11px]">{execTime}ms</Typography>
+                            <Typography variant="mono" className="text-xs">{execTime}ms</Typography>
                         </div>
                     </div>
                     <div className="flex gap-2 overflow-x-auto no-scrollbar items-center px-2">
@@ -1645,7 +1645,7 @@ id: String(ra.entityId) })}
                                     setAutoLimit(!autoLimit);
                                     e.stopPropagation();
                                 }}>
-                                    <Typography variant="caption" className="text-[11px] text-text-secondary cursor-pointer select-none">{t("studio_sql_limit_1000")}</Typography>
+                                    <Typography variant="caption" className="text-xs text-text-secondary cursor-pointer select-none">{t("studio_sql_limit_1000")}</Typography>
                                     <div onClick={(e) => e.stopPropagation()}>
                                         <Checkbox
                                             checked={autoLimit}

@@ -203,7 +203,8 @@ export const CREATE_USER_FLAGS = {
     "--name": String,
     "--role": [String],
     "--password": String,
-    "--skip-password-policy": Boolean
+    "--skip-password-policy": Boolean,
+    "--no-invite": Boolean
 } satisfies arg.Spec;
 
 async function createUser(rawArgs: string[]): Promise<void> {
@@ -228,7 +229,8 @@ async function createUser(rawArgs: string[]): Promise<void> {
             ...(flags["--name"] ? { displayName: flags["--name"] } : {}),
             ...(flags["--password"] ? { password: flags["--password"] } : {}),
             ...(roles ? { roles } : {}),
-            ...(flags["--skip-password-policy"] ? { skipPasswordPolicy: true } : {})
+            ...(flags["--skip-password-policy"] ? { skipPasswordPolicy: true } : {}),
+            ...(flags["--no-invite"] ? { invite: false } : {})
         }
     });
     const user = userOf(body);
@@ -535,7 +537,7 @@ export const USERS_ACTIONS: HelpAction[] = [
         action: "create",
         args: "<email>",
         description: "Create an account; it is emailed an invitation, or shown a temporary password",
-        flags: [["--email, -e <email>", "The email (or as the argument)"], ["--name <name>", "Display name"], ["--role <role>", "A role to give it (repeatable, or a,b)"], ["--password <password>", "Set this password instead of inviting"], ["--skip-password-policy", "Accept a password the policy would refuse (imports)"]]
+        flags: [["--email, -e <email>", "The email (or as the argument)"], ["--name <name>", "Display name"], ["--role <role>", "A role to give it (repeatable, or a,b)"], ["--password <password>", "Set this password instead of inviting"], ["--skip-password-policy", "Accept a password the policy would refuse (imports)"], ["--no-invite", "No password and no email: for an app that signs in by magic link, code or provider"]]
     },
     {
         action: "update",

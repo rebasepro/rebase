@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "@rebasepro/ui/index.css" layer(base);
 
+/* The same `dark:` variant as global.css. This file is a second Tailwind entry,
+   and without the line its `dark:` utilities fell back to Tailwind's default,
+   the OS preference: with the site switched to light on an OS in dark mode,
+   every demo on the page drew white text on a light ground. */
+@custom-variant dark (&:is([data-theme=dark], [data-theme=dark] *, .island-dark, .island-dark *, .ground-chroma, .ground-chroma *));
+
 
 
 @plugin "@tailwindcss/typography";

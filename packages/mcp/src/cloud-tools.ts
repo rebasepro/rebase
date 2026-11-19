@@ -148,41 +148,47 @@ export interface CloudCall {
 }
 
 /**
- * The cloud tools that read a project, and so follow `rebase_project_use_cloud`.
+ * The cloud tools that act on the project this call resolved to, with
+ * `--project`, which every `rebase cloud` command takes.
  *
- * After an agent points the tools at a project, these act on it with
- * `--project`, which every `rebase cloud` command takes. Without it they asked
- * the directory's link, and refused `no_project` in a directory linked to
- * nothing, right after the agent had selected the project it wanted.
+ * The call's project is resolved before the tool runs (`project-scope.ts`):
+ * from the `project` argument, the session directory's link, or the active
+ * project, and refused when the first two disagree. Without `--project` the
+ * CLI asked the link of the directory it was spawned in, which is the active
+ * registry entry's directory, not necessarily the session's, so an env change
+ * could land on a project nobody in the session named.
  *
- * The writes are left out on purpose. A deploy ships THIS directory's code, so
- * it can only go to the project the directory is linked to. An env change and
- * a rollback change production, and the link is the one place a person
- * decided which project that is.
+ * A deploy is left out: it ships the directory it runs in, so it can only go
+ * to that directory's link. `index.ts` refuses one whose resolved project is
+ * not that link.
  */
 export const CLOUD_TOOLS_FOLLOWING_SELECTION: ReadonlySet<CloudCommandTool> = new Set<CloudCommandTool>([
     "rebase_cloud_status",
     "rebase_cloud_logs",
     "rebase_cloud_env_list",
-    "rebase_cloud_deployments_list"
+    "rebase_cloud_deployments_list",
+    "rebase_cloud_env_set",
+    "rebase_cloud_rollback"
 ]);
 
 /**
  * `validateToolArgs`, then the argv for that tool. Throws `ToolArgumentError`.
  *
- * `selectedProject` is the id `rebase_project_use_cloud` selected, if any. The
- * read tools act on it (see {@link CLOUD_TOOLS_FOLLOWING_SELECTION}).
+ * `selectedProject` is the Cloud project id this call resolved to, if any
+ * (see {@link CLOUD_TOOLS_FOLLOWING_SELECTION}); `targetLabel` names it in a
+ * confirmation refusal, so the person asked to agree hears which project.
  */
 export function cloudToolCall(
     name: CloudCommandTool,
     schema: ToolInputSchema,
     rawArgs: unknown,
-    selectedProject?: string
+    selectedProject?: string,
+    targetLabel?: string
 ): CloudCall {
     const call = buildCloudToolCall(name, schema, rawArgs);
     // After the arguments are read, so a malformed call hears what is wrong
     // with it before it hears that it needs confirming.
-    requireConfirmed(name, validateToolArgs(name, schema, rawArgs));
+    requireConfirmed(name, validateToolArgs(name, schema, rawArgs), targetLabel);
     if (selectedProject && CLOUD_TOOLS_FOLLOWING_SELECTION.has(name)) {
         call.argv.push("--project", selectedProject);
     }
@@ -193,25 +199,26 @@ export function cloudToolCall(
  * The tools that change production, refused until the call says the user
  * agreed: the hosted connector plans and then confirms the same three, and an
  * MCP call has no terminal for the CLI's own prompt. The refusal is the plan —
- * it says what would happen — and nothing is spawned.
+ * it says what would happen, and to which project — and nothing is spawned.
  */
-function requireConfirmed(name: CloudCommandTool, args: Record<string, unknown>): void {
+function requireConfirmed(name: CloudCommandTool, args: Record<string, unknown>, targetLabel?: string): void {
     if (args.confirm === true) return;
     const preview = args.preview === true || typeof args.previewName === "string";
+    const where = targetLabel ? `the Rebase Cloud project "${targetLabel}"` : "the linked Rebase Cloud project";
     const again = `Ask the user, then call ${name} again with the same arguments and \`confirm: true\`.`;
     if (name === "rebase_cloud_deploy" && !preview) {
         throw new ToolArgumentError(
-            `This would deploy ${typeof args.app === "string" ? `the app "${args.app}"` : "this directory"} to the linked Rebase Cloud project's production. Nothing was done. ${again}`
+            `This would deploy ${typeof args.app === "string" ? `the app "${args.app}"` : "this directory"} to ${where}'s production. Nothing was done. ${again}`
         );
     }
     if (name === "rebase_cloud_env_set" && args.preview !== true) {
         throw new ToolArgumentError(
-            `This would set ${typeof args.key === "string" ? args.key : "the variable"} in production, applied on the next deploy. Nothing was done. ${again}`
+            `This would set ${typeof args.key === "string" ? args.key : "the variable"} in ${where}'s production, applied on the next deploy. Nothing was done. ${again}`
         );
     }
     if (name === "rebase_cloud_rollback") {
         throw new ToolArgumentError(
-            `This would put ${typeof args.deploymentId === "string" ? `deployment ${args.deploymentId}` : "the last good deployment"} back into production. Nothing was done. ${again}`
+            `This would put ${typeof args.deploymentId === "string" ? `deployment ${args.deploymentId}` : "the last good deployment"} back into ${where}'s production. Nothing was done. ${again}`
         );
     }
 }

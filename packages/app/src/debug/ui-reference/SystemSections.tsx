@@ -11,6 +11,7 @@
  */
 import React from "react";
 import {
+    StatusDot,
     Avatar,
     Button,
     Card,
@@ -48,7 +49,7 @@ const PRINCIPLES: { title: string; body: string; specimen: React.ReactNode }[] =
         body: "Every control is a shade of the surface ladder. Colour appears where it means something: a dot for a state, a tint behind a value the operator chose, an outline, an icon, and the one filled button a screen has for its main action.",
         specimen: (
             <div className="flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center gap-2 text-sm"><Dot className="bg-green-500"/>Live</span>
+                <StatusDot tone="ok">Live</StatusDot>
                 <Chip colorScheme="blue" size="small">Published</Chip>
                 <Chip colorScheme="red" size="small" outlined>Overdue</Chip>
                 <Button size="small">Cancel</Button>
@@ -176,9 +177,10 @@ export function ColourSection() {
                 <div>
                     <SpecimenLabel>dot</SpecimenLabel>
                     <div className="flex flex-col gap-2 text-sm">
-                        <span className="inline-flex items-center gap-2"><Dot className="bg-green-500"/>Healthy</span>
-                        <span className="inline-flex items-center gap-2"><Dot className="bg-amber-500"/>Degraded</span>
-                        <span className="inline-flex items-center gap-2"><Dot className="bg-red-500"/>Failing</span>
+                        <StatusDot tone="ok">Healthy</StatusDot>
+                        <StatusDot tone="busy">Degraded</StatusDot>
+                        <StatusDot tone="bad">Failing</StatusDot>
+                        <StatusDot tone="idle">Stopped</StatusDot>
                     </div>
                 </div>
                 <div>
@@ -424,7 +426,7 @@ export function DepthIconsSection() {
                                 <span className="w-7 h-7 rounded-md bg-surface-raised flex items-center justify-center text-text-secondary dark:text-text-secondary-dark shrink-0">{icon}</span>
                                 <div className="min-w-0">
                                     <Typography variant="body2" className="font-medium block leading-tight">{name}</Typography>
-                                    <Typography variant="mono" component="span" color="secondary" className="text-[11px]">{sub}</Typography>
+                                    <Typography variant="mono" component="span" color="secondary" className="text-xs">{sub}</Typography>
                                 </div>
                                 <Typography variant="mono" component="span" color="secondary" className="ml-auto text-xs">{count}</Typography>
                             </div>
@@ -454,7 +456,7 @@ function StatCard({ hue, icon, label, value, context, children }: {
                 <Typography variant="micro" component="span" color="secondary">{label}</Typography>
             </div>
             <Typography variant="stat" component="div">{value}</Typography>
-            <Typography variant="mono" component="div" color="secondary" className="text-[11px] mt-1.5">{context}</Typography>
+            <Typography variant="mono" component="div" color="secondary" className="text-xs mt-1.5">{context}</Typography>
             {children && <div className="mt-4">{children}</div>}
         </Card>
     );
@@ -478,7 +480,7 @@ export function CardsDataSection() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <StatCard hue="bg-blue-500" icon={<ShoppingCartIcon size={14}/>} label="Orders" value="1,284" context="+ 40 this week">
-                    <Typography variant="mono" component="div" color="secondary" className="text-[11px] flex gap-4">
+                    <Typography variant="mono" component="div" color="secondary" className="text-xs flex gap-4">
                         <span>12 pending</span><span>3 refunded</span>
                     </Typography>
                 </StatCard>
@@ -498,7 +500,7 @@ export function CardsDataSection() {
                     </div>
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
                         {storage.map(([hue, name, size]) => (
-                            <Typography key={name} variant="mono" component="span" color="secondary" className="text-[11px] inline-flex items-center gap-1.5">
+                            <Typography key={name} variant="mono" component="span" color="secondary" className="text-xs inline-flex items-center gap-1.5">
                                 <Dot className={hue}/>{name} · {size}
                             </Typography>
                         ))}
@@ -549,7 +551,7 @@ export function CardsDataSection() {
                                         ? <code className="font-mono text-xs bg-surface-raised px-1.5 py-0.5 rounded">{object}</code>
                                         : object}
                                 </span>
-                                <Typography variant="mono" component="span" color="secondary" className="ml-auto text-[11px] shrink-0">{when}</Typography>
+                                <Typography variant="mono" component="span" color="secondary" className="ml-auto text-xs shrink-0">{when}</Typography>
                             </div>
                         );
                     })}

@@ -95,7 +95,7 @@ The first run needs no schema command.
 the development loop; see `rebase-basics` for what it deliberately leaves alone.
 For those changes `db push` works on the managed database too (0.25+): it plans
 against a throwaway in-memory database that the CLI starts for the command.
-Rebase 0.34 and later use Ptah Compat for that plan.
+Rebase 0.35 and later use Ptah Compat for that plan.
 On 0.24 and earlier it refuses the managed database.
 
 `rebase db url` prints whichever database is in use, managed or not.
@@ -166,8 +166,8 @@ pnpm install
 
 That installs the workspace: `frontend` and `backend`.
 
-**On Windows**, Rebase 0.34 and later use the Ptah Compat package installed
-with the backend. Rebase 0.33 and earlier use `atlas.exe` on `PATH`.
+**On Windows**, Rebase 0.35 and later use the Ptah Compat package installed
+with the backend. Rebase 0.34 and earlier use `atlas.exe` on `PATH`.
 Use the instructions for the project's Rebase version in the
 [Windows guide](https://rebase.pro/docs/getting-started/windows/).
 

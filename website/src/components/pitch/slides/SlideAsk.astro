@@ -5,16 +5,16 @@ const TOTAL = 12;
 <PitchSlide id="slide-ask" slideNumber={12} totalSlides={TOTAL}>
     <div class="flex flex-col gap-4">
         <div class="text-center">
-            <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase mb-2">The Ask</p>
-            <h2 class="text-5xl font-semibold text-white"><a href="https://eic.ec.europa.eu/eic-funding-opportunities/eic-accelerator_en" target="_blank" rel="noopener" class="hover:underline">€2.5M EIC Grant</a></h2>
-            <p class="text-surface-300 text-sm mt-1">24-month execution plan · 8–12 new EU hires</p>
+            <p class="text-xs font-semibold tracking-[0.25em] text-tone-500 uppercase mb-2">The Ask</p>
+            <h2 class="text-5xl font-semibold text-tone-max"><a href="https://eic.ec.europa.eu/eic-funding-opportunities/eic-accelerator_en" target="_blank" rel="noopener" class="hover:underline">€2.5M EIC Grant</a></h2>
+            <p class="text-tone-300 text-sm mt-1">24-month execution plan · 8–12 new EU hires</p>
         </div>
 
         {/* Revenue projection — compact chart */}
-        <div class="rounded-xl border border-surface-700 bg-surface-900/40 px-5 py-4">
+        <div class="rounded-xl border border-tone-700 bg-tone-900/40 px-5 py-4">
             <div class="flex items-center justify-between mb-2">
-                <h3 class="text-white font-semibold text-xs">Revenue Projection</h3>
-                <div class="flex items-center gap-4 text-3xs text-surface-400">
+                <h3 class="text-tone-max font-semibold text-xs">Revenue Projection</h3>
+                <div class="flex items-center gap-4 text-3xs text-tone-400">
                     <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-[#0070f4] inline-block"></span> Base</span>
                     <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-[#0070f4]/30 inline-block"></span> Conservative</span>
                 </div>
@@ -77,50 +77,50 @@ const TOTAL = 12;
                 <circle cx="540" cy="22" r="4" fill="#34d399" stroke="#000" stroke-width="1.5"/>
                 <text x="530" y="16" fill="#34d399" font-size="8" font-weight="700" text-anchor="end" font-family="system-ui">Break-even</text>
             </svg>
-            <div class="flex items-center justify-between text-3xs text-surface-400 mt-1">
-                <span><strong class="text-white">Today:</strong> Pre-revenue · 2 production customers · Rebase Cloud in private beta</span>
+            <div class="flex items-center justify-between text-3xs text-tone-400 mt-1">
+                <span><strong class="text-tone-max">Today:</strong> Pre-revenue · 2 production customers · Rebase Cloud in private beta</span>
                 <span><strong class="text-emerald-400">Target:</strong> Self-sustaining by M24, Series A ready</span>
             </div>
         </div>
 
         {/* Budget breakdown — compact */}
-        <div class="overflow-hidden rounded-xl border border-surface-700">
+        <div class="overflow-hidden rounded-xl border border-tone-700">
             <table class="w-full text-2xs">
                 <thead>
-                    <tr class="bg-surface-900/60 text-left">
-                        <th class="px-3 py-2 text-surface-300 font-semibold">Work Package</th>
-                        <th class="px-3 py-2 text-surface-300 font-semibold">Budget</th>
-                        <th class="px-3 py-2 text-surface-300 font-semibold">Timeline</th>
-                        <th class="px-3 py-2 text-surface-300 font-semibold">Key Deliverables</th>
+                    <tr class="bg-tone-900/60 text-left">
+                        <th class="px-3 py-2 text-tone-300 font-semibold">Work Package</th>
+                        <th class="px-3 py-2 text-tone-300 font-semibold">Budget</th>
+                        <th class="px-3 py-2 text-tone-300 font-semibold">Timeline</th>
+                        <th class="px-3 py-2 text-tone-300 font-semibold">Key Deliverables</th>
                     </tr>
                 </thead>
-                <tbody class="text-surface-300">
-                    <tr class="border-t border-surface-800">
-                        <td class="px-3 py-1.5 font-medium text-white">WP1 — Rebase Cloud</td>
+                <tbody class="text-tone-300">
+                    <tr class="border-t border-tone-800">
+                        <td class="px-3 py-1.5 font-medium text-tone-max">WP1 — Rebase Cloud</td>
                         <td class="px-3 py-1.5 text-primary font-semibold">€700K</td>
                         <td class="px-3 py-1.5">M1–M18</td>
                         <td class="px-3 py-1.5">Managed EU hosting, auto-scaling, one-click deploy</td>
                     </tr>
-                    <tr class="border-t border-surface-800 bg-surface-900/20">
-                        <td class="px-3 py-1.5 font-medium text-white">WP2 — AI & Agents</td>
+                    <tr class="border-t border-tone-800 bg-tone-900/20">
+                        <td class="px-3 py-1.5 font-medium text-tone-max">WP2 — AI & Agents</td>
                         <td class="px-3 py-1.5 text-primary font-semibold">€500K</td>
                         <td class="px-3 py-1.5">M3–M20</td>
                         <td class="px-3 py-1.5">AI-powered queries, automated app scaffolding, agent integration</td>
                     </tr>
-                    <tr class="border-t border-surface-800">
-                        <td class="px-3 py-1.5 font-medium text-white">WP3 — Core Platform</td>
+                    <tr class="border-t border-tone-800">
+                        <td class="px-3 py-1.5 font-medium text-tone-max">WP3 — Core Platform</td>
                         <td class="px-3 py-1.5 text-primary font-semibold">€400K</td>
                         <td class="px-3 py-1.5">M1–M24</td>
                         <td class="px-3 py-1.5">Multi-database support, plugin marketplace, enterprise security</td>
                     </tr>
-                    <tr class="border-t border-surface-800 bg-surface-900/20">
-                        <td class="px-3 py-1.5 font-medium text-white">WP4 — Go-to-Market</td>
+                    <tr class="border-t border-tone-800 bg-tone-900/20">
+                        <td class="px-3 py-1.5 font-medium text-tone-max">WP4 — Go-to-Market</td>
                         <td class="px-3 py-1.5 text-primary font-semibold">€450K</td>
                         <td class="px-3 py-1.5">M1–M24</td>
                         <td class="px-3 py-1.5">Developer advocacy, EU conference circuit, community</td>
                     </tr>
-                    <tr class="border-t border-surface-800">
-                        <td class="px-3 py-1.5 font-medium text-white">WP5 — Team & Ops</td>
+                    <tr class="border-t border-tone-800">
+                        <td class="px-3 py-1.5 font-medium text-tone-max">WP5 — Team & Ops</td>
                         <td class="px-3 py-1.5 text-primary font-semibold">€450K</td>
                         <td class="px-3 py-1.5">M1–M24</td>
                         <td class="px-3 py-1.5">8–12 EU hires, legal, GDPR certification</td>
@@ -130,14 +130,14 @@ const TOTAL = 12;
         </div>
 
         <div class="flex items-center justify-between">
-            <div class="text-surface-300 text-2xs">
-                <strong class="text-white">Milestones:</strong> Cloud general availability (M6) · 1K projects (M12) · €500K ARR (M18) · Break-even (M24)
+            <div class="text-tone-300 text-2xs">
+                <strong class="text-tone-max">Milestones:</strong> Cloud general availability (M6) · 1K projects (M12) · €500K ARR (M18) · Break-even (M24)
             </div>
             <div class="text-right">
-                <p class="text-white font-semibold text-sm"><a href="https://rebase.pro" target="_blank" rel="noopener" class="hover:text-primary transition-colors">rebase.pro</a></p>
-                <p class="text-surface-400 text-3xs">
-                    <a href="mailto:hello@rebase.pro" class="hover:text-white transition-colors">hello@rebase.pro</a> ·
-                    <a href="https://github.com/firecmsco/firecms" target="_blank" rel="noopener" class="hover:text-white transition-colors">GitHub</a>
+                <p class="text-tone-max font-semibold text-sm"><a href="https://rebase.pro" target="_blank" rel="noopener" class="hover:text-primary transition-colors">rebase.pro</a></p>
+                <p class="text-tone-400 text-3xs">
+                    <a href="mailto:hello@rebase.pro" class="hover:text-tone-max transition-colors">hello@rebase.pro</a> ·
+                    <a href="https://github.com/firecmsco/firecms" target="_blank" rel="noopener" class="hover:text-tone-max transition-colors">GitHub</a>
                 </p>
             </div>
         </div>

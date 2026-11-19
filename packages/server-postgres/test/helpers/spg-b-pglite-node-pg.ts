@@ -15,7 +15,6 @@
  * statements from outside it wait until it settles.
  */
 import { AsyncLocalStorage } from "node:async_hooks";
-import { jest } from "@jest/globals";
 import pg from "pg";
 import type { PGlite, Results } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -108,15 +107,29 @@ export function pgliteNodePg<TSchema extends Record<string, unknown> = Record<st
     const inTransaction = new AsyncLocalStorage<true>();
     const exclusive = createMutex();
 
+    // The two overrides are own properties, not `jest.spyOn`. Jest keeps every
+    // spy it creates, and the implementation it was given, until the test file
+    // ends — and these close over the PGlite instance. A file that opens a
+    // fresh database per test therefore kept every one of them alive, about
+    // 250 MB of WASM heap each on Linux: history-served-as-read peaked at
+    // 4.2 GB, and two such files side by side were enough to run the CI
+    // runner out of memory (verify / unit-postgres, shard 2, 2026-11-19). A
+    // spy is also undone by any `jest.restoreAllMocks()` in the file, which
+    // would put a real network client back under the database.
     const client = new pg.Client({ connectionString: "postgres://pglite@127.0.0.1:1/pglite" });
-    jest.spyOn(client, "query").mockImplementation((...args: unknown[]) => {
-        const query = clientQueryOf(args);
-        return inTransaction.getStore() ? run(query) : exclusive(() => run(query));
+    Object.defineProperty(client, "query", {
+        configurable: true,
+        writable: true,
+        value: (...args: unknown[]) => {
+            const query = clientQueryOf(args);
+            return inTransaction.getStore() ? run(query) : exclusive(() => run(query));
+        }
     });
 
     const db = drizzle({ ...config, client });
     const transaction = db.transaction.bind(db);
-    jest.spyOn(db, "transaction").mockImplementation((work, transactionConfig) =>
-        exclusive(() => inTransaction.run(true, () => transaction(work, transactionConfig))));
+    const exclusiveTransaction: typeof transaction = (work, transactionConfig) =>
+        exclusive(() => inTransaction.run(true, () => transaction(work, transactionConfig)));
+    Object.defineProperty(db, "transaction", { configurable: true, writable: true, value: exclusiveTransaction });
     return db;
 }

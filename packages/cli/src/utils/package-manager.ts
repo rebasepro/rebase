@@ -14,10 +14,8 @@ import { spawnSync } from "child_process";
  *
  * Yarn and bun are deliberately absent, and this is the note that says so
  * rather than leaving it to be discovered. A yarn or bun user gets an npm
- * project: `detectPackageManager` finds no `pnpm-lock.yaml` and no
- * `package-lock.json`, falls through to the pnpm probe, and lands on npm —
- * silently, and with a `yarn.lock` or `bun.lockb` sitting right there in the
- * directory it was asked about.
+ * or pnpm project, and `detectPackageManager` says so out loud when it sees a
+ * `yarn.lock`, a `bun.lockb` or a yarn/bun user agent.
  *
  * The reason is not indifference. Every generated project is a workspace, and
  * the scaffold writes one protocol for the workspace links —
@@ -139,22 +137,35 @@ export function resetPnpmAvailabilityCache(): void {
     cachedPnpmAvailable = undefined;
 }
 
+/** Whether the yarn/bun invocation notice has been printed in this process. */
+let warnedUnsupportedInvoker = false;
+
+/** The package manager that started this process, from `npm_config_user_agent`. */
+export function invokingPackageManager(
+    env: Readonly<Record<string, string | undefined>> = process.env
+): "pnpm" | "npm" | "yarn" | "bun" | undefined {
+    const name = (env.npm_config_user_agent ?? "").split("/")[0];
+    return name === "pnpm" || name === "npm" || name === "yarn" || name === "bun" ? name : undefined;
+}
+
 /**
  * Detect the package manager for a Rebase project.
- *
- * Rebase recommends pnpm, so detection prefers it. Crucially, *how the CLI was
- * invoked* (`npx` vs `pnpm dlx`, i.e. `npm_config_user_agent`) is deliberately
- * ignored: running `npx @rebasepro/cli init` says nothing about how the user
- * wants to manage the project they're creating, and letting it pin the scaffold
- * to npm is what made every `npx`-invoked project an npm project.
  *
  * Detection order:
  * 1. An existing lock file — an explicit choice we always respect
  *    (`pnpm-lock.yaml` wins over `package-lock.json` when both are present).
- * 2. pnpm, whenever it is installed.
- * 3. npm, only as a fallback when pnpm is genuinely unavailable.
+ * 2. The package manager that started the CLI (`npm_config_user_agent`):
+ *    `npx @rebasepro/cli init` scaffolds and suggests npm, `pnpm dlx` pnpm.
+ *    Suggesting one tool while setting the project up with another is what
+ *    this order exists to prevent. Yarn and bun are not scaffold targets (see
+ *    {@link PackageManager}); they are told so and fall through.
+ * 3. pnpm, whenever it is installed.
+ * 4. npm, only as a fallback when pnpm is genuinely unavailable.
  */
-export function detectPackageManager(targetDir?: string): PackageManager {
+export function detectPackageManager(
+    targetDir?: string,
+    env: Readonly<Record<string, string | undefined>> = process.env
+): PackageManager {
     // 1. Respect an existing project's lock file.
     const dirs = [targetDir, process.cwd()].filter((d): d is string => !!d);
     for (const dir of dirs) {
@@ -166,19 +177,34 @@ export function detectPackageManager(targetDir?: string): PackageManager {
         // scaffolding an npm workspace beside their lockfile without comment.
         for (const [lock, name] of [["yarn.lock", "yarn"], ["bun.lockb", "bun"], ["bun.lock", "bun"]] as const) {
             if (!fs.existsSync(path.join(dir, lock))) continue;
+            const fallback = isPnpmAvailable() ? "pnpm" : "npm";
             console.warn(
                 `[rebase] Found ${lock}, but Rebase scaffolds pnpm or npm workspaces only — ` +
-                `${name} is not supported yet. Continuing with ` +
-                `${isPnpmAvailable() ? "pnpm" : "npm"}.`
+                `${name} is not supported yet. Continuing with ${fallback}.`
             );
-            return isPnpmAvailable() ? "pnpm" : "npm";
+            return fallback;
         }
     }
 
-    // 2. Prefer pnpm whenever it's installed.
+    // 2. The package manager the user started the CLI with.
+    const invoking = invokingPackageManager(env);
+    if (invoking === "pnpm" || invoking === "npm") return invoking;
+    if (invoking === "yarn" || invoking === "bun") {
+        const fallback = isPnpmAvailable() ? "pnpm" : "npm";
+        // Detection runs several times in one command; say it once.
+        if (warnedUnsupportedInvoker) return fallback;
+        warnedUnsupportedInvoker = true;
+        console.warn(
+            `[rebase] Started with ${invoking}, but Rebase scaffolds pnpm or npm workspaces only — ` +
+            `${invoking} is not supported yet. Continuing with ${fallback}.`
+        );
+        return fallback;
+    }
+
+    // 3. Prefer pnpm whenever it's installed.
     if (isPnpmAvailable()) return "pnpm";
 
-    // 3. Fall back to npm only when pnpm is genuinely unavailable.
+    // 4. Fall back to npm only when pnpm is genuinely unavailable.
     return "npm";
 }
 

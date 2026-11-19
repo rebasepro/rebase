@@ -28,10 +28,10 @@ export function SchemaBuilderMiniDemo() {
         <div className="h-32 w-full bg-surface-frame rounded-lg border border-hairline mb-6 flex flex-col pointer-events-none select-none p-3 overflow-hidden relative">
             <div className="flex items-center justify-between mb-3 border-b border-hairline pb-2">
                 <div className="flex items-center gap-1.5">
-                    <svg className="w-3.5 h-3.5 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                    <span className="text-[11px] font-semibold text-white">Posts Scheme</span>
+                    <svg className="w-3.5 h-3.5 text-tone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <span className="text-[11px] font-semibold text-tone-max">Posts Scheme</span>
                 </div>
-                <div className={`transition-all duration-300 w-5 h-5 rounded-full ${step >= 1 ? "bg-primary/20 ring-1 ring-primary/40 text-primary" : "bg-surface-raised text-surface-400"} flex items-center justify-center`}>
+                <div className={`transition-all duration-300 w-5 h-5 rounded-full ${step >= 1 ? "bg-primary/20 ring-1 ring-primary/40 text-primary" : "bg-surface-raised text-tone-400"} flex items-center justify-center`}>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
                 </div>
             </div>
@@ -41,13 +41,13 @@ export function SchemaBuilderMiniDemo() {
                     <div className="flex items-center gap-1.5">
                         <span className="text-blue-400 text-[9px] font-mono">id</span>
                     </div>
-                    <span className="text-surface-500 text-[8px] bg-surface-raised px-1 rounded">uuid</span>
+                    <span className="text-tone-500 text-[8px] bg-surface-raised px-1 rounded">uuid</span>
                 </div>
                 <div className="flex justify-between items-center bg-surface-raised p-1.5 rounded border border-hairline">
                     <div className="flex items-center gap-1.5">
                         <span className="text-blue-400 text-[9px] font-mono">title</span>
                     </div>
-                    <span className="text-surface-500 text-[8px] bg-surface-raised px-1 rounded">text</span>
+                    <span className="text-tone-500 text-[8px] bg-surface-raised px-1 rounded">text</span>
                 </div>
 
                 {step === 0 && <div className="h-6"/>}

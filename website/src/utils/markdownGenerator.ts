@@ -203,7 +203,7 @@ The admin panel that ships with a Rebase backend — a client of the same API, u
 - **History & audit**: per-table version history with side-by-side comparison and revert.
 - **Import & export**: CSV, JSON and Excel with automatic field mapping.
 - **Users & roles**: account management against the same roles your RLS policies read.
-- **Extensible in React**: custom fields, previews, entity views and actions referenced from the \`admin\` block.
+- **Extensible in React**: custom fields, previews, entity views and actions imported into the table's \`customizeTable\` file.
 `;
   }
 
@@ -213,7 +213,7 @@ The admin panel that ships with a Rebase backend — a client of the same API, u
 Let AI agents read, write, and act on your Postgres data autonomously.
 
 ## Capabilities
-- **Model Context Protocol (MCP) Server**: Exposes your Postgres data plus schema, user, storage, cron and function tools — 40 of them — to AI assistants like Cursor and Claude.
+- **Model Context Protocol (MCP) Server**: Exposes your Postgres data plus schema, user, storage, cron, function and deploy tools — more than fifty — to AI assistants like Cursor and Claude.
 - **Scoped API Keys**: Per-table, per-operation permissions for agents, enforced by Postgres row-level security on every query.
 - **${inline(tr("whatsnew.claude.title"))}**: ${cleanHtml(tr("whatsnew.claude.desc"))}
 `;
@@ -239,7 +239,7 @@ A typed client library to interact with your Rebase backend from client-side or 
 
 ## Features
 - **Type Safety**: Automatic TypeScript types generated directly from your tables.
-- **CRUD Operations**: Securely fetch and update documents with IDE autocomplete.
+- **CRUD Operations**: Securely fetch and update rows with IDE autocomplete.
 - **Realtime Subscriptions**: Subscribe to table updates or broadcast channels over WebSockets.
 - **Auth & Storage**: Built-in methods to handle login, sign-up, JWT auth, and resumable file uploads.
 `;

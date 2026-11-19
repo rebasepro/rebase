@@ -1015,7 +1015,7 @@ function InnerCheckBox({ checked }: { checked: boolean }) {
             <div
                 className={cls(
                     "border-2 relative transition-colors ease-in-out duration-150 w-4 h-4 rounded-xs flex items-center justify-center",
-                    checked ? "bg-primary text-surface-accent-100 dark:text-surface-accent-900 border-transparent" : "bg-surface-card border-surface-accent-800 dark:border-surface-accent-500"
+                    checked ? "bg-primary text-on-primary border-transparent" : "bg-surface-card border-surface-accent-800 dark:border-surface-accent-500"
                 )}
             >
                 {checked && <CheckIcon size={iconSize.smallest} className="absolute"/>}

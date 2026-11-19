@@ -255,6 +255,84 @@ included. The rules that fall out of it:
 6. **Read-view values are body size.** The detail view inherits `text-sm`;
    only the last row of a summary section steps up to `text-base`.
 
+## Nothing a person reads is under 12px
+
+Changed 2026-11-18. `typography-caption` is 12px (`text-xs`, leading 1.45). It
+was 11px, and caption is the kit's variant for descriptions, hints and detail
+lines — sentences — so the rule `typography-micro` states for itself (the one
+tier under 12px is the one that never carries a sentence) was broken at the
+source, in about a hundred files. The same pass moved 156 hand-written
+`text-[10px]` / `text-[11px]` / `text-2xs` in the kit, the admin, the
+reference page and Studio to `text-xs`.
+
+What stays under 12px, and why: `typography-micro` (the uppercase tracked label
+above a value); chart axis ticks (`TICK_CLASSES`, a measured value on an axis
+in the tabular voice); keyboard-shortcut badges; glyph-sized things that are
+not read as text — a sort-order counter beside a column title, a policy count
+in a row, an emoji marker, the initials inside a 20–24px avatar, a day number
+in a calendar cell. A layout that depended on 11px is fixed where it breaks,
+not by keeping the small size.
+
+## Icons at 1.5 stroke
+
+Changed 2026-11-18. Lucide draws at stroke 2, and at the 14–16px the product
+uses that reads heavy against Inter at 400–500: the most recognisable "default
+kit" tell. One rule in `src/index.css` draws every Lucide icon at 1.5; a
+stylesheet rule outranks the presentation attribute Lucide writes, so no call
+site changed. It selects `svg.lucide` only, so charts, the logo, React Flow and
+hand-drawn SVGs keep their own strokes.
+
+Two exceptions are in the selector. An icon drawn at 12px or under keeps 2,
+because 1.5 breaks a glyph that small up (Lucide writes the size into `width`,
+so the rule reads it there). An icon given `stroke-keep` keeps whatever it was
+given: the checkbox's check and minus marks, and the SQL editor's empty-state
+database drawn at 1.
+
+## Status, facts and activity: three pieces the console made first
+
+Added 2026-11-18. The cloud console built these by hand, with consumers in both
+products, so they moved into the kit.
+
+- **`StatusDot`** is "status is a dot before the word" as a component: tones
+  `ok` (emerald), `busy` (amber, pulsing, because busy ends), `bad` (red) and
+  `idle` (the disabled ink, never a numbered surface). The word is the
+  secondary ink at 14px (`medium`) or 12px (`small`); `inherit` takes the size
+  of the text around it, for a status that is a tile's value. The reference
+  page's dot examples and the log explorer's live / connecting / polling line
+  use it. Dots that colour a name rather than stand before a state word — a
+  cron job's row, an API key's row, a legend swatch — are glyphs and stay as
+  they are.
+- **`StatTile`** names one fact: a 40px (`medium`) or 48px (`large`) icon well
+  on `surface-raised`, a `micro` label, the value in `h5` or `h4`, an optional
+  detail line, and optionally a button to the page that owns the fact, with an
+  action (a chevron) beside the button rather than inside it. It is a sibling
+  of `KpiTile`, not a variant: a `KpiTile` is a card with a measured figure,
+  its change and a sparkline; a `StatTile` has no card, so a grid of them sits
+  on a hero without becoming boxes inside boxes. They share the label voice and
+  the figure face. Its content is top-aligned (changed the same day: centred,
+  a tile with a detail line sat higher than its neighbour without one), so the
+  tiles in a row share a label line and a value line. Nothing in it truncates:
+  label, value and detail wrap, because a fact cut short is a different fact
+  ("No manual back…"). A `valueAction` (a chevron about the value) sits 6px
+  after the value; the tile's button is stretched over the content rather than
+  wrapped round it, so that control is never nested inside the button. There is no general-purpose `Stat`; an earlier one was
+  removed at Francesco's request, and this tile is scoped to the fact above.
+- **`TimeBars`** is a measure over time as one bar per bucket, with an optional
+  secondary share (errors of requests) as a red segment at the top of each bar.
+  A bucket with nothing recorded is a gap and draws nothing; a recorded zero
+  draws a 1px tick, so "running and quiet" is visible and differs from "not
+  running". Bars are the primary at 58%, full strength under the pointer, a 1px
+  gap apart at any count, top corners rounded by 1px; markers are dashed
+  hairlines. `BarChart` draws its bars at the same strength
+  (`BAR_REST_OPACITY` in `chart_parts.tsx`): two bar charts at two strengths
+  read as two systems. One focus stop with a hover and arrow-key readout, `ChartStatus`
+  for loading, error and empty, words and locale from `UiLabelsProvider`, as
+  `TimeSeriesChart` does. The geometry is `metrics/time_bars_geometry.ts`.
+
+`bg-dot-grid` is the ground for a well that is drawn on (a map, a canvas): dots
+in `hairline-strong` at a 16px pitch, so they switch with the theme. Pair it
+with the well's fill.
+
 ## Type, color, control heights
 
 Recorded in `src/theme.css` and `src/index.css` with their reasoning inline:

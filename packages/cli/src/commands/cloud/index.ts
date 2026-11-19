@@ -108,6 +108,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--endpoint": String,
     "--events": String,
     "--expires-in": String,
+    "--file": String,
     "--format": String,
     "--function": String,
     "--grep": String,
@@ -258,13 +259,16 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
     // A piped `cloud deploy` prints its summary, not JSON — see `initOutputMode`.
     // Re-latched here rather than decided above because the group is only known
     // now; nothing between the two calls prints.
-    if (group === "deploy") initOutputMode(rawArgs, { whenPiped: "human" });
-
     // `--help` has to be recovered from `rawArgs` rather than read off `pos`.
     // `positionals()` resolves against `GLOBAL_CLOUD_FLAGS`, which declares
     // `--help`, so `arg` *consumes* it — correct for `--project` and `--json`,
     // which modify a command, but wrong for `--help`, which replaces it.
     const wantsHelp = rawArgs.includes("--help") || rawArgs.includes("-h");
+    // Not for `--help`: a help page is a reference a program reads, and every
+    // other page in the family is one JSON value when piped. `deploy --help`
+    // alone printed text, so an agent reading the family's help as JSON
+    // choked on exactly the command it most needed to read.
+    if (group === "deploy" && !wantsHelp) initOutputMode(rawArgs, { whenPiped: "human" });
     // A flag is never an action. `rebase cloud env --frobnicate` used to read
     // the flag as the action and refuse it as an unknown *command* — a refusal,
     // but about the wrong half of the line; the group's own parser is what

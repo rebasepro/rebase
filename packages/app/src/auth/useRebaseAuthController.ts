@@ -6,6 +6,7 @@ import type { AuthConfigResponse } from "./api";
 import { RebaseAuthController, RebaseAuthControllerProps } from "./types";
 import { bindSessionCachesToUser, clearSessionCaches } from "./session_caches";
 import { isAppleCancellation } from "./apple-sign-in";
+import { platformSignInFromAddress } from "./platform-signin";
 
 /**
  * Auth controller hook for JWT-based authentication.
@@ -141,8 +142,22 @@ export function useRebaseAuthController(
         // Initial sync with whatever is currently in the SDK
         updateState(auth.getSession());
 
+        // Opened from the platform's console with a sign-in token in the
+        // address: it is taken out of the address now, and spent once the SDK
+        // has settled. The first screen stays the loading one until then, so
+        // an owner sent here never sees a login form flash past.
+        const signInWithPlatformToken = auth.signInWithPlatformToken?.bind(auth);
+        const platformSignIn = typeof window !== "undefined" && signInWithPlatformToken
+            ? platformSignInFromAddress(token => auth.isInitialized().then(() => signInWithPlatformToken(token)))
+            : undefined;
+
         // Wait for SDK initialization (restoring session from storage or silent refresh)
-        auth.isInitialized().then(() => {
+        auth.isInitialized().then(async () => {
+            if (platformSignIn) {
+                await platformSignIn.catch((error: unknown) => {
+                    if (isMountedRef.current) setAuthProviderError(error instanceof Error ? error : new Error(String(error)));
+                });
+            }
             if (isMountedRef.current) {
                 updateState(auth.getSession());
                 setInitialLoading(false);
@@ -501,6 +516,9 @@ export function useRebaseAuthController(
         // link's screen can tell a missing feature from a failed request.
         changeEmail: auth?.changeEmail ? changeEmail : undefined,
         magicLinkLogin: auth?.verifyMagicLink ? magicLinkLogin : undefined,
+        // Where "Continue with Rebase Cloud" goes, when the backend's platform
+        // signs its project's owners in; see `platform-signin.ts`.
+        platformSignIn: authConfig?.platformSignIn,
         confirmEmailChange: auth?.confirmEmailChange ? confirmEmailChange : undefined,
         updateProfile,
         fetchSessions,

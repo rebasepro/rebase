@@ -108,6 +108,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         entityActions,
 
         effectiveRoleController,
+        simulateAccess = false,
         modeController: modeControllerProp,
         apiUrl,
         translations,
@@ -306,7 +307,9 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
     } | null>(null);
     const signedInUid = authController.user?.uid;
     const activeSimulation = simulationState && simulationState.uid === signedInUid ? simulationState : null;
-    const simulationAvailable = Boolean(client?.simulate) && !dataSourcesValue.sources[DEFAULT_DATA_SOURCE_KEY];
+    // Opt-in (`simulateAccess`): without it no control is offered and no
+    // data view rides a simulated client, wherever a control is placed.
+    const simulationAvailable = simulateAccess && Boolean(client?.simulate) && !dataSourcesValue.sources[DEFAULT_DATA_SOURCE_KEY];
     const simulatedClient = useMemo(
         () => (activeSimulation && simulationAvailable && client?.simulate ? client.simulate(activeSimulation.simulation) : undefined),
         [activeSimulation, simulationAvailable, client]

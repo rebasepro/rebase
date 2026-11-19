@@ -145,11 +145,11 @@ import HeroBackdrop from "../HeroBackdrop.astro";
                     </svg>
                     {t('kd.hero.badge')}
                 </div>
-                <h1 class="mb-6 text-display-2 text-white">
+                <h1 class="mb-6 text-display-2 text-tone-max">
                     {t('kd.hero.title1')} <span class="gradient-text">{t('kd.hero.title2')}</span>
                 </h1>
-                <p class="mb-6 text-lg leading-8 text-surface-300 lg:text-xl" set:html={t('kd.hero.p1')} />
-                <p class="mb-10 text-base leading-7 text-surface-400">
+                <p class="mb-6 text-lg leading-8 text-tone-300 lg:text-xl" set:html={t('kd.hero.p1')} />
+                <p class="mb-10 text-base leading-7 text-tone-400">
                     {t('kd.hero.p2')}
                 </p>
                 <div class="flex items-center justify-start gap-4 flex-wrap">
@@ -161,28 +161,28 @@ import HeroBackdrop from "../HeroBackdrop.astro";
                         </svg>
                     </a>
                     <a href={`/${lang === 'en' ? '' : lang + '/'}contact`}
-                       class="inline-flex items-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all duration-200 ease-in-out">
+                       class="inline-flex items-center gap-x-2 rounded-lg border border-tone-700 bg-tone-800 px-6 py-3 text-base font-semibold text-tone-max hover:bg-tone-700 transition-all duration-200 ease-in-out">
                         {t('kd.hero.btn.info')}
                     </a>
                 </div>
             </div>
         </section>
         <!-- Logos institucionales -->
- <section class="relative z-0 py-strip border-b border-surface-800">
+ <section class="relative z-0 py-strip border-b border-tone-800">
             <div class="mx-auto max-w-5xl px-6 lg:px-8">
-                <p class="text-center text-sm text-surface-400 mb-8">{t('kd.logos.funded')}</p>
+                <p class="text-center text-sm text-tone-400 mb-8">{t('kd.logos.funded')}</p>
                 <div class="flex items-center justify-center gap-8 flex-wrap">
-                    <div class="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-white/5 ring-1 ring-surface-800">
-                        <span class="text-xs text-surface-400 uppercase tracking-wider">{t('kd.logos.plan')}</span>
-                        <span class="text-sm font-semibold text-white">{t('kd.logos.gov')}</span>
+                    <div class="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-tone-max/5 ring-1 ring-tone-800">
+                        <span class="text-xs text-tone-400 uppercase tracking-wider">{t('kd.logos.plan')}</span>
+                        <span class="text-sm font-semibold text-tone-max">{t('kd.logos.gov')}</span>
                     </div>
-                    <div class="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-white/5 ring-1 ring-surface-800">
-                        <span class="text-xs text-surface-400 uppercase tracking-wider">{t('kd.logos.fundedBy')}</span>
-                        <span class="text-sm font-semibold text-white">{t('kd.logos.eu')}</span>
+                    <div class="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-tone-max/5 ring-1 ring-tone-800">
+                        <span class="text-xs text-tone-400 uppercase tracking-wider">{t('kd.logos.fundedBy')}</span>
+                        <span class="text-sm font-semibold text-tone-max">{t('kd.logos.eu')}</span>
                     </div>
-                    <div class="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-white/5 ring-1 ring-surface-800">
-                        <span class="text-xs text-surface-400 uppercase tracking-wider">{t('kd.logos.managed')}</span>
-                        <span class="text-sm font-semibold text-white">Red.es</span>
+                    <div class="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-tone-max/5 ring-1 ring-tone-800">
+                        <span class="text-xs text-tone-400 uppercase tracking-wider">{t('kd.logos.managed')}</span>
+                        <span class="text-sm font-semibold text-tone-max">Red.es</span>
                     </div>
                 </div>
             </div>
@@ -193,10 +193,10 @@ import HeroBackdrop from "../HeroBackdrop.astro";
         <!-- ¿Qué es el Kit Digital? -->
  <section class="py-chapter">
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
-                <h2 class="text-3xl sm:text-4xl text-white mb-8 text-center">{t('kd.whatis.title')}</h2>
-                <div class="prose prose-lg prose-invert max-w-none">
-                    <p class="text-lg text-surface-300 leading-relaxed mb-6" set:html={t('kd.whatis.p1')} />
-                    <p class="text-lg text-surface-300 leading-relaxed mb-6" set:html={t('kd.whatis.p2')} />
+                <h2 class="text-3xl sm:text-4xl text-tone-max mb-8 text-center">{t('kd.whatis.title')}</h2>
+                <div class="prose prose-lg dark:prose-invert max-w-none">
+                    <p class="text-lg text-tone-300 leading-relaxed mb-6" set:html={t('kd.whatis.p1')} />
+                    <p class="text-lg text-tone-300 leading-relaxed mb-6" set:html={t('kd.whatis.p2')} />
                 </div>
 
                 <!-- Segmentos -->
@@ -208,9 +208,9 @@ import HeroBackdrop from "../HeroBackdrop.astro";
                         { name: t('kd.seg.2'), range: t('kd.range.2'), bono: t('kd.amount.6k') },
                         { name: t('kd.seg.3'), range: t('kd.range.3'), bono: t('kd.amount.2k') },
                     ].map((seg) => (
-                        <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-5 ring-1 ring-inset ring-surface-800 text-center">
-                            <h3 class="text-base text-white mb-1">{seg.name}</h3>
-                            <p class="text-surface-400 text-xs mb-2">{seg.range}</p>
+                        <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-5 ring-1 ring-inset ring-tone-800 text-center">
+                            <h3 class="text-base text-tone-max mb-1">{seg.name}</h3>
+                            <p class="text-tone-400 text-xs mb-2">{seg.range}</p>
                             <p class="text-primary-light font-semibold text-sm">{seg.bono}</p>
                         </div>
                     ))}
@@ -222,22 +222,22 @@ import HeroBackdrop from "../HeroBackdrop.astro";
  <section id="soluciones" class="py-chapter scroll-mt-20">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-16">
-                    <h2 class="text-3xl sm:text-4xl text-white">{t('kd.solutions.title')}</h2>
-                    <p class="mt-lead text-lg leading-8 text-surface-400">{t('kd.solutions.desc')}</p>
-                    <p class="mt-4 text-base leading-7 text-surface-500">{t('kd.solutions.oneProduct')}</p>
+                    <h2 class="text-3xl sm:text-4xl text-tone-max">{t('kd.solutions.title')}</h2>
+                    <p class="mt-lead text-lg leading-8 text-tone-400">{t('kd.solutions.desc')}</p>
+                    <p class="mt-4 text-base leading-7 text-tone-500">{t('kd.solutions.oneProduct')}</p>
                 </div>
 
                 <div class="space-y-12">
                     {solutions.map((sol, idx) => (
-                        <div class="relative overflow-hidden rounded-2xl bg-surface-900/30 ring-1 ring-inset ring-surface-800 p-8 lg:p-10" id={sol.slug}>
+                        <div class="relative overflow-hidden rounded-2xl bg-tone-900/30 ring-1 ring-inset ring-tone-800 p-8 lg:p-10" id={sol.slug}>
                             <!-- Category badge -->
                             <div class="inline-flex items-center gap-2 rounded-full bg-primary/10 border border-primary/20 px-3 py-1 text-xs font-medium text-primary-light mb-4">
                                 {t('kd.solutions.badge')}
                             </div>
 
-                            <h3 class="text-2xl text-white mb-2">{sol.category}</h3>
+                            <h3 class="text-2xl text-tone-max mb-2">{sol.category}</h3>
                             <p class="text-primary-light font-medium text-lg mb-4">{t('kd.solutions.sol_prefix')} Rebase</p>
-                            <p class="text-surface-300 leading-relaxed mb-6 max-w-4xl">{sol.description}</p>
+                            <p class="text-tone-300 leading-relaxed mb-6 max-w-4xl">{sol.description}</p>
 
                             <!-- Sector applicability -->
                             <div class="flex items-center gap-2 mb-4 rounded-lg bg-green-900/20 border border-green-700/30 px-4 py-2.5 w-fit">
@@ -259,14 +259,14 @@ import HeroBackdrop from "../HeroBackdrop.astro";
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 <!-- Features -->
                                 <div>
-                                    <h4 class="text-sm uppercase text-surface-400 mb-4">{t('kd.solutions.features_title')}</h4>
+                                    <h4 class="text-sm uppercase text-tone-400 mb-4">{t('kd.solutions.features_title')}</h4>
                                     <ul class="space-y-3">
                                         {sol.features.map((f) => (
                                             <li class="flex items-start gap-3">
                                                 <svg class="h-5 w-5 text-primary-light flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                                                 </svg>
-                                                <span class="text-surface-300 text-sm">{f}</span>
+                                                <span class="text-tone-300 text-sm">{f}</span>
                                             </li>
                                         ))}
                                     </ul>
@@ -274,25 +274,25 @@ import HeroBackdrop from "../HeroBackdrop.astro";
 
                                 <!-- Segments & Sectors -->
                                 <div>
-                                    <h4 class="text-sm uppercase text-surface-400 mb-4">{t('kd.solutions.segments_title')}</h4>
+                                    <h4 class="text-sm uppercase text-tone-400 mb-4">{t('kd.solutions.segments_title')}</h4>
                                     <div class="space-y-3 mb-6">
                                         {sol.segments.map((seg) => (
-                                            <div class="flex items-center justify-between rounded-lg bg-surface-800/50 px-4 py-3 ring-1 ring-surface-700">
+                                            <div class="flex items-center justify-between rounded-lg bg-tone-800/50 px-4 py-3 ring-1 ring-tone-700">
                                                 <div>
-                                                    <span class="font-medium text-white text-sm">{seg.name}</span>
-                                                    <span class="text-surface-400 text-xs ml-2">({seg.range})</span>
-                                                    {seg.users && <span class="text-surface-500 text-xs ml-1">· {seg.users}</span>}
+                                                    <span class="font-medium text-tone-max text-sm">{seg.name}</span>
+                                                    <span class="text-tone-400 text-xs ml-2">({seg.range})</span>
+                                                    {seg.users && <span class="text-tone-500 text-xs ml-1">· {seg.users}</span>}
                                                 </div>
                                                 <span class="text-primary-light font-semibold text-sm">{seg.amount}</span>
                                             </div>
                                         ))}
                                     </div>
 
-                                    <h4 class="text-sm uppercase text-surface-400 mb-3">{t('kd.solutions.sectors_title')}</h4>
-                                    <p class="text-surface-400 text-sm leading-relaxed mb-4">{sol.sectors}</p>
+                                    <h4 class="text-sm uppercase text-tone-400 mb-3">{t('kd.solutions.sectors_title')}</h4>
+                                    <p class="text-tone-400 text-sm leading-relaxed mb-4">{sol.sectors}</p>
 
                                     {sol.sourceUrl && (
-                                        <a href={sol.sourceUrl} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-surface-500 hover:text-primary-light transition-colors">
+                                        <a href={sol.sourceUrl} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-tone-500 hover:text-primary-light transition-colors">
                                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                                             </svg>
@@ -308,10 +308,10 @@ import HeroBackdrop from "../HeroBackdrop.astro";
         </section>
 
         <!-- Zona geográfica de actuación -->
- <section class="py-chapter border-t border-surface-800">
+ <section class="py-chapter border-t border-tone-800">
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
-                <h2 class="text-3xl sm:text-4xl text-white mb-8 text-center">{t('kd.geo.title')}</h2>
-                <p class="text-lg text-surface-300 leading-relaxed mb-8 text-center" set:html={t('kd.geo.desc')} />
+                <h2 class="text-3xl sm:text-4xl text-tone-max mb-8 text-center">{t('kd.geo.title')}</h2>
+                <p class="text-lg text-tone-300 leading-relaxed mb-8 text-center" set:html={t('kd.geo.desc')} />
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                     {[
                         t('kd.geo.andalucia'), t('kd.geo.aragon'), t('kd.geo.asturias'), t('kd.geo.baleares'),
@@ -320,15 +320,15 @@ import HeroBackdrop from "../HeroBackdrop.astro";
                         t('kd.geo.madrid'), t('kd.geo.murcia'), t('kd.geo.navarra'),
                         t('kd.geo.paisvasco'), t('kd.geo.larioja'), t('kd.geo.ceuta'), t('kd.geo.melilla')
                     ].map((region) => (
-                        <div class="flex items-center gap-2 rounded-lg bg-surface-900/50 px-3 py-2 ring-1 ring-surface-800">
+                        <div class="flex items-center gap-2 rounded-lg bg-tone-900/50 px-3 py-2 ring-1 ring-tone-800">
                             <svg class="h-4 w-4 text-primary-light flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                             </svg>
-                            <span class="text-surface-300 text-xs">{region}</span>
+                            <span class="text-tone-300 text-xs">{region}</span>
                         </div>
                     ))}
                 </div>
-                <p class="text-sm text-surface-400 mt-6 text-center">
+                <p class="text-sm text-tone-400 mt-6 text-center">
                     {t('kd.geo.remote')}
                 </p>
             </div>
@@ -337,8 +337,8 @@ import HeroBackdrop from "../HeroBackdrop.astro";
         <!-- CTA -->
  <section class="py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
-                <h2 class="text-3xl sm:text-4xl text-white mb-4">{t('kd.cta.title')}</h2>
-                <p class="text-lg text-surface-400 mb-8 max-w-2xl mx-auto">{t('kd.cta.desc')}</p>
+                <h2 class="text-3xl sm:text-4xl text-tone-max mb-4">{t('kd.cta.title')}</h2>
+                <p class="text-lg text-tone-400 mb-8 max-w-2xl mx-auto">{t('kd.cta.desc')}</p>
                 <div class="flex items-center justify-center gap-x-6 flex-wrap">
                     <a href={`/${lang === 'en' ? '' : lang + '/'}contact`}
                        class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
@@ -350,7 +350,7 @@ import HeroBackdrop from "../HeroBackdrop.astro";
                     <a href="https://calendar.app.google/UDSmMagx6AEwar8P8"
                        target="_blank"
                        rel="noopener noreferrer"
-                       class="inline-flex items-center gap-x-2 text-white hover:text-primary-light transition-colors font-semibold">
+                       class="inline-flex items-center gap-x-2 text-tone-max hover:text-primary-light transition-colors font-semibold">
                         {t('kd.cta.book')}
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-7-7l7 7-7 7" />
@@ -361,9 +361,9 @@ import HeroBackdrop from "../HeroBackdrop.astro";
         </section>
 
         <!-- Legal disclaimer -->
- <section class="py-8 border-t border-surface-800">
+ <section class="py-8 border-t border-tone-800">
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
-                <p class="text-xs text-surface-500 text-center leading-relaxed" set:html={t('kd.legal.disclaimer')} />
+                <p class="text-xs text-tone-500 text-center leading-relaxed" set:html={t('kd.legal.disclaimer')} />
             </div>
         </section>
 

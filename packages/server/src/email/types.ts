@@ -152,6 +152,10 @@ export interface EmailConfig {
      * Base URL for magic link login (e.g., "https://myapp.com")
      * The magic link will be: {baseUrl}/auth/magic-link?token={token}
      * Falls back to `resetPasswordUrl` if not set.
+     *
+     * With `{token}` in it, it is the whole link instead, the token put where
+     * the placeholder is: `"https://myapp.com/app.html#ml={token}"`, for a
+     * frontend that does not serve `/auth/magic-link`. `MAGIC_LINK_URL`.
      */
     magicLinkUrl?: string;
 

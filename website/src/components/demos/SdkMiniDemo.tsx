@@ -99,14 +99,14 @@ export function SdkMiniDemo() {
     const done = step === LAST;
 
     return (
-        <div className="h-full w-full bg-[#1b1e22] flex flex-col pointer-events-none select-none overflow-hidden relative font-mono text-[11px] [font-variant-ligatures:none]">
+        <div className="h-full w-full bg-[#1b1e22] island-dark flex flex-col pointer-events-none select-none overflow-hidden relative font-mono text-[11px] [font-variant-ligatures:none]">
             <div className="flex-1 flex min-h-0 overflow-hidden">
                 {/* Left pane: application query editor */}
                 <div
                     className="relative flex-1 overflow-hidden pt-3 transition-opacity"
                     style={{ opacity: fading ? 0 : 1, transitionDuration: `${FADE_MS}ms` }}
                 >
-                    <div className="flex items-center justify-between px-4 pb-2 mb-1 border-b border-white/[0.06] text-[10px] text-[#80868e]">
+                    <div className="flex items-center justify-between px-4 pb-2 mb-1 border-b border-tone-max/[0.06] text-[10px] text-[#80868e]">
                         <span className="flex items-center gap-1.5">
                             <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#4ec9b0]" />
                             src/routes/posts.ts
@@ -123,7 +123,7 @@ export function SdkMiniDemo() {
                                 )}
                                 {i === caretRow && frame.popup && (
                                     <span
-                                        className="absolute top-full z-10 mt-0.5 min-w-32 rounded-sm border border-[#41454b] bg-[#252526] py-0.5 shadow-xl"
+                                        className="absolute top-full z-10 mt-0.5 min-w-32 rounded-sm border border-[#41454b] bg-[#252526] island-dark py-0.5 shadow-xl"
                                         style={{ left: `calc(${caretCol}ch + 0.75rem)` }}
                                     >
                                         {frame.popup.items.map((item, k) => (
@@ -142,7 +142,7 @@ export function SdkMiniDemo() {
 
                     {/* The payoff: what `find()` resolves to, as the editor's hover shows it. */}
                     {frame.hover && (
-                        <div className="ml-11 mt-2 inline-block rounded-sm border border-[#41454b] bg-[#252526] px-2.5 py-1.5 shadow-lg">
+                        <div className="ml-11 mt-2 inline-block rounded-sm border border-[#41454b] bg-[#252526] island-dark px-2.5 py-1.5 shadow-lg">
                             <div className="text-[#d1d4d9]">
                                 <span className={KW}>const</span> <span className={ID}>data</span>: <span className={TYPE}>Post</span>[]
                             </div>
@@ -155,10 +155,10 @@ export function SdkMiniDemo() {
                 </div>
 
                 {/* Right pane (desktop): generated schema types & RLS contract */}
-                <div className="hidden lg:flex w-[380px] shrink-0 flex-col border-l border-white/[0.08] bg-[#15181c] pt-3 px-4">
-                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.06] text-[10px] text-[#80868e]">
+                <div className="hidden lg:flex w-[380px] shrink-0 flex-col border-l border-tone-max/[0.08] bg-[#15181c] island-dark pt-3 px-4">
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-tone-max/[0.06] text-[10px] text-[#80868e]">
                         <span>generated/sdk/database.types.ts</span>
-                        <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-[#9cdcfe]">auto-generated</span>
+                        <span className="rounded bg-tone-max/[0.06] px-1.5 py-0.5 text-[9px] text-[#9cdcfe]">auto-generated</span>
                     </div>
                     <div className="space-y-0.5 text-[10.5px] leading-[17px] text-[#d1d4d9]">
                         <div>
@@ -173,7 +173,7 @@ export function SdkMiniDemo() {
                         <div className="pl-6">
                             <span className={ID}>title</span>: <span className={TYPE}>string</span>;
                         </div>
-                        <div className={`pl-6 rounded-sm transition-colors ${step >= 4 && step <= 6 ? "bg-[#04395e]/70 text-white" : ""}`}>
+                        <div className={`pl-6 rounded-sm transition-colors ${step >= 4 && step <= 6 ? "bg-[#04395e]/70 text-tone-max" : ""}`}>
                             <span className={ID}>status</span>: <span className={STR}>&apos;draft&apos;</span> | <span className={STR}>&apos;published&apos;</span>;
                         </div>
                         <div className="pl-6">
@@ -192,7 +192,7 @@ export function SdkMiniDemo() {
                         </div>
                     </div>
 
-                    <div className="mt-auto mb-2.5 rounded border border-white/[0.08] bg-[#1b1e22] px-2.5 py-2 text-[10px]">
+                    <div className="mt-auto mb-2.5 rounded border border-tone-max/[0.08] bg-[#1b1e22] island-dark px-2.5 py-2 text-[10px]">
                         <div className="flex items-center justify-between text-[#80868e]">
                             <span>Postgres RLS policy</span>
                             <span className="text-emerald-400">enforced</span>
@@ -206,7 +206,7 @@ export function SdkMiniDemo() {
 
             <div className="h-5 bg-[#007acc] flex items-center px-2 gap-3 text-[9px] text-white/90 shrink-0">
                 <span>TypeScript 5.8 · @rebasepro/client</span>
-                <span className="hidden sm:inline text-white/75">schema synced from backend/schema/posts.ts</span>
+                <span className="hidden sm:inline text-tone-max/75">schema synced from backend/schema/posts.ts</span>
                 <span className="ml-auto">UTF-8</span>
                 <span>Ln {caretRow + 1}, Col {caretCol + 1}</span>
             </div>

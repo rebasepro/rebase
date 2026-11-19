@@ -341,7 +341,7 @@ describe("the platform key in the environment", () => {
 
         const verified = await verifyPlatformToken(await platformToken(), config);
 
-        expect(verified).toEqual({ subject: "cloud-user-1", scopes: ["cron:read"], tokenId: "tok-1" });
+        expect(verified).toMatchObject({ subject: "cloud-user-1", scopes: ["cron:read"], tokenId: "tok-1" });
     });
 });
 

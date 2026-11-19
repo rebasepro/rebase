@@ -295,7 +295,7 @@ describe("Database migration E2E", () => {
         fs.writeFileSync(path.join(schemaDir, "tasks.ts"), tasksTableTs().replace(/,\n\s*done:.*\n/, "\n"));
         const generated = await run("db", "generate", "--schema-dir", schemaDir, "drop_done");
         expect(generated.exitCode).toBe(0);
-        expect(generated.all).toContain("destructive change(s) that will DESTROY data when applied");
+        expect(generated.all).toMatch(/change\(s\) that need confirming: \d+ destroys? data/);
         expect(generated.all).toMatch(/DROP COLUMN.*"done"/);
 
         const refused = await run("db", "migrate", "--refuse-destructive");

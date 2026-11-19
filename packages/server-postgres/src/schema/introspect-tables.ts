@@ -40,6 +40,7 @@ import type {
     UnmappedTable
 } from "@rebasepro/types";
 import { classifyTable, policyToSecurityRule, tableGeneratedPolicyNames } from "@rebasepro/common";
+import { isAuthUsersReference, isCallerIdDefault, objectsLeftBehind, plainIndexes, translateSupabaseRoles, type LeftBehind } from "./introspect-foreign";
 import { firstFreeKey, toWireKey } from "@rebasepro/utils";
 
 import {
@@ -161,6 +162,15 @@ export interface DescribeTablesOptions extends IntrospectTablesOptions {
     leaveOut?: ReadonlySet<string>;
     /** The CHECK constraints, parsed (`parseCheckConstraints`): validation in `"generate"`. */
     checkFacts?: CheckFactsByTable;
+    /**
+     * `"supabase"` (`schema introspect --from supabase`) translates Supabase's
+     * conventions for a database that is being left: an `auth.uid()` default
+     * becomes `.onCreateUser()`, a user-id column becomes text, and `TO anon`
+     * / `TO authenticated` become conditions. Off by default, because a
+     * database Rebase runs on in place keeps those roles, and Supabase's own
+     * API still relies on them.
+     */
+    from?: "supabase";
 }
 
 /**
@@ -170,6 +180,13 @@ export interface DescribeTablesOptions extends IntrospectTablesOptions {
  */
 export interface DescribedTables extends IntrospectedTables {
     notes: IntrospectionNotes;
+    /**
+     * `"generate"` only: what the files do not carry — functions, triggers,
+     * extensions, CHECKs the database would stop enforcing, indexes that are
+     * not plain columns, foreign keys into another schema — each with why and,
+     * where Postgres can print it, the SQL that recreates it.
+     */
+    leftBehind: LeftBehind[];
 }
 
 // ── Entry points ─────────────────────────────────────────────────────────────
@@ -295,6 +312,7 @@ export function describeTables(metadata: SchemaMetadata, options: DescribeTables
     const joinTables = options.joinTables ?? identifyJoinTables(tablesMap);
     const leaveOut = options.leaveOut ?? new Set<string>();
     const notes: IntrospectionNotes = { drift: new Map(), remark: new Map() };
+    const leftBehind: LeftBehind[] = generate ? objectsLeftBehind(metadata.objects ?? []) : [];
     const note = (table: string, text: string, kind: keyof IntrospectionNotes = "drift"): void => {
         const list = notes[kind].get(table) ?? [];
         list.push(text);
@@ -334,8 +352,24 @@ export function describeTables(metadata: SchemaMetadata, options: DescribeTables
         joinTables,
         servedNames,
         checkFacts: options.checkFacts ?? new Map(),
-        note
+        note,
+        leftBehind,
+        supabase: options.from === "supabase"
     };
+    if (generate) {
+        // The database enforces a CHECK; after a push from the files, only the
+        // API validates what of it could be read as bounds. Said for every one.
+        for (const check of metadata.checks) {
+            if (!servedNames.has(check.table_name)) continue;
+            leftBehind.push({
+                kind: "check",
+                name: check.constraint_name,
+                table: check.table_name,
+                why: "a CHECK is not part of a table definition: the API validates the bounds it could read, and the database stops enforcing it",
+                sql: `ALTER TABLE ${quoteIdent(schema)}.${quoteIdent(check.table_name)} ADD CONSTRAINT ${quoteIdent(check.constraint_name)} ${check.definition};`
+            });
+        }
+    }
     // Keys first, for every table: a relation names its target's key column.
     const shapes = new Map<string, TableShape>();
     for (const row of described) {
@@ -347,7 +381,7 @@ export function describeTables(metadata: SchemaMetadata, options: DescribeTables
         const shape = shapes.get(row.table_name);
         if (shape) tables.push(describeTable(row, shape, shapes, context));
     }
-    return { tables, skipped, junctions, unprotected, notes };
+    return { tables, skipped, junctions, unprotected, notes, leftBehind };
 }
 
 // ── Internals ────────────────────────────────────────────────────────────────
@@ -362,6 +396,9 @@ interface TableContext {
     servedNames: ReadonlySet<string>;
     checkFacts: CheckFactsByTable;
     note: (table: string, text: string, kind?: keyof IntrospectionNotes) => void;
+    leftBehind: LeftBehind[];
+    /** `from: "supabase"`: translate Supabase's conventions (see {@link DescribeTablesOptions.from}). */
+    supabase: boolean;
 }
 
 /** A foreign key that becomes a `belongsTo`. */
@@ -399,6 +436,19 @@ function linkableForeignKeys(meta: TableMeta, context: TableContext): ForeignKey
         const fk = rows[0];
         if (rows.length > 1) {
             context.note(meta.name, `the foreign key ${constraint} spans (${rows.map(r => r.column_name).join(", ")}); a relation holds one column, so its columns are plain columns.`);
+            if (context.generate) {
+                const ordered = [...rows].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0));
+                context.leftBehind.push({
+                    kind: "foreign key",
+                    name: constraint,
+                    table: meta.name,
+                    why: "a foreign key over several columns has no relation to hold it; `db push` leaves it where it is, and a new database needs its SQL",
+                    sql: `ALTER TABLE ${quoteIdent(context.schema)}.${quoteIdent(meta.name)} ADD CONSTRAINT ${quoteIdent(constraint)} ` +
+                        `FOREIGN KEY (${ordered.map(r => quoteIdent(r.column_name)).join(", ")}) REFERENCES ` +
+                        `${quoteIdent(context.schema)}.${quoteIdent(fk.foreign_table_name)} (${ordered.map(r => quoteIdent(r.foreign_column_name)).join(", ")})` +
+                        `${fk.delete_rule && fk.delete_rule !== "NO ACTION" ? ` ON DELETE ${fk.delete_rule}` : ""};`
+                });
+            }
             continue;
         }
         if (!context.servedNames.has(fk.foreign_table_name)) continue;
@@ -550,6 +600,33 @@ function describeColumn(col: TableColumn, key: string, meta: TableMeta, context:
  */
 function applyGeneratedFacts(out: ColumnDescriptor, col: TableColumn, meta: TableMeta, context: TableContext): void {
     const name = col.column_name.toLowerCase();
+    // Supabase's user ids. `rebase.users.id` is text and `rebase.uid()`
+    // returns text, so a uuid column compared with it in a policy fails
+    // (`uuid = text`); the column becomes text, which holds the same ids.
+    const authRef = (context.metadata.externalFks ?? []).find(fk =>
+        fk.table_name === meta.name && fk.column_name === col.column_name && isAuthUsersReference(fk));
+    const callerDefault = isCallerIdDefault(col.column_default);
+    if (context.supabase && (authRef || callerDefault) && !out.primaryKey && out.generated === undefined) {
+        out.semantic = "user";
+        if (out.type.kind === "uuid") {
+            out.type = { kind: "text" };
+            context.note(meta.name, `"${col.column_name}" held a Supabase user id as uuid; it is text, as \`rebase.users.id\` and \`rebase.uid()\` are, so policies compare like with like.`, "remark");
+        }
+        if (callerDefault) {
+            out.stamp = { on: "create", value: "user" };
+            delete out.default;
+            context.note(meta.name, `"${col.column_name}" defaulted to auth.uid(); it is \`.onCreateUser()\`: the server writes the caller's id on create.`, "remark");
+        }
+        if (authRef) {
+            context.leftBehind.push({
+                kind: "foreign key",
+                name: authRef.constraint_name ?? `${col.column_name} → auth.users`,
+                table: meta.name,
+                why: `"${col.column_name}" referenced auth.users(id). It is declared \`.userId()\`; for the database to enforce it, add \`rel.belongsTo(() => users)\` against the project's users table` +
+                    (authRef.delete_rule ? ` (it was ON DELETE ${authRef.delete_rule})` : "")
+            });
+        }
+    }
     const temporal = out.type.kind === "timestamptz" || out.type.kind === "date" || out.type.kind === "time";
     const nowDefault = out.default?.kind === "sql" && /^(now\(\)|CURRENT_TIMESTAMP)$/i.test(out.default.expression);
     if (temporal && !out.primaryKey && out.generated === undefined) {
@@ -816,6 +893,26 @@ function describeTable(row: TableRow, shape: TableShape, shapes: ReadonlyMap<str
         rls: rlsOf(row, name, context)
     };
     if (shape.search) descriptor.search = shape.search;
+    if (context.generate && context.metadata.indexDefinitions) {
+        const { indexes, unsupported } = plainIndexes(
+            context.metadata.indexDefinitions.filter(index => index.table_name === name),
+            shape.keyByColumn,
+            new Set(shape.links.map(link => link.fk.column_name))
+        );
+        if (indexes.length > 0) descriptor.indexes = indexes;
+        for (const index of unsupported) {
+            // A unique index over several columns is a constraint the planner
+            // reads elsewhere; the rest are what `indexes` cannot spell.
+            if (index.unique && !index.predicate && Array.isArray(index.column_names)) continue;
+            context.leftBehind.push({
+                kind: "index",
+                name: index.index_name,
+                table: name,
+                why: "an index on an expression, with a predicate, unique, or of a method `indexes` does not declare",
+                sql: `${index.definition};`
+            });
+        }
+    }
     return descriptor;
 }
 
@@ -913,7 +1010,7 @@ const adminBaselineNames = (table: string): Set<string> =>
     tableGeneratedPolicyNames({ slug: table, table, columns: {}, links: {}, idKey: "id", rules: [], auth: false });
 
 /** A `pg_policies` row as the rule `db push` compiles back into it. */
-function ruleOf(policy: PolicyRow): SecurityRule {
+function readRule(policy: PolicyRow): SecurityRule {
     const cmd = policy.cmd.toUpperCase();
     return policyToSecurityRule({
         policyname: policy.policy_name,
@@ -946,21 +1043,37 @@ function rlsOf(row: TableRow, table: string, context: TableContext): RlsDescript
         if (row.rls_enabled !== true) {
             return { posture: "rules", rules: [{ name: `${table}_rls_disabled`, operations: ["all"], access: "public" }], defaultPolicies: false };
         }
-        return { posture: "rules", rules: (policies ?? []).map(ruleOf), defaultPolicies: false };
+        return { posture: "rules", rules: (policies ?? []).map(readRule), defaultPolicies: false };
     }
     if (policies === undefined) return { posture: "admin-only", rules: [], defaultPolicies: true };
     const baseline = adminBaselineNames(table);
+    // Supabase's `TO anon` / `TO authenticated`, translated (see
+    // `translateSupabaseRoles`); a policy only for `service_role` is dropped.
+    const ruleOf = (policy: PolicyRow): SecurityRule | null => {
+        if (!context.supabase) return readRule(policy);
+        const translated = translateSupabaseRoles(readRule(policy));
+        if (translated.note) context.note(table, translated.note, "remark");
+        return translated.rule;
+    };
+    const rules = (list: PolicyRow[]): SecurityRule[] => list.map(ruleOf).filter((rule): rule is SecurityRule => rule !== null);
     if (row.rls_enabled === false) {
         // The push switches RLS on whatever the file says; the table keeps the
         // baseline (nothing narrowed anyone before) and its own policies.
-        const own = policies.filter(policy => !baseline.has(policy.policy_name)).map(ruleOf);
+        const own = rules(policies.filter(policy => !baseline.has(policy.policy_name)));
         return own.length > 0 ? { posture: "rules", rules: own, defaultPolicies: true } : { posture: "admin-only", rules: [], defaultPolicies: true };
     }
     const present = new Set(policies.map(policy => policy.policy_name));
     if (row.rls_enabled !== true && present.size === 0) return { posture: "admin-only", rules: [], defaultPolicies: true };
     const keepsBaseline = [...baseline].every(name => present.has(name));
-    const own = policies.filter(policy => !(keepsBaseline && baseline.has(policy.policy_name))).map(ruleOf);
+    const own = rules(policies.filter(policy => !(keepsBaseline && baseline.has(policy.policy_name))));
     if (keepsBaseline) return own.length > 0 ? { posture: "rules", rules: own, defaultPolicies: true } : { posture: "admin-only", rules: [], defaultPolicies: true };
     if (own.length > 0) return { posture: "rules", rules: own, defaultPolicies: false };
-    return { posture: "rules", rules: [{ name: `${table}_closed`, operation: "all", using: "false" }], defaultPolicies: false };
+    // RLS on and no policy: only the owner connection reaches the rows. Its
+    // nearest posture is "admin-only" — the server's own code
+    // (`rebase.dataAsAdmin`) and admins, which is what Supabase's
+    // `service_role` was. A rule granting nothing (`using: "false"`) locked
+    // out `rebase.dataAsAdmin` as well, leaving only `rebase.sql()`.
+    context.note(table, `"${table}" has row-level security on and no policy: it is "admin-only", so server code (\`rebase.dataAsAdmin\`) and admins reach it. ` +
+        "Write `rls: [{ operation: \"all\", using: \"false\" }]` to keep it closed to admins too.", "remark");
+    return { posture: "admin-only", rules: [], defaultPolicies: true };
 }

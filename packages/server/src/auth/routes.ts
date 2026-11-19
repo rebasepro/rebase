@@ -29,6 +29,7 @@ import { mountMfaRoutes } from "./mfa-routes";
 import { assertMfaSatisfied } from "./mfa-gate";
 import { mountSessionRoutes } from "./session-routes";
 import { mountMagicLinkRoutes } from "./magic-link-routes";
+import { mountPlatformSignInRoutes, type PlatformSignInConfig } from "./platform-signin-routes";
 import { mountOtpRoutes } from "./otp-routes";
 import { mountDeviceLoginRoutes, type DeviceLoginRoutesConfig } from "./device-login-routes";
 import { isBootstrapWindowOpen, isOnlyUser, isSteadyStateRegistrationOpen, isUserTableEmpty, SETUP_REQUIRED_MESSAGE } from "./registration-policy";
@@ -115,6 +116,13 @@ export interface AuthModuleConfig {
      * Off when absent. See `device-login-routes.ts`.
      */
     deviceLogin?: DeviceLoginRoutesConfig;
+    /**
+     * The platform's sign-in door, `POST /auth/platform-signin`: a project
+     * owner arriving from the platform's console with a short-lived token is
+     * signed in as `admin`. Off when absent — every self-hosted backend. See
+     * `platform-signin-routes.ts`.
+     */
+    platformSignIn?: PlatformSignInConfig;
     /**
      * Opt-in httpOnly cookie mode for refresh tokens.
      *
@@ -1916,6 +1924,23 @@ aal: sessionAal };
             ops,
             parseBody,
             requireLiveSession,
+            buildAuthResponse,
+            createSessionAndTokens,
+            applyTransformHook
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Platform sign-in (a project's owner, sent by the platform's console)
+    // ═══════════════════════════════════════════════════════════════════════
+    if (config.platformSignIn) {
+        mountPlatformSignInRoutes({
+            router,
+            config,
+            platformSignIn: config.platformSignIn,
+            limiters,
+            ops,
+            parseBody,
             buildAuthResponse,
             createSessionAndTokens,
             applyTransformHook

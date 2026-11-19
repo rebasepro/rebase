@@ -21,8 +21,9 @@ export interface RlsSimulatorBarProps {
 }
 
 /**
- * Whether the signed-in person may simulate access here: an administrator,
- * with data views that ride a client able to derive a simulated one.
+ * Whether the signed-in person may simulate access here: the app opted in
+ * with `<Rebase simulateAccess>`, they are an administrator, and the data
+ * views ride a client able to derive a simulated one.
  *
  * @group Hooks and utilities
  */
@@ -37,8 +38,9 @@ export function useCanSimulateAccess(): boolean {
  * user or a service key, so an administrator sees exactly the rows and fields
  * that identity's row-level security lets it read.
  *
- * Shown only to an administrator, and only when the data views ride a client
- * that can derive a simulated one. The server checks the first again on every
+ * Shown only when the app passes `<Rebase simulateAccess>`, only to an
+ * administrator, and only when the data views ride a client that can derive
+ * a simulated one. The server checks the first again on every
  * request: anyone else sending the simulation headers gets a 403.
  *
  * @group Components

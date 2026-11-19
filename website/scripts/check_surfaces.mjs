@@ -85,7 +85,9 @@ const RETIRED = [
    how `.frame` spent six weeks darker than the section it sat in. They remain
    fine as borders, rings, shadows and gradient stops, so this matches the
    background utilities only. */
-const HOLE = /\bbg-surface-9(?:00|50)(?:\/\d+)?\b/;
+/* `tone-*` (global.css, 2026-11-18) is the same ramp made theme-aware, so its
+   900/950 steps and `tone-min` are the same holes in dark mode. */
+const HOLE = /\bbg-(?:surface|tone)-9(?:00|50)(?:\/\d+)?\b|\bbg-tone-min\b/;
 
 /* A comment may cite a banned name in prose — this file's own header does, and
    so does the block in global.css that records why the tokens were retired.

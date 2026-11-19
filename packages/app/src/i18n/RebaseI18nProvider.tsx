@@ -315,6 +315,7 @@ function UiLabelsFromTranslations({ children }: PropsWithChildren) {
         previousPeriodValue: (days, value) => t("insights_previous_period_value", { count: days, value }),
         lastDays: (days) => t("insights_period_last_days", { count: days }),
         noData: t("insights_no_data"),
+        nothingRecorded: t("insights_nothing_recorded"),
         date: t("date"),
         locale: language,
         relativeTime: {

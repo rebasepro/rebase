@@ -540,7 +540,7 @@ message: e instanceof Error ? e.message : String(e) });
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <Typography variant="caption" className="text-surface-accent-500 text-[11px]">
+                                <Typography variant="caption" className="text-surface-accent-500 text-xs">
                                     {t("studio_storage_name")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px] break-all">
@@ -548,7 +548,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 </Typography>
                             </div>
                             <div>
-                                <Typography variant="caption" className="text-surface-accent-500 text-[11px]">
+                                <Typography variant="caption" className="text-surface-accent-500 text-xs">
                                     {t("studio_storage_type")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px]">
@@ -557,7 +557,7 @@ message: e instanceof Error ? e.message : String(e) });
                             </div>
                             {file.size !== undefined && (
                                 <div>
-                                    <Typography variant="caption" className="text-surface-accent-500 text-[11px]">
+                                    <Typography variant="caption" className="text-surface-accent-500 text-xs">
                                         {t("studio_storage_size")}
                                     </Typography>
                                     <Typography variant="body2" className="text-[13px]">
@@ -566,7 +566,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 </div>
                             )}
                             <div>
-                                <Typography variant="caption" className="text-surface-accent-500 text-[11px]">
+                                <Typography variant="caption" className="text-surface-accent-500 text-xs">
                                     {t("studio_storage_extension")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px] font-mono">
@@ -574,7 +574,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 </Typography>
                             </div>
                             <div className="col-span-2">
-                                <Typography variant="caption" className="text-surface-accent-500 text-[11px]">
+                                <Typography variant="caption" className="text-surface-accent-500 text-xs">
                                     {t("studio_storage_path")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px] font-mono break-all">
@@ -585,7 +585,7 @@ message: e instanceof Error ? e.message : String(e) });
 
                         {link && (
                             <div className="pt-2">
-                                <Typography variant="caption" className="text-surface-accent-500 text-[11px] block mb-1">
+                                <Typography variant="caption" className="text-surface-accent-500 text-xs block mb-1">
                                     {t("studio_storage_url")}
                                 </Typography>
                                 <div
@@ -595,7 +595,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     )}
                                     onClick={handleCopy}
                                 >
-                                    <Typography variant="caption" className="font-mono text-[11px] truncate flex-1 min-w-0 text-primary">
+                                    <Typography variant="caption" className="font-mono text-xs truncate flex-1 min-w-0 text-primary">
                                         {absoluteUrl(link.url)}
                                     </Typography>
                                     <Tooltip title={urlCopied ? t("studio_storage_url_copied") : t("studio_storage_copy_url")}>
@@ -608,11 +608,11 @@ message: e instanceof Error ? e.message : String(e) });
                                     </Tooltip>
                                 </div>
                                 {link.isPublic ? (
-                                    <Typography variant="caption" color="secondary" className="block mt-1 text-[11px]">
+                                    <Typography variant="caption" color="secondary" className="block mt-1 text-xs">
                                         {t("studio_storage_url_public")}
                                     </Typography>
                                 ) : link.expiresInSeconds !== undefined ? (
-                                    <Typography variant="caption" color="secondary" className="block mt-1 text-[11px]">
+                                    <Typography variant="caption" color="secondary" className="block mt-1 text-xs">
                                         {t("studio_storage_url_temporary", { minutes: Math.max(1, Math.round(link.expiresInSeconds / 60)) })}
                                     </Typography>
                                 ) : null}
@@ -1400,7 +1400,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             </Typography>
                                         </TableCell>
                                         <TableCell className="px-4 py-2.5 text-right">
-                                            <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark font-mono text-[11px]">
+                                            <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark font-mono text-xs">
                                                 {file.size !== undefined ? formatFileSize(file.size) : "—"}
                                             </Typography>
                                         </TableCell>
@@ -1518,7 +1518,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             <Typography variant="body2" className="text-[12px] font-medium truncate text-surface-900 dark:text-white">
                                                 {file.name}
                                             </Typography>
-                                            <Typography variant="caption" color="secondary" className="truncate block mt-0.5 text-[11px]">
+                                            <Typography variant="caption" color="secondary" className="truncate block mt-0.5 text-xs">
                                                 {file.size !== undefined ? formatFileSize(file.size) : "—"}
                                             </Typography>
                                         </div>
@@ -1604,7 +1604,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             </Button>
                                         </div>
                                     ) : !loading ? (
-                                        <Chip size="small" className="shrink-0 text-[10px]">
+                                        <Chip size="small" className="shrink-0 text-xs">
                                             {t("studio_storage_file_count", { count: files.length })}
                                             {folders.length > 0 ? `, ${t("studio_storage_folder_count", { count: folders.length })}` : ""}
                                         </Chip>
@@ -1716,7 +1716,7 @@ message: e instanceof Error ? e.message : String(e) });
 
                             {/* Status bar */}
                             <div className={cls("px-4 py-1.5 border-t bg-surface-sheet flex items-center justify-between shrink-0", defaultBorderMixin)}>
-                                <div className="flex items-center gap-4 text-[11px]">
+                                <div className="flex items-center gap-4 text-xs">
                                     <span className="text-text-disabled dark:text-text-disabled-dark font-semibold uppercase tracking-tighter">
                                         {t("studio_storage_path")}
                                     </span>
@@ -1725,11 +1725,11 @@ message: e instanceof Error ? e.message : String(e) });
                                     </span>
                                 </div>
                                 {selectedPaths.size > 0 ? (
-                                    <div className="text-[11px] text-text-secondary dark:text-text-secondary-dark">
+                                    <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
                                         {t("studio_storage_items_selected", { count: selectedPaths.size })}
                                     </div>
                                 ) : selectedFile ? (
-                                    <div className="text-[11px] text-text-secondary dark:text-text-secondary-dark">
+                                    <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
                                         {t("studio_storage_selected_label")} <span className="font-mono">{selectedFile.name}</span>
                                     </div>
                                 ) : null}

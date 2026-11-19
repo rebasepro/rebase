@@ -255,6 +255,7 @@ export default defineConfig({
                         { label: "Customizing the Admin", slug: "docs/frontend/customizing" },
                         { label: "Panels in your own pages", slug: "docs/frontend/panels" },
                         { label: "Extending Rebase", slug: "docs/frontend/extending" },
+                        { label: "Theming & Branding", slug: "docs/frontend/theming" },
                         { label: "Styling Custom UI", slug: "docs/frontend/styling" },
                         { label: "Translations", slug: "docs/frontend/i18n" },
                         { label: "Component Overrides (Swizzling)", slug: "docs/frontend/component-overrides" },
@@ -383,6 +384,7 @@ export default defineConfig({
                         { label: "Blog CMS", slug: "docs/recipes/blog-cms" },
                         { label: "Editorial publishing", slug: "docs/recipes/editorial-publishing" },
                         { label: "Importing from WordPress", slug: "docs/recipes/import-from-wordpress" },
+                        { label: "Migrating from Supabase", slug: "docs/recipes/migrate-from-supabase" },
                         { label: "Custom Dashboard", slug: "docs/recipes/custom-dashboard" },
                         { label: "Webhook Integration", slug: "docs/recipes/webhooks" }
                     ]

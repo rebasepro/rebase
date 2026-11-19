@@ -68,6 +68,12 @@ export interface ScaffoldProps {
     logo?: string;
 
     /**
+     * The logo for the dark theme, when `logo` would not read on a dark
+     * background. Falls back to `logo`.
+     */
+    logoDark?: string;
+
+    /**
      * If true, the main content will be padded in large layouts. Defaults to true.
      */
     padding?: boolean;
@@ -96,6 +102,7 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
             autoOpenDrawer = true,
             defaultDrawerOpen = false,
             logo,
+            logoDark,
             className,
             style,
             padding = true
@@ -232,8 +239,9 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
             openDrawer: handleDrawerOpen,
             closeDrawer: handleDrawerClose,
             closeHover: setOnHoverFalse,
-            logo
-        }), [includeDrawer, computedDrawerOpen, computedDrawerHovered, handleDrawerOpen, handleDrawerClose, setOnHoverFalse, logo]);
+            logo,
+            logoDark
+        }), [includeDrawer, computedDrawerOpen, computedDrawerHovered, handleDrawerOpen, handleDrawerClose, setOnHoverFalse, logo, logoDark]);
 
         return (
             <AppContext.Provider value={appContextValue}>

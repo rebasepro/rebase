@@ -382,13 +382,25 @@ offset: 0 });
 
         // A chosen password is held to the password policy; an administrator
         // importing accounts may waive it with `skipPasswordPolicy: true`.
-        const prepResult = await prepareAdminUserValues(body, {
+        if (body.invite !== undefined && typeof body.invite !== "boolean") {
+            throw ApiError.badRequest("`invite` is true or false", "INVALID_INPUT");
+        }
+        const prepared = await prepareAdminUserValues(body, {
             authRepo,
             emailService,
             emailConfig,
             resolvedHooks: ops,
             authTableHooks
         }, { mayWaivePasswordPolicy: callerIsAdmin(c) });
+        // `invite: false` with no password: an account with no password and no
+        // email, for an app whose sign-in is a magic link, a code or a provider.
+        // The built-in step otherwise sets a generated password and emails an
+        // invitation to set it, which is the wrong mail for such an app. A
+        // create hook decides for itself (it sees `invite` in the body).
+        const noInvite = body.invite === false && !body.password && !prepared.hookHandledEmail;
+        const prepResult = noInvite
+            ? { ...prepared, values: { ...prepared.values, passwordHash: undefined }, clearPassword: undefined }
+            : prepared;
 
         // `beforeUserCreate` runs here too.
         //

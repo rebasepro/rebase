@@ -65,7 +65,7 @@ import { stripUnreadable } from "./services/row-pipeline";
 import { HistoryService } from "./history/HistoryService";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { extractPgError, isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
-import { rowsOfResult } from "./utils/result-rows";
+import { rowsOfResult, withInstantsAsRfc3339 } from "./utils/result-rows";
 import { applyAuthContext, authContextStatement } from "./security/rls-enforcement";
 import type { RequestIdentity } from "./security/rls-settings";
 import { assertCallerSql } from "./security/caller-sql";
@@ -3571,7 +3571,8 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             // Per-field read rules are the driver's, not Postgres's: the
             // columns this caller may not read come out, as the API's do.
             return withoutUnreadableColumns(
-                rowsOfResult(result),
+                // Instants as `/api/data` returns them, not Postgres's text.
+                withInstantsAsRfc3339(result, rowsOfResult(result)),
                 fieldsOfResult(result),
                 { roles: this.user?.roles ?? [] },
                 this.delegate.registry?.tables().map(table => table.descriptor) ?? [],

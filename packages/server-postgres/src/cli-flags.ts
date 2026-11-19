@@ -112,7 +112,9 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         // Whether rows are sampled at all: without a terminal the prompt is
         // skipped, and the skip line names `--data-inference`.
         "--data-inference": Boolean,
-        "--no-data-inference": Boolean
+        "--no-data-inference": Boolean,
+        // Translate Supabase's conventions (`introspect-foreign.ts`).
+        "--from": String
     },
     "schema stale": {
         "--schema-dir": String,

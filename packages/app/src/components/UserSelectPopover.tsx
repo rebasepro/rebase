@@ -316,7 +316,7 @@ export function UserSelectPopover({
                         <div className={cls("px-3 py-2 border-t text-center", defaultBorderMixin)}>
                             <Typography
                                 variant="caption"
-                                className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
+                                className="text-xs text-text-disabled dark:text-text-disabled-dark"
                             >
                                 Showing the first {filteredUsers.length} of {totalCount} users. Search to find the others.
                             </Typography>
@@ -328,7 +328,7 @@ export function UserSelectPopover({
                         <div className={cls("px-3 py-2 border-t text-center", defaultBorderMixin)}>
                             <Typography
                                 variant="caption"
-                                className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
+                                className="text-xs text-text-disabled dark:text-text-disabled-dark"
                             >
                                 Showing {renderLimit} of {totalFilterable} results. Use search to narrow down.
                             </Typography>
@@ -396,7 +396,7 @@ function UserRow({ user, isSelected, isSelf, onClick }: UserRowProps) {
                     )}
                 </div>
                 {(user.email || user.roles?.length) && (
-                    <span className="text-[10px] text-text-disabled dark:text-text-disabled-dark truncate">
+                    <span className="text-xs text-text-disabled dark:text-text-disabled-dark truncate">
                         {user.email && user.displayName ? user.email : ""}
                         {user.email && user.displayName && user.roles?.length ? " · " : ""}
                         {user.roles?.length ? user.roles.join(", ") : ""}

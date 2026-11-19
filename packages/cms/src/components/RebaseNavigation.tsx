@@ -20,7 +20,7 @@ import {
     useUiPreferences
 } from "@rebasepro/app";
 import { resolveDataSource } from "@rebasepro/common";
-import { buildRoutedRebaseData } from "@rebasepro/cms-types";
+import { buildRoutedRebaseData, studioSchemaToolEnabled } from "@rebasepro/cms-types";
 import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
 import type { AppView, CollectionCustomView, CollectionEditorOptions, EntityCustomView, EntityAction, RebasePlugin, AdminCollection, TableCustomization } from "@rebasepro/cms-types";
@@ -279,15 +279,21 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         } : { readOnly: true }
     );
 
+    const { t } = useTranslation();
+
     // ── Auto-inject schema view into Studio devViews ──────────────────
     const schemaView: AppView | undefined = useMemo(() => {
-        if (!collectionEditorEnabled) return undefined;
-        // Only inject when Studio is registered and includes "schema" tool (or all tools)
-        const studioTools = registry.studioConfig?.tools ?? ["sql", "js", "rls", "schema", "storage"];
-        if (!registry.studioConfig || !studioTools.includes("schema")) return undefined;
+        // One rule, shared with the drawer and both home pages: they sort a
+        // view into the Studio by asking the same question, so a route
+        // injected here on any other terms shows up in CMS mode.
+        if (!studioSchemaToolEnabled(registry)) return undefined;
         return {
             slug: "schema",
-            name: "Edit collections",
+            // The name and description the Studio home page's card carries:
+            // the drawer said "Edit collections" for what the card beside
+            // it called "Collections".
+            name: t("studio_tool_schema"),
+            description: t("studio_tool_schema_description"),
             group: "Database",
             icon: "LayoutList",
             nestedRoutes: true,
@@ -306,7 +312,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
                 </Suspense>
             )
         };
-    }, [collectionEditorEnabled, registry.studioConfig]);
+    }, [registry, t]);
 
     const devViews = useMemo(() => {
         const base = registry.studioConfig?.devViews ?? [];
@@ -359,7 +365,6 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     // Refreshing the navigation asks for the tables again too: it is what the
     // collection editor calls after it changed the schema, and with an `ETag`
     // an unchanged schema costs a 304.
-    const { t } = useTranslation();
     const tablesError = descriptors.status === "error" ? descriptors.error : undefined;
     const reloadTables = descriptors.reload;
     const tablesInUse = registry.cmsConfig !== null && !descriptors.unavailable;

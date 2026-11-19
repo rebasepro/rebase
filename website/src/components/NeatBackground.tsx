@@ -988,6 +988,12 @@ export function NeatBackground({
             });
             // The whole seat, not just the offset the constructor took.
             if (isGlow) writeGlow(glowPose);
+            // A painted glow is what the header reads to draw light ink over the
+            // hero (global.css, "The bar over the hero"). On the canvas, not on
+            // <html>: the canvas persists across navigations and keeps the mark,
+            // while a swap strips <html>'s attributes. A browser that never gets
+            // a gradient never gets the mark, and the bar keeps the page's ink.
+            if (variant === "glow") canvas.setAttribute("data-painted", "");
             scrollHandler?.();
         };
 
@@ -1153,6 +1159,7 @@ export function NeatBackground({
             document.removeEventListener("astro:after-swap", onAfterSwap);
             if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
             if (neat) neat.destroy();
+            canvas.removeAttribute("data-painted");
         };
 
         // Scroll parallax is motion too, so reduced-motion viewers keep the still
@@ -1250,13 +1257,14 @@ export function NeatBackground({
         // Overscanned sideways: on a narrow portrait canvas Neat stops widening
         // its frustum, and the flowing plane can bring its own edge into frame —
         // a hard band of the clear colour down one side of the hero on phones
-        // (Francesco, 2026-11-10). Drawing 8% past each side keeps the edge out
-        // of view at any moment of the flow.
+        // (Francesco, 2026-11-10). 8% past each side still let the edge in at
+        // some widths, in light mode as a pale band left and right of the
+        // field (2026-11-19); 20% keeps it out of view at any moment of the flow.
         return (
             <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
                 <canvas
                     ref={canvasRef}
-                    style={{ position: "absolute", top: 0, left: "-8%", display: "block", width: "116%", height: "100vh", minHeight: "100%" }}
+                    style={{ position: "absolute", top: 0, left: "-20%", display: "block", width: "140%", height: "100vh", minHeight: "100%" }}
                     aria-hidden="true"
                 />
             </div>

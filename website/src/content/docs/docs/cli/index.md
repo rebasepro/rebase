@@ -59,6 +59,12 @@ Starts both frontend and backend with hot reloading, and regenerates the Drizzle
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
 
+A static app in `rebase.json` with no build step (no `build`, and `output` is
+its `root`, such as a plain HTML site) is served by the backend from that
+directory, at its `path`, as `rebase start` serves it from the bundle, and
+`FRONTEND_URL` is set to it (on the backend's port) so emailed links land there.
+An app with a build runs in Vite on its own port, and `FRONTEND_URL` is Vite's.
+
 An edit to `.env`
 restarts the backend, which reads the file again, as the admin panel does. What
 `rebase dev` sets itself is kept until you restart it: `PORT`, and
@@ -133,18 +139,14 @@ flagged as a downgrade. A `--dry-run` of an upgrade the real run would refuse
 shows what would move and exits 0, and under `--json` its document carries the
 refusal as `wouldRefuse` (`{ code, message, hint }`).
 
-#### Upgrade a PostgreSQL project to Rebase 0.34
-
-Run the 0.34 CLI from your project root on Linux, macOS, or Windows:
+#### Upgrade a PostgreSQL project to Rebase 0.35
 
 ```bash
-pnpm dlx @rebasepro/cli@0.34.0 upgrade --to 0.34.0 # version-pin: ignore
+pnpm dlx @rebasepro/cli@0.35.0 upgrade --to 0.35.0 # version-pin: ignore
 ```
 
-The 0.34 upgrader updates the Rebase packages and changes the PostgreSQL
-backend's dependency from `@ariga/atlas` to `@stokaro/ptah-compat`. Run it
-with the new CLI even if your project currently pins an older one.
-Existing migration files, `atlas.sum`, and recorded revisions carry over.
+Run from the project root. The 0.35 CLI replaces `@ariga/atlas` with
+`@stokaro/ptah-compat` and keeps your SQL migrations, `atlas.sum`, and revisions.
 
 ### `rebase start`
 

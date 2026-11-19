@@ -1,5 +1,5 @@
 ---
-sourceHash: 9744aa8314ae21d2
+sourceHash: bbd9b047f57672eb
 title: Suddivisione in più processi
 sidebar_label: Processi separati
 description: Esegui un unico bundle come più processi cooperanti — un'API, un livello di funzioni, un worker — dalla stessa immagine runtime pubblicata, in modo che una funzione personalizzata pesante non competa più con l'API dei dati.
@@ -272,7 +272,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.33.2"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.34.1"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Di solito vale la pena bloccare solo il tag: il repository viene ereditato, quindi si tratta di

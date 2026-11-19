@@ -1,5 +1,5 @@
 ---
-sourceHash: d92fc6d34e2b4f26
+sourceHash: aebeca7e285691df
 title: Référence des hooks
 sidebar_label: Hooks
 description: Hooks React fournis par Rebase pour accéder à l'authentification, aux données, à la navigation, aux panneaux latéraux, au stockage et à l'état de l'interface utilisateur.
@@ -415,7 +415,7 @@ function EditForm() {
 Changez le rôle pour lequel la navigation du panneau d'administration est construite, sans vous déconnecter :
 c'est-à-dire les vues Studio qu'il liste. Cela n'envoie rien au serveur et n'évalue
 aucune politique de sécurité au niveau des lignes (RLS), de sorte qu'une vue de données affiche toujours ce que vous êtes autorisé à lire. Pour
-tester les règles RLS, utilisez **Simuler l'accès** (au-dessus de votre avatar dans le menu latéral) ou `client.simulate()` dans
+tester les règles RLS, utilisez **Simuler l'accès** (au-dessus de votre avatar dans le menu latéral, une fois activé par `<Rebase simulateAccess>`) ou `client.simulate()` dans
 le code ; voir [Tester l'accès](/docs/frontend/authentication/#testing-access-simulate-access).
 
 `<Rebase>` fournit le contrôleur. `useBuildEffectiveRoleController`, le hook

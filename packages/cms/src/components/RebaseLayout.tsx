@@ -29,6 +29,8 @@ export interface RebaseLayoutProps {
     defaultDrawerOpen?: boolean;
     /** Path to the logo shown in the drawer and top bar. Falls back to the Rebase mark. */
     logo?: string;
+    /** The logo for the dark theme, when `logo` would not read on a dark background. Falls back to `logo`. */
+    logoDark?: string;
     /** Dev views passed to AdminModeSyncer (resolved from RebaseNavigation). */
     devViews?: AppView[];
 }
@@ -66,6 +68,7 @@ export function RebaseLayout(props: RebaseLayoutProps) {
         autoOpenDrawer = true,
         defaultDrawerOpen = false,
         logo,
+        logoDark,
         devViews = []
     } = props;
 
@@ -78,7 +81,7 @@ export function RebaseLayout(props: RebaseLayoutProps) {
     // default bar as `OriginalComponent`. An `appBar` element still wins, the
     // way a `drawer` element wins over a `"Shell.Drawer"` override.
     const ActiveAppBar = appBar ?? (ResolvedAppBar !== DefaultAppBar
-        ? <ResolvedAppBar title={title} logo={logo}/>
+        ? <ResolvedAppBar title={title} logo={logo} logoDark={logoDark}/>
         : null);
 
     const ActiveDrawer = drawer ?? (
@@ -89,7 +92,7 @@ export function RebaseLayout(props: RebaseLayoutProps) {
     );
 
     return (
-        <Scaffold autoOpenDrawer={autoOpenDrawer} defaultDrawerOpen={defaultDrawerOpen} logo={logo}>
+        <Scaffold autoOpenDrawer={autoOpenDrawer} defaultDrawerOpen={defaultDrawerOpen} logo={logo} logoDark={logoDark}>
             <AdminModeSyncer devViews={devViews}/>
             {ActiveAppBar}
             {ActiveDrawer}

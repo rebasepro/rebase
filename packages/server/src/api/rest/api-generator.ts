@@ -4,7 +4,7 @@ import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, parseWriteFilter, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
-import { apiHiddenKeys, cursorToStartAfter, isSoftDeleteRestore, pivotTable, relationOf } from "@rebasepro/common";
+import { apiHiddenKeys, COMPOSITE_ID_SEPARATOR, cursorToStartAfter, isSoftDeleteRestore, pivotTable, relationOf } from "@rebasepro/common";
 import { isObject } from "@rebasepro/utils";
 import { assertNoHiddenAggregateNames, assertQueryFieldsReadable, assertReadableFields, requestViewer } from "./field-access-query";
 import { assertJunctionWritable, assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
@@ -114,6 +114,29 @@ function rowIdentity(row: Record<string, unknown>, table: TableDescriptor): unkn
     if (keys.length === 0) return null;
     if (keys.length === 1) return row[keys[0]] ?? null;
     return Object.fromEntries(keys.map(key => [key, row[key] ?? null]));
+}
+
+/**
+ * Refuse an address with the wrong number of parts for a table's key.
+ *
+ * A table keyed on `(agency_id, id)` is addressed as `<agency_id>:::<id>`.
+ * Given `/proposals/p1`, the parts did not match, the read found nothing, and
+ * the answer was the 404 that says the row "may be hidden from this caller by
+ * row-level security", which sent the caller to the policies. Exported for
+ * the test.
+ */
+export function assertKeyAddress(table: Pick<TableDescriptor, "slug" | "primaryKey">, id: string): void {
+    const keys = table.primaryKey;
+    if (keys.length < 2) return;
+    const parts = id.split(COMPOSITE_ID_SEPARATOR).length;
+    if (parts === keys.length) return;
+    throw new ApiError(
+        400,
+        "COMPOSITE_KEY_ADDRESS",
+        `'${table.slug}' has a composite key (${keys.join(", ")}), and '${id}' names ${parts} of its ${keys.length} parts. ` +
+        `Address a row as /${table.slug}/${keys.map(key => `<${key}>`).join(COMPOSITE_ID_SEPARATOR)}, each part URL-encoded.`,
+        { collection: table.slug, primaryKey: keys }
+    );
 }
 
 /**
@@ -1569,6 +1592,7 @@ export class RestApiGenerator {
         this.router.get(`${basePath}/:id`, async (c) => {
             this.enforceApiKeyPermission(c, table.slug);
             const id = c.req.param("id");
+            assertKeyAddress(table, String(id));
             const queryDict = c.req.queries();
             const queryOptions = this.parseQuery(queryDict, { table, c });
             const driver = this.getScopedDriver(c);
@@ -1898,6 +1922,7 @@ export class RestApiGenerator {
             this.enforceApiKeyPermission(c, table.slug);
             const driver = this.getScopedDriver(c);
             const body = await parseJsonBody(c);
+            assertKeyAddress(table, String(c.req.param("id")));
             return this.updateRow(c, driver, ownRow(table.slug), String(c.req.param("id")), body);
         };
 
@@ -1946,6 +1971,7 @@ export class RestApiGenerator {
         this.router.delete(`${basePath}/:id`, async (c) => {
             this.enforceApiKeyPermission(c, table.slug);
             const driver = this.getScopedDriver(c);
+            assertKeyAddress(table, String(c.req.param("id")));
             return this.deleteRow(c, driver, ownRow(table.slug), String(c.req.param("id")));
         });
     }

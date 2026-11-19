@@ -136,8 +136,8 @@ export function AdminDemoCarousel({
                 onClick={() => handleTabClick(index)}
                 className={`relative overflow-hidden flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium transition-all duration-300 cursor-pointer select-none ${
                   isActive
-                    ? "bg-surface-raised text-white border border-hairline"
-                    : "bg-surface-raised text-surface-500 border border-hairline hover:text-surface-300 hover:border-hairline-strong"
+                    ? "bg-surface-raised text-tone-max border border-hairline"
+                    : "bg-surface-raised text-tone-500 border border-hairline hover:text-tone-300 hover:border-hairline-strong"
                 }`}
               >
                 {/* Progress fill for active tab */}

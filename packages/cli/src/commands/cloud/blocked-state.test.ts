@@ -14,7 +14,7 @@
  * when polling is the right thing to do, and names a command otherwise.
  */
 import { describe, expect, it } from "vitest";
-import { resolveBlockedState } from "./resources";
+import { readAuthConfig, resolveBlockedState } from "./resources";
 
 describe("resolveBlockedState", () => {
     it("names the missing database, and the command that attaches it", () => {
@@ -175,5 +175,35 @@ describe("which log a failed deploy sends you to", () => {
             database: { connectionStatus: "connected" },
             lastDeploy: { status: "failed" }
         }).nextAction).toBe("rebase cloud logs");
+    });
+
+    it("names missing email when the live app has magic-link sign-in on and cannot send it", () => {
+        const state = resolveBlockedState({
+            projectStatus: "active",
+            database: { connectionStatus: "connected" },
+            lastDeploy: { status: "success" },
+            authConfig: { unavailable: { magicLink: "EMAIL_NOT_CONFIGURED" } }
+        });
+        expect(state.blockedOn).toBe("email_not_configured");
+        expect(state.nextAction).toContain("SMTP_HOST");
+        expect(resolveBlockedState({
+            projectStatus: "active",
+            database: { connectionStatus: "connected" },
+            lastDeploy: { status: "success" },
+            authConfig: {}
+        }).blockedOn).toBeNull();
+    });
+});
+
+describe("readAuthConfig", () => {
+    it("reads `unavailable`, and answers undefined for an app that does not answer", async () => {
+        const answering = (async () => new Response(JSON.stringify({ magicLink: false, unavailable: { magicLink: "EMAIL_NOT_CONFIGURED" } }), { status: 200 })) as typeof fetch;
+        expect(await readAuthConfig("shop.rebase.app", answering)).toEqual({ unavailable: { magicLink: "EMAIL_NOT_CONFIGURED" } });
+        const fine = (async () => new Response(JSON.stringify({ magicLink: true }), { status: 200 })) as typeof fetch;
+        expect(await readAuthConfig("https://shop.example.com", fine)).toEqual({});
+        const down = (async () => { throw new Error("ECONNREFUSED"); }) as typeof fetch;
+        expect(await readAuthConfig("shop.rebase.app", down)).toBeUndefined();
+        const notRebase = (async () => new Response("<html>", { status: 404 })) as typeof fetch;
+        expect(await readAuthConfig("shop.rebase.app", notRebase)).toBeUndefined();
     });
 });

@@ -202,7 +202,7 @@ export function StudioHomePage({
                                         color="secondary"
                                         className={cls(
                                             "px-4 py-1 rounded",
-                                            "font-medium text-[10px] uppercase tracking-[0.08em] text-surface-400 dark:text-surface-400"
+                                            "font-medium text-2xs uppercase tracking-[0.08em] text-surface-400 dark:text-surface-400"
                                         )}
                                     >
                                         {groupLabel(section.label)}
@@ -272,7 +272,7 @@ export function StudioHomePage({
                             color="secondary"
                             className={cls(
                                 "px-4 py-1 rounded",
-                                "font-medium text-[10px] uppercase tracking-[0.08em] text-surface-400 dark:text-surface-400"
+                                "font-medium text-2xs uppercase tracking-[0.08em] text-surface-400 dark:text-surface-400"
                             )}
                         >
                             Quick Start
@@ -321,7 +321,7 @@ export function StudioHomePage({
                             color="secondary"
                             className={cls(
                                 "px-4 py-1 rounded",
-                                "font-medium text-[10px] uppercase tracking-[0.08em] text-surface-400 dark:text-surface-400"
+                                "font-medium text-2xs uppercase tracking-[0.08em] text-surface-400 dark:text-surface-400"
                             )}
                         >
                             {s.title}

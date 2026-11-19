@@ -61,6 +61,13 @@ const colorClasses = {
     secondary: "bg-secondary"
 }
 
+// The tick is drawn in the ink that belongs on the fill, so a rebranded
+// primary (a yellow, a lime) keeps a legible tick. See `--color-on-primary`.
+const inkClasses = {
+    primary: "text-on-primary",
+    secondary: "text-on-secondary"
+}
+
 export const Checkbox = React.memo(({
                              id,
                              checked,
@@ -106,7 +113,7 @@ export const Checkbox = React.memo(({
                         disabled
                             ? "bg-surface-300 dark:bg-surface-600"
                             : (indeterminate || isChecked ? colorClasses[color] : "bg-surface-card"),
-                        (indeterminate || isChecked) ? "text-surface-accent-100 dark:text-surface-accent-900" : "",
+                        (indeterminate || isChecked) ? inkClasses[color] : "",
                         disabled
                             ? "border-transparent"
                             : (indeterminate || isChecked ? "border-transparent" : "border-surface-accent-800 dark:border-surface-accent-500")
@@ -114,10 +121,10 @@ export const Checkbox = React.memo(({
                     <CheckboxPrimitive.Indicator asChild>
                         {indeterminate
                             ? (
-                                <MinusIcon size={iconSize} className={"absolute"}/>
+                                <MinusIcon size={iconSize} className={"absolute stroke-keep"}/>
                             )
                             : (
-                                <CheckIcon size={iconSize} className={"absolute"}/>
+                                <CheckIcon size={iconSize} className={"absolute stroke-keep"}/>
                             )}
                     </CheckboxPrimitive.Indicator>
                 </div>

@@ -20,7 +20,7 @@ jest.mock("node:perf_hooks", () => ({
 }));
 
 function sqlDriver() {
-    const executeSql = jest.fn(async () => []);
+    const executeSql = jest.fn(async (_sql: string, _options?: { params?: unknown[] }) => []);
     return { driver: fakeDataDriver({ admin: { executeSql } }), executeSql };
 }
 
@@ -44,6 +44,37 @@ describe("the metrics sampler's stop", () => {
 
         expect(executeSql.mock.calls.length).toBe(written);
         expect(histogram.disable).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("the sampler's request history", () => {
+    beforeEach(() => {
+        jest.useFakeTimers();
+        jest.clearAllMocks();
+    });
+    afterEach(() => jest.useRealTimers());
+
+    it("writes per-minute deltas from the registry it was pointed at", async () => {
+        const { driver, executeSql } = sqlDriver();
+        const history = createMetricsHistory(driver)!;
+        let totals = { data: { requests: 5, errors: 1 } };
+        history.countRequestsFrom(() => totals);
+        const stop = history.start();
+        await jest.advanceTimersByTimeAsync(0);
+
+        const deltaWrites = () => executeSql.mock.calls
+            .map(([, options]) => options?.params)
+            .filter((params): params is unknown[] => Array.isArray(params) && String(params[1]).includes("_data"))
+            .map(params => [params[1], params[3]]);
+
+        // The first tick writes the count since boot.
+        expect(deltaWrites()).toEqual([["requests_data", 5], ["errors_data", 1]]);
+
+        totals = { data: { requests: 8, errors: 1 } };
+        await jest.advanceTimersByTimeAsync(SAMPLE_INTERVAL_MS);
+        // Then only the difference, and no row for the unchanged errors.
+        expect(deltaWrites()).toEqual([["requests_data", 5], ["errors_data", 1], ["requests_data", 3]]);
+        stop();
     });
 });
 

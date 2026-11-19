@@ -119,18 +119,16 @@ describe("promptForConsent", () => {
         expect(telemetry.readConfig().machineId).toBeUndefined();
     });
 
-    it("defaults to no, so a bare Enter shares nothing", async () => {
-        // Telemetry is off until somebody says yes, and every surface says so —
-        // the help, the README, the skills. A pre-selected yes made Enter, the
-        // commonest answer to any prompt, the consent: interactive `init` sent
-        // `cli.init` the moment it was pressed through.
+    it("pre-selects yes, while still asking", async () => {
+        // The question is always shown, with what is sent described above it;
+        // the pre-selected answer is yes, and `n` declines.
         const { consent } = await load();
-        const promptSpy = vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: false });
+        const promptSpy = vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: true });
 
         await consent.promptForConsent();
 
         const questions: unknown = promptSpy.mock.calls[0][0];
-        expect(Array.isArray(questions) ? questions[0] : questions).toMatchObject({ default: false });
+        expect(Array.isArray(questions) ? questions[0] : questions).toMatchObject({ default: true });
     });
 
     it("does not persist anything when the prompt itself fails", async () => {

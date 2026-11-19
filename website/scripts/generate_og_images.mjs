@@ -69,7 +69,7 @@ const CARDS = [
         slug: "docs",
         eyebrow: "Documentation",
         title: "Build on Rebase",
-        sub: "Quickstart, collections, row-level security, deployment — in six languages."
+        sub: "Quickstart, tables, row-level security, deployment — in six languages."
     },
     {
         slug: "pricing",
@@ -128,7 +128,7 @@ const CARDS = [
         slug: "cms",
         eyebrow: "Rebase CMS",
         title: "The same definition, rendered for people.",
-        sub: "Spreadsheet editing, media, relations and roles, generated from your collections."
+        sub: "Spreadsheet editing, media, relations and roles, generated from your tables."
     },
     {
         slug: "studio",

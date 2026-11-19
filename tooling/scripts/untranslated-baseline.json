@@ -117,7 +117,6 @@
   "packages/cms/src/components/EntityPreviewBinding.tsx::entity_not_found": 1,
   "packages/cms/src/components/EntityViewBinding.tsx::settings_heading": 1,
   "packages/cms/src/components/HomePage/HomePageDnD.tsx::drop_here_create_group": 1,
-  "packages/cms/src/components/RebaseNavigation.tsx::edit_collections": 1,
   "packages/cms/src/components/SelectableTable/filters/RelationFilterField.tsx::filter_for_null_values": 1,
   "packages/cms/src/data_import/components/DataNewPropertiesMapping.tsx::autogenerate_id": 3,
   "packages/cms/src/data_import/components/DataNewPropertiesMapping.tsx::column_in_file": 1,

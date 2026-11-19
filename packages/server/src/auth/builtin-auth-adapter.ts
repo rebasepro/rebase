@@ -124,6 +124,8 @@ export interface BuiltinAuthAdapterConfig {
     refreshTokenReuse?: import("./routes").RefreshTokenReusePolicy;
     /** A magic-link or email-code request for an unknown address creates its account, while registration is open. */
     magicLinkCreatesUsers?: boolean;
+    /** The platform's sign-in door; see `AuthModuleConfig.platformSignIn`. */
+    platformSignIn?: import("./platform-signin-routes").PlatformSignInConfig;
 }
 
 /**
@@ -161,6 +163,18 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
     const jwt = config.jwt ?? processJwtService;
 
     const resolvedOps = resolveAuthHooks(authHooks);
+
+    // Said at boot, once: a deployment with magic-link sign-in switched on and
+    // no email service is live and reachable, and nobody can sign in to it.
+    // `GET /auth/config` carries the same fact as `unavailable`, which is what
+    // `rebase cloud status` reads.
+    if ((enableMagicLink || enableEmailOtp) && !emailService?.isConfigured()) {
+        logger.warn(
+            `[Auth] ${[enableMagicLink && "AUTH_MAGIC_LINK", enableEmailOtp && "AUTH_EMAIL_OTP"].filter(Boolean).join(" and ")} ` +
+            "is on, but no email service is configured, so that sign-in is off (the route answers 503 EMAIL_NOT_CONFIGURED). " +
+            "Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and SMTP_FROM, or pass `email` to the backend."
+        );
+    }
 
     /**
      * The caller's roles as the database has them now.
@@ -379,7 +393,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 requireEmailVerification,
                 refreshTokenReuseIntervalSeconds,
                 refreshTokenReuse,
-                magicLinkCreatesUsers
+                magicLinkCreatesUsers,
+                platformSignIn: config.platformSignIn
             });
         },
 

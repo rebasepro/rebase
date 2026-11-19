@@ -38,7 +38,7 @@ const t = useTranslations(lang);
 import ChapterRule from "./ChapterRule.astro";
 ---
 
-<section id="collection-power" class="chapter ground-raised relative z-0 py-chapter overflow-hidden border-y border-white/8">
+<section id="collection-power" class="chapter ground-raised relative z-0 py-chapter overflow-hidden border-y border-tone-max/8">
     {/* Layout overhaul applied: BG grid lines removed, sticky positioning removed. */}
     {/* Header was centred in a 2xl measure while every other beat runs the
         72rem shell left-aligned, so this one section's left edge agreed with
@@ -47,8 +47,8 @@ import ChapterRule from "./ChapterRule.astro";
         chroma fields read as structure rather than as decoration. */}
     <div class="relative mx-auto max-w-6xl px-6 lg:px-8 mb-content animate-on-scroll fade-in-up">
         <ChapterRule label={t('power.badge')} index={index} dot="text-cyan-300" />
-        <h2 class="mt-lead max-w-[42rem] font-headers text-display-2 text-white text-balance" set:html={t('power.title')}></h2>
-        <p class="mt-lead max-w-[38rem] text-lg text-surface-400">
+        <h2 class="mt-lead max-w-[42rem] font-headers text-display-2 text-tone-max text-balance" set:html={t('power.title')}></h2>
+        <p class="mt-lead max-w-[38rem] text-lg text-tone-400">
             {t('power.subtitle')}
         </p>
     </div>
@@ -177,7 +177,7 @@ import ChapterRule from "./ChapterRule.astro";
             <div data-card class="frame relative z-10 w-[360px] xl:w-[400px] mr-2 xl:mr-4">
                 {/* Toolbar — collection name + search + add */}
                 <div class="flex items-center justify-between px-3 py-2 border-b border-hairline">
-                    <span class="text-sm text-white font-medium">Products</span>
+                    <span class="text-sm text-tone-max font-medium">Products</span>
                     <div class="flex items-center gap-1.5">
                         <div class="h-8 bg-surface-card border border-hairline rounded-lg px-2.5 flex items-center gap-1.5">
 
@@ -197,9 +197,9 @@ import ChapterRule from "./ChapterRule.astro";
   <circle cx="11" cy="11" r="8" />
 </svg>
 
-                            <span class="text-2xs text-surface-500">Search…</span>
+                            <span class="text-2xs text-tone-500">Search…</span>
                         </div>
-                        <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-surface-card border border-hairline hover:bg-white/[0.09]">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-surface-card border border-hairline hover:bg-tone-max/[0.09]">
 
 <svg
   class="lucide lucide-plus"
@@ -221,7 +221,7 @@ import ChapterRule from "./ChapterRule.astro";
                     </div>
                 </div>
                 {/* Header row — bg-surface-sheet, no vertical borders, uppercase */}
-                <div class="flex text-3xs font-semibold text-surface-500 tracking-wider uppercase border-b border-hairline bg-surface-sheet">
+                <div class="flex text-3xs font-semibold text-tone-500 tracking-wider uppercase border-b border-hairline bg-surface-sheet">
                     <div class="px-3 py-2.5 w-[72px] text-center">ID</div>
                     <div class="px-3 py-2.5 flex-1">Name</div>
                     <div class="px-3 py-2.5 w-[100px]">Category</div>
@@ -231,12 +231,12 @@ import ChapterRule from "./ChapterRule.astro";
                 {/* Data rows — no vertical borders, horizontal dividers only */}
                 {SAMPLE_ROWS.map((row) => (
                     <div class="flex text-sm border-b border-hairline last:border-0 hover:bg-surface-hover cursor-pointer">
-                        <div class="px-3 py-3 w-[72px] text-surface-500 font-mono text-xs text-center truncate">{row.id}</div>
-                        <div class="px-3 py-3 text-surface-200 flex-1 truncate">{row.name}</div>
+                        <div class="px-3 py-3 w-[72px] text-tone-500 font-mono text-xs text-center truncate">{row.id}</div>
+                        <div class="px-3 py-3 text-tone-200 flex-1 truncate">{row.name}</div>
                         <div class="px-3 py-3 w-[100px]">
                             <span class={row.catColor}>{row.cat}</span>
                         </div>
-                        <div class="px-3 py-3 text-surface-200 text-right w-14">{row.price}</div>
+                        <div class="px-3 py-3 text-tone-200 text-right w-14">{row.price}</div>
                         <div class="px-3 py-3 w-14 flex justify-center">
                             {/* Inline boolean switch matching BooleanSwitch */}
                             <div class={`switch-track scale-[0.68] origin-center ${row.stock ? 'switch-track-on' : ''}`}>
@@ -253,7 +253,7 @@ import ChapterRule from "./ChapterRule.astro";
                 <div class="px-5 pt-5 pb-4 space-y-4">
                     {/* Title + sync indicator */}
                     <div class="flex items-center justify-between">
-                        <span class="text-base font-medium text-white">Wireless Headphones</span>
+                        <span class="text-base font-medium text-tone-max">Wireless Headphones</span>
                         <span class="inline-flex items-center gap-1 text-3xs font-medium text-green-400 bg-green-950/60 border border-green-800/40 px-1.5 py-0.5 rounded-full">
 
 <svg
@@ -276,13 +276,13 @@ import ChapterRule from "./ChapterRule.astro";
                     </div>
                     {/* Entity path */}
                     <div class="rounded-md bg-surface-raised px-3 py-1.5">
-                        <code class="text-3xs text-surface-500 select-all">products/x7kQ2p</code>
+                        <code class="text-3xs text-tone-500 select-all">products/x7kQ2p</code>
                     </div>
 
                     {/* Name field — floating label inside fieldBackgroundMixin */}
                     <div class="field min-h-[66px] flex flex-col justify-center">
                         <span class="field-label text-primary-light">Name <span class="text-red-500">*</span></span>
-                        <div class="px-3 pt-8 pb-2 text-base leading-6 text-surface-200">Wireless Headphones</div>
+                        <div class="px-3 pt-8 pb-2 text-base leading-6 text-tone-200">Wireless Headphones</div>
                     </div>
                     {/* Category field — select style */}
                     <div class="field min-h-[66px] flex flex-col justify-center">
@@ -291,7 +291,7 @@ import ChapterRule from "./ChapterRule.astro";
                             <span class="chip chip-blue">Electronics</span>
 
 <svg
-  class="lucide lucide-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-surface-400"
+  class="lucide lucide-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-tone-400"
   xmlns="http://www.w3.org/2000/svg"
   width="20"
   height="20"
@@ -310,13 +310,13 @@ import ChapterRule from "./ChapterRule.astro";
                     {/* Price field */}
                     <div class="field min-h-[66px] flex flex-col justify-center">
                         <span class="field-label">Price</span>
-                        <div class="px-3 pt-8 pb-2 text-base leading-6 text-surface-200 flex items-center gap-1">
-                            <span class="text-surface-500">€</span> 129
+                        <div class="px-3 pt-8 pb-2 text-base leading-6 text-tone-200 flex items-center gap-1">
+                            <span class="text-tone-500">€</span> 129
                         </div>
                     </div>
                     {/* Boolean field — BooleanSwitchWithLabel style */}
                     <div class="field min-h-[66px] pl-4 pr-6 flex items-center justify-between cursor-pointer">
-                        <span class="text-sm text-surface-200">In Stock</span>
+                        <span class="text-sm text-tone-200">In Stock</span>
                         <div class="switch-track switch-track-on">
                             <div class="switch-knob switch-knob-on"></div>
                         </div>
@@ -334,17 +334,17 @@ import ChapterRule from "./ChapterRule.astro";
                 <div class="frame relative z-10 ring-1 ring-primary/40">
                     <div class="flex items-center justify-between px-4 py-3 bg-surface-sheet border-b border-hairline">
                         <div class="flex items-center gap-3">
-                            <span class="text-2xs text-surface-400 font-mono tracking-wider uppercase font-semibold ml-2">{t('power.appcode')}</span>
+                            <span class="text-2xs text-tone-400 font-mono tracking-wider uppercase font-semibold ml-2">{t('power.appcode')}</span>
                         </div>
-                        <span class="text-2xs text-surface-500 font-mono">products.ts</span>
+                        <span class="text-2xs text-tone-500 font-mono">products.ts</span>
                     </div>
-                    <pre class="bg-surface-well px-5 py-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
+                    <pre class="bg-surface-well px-5 py-5 font-mono text-2xs leading-relaxed text-tone-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
                 </div>
             </div>
 
             {/* "generates all of the following" */}
             <div class="flex flex-col items-center gap-3">
-                <p class="text-xs text-surface-500 font-mono">{t('power.generates')}</p>
+                <p class="text-xs text-tone-500 font-mono">{t('power.generates')}</p>
                 <div class="flex flex-wrap justify-center gap-2">
                     {[
                         { icon: Database,            label: t('power.label.db') },
@@ -356,8 +356,8 @@ import ChapterRule from "./ChapterRule.astro";
                     ].map(item => {
                         const IconComp = item.icon;
                         return (
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-hairline bg-surface-raised text-surface-400 text-2xs">
-                                <IconComp class="text-surface-400 w-3 h-3" />
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-hairline bg-surface-raised text-tone-400 text-2xs">
+                                <IconComp class="text-tone-400 w-3 h-3" />
                                 {item.label}
                             </span>
                         );
@@ -389,10 +389,10 @@ import ChapterRule from "./ChapterRule.astro";
   <path d="M3 12A9 3 0 0 0 21 12" />
 </svg>
 
-                    <span class="text-2xs uppercase tracking-wider font-semibold text-surface-400 font-mono">DB Schema</span>
+                    <span class="text-2xs uppercase tracking-wider font-semibold text-tone-400 font-mono">DB Schema</span>
                     <img src="/img/postgres_elephant.webp" loading="lazy" decoding="async" width="540" height="557" class="h-3 w-auto opacity-35 grayscale filter brightness-200 ml-auto" alt="postgres"/>
                 </div>
-                <div class="bg-surface-well p-4 font-mono text-2xs leading-relaxed text-surface-400">
+                <div class="bg-surface-well p-4 font-mono text-2xs leading-relaxed text-tone-400">
                     <pre set:html={SQL_HTML}></pre>
                 </div>
             </div>
@@ -417,10 +417,10 @@ import ChapterRule from "./ChapterRule.astro";
   <path d="m8 6-6 6 6 6" />
 </svg>
 
-                    <span class="text-2xs uppercase tracking-wider font-semibold text-surface-400 font-mono">Typed SDK</span>
+                    <span class="text-2xs uppercase tracking-wider font-semibold text-tone-400 font-mono">Typed SDK</span>
                     <span class="ml-auto text-3xs font-semibold text-blue-400 font-mono">TS</span>
                 </div>
-                <div class="bg-surface-well p-4 font-mono text-2xs leading-relaxed text-surface-400">
+                <div class="bg-surface-well p-4 font-mono text-2xs leading-relaxed text-tone-400">
                     <pre set:html={SDK_HTML}></pre>
                 </div>
             </div>
@@ -448,13 +448,13 @@ import ChapterRule from "./ChapterRule.astro";
   <path d="M2 12h20" />
 </svg>
 
-                        <span class="text-2xs uppercase tracking-wider font-semibold text-surface-400 font-mono">REST API</span>
+                        <span class="text-2xs uppercase tracking-wider font-semibold text-tone-400 font-mono">REST API</span>
                     </div>
                     <div class="divide-y divide-hairline">
                         {SAMPLE_ENDPOINTS.map(ep => (
                             <div class="flex items-center justify-between px-3 py-2.5">
                                 <span class={`flex-shrink-0 text-3xs font-semibold border px-1.5 py-0.5 rounded font-mono ${ep.color}`}>{ep.method}</span>
-                                <span class="font-mono text-3xs text-surface-400 truncate text-right">{ep.path}</span>
+                                <span class="font-mono text-3xs text-tone-400 truncate text-right">{ep.path}</span>
                             </div>
                         ))}
                     </div>
@@ -470,11 +470,11 @@ import ChapterRule from "./ChapterRule.astro";
     <div class="lg:hidden px-6 space-y-4 animate-on-scroll fade-in-up delay-100">
         <div class="rounded-xl overflow-hidden frame">
             <div class="flex items-center justify-between px-4 py-3 bg-surface-sheet border-b border-hairline">
-                <span class="text-2xs text-surface-400 font-mono uppercase font-semibold">{t('power.appcode')} — products.ts</span>
+                <span class="text-2xs text-tone-400 font-mono uppercase font-semibold">{t('power.appcode')} — products.ts</span>
             </div>
-            <pre class="bg-surface-well p-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
+            <pre class="bg-surface-well p-5 font-mono text-2xs leading-relaxed text-tone-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
         </div>
-        <p class="text-center text-xs text-surface-500 font-mono">{t('power.mobile.generates')}</p>
+        <p class="text-center text-xs text-tone-500 font-mono">{t('power.mobile.generates')}</p>
     </div>
 
 </section>

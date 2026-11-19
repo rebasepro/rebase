@@ -757,6 +757,8 @@ export const de: RebaseTranslations = {
     auth_email_change_continue: "Weiter",
     auth_email_change_unavailable: "Das Ändern der E-Mail-Adresse ist in diesem Backend nicht verfügbar.",
     auth_signing_in_with_link: "Du wirst angemeldet…",
+    auth_continue_with_platform: "Weiter mit Rebase Cloud",
+    auth_platform_signin_hint: "Dieses Projekt läuft auf Rebase Cloud. Seine Eigentümer melden sich über die Projektseite in der Konsole an, ohne ein Passwort festzulegen.",
     auth_magic_link_failed_title: "Anmeldelink nicht angenommen",
     auth_magic_link_unavailable: "Anmeldelinks sind in diesem Backend nicht verfügbar.",
     reset_mfa_title: "Zwei-Schritt-Verifizierung zurücksetzen",
@@ -1309,7 +1311,7 @@ export const de: RebaseTranslations = {
     studio_tool_cron: "Cron-Jobs",
     studio_tool_cron_description: "Geplante Aufgaben verwalten",
     studio_tool_schema_visualizer: "Schema-Visualisierung",
-    studio_tool_schema_visualizer_description: "Entitätsdiagramm Ihrer Collections",
+    studio_tool_schema_visualizer_description: "Entitätsdiagramm Ihrer Tabellen",
     studio_tool_branches: "Branches",
     studio_tool_branches_description: "Datenbank-Branches erstellen und verwalten",
     studio_tool_backups: "Sicherungen",
@@ -1750,6 +1752,7 @@ export const de: RebaseTranslations = {
     insights_change_down: "Rückgang: {{change}}",
     insights_change_none: "Unverändert",
     insights_no_data: "Keine Daten für diesen Zeitraum",
+    insights_nothing_recorded: "Nichts aufgezeichnet",
 
     // ─── Icon button names ───────────────────────────────────────
     add_to_favourites: "Zu Favoriten hinzufügen",

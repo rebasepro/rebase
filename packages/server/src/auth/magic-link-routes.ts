@@ -8,7 +8,7 @@ import type { HonoEnv } from "../api/types";
 import { ApiError } from "../api/errors";
 import { generateSecureToken, hashToken } from "./admin-user-ops";
 import { getMagicLinkTemplate, resolveEmailBranding } from "../email/templates";
-import { resolveEmailLinkBase } from "../email/link-base";
+import { magicLinkHref } from "../email/link-base";
 import {
     RECIPIENT_ROUTE_FLOOR_MS,
     captureRecipientEmail,
@@ -126,8 +126,7 @@ export function mountMagicLinkRoutes(deps: {
             await authRepo.createMagicLinkToken(user.id, tokenHash, expiresAt);
 
             // Build magic link URL
-            const baseUrl = resolveEmailLinkBase(emailConfig, "magicLink");
-            const magicLinkUrl = `${baseUrl}/auth/magic-link?token=${token}`;
+            const magicLinkUrl = magicLinkHref(emailConfig, token);
 
             // Get email template
             const { appName, logoUrl } = resolveEmailBranding(emailConfig);

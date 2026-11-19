@@ -22,8 +22,8 @@ import ChapterRule from "../ChapterRule.astro";
             <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
                 <p class="hero-eyebrow mb-label" set:html={t("securitypage.00")}></p>
                 <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t("securitypage.01")}</span></div>
-                <h1 class="mb-6 text-display-2 text-white" set:html={t("securitypage.02")}></h1>
-                <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl" set:html={t("securitypage.03")}></p>
+                <h1 class="mb-6 text-display-2 text-tone-max" set:html={t("securitypage.02")}></h1>
+                <p class="mb-10 text-lg leading-8 text-tone-300 lg:text-xl" set:html={t("securitypage.03")}></p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-start">
                     <a href="#rls"
                        class="inline-flex items-center justify-start gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow">
@@ -31,7 +31,7 @@ import ChapterRule from "../ChapterRule.astro";
                         <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
                     </a>
                     <a href={DEMO_URL} target="_blank" rel="noopener noreferrer"
-                       class="inline-flex items-center justify-start gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all">{t("securitypage.81")}</a>
+                       class="inline-flex items-center justify-start gap-x-2 rounded-lg border border-tone-700 bg-tone-800 px-6 py-3 text-base font-semibold text-tone-max hover:bg-tone-700 transition-all">{t("securitypage.81")}</a>
                 </div>
             </div>
         </section>
@@ -40,24 +40,24 @@ import ChapterRule from "../ChapterRule.astro";
         <!-- Free tool: rls-check -->
         <section class="relative z-0 py-chapter">
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
-                <div class="rounded-2xl border border-surface-700/80 bg-surface-900/60 px-6 py-10 sm:px-10 sm:py-12">
+                <div class="rounded-2xl border border-tone-700/80 bg-tone-900/60 px-6 py-10 sm:px-10 sm:py-12">
                     <div class="text-center">
                         <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-xs font-medium text-primary-light">{t("securitypage.04")}</span>
-                        <h2 class="mt-5 text-2xl sm:text-3xl text-white">{t("securitypage.05")}</h2>
-                        <p class="mt-lead text-base leading-7 text-surface-400" set:html={t("securitypage.06")}></p>
+                        <h2 class="mt-5 text-2xl sm:text-3xl text-tone-max">{t("securitypage.05")}</h2>
+                        <p class="mt-lead text-base leading-7 text-tone-400" set:html={t("securitypage.06")}></p>
                     </div>
 
                     <div class="mt-8 group relative">
                         <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
                              aria-hidden="true"></div>
-                        <div class="relative rounded-xl bg-surface-950/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
+                        <div class="relative rounded-xl bg-tone-950/80 border border-tone-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
                             <div class="px-5 py-4 flex items-center justify-between">
                                 <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
                                     <span class="text-primary-light mr-3">~</span>
-                                    <span class="text-white">{t("securitypage.07")}</span>
+                                    <span class="text-tone-max">{t("securitypage.07")}</span>
                                 </div>
                                 <button data-track-copy="security-rls-check" data-command="npx @rebasepro/rls-check"
-                                        class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                                        class="copy-btn shrink-0 text-tone-500 hover:text-tone-max transition-colors"
                                         aria-label="Copy command" title="Copy to clipboard">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
                                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -70,7 +70,7 @@ import ChapterRule from "../ChapterRule.astro";
                         </div>
                     </div>
 
-                    <p class="mt-5 text-center text-xs leading-6 text-surface-500">{t("securitypage.08")}</p>
+                    <p class="mt-5 text-center text-xs leading-6 text-tone-500">{t("securitypage.08")}</p>
 
                     <div class="mt-6 text-center">
                         <a href="/rls-check"
@@ -97,22 +97,22 @@ import ChapterRule from "../ChapterRule.astro";
                             <svg class="lucide lucide-shield-check" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
                             {t("securitypage.lbl.db")}
                         </div>
-                        <h2 class="text-3xl sm:text-4xl text-white">{t("securitypage.09")}</h2>
-                        <p class="mt-lead text-base text-surface-400 max-w-2xl">{t("securitypage.10")}</p>
+                        <h2 class="text-3xl sm:text-4xl text-tone-max">{t("securitypage.09")}</h2>
+                        <p class="mt-lead text-base text-tone-400 max-w-2xl">{t("securitypage.10")}</p>
                     </div>
 
                     <!-- Browser chrome frame -->
-                    <div class="w-full rounded-2xl border border-surface-800 bg-surface-950/90 shadow-2xl overflow-hidden">
-                        <div class="flex items-center justify-between px-4 py-3 border-b border-surface-800/60 bg-surface-900/30">
+                    <div class="w-full rounded-2xl border border-tone-800 bg-tone-950/90 shadow-2xl overflow-hidden">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-tone-800/60 bg-tone-900/30">
                             <div class="flex items-center gap-1.5">
-                                <span class="text-2xs font-mono text-surface-500 ml-3">{t("securitypage.11")}</span>
+                                <span class="text-2xs font-mono text-tone-500 ml-3">{t("securitypage.11")}</span>
                             </div>
                             <span class="text-3xs font-mono text-emerald-400 flex items-center gap-1">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                                 {t("securitypage.12")}
                             </span>
                         </div>
-                        <div class="p-6 bg-[#08090b]">
+                        <div class="p-6 bg-[#08090b] island-dark">
                             <RLSEditorDemo client:only="react" />
                         </div>
                     </div>
@@ -129,36 +129,36 @@ import ChapterRule from "../ChapterRule.astro";
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                     <div class="lg:col-span-5">
-                        <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("securitypage.13")}</h2>
-                        <p class="text-base text-surface-400 leading-relaxed mb-4">{t("securitypage.14")}</p>
-                        <p class="text-base text-surface-400 leading-relaxed">{t("securitypage.15")}</p>
+                        <h2 class="text-3xl sm:text-4xl text-tone-max mb-5">{t("securitypage.13")}</h2>
+                        <p class="text-base text-tone-400 leading-relaxed mb-4">{t("securitypage.14")}</p>
+                        <p class="text-base text-tone-400 leading-relaxed">{t("securitypage.15")}</p>
                     </div>
                     <div class="lg:col-span-7">
-                        <div class="rounded-2xl border border-surface-800/80 bg-surface-950/60 overflow-hidden">
-                            <ul class="divide-y divide-surface-800/60">
+                        <div class="rounded-2xl border border-tone-800/80 bg-tone-950/60 overflow-hidden">
+                            <ul class="divide-y divide-tone-800/60">
                                 <li class="px-7 py-5">
-                                    <p class="text-sm font-semibold text-white mb-1">{t("securitypage.16")}</p>
-                                    <p class="text-sm text-surface-400 leading-relaxed">{t("securitypage.17")}</p>
+                                    <p class="text-sm font-semibold text-tone-max mb-1">{t("securitypage.16")}</p>
+                                    <p class="text-sm text-tone-400 leading-relaxed">{t("securitypage.17")}</p>
                                 </li>
                                 <li class="px-7 py-5">
-                                    <p class="text-sm font-semibold text-white mb-1">{t("securitypage.18")}</p>
-                                    <p class="text-sm text-surface-400 leading-relaxed">{t("securitypage.19")}</p>
+                                    <p class="text-sm font-semibold text-tone-max mb-1">{t("securitypage.18")}</p>
+                                    <p class="text-sm text-tone-400 leading-relaxed">{t("securitypage.19")}</p>
                                 </li>
                                 <li class="px-7 py-5">
-                                    <p class="text-sm font-semibold text-white mb-1">{t("securitypage.20")}</p>
-                                    <p class="text-sm text-surface-400 leading-relaxed">{t("securitypage.21")}</p>
+                                    <p class="text-sm font-semibold text-tone-max mb-1">{t("securitypage.20")}</p>
+                                    <p class="text-sm text-tone-400 leading-relaxed">{t("securitypage.21")}</p>
                                 </li>
                                 <li class="px-7 py-5">
-                                    <p class="text-sm font-semibold text-white mb-1">{t("securitypage.22")}</p>
-                                    <p class="text-sm text-surface-400 leading-relaxed">{t("securitypage.23")}</p>
+                                    <p class="text-sm font-semibold text-tone-max mb-1">{t("securitypage.22")}</p>
+                                    <p class="text-sm text-tone-400 leading-relaxed">{t("securitypage.23")}</p>
                                 </li>
                                 <li class="px-7 py-5">
-                                    <p class="text-sm font-semibold text-white mb-1">{t("securitypage.24")}</p>
-                                    <p class="text-sm text-surface-400 leading-relaxed" set:html={t("securitypage.25")}></p>
+                                    <p class="text-sm font-semibold text-tone-max mb-1">{t("securitypage.24")}</p>
+                                    <p class="text-sm text-tone-400 leading-relaxed" set:html={t("securitypage.25")}></p>
                                 </li>
                                 <li class="px-7 py-5">
-                                    <p class="text-sm font-semibold text-white mb-1">{t("securitypage.26")}</p>
-                                    <p class="text-sm text-surface-400 leading-relaxed">{t("securitypage.27")}</p>
+                                    <p class="text-sm font-semibold text-tone-max mb-1">{t("securitypage.26")}</p>
+                                    <p class="text-sm text-tone-400 leading-relaxed">{t("securitypage.27")}</p>
                                 </li>
                             </ul>
                         </div>
@@ -176,31 +176,31 @@ import ChapterRule from "../ChapterRule.astro";
                             <svg class="lucide lucide-users" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><path d="M16 3.128a4 4 0 0 1 0 7.744" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /></svg>
                             {t("securitypage.lbl.roles")}
                         </div>
-                        <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("securitypage.28")}</h2>
-                        <p class="text-lg text-surface-300 mb-8">{t("securitypage.29")}</p>
+                        <h2 class="text-3xl sm:text-4xl text-tone-max mb-4">{t("securitypage.28")}</h2>
+                        <p class="text-lg text-tone-300 mb-8">{t("securitypage.29")}</p>
                         <div class="space-y-4">
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-                                <p class="text-surface-400" set:html={t("securitypage.30")}></p>
+                                <p class="text-tone-400" set:html={t("securitypage.30")}></p>
                             </div>
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-                                <p class="text-surface-400" set:html={t("securitypage.31")}></p>
+                                <p class="text-tone-400" set:html={t("securitypage.31")}></p>
                             </div>
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-                                <p class="text-surface-400" set:html={t("securitypage.32")}></p>
+                                <p class="text-tone-400" set:html={t("securitypage.32")}></p>
                             </div>
                         </div>
                     </div>
                     <div class="flex items-center justify-center">
-                        <div class="w-full max-w-md rounded-2xl border border-surface-800 bg-surface-950/90 shadow-2xl overflow-hidden">
-                            <div class="flex items-center justify-between px-4 py-3 border-b border-surface-800/60 bg-surface-900/30">
+                        <div class="w-full max-w-md rounded-2xl border border-tone-800 bg-tone-950/90 shadow-2xl overflow-hidden">
+                            <div class="flex items-center justify-between px-4 py-3 border-b border-tone-800/60 bg-tone-900/30">
                                 <div class="flex items-center gap-1.5">
-                                    <span class="text-2xs font-mono text-surface-500 ml-3">roles</span>
+                                    <span class="text-2xs font-mono text-tone-500 ml-3">roles</span>
                                 </div>
                             </div>
-                            <div class="p-6 bg-[#08090b]">
+                            <div class="p-6 bg-[#08090b] island-dark">
                                 <RbacMiniDemo client:load />
                             </div>
                         </div>
@@ -224,28 +224,28 @@ import ChapterRule from "../ChapterRule.astro";
                             <svg class="lucide lucide-database" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
                             Data sovereignty · self-hosted
                         </div>
-                        <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("securitypage.33")}</h2>
-                        <p class="text-lg text-surface-300 mb-8" set:html={t("securitypage.34")}></p>
+                        <h2 class="text-3xl sm:text-4xl text-tone-max mb-4">{t("securitypage.33")}</h2>
+                        <p class="text-lg text-tone-300 mb-8" set:html={t("securitypage.34")}></p>
                         <div class="space-y-6">
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
                                 <div>
-                                    <h3 class="text-white">{t("securitypage.35")}</h3>
-                                    <p class="text-surface-400">{t("securitypage.36")}</p>
+                                    <h3 class="text-tone-max">{t("securitypage.35")}</h3>
+                                    <p class="text-tone-400">{t("securitypage.36")}</p>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
                                 <div>
-                                    <h3 class="text-white">{t("securitypage.37")}</h3>
-                                    <p class="text-surface-400">{t("securitypage.38")}</p>
+                                    <h3 class="text-tone-max">{t("securitypage.37")}</h3>
+                                    <p class="text-tone-400">{t("securitypage.38")}</p>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
                                 <div>
-                                    <h3 class="text-white">{t("securitypage.39")}</h3>
-                                    <p class="text-surface-400">{t("securitypage.40")}</p>
+                                    <h3 class="text-tone-max">{t("securitypage.39")}</h3>
+                                    <p class="text-tone-400">{t("securitypage.40")}</p>
                                 </div>
                             </div>
                         </div>
@@ -265,30 +265,30 @@ import ChapterRule from "../ChapterRule.astro";
                         <svg class="lucide lucide-server" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
                         Self-Hosted
                     </div>
-                    <h2 class="text-3xl sm:text-4xl text-white">{t("securitypage.41")}</h2>
-                    <p class="mt-lead text-lg leading-8 text-surface-400">{t("securitypage.42")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-tone-max">{t("securitypage.41")}</h2>
+                    <p class="mt-lead text-lg leading-8 text-tone-400">{t("securitypage.42")}</p>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10 mb-6">
                             <svg class="lucide lucide-database text-blue-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
                         </div>
-                        <h3 class="text-xl text-white mb-3">{t("securitypage.83")}</h3>
-                        <p class="text-surface-400 text-sm">{t("securitypage.43")}</p>
+                        <h3 class="text-xl text-tone-max mb-3">{t("securitypage.83")}</h3>
+                        <p class="text-tone-400 text-sm">{t("securitypage.43")}</p>
                     </div>
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10 mb-6">
                             <svg class="lucide lucide-container text-orange-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="14" rx="2" /><rect width="20" height="8" x="2" y="2" rx="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
                         </div>
-                        <h3 class="text-xl text-white mb-3">{t("securitypage.84")}</h3>
-                        <p class="text-surface-400 text-sm">{t("securitypage.44")}</p>
+                        <h3 class="text-xl text-tone-max mb-3">{t("securitypage.84")}</h3>
+                        <p class="text-tone-400 text-sm">{t("securitypage.44")}</p>
                     </div>
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-violet-500/10 mb-6">
                             <svg class="lucide lucide-git-branch text-violet-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>
                         </div>
-                        <h3 class="text-xl text-white mb-3">{t("securitypage.85")}</h3>
-                        <p class="text-surface-400 text-sm">{t("securitypage.45")}</p>
+                        <h3 class="text-xl text-tone-max mb-3">{t("securitypage.85")}</h3>
+                        <p class="text-tone-400 text-sm">{t("securitypage.45")}</p>
                     </div>
                 </div>
             </div>
@@ -299,27 +299,27 @@ import ChapterRule from "../ChapterRule.astro";
         <section class="py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-12">
-                    <h2 class="text-3xl sm:text-4xl text-white">{t("securitypage.46")}</h2>
-                    <p class="mt-lead text-lg leading-8 text-surface-400" set:html={t("securitypage.47")}></p>
+                    <h2 class="text-3xl sm:text-4xl text-tone-max">{t("securitypage.46")}</h2>
+                    <p class="mt-lead text-lg leading-8 text-tone-400" set:html={t("securitypage.47")}></p>
                 </div>
                 <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20 font-medium">
                             <svg class="lucide lucide-server" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
                             {t("securitypage.lbl.oss")}
                         </div>
-                        <h3 class="text-2xl text-white mb-4">{t("securitypage.48")}</h3>
-                        <p class="text-surface-400 mb-4">{t("securitypage.49")}</p>
-                        <p class="text-surface-500 text-sm">{t("securitypage.50")}</p>
+                        <h3 class="text-2xl text-tone-max mb-4">{t("securitypage.48")}</h3>
+                        <p class="text-tone-400 mb-4">{t("securitypage.49")}</p>
+                        <p class="text-tone-500 text-sm">{t("securitypage.50")}</p>
                     </div>
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">
                             <svg class="lucide lucide-cloud" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9" /></svg>
                             Rebase Cloud · Private beta
                         </div>
-                        <h3 class="text-2xl text-white mb-4">{t("securitypage.51")}</h3>
-                        <p class="text-surface-400 mb-4" set:html={t("securitypage.52")}></p>
-                        <p class="text-surface-500 text-sm">{t("securitypage.53")}</p>
+                        <h3 class="text-2xl text-tone-max mb-4">{t("securitypage.51")}</h3>
+                        <p class="text-tone-400 mb-4" set:html={t("securitypage.52")}></p>
+                        <p class="text-tone-500 text-sm">{t("securitypage.53")}</p>
                     </div>
                 </div>
             </div>
@@ -333,56 +333,56 @@ import ChapterRule from "../ChapterRule.astro";
                         <svg class="lucide lucide-cloud" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9" /></svg>
                         Rebase Cloud · Private beta
                     </div>
-                    <h2 class="text-3xl sm:text-4xl text-white">{t("securitypage.54")}</h2>
-                    <p class="mt-lead text-lg leading-8 text-surface-400" set:html={t("securitypage.55")}></p>
+                    <h2 class="text-3xl sm:text-4xl text-tone-max">{t("securitypage.54")}</h2>
+                    <p class="mt-lead text-lg leading-8 text-tone-400" set:html={t("securitypage.55")}></p>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10 mb-6">
                             <svg class="lucide lucide-map-pin text-blue-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
                         </div>
-                        <h3 class="text-xl text-white mb-3">{t("securitypage.56")}</h3>
-                        <p class="text-surface-400 text-sm" set:html={t("securitypage.57")}></p>
+                        <h3 class="text-xl text-tone-max mb-3">{t("securitypage.56")}</h3>
+                        <p class="text-tone-400 text-sm" set:html={t("securitypage.57")}></p>
                     </div>
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-violet-500/10 mb-6">
                             <svg class="lucide lucide-users text-violet-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><path d="M16 3.128a4 4 0 0 1 0 7.744" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /></svg>
                         </div>
-                        <h3 class="text-xl text-white mb-3">{t("securitypage.58")}</h3>
-                        <p class="text-surface-400 text-sm" set:html={t("securitypage.59")}></p>
+                        <h3 class="text-xl text-tone-max mb-3">{t("securitypage.58")}</h3>
+                        <p class="text-tone-400 text-sm" set:html={t("securitypage.59")}></p>
                     </div>
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10 mb-6">
                             <svg class="lucide lucide-database text-emerald-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
                         </div>
-                        <h3 class="text-xl text-white mb-3">{t("securitypage.60")}</h3>
-                        <p class="text-surface-400 text-sm" set:html={t("securitypage.61")}></p>
+                        <h3 class="text-xl text-tone-max mb-3">{t("securitypage.60")}</h3>
+                        <p class="text-tone-400 text-sm" set:html={t("securitypage.61")}></p>
                     </div>
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10 mb-6">
                             <svg class="lucide lucide-shield-check text-orange-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
                         </div>
-                        <h3 class="text-xl text-white mb-3">{t("securitypage.62")}</h3>
-                        <p class="text-surface-400 text-sm" set:html={t("securitypage.63")}></p>
+                        <h3 class="text-xl text-tone-max mb-3">{t("securitypage.62")}</h3>
+                        <p class="text-tone-400 text-sm" set:html={t("securitypage.63")}></p>
                     </div>
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-rose-500/10 mb-6">
                             <svg class="lucide lucide-lock text-rose-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                         </div>
-                        <h3 class="text-xl text-white mb-3">{t("securitypage.64")}</h3>
-                        <p class="text-surface-400 text-sm" set:html={t("securitypage.65")}></p>
+                        <h3 class="text-xl text-tone-max mb-3">{t("securitypage.64")}</h3>
+                        <p class="text-tone-400 text-sm" set:html={t("securitypage.65")}></p>
                     </div>
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-sky-500/10 mb-6">
                             <svg class="lucide lucide-history text-sky-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>
                         </div>
-                        <h3 class="text-xl text-white mb-3">{t("securitypage.66")}</h3>
-                        <p class="text-surface-400 text-sm" set:html={t("securitypage.67")}></p>
+                        <h3 class="text-xl text-tone-max mb-3">{t("securitypage.66")}</h3>
+                        <p class="text-tone-400 text-sm" set:html={t("securitypage.67")}></p>
                     </div>
                 </div>
 
-                <p class="mx-auto max-w-3xl mt-10 text-center text-sm text-surface-500">{t("securitypage.68")}</p>
+                <p class="mx-auto max-w-3xl mt-10 text-center text-sm text-tone-500">{t("securitypage.68")}</p>
             </div>
         </section>
 
@@ -390,28 +390,28 @@ import ChapterRule from "../ChapterRule.astro";
  <section class="py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="max-w-4xl mx-auto text-center mb-12">
-                    <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("securitypage.69")}</h2>
-                    <p class="text-lg text-surface-300">{t("securitypage.70")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-tone-max mb-4">{t("securitypage.69")}</h2>
+                    <p class="text-lg text-tone-300">{t("securitypage.70")}</p>
                 </div>
                 <div class="max-w-5xl mx-auto grid md:grid-cols-2 gap-6">
-                    <div class="p-8 rounded-2xl border bg-surface-900/50 border-surface-800">
+                    <div class="p-8 rounded-2xl border bg-tone-900/50 border-tone-800">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20 font-medium">{t("securitypage.86")}</div>
-                        <h3 class="text-xl text-white mb-4">{t("securitypage.71")}</h3>
-                        <ul class="space-y-3 text-surface-400 text-sm">
+                        <h3 class="text-xl text-tone-max mb-4">{t("securitypage.71")}</h3>
+                        <ul class="space-y-3 text-tone-400 text-sm">
                             <li set:html={t("securitypage.72")}></li>
                             <li set:html={t("securitypage.73")}></li>
                             <li set:html={t("securitypage.74")}></li>
                         </ul>
                     </div>
-                    <div class="p-8 rounded-2xl border bg-surface-900/50 border-surface-800">
+                    <div class="p-8 rounded-2xl border bg-tone-900/50 border-tone-800">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">{t("securitypage.87")}</div>
-                        <h3 class="text-xl text-white mb-4">{t("securitypage.75")}</h3>
-                        <ul class="space-y-3 text-surface-400 text-sm">
+                        <h3 class="text-xl text-tone-max mb-4">{t("securitypage.75")}</h3>
+                        <ul class="space-y-3 text-tone-400 text-sm">
                             <li set:html={t("securitypage.76")}></li>
                             <li set:html={t("securitypage.77")}></li>
                             <li set:html={t("securitypage.78")}></li>
                         </ul>
-                        <p class="mt-5 text-surface-500 text-xs" set:html={t("securitypage.79")}></p>
+                        <p class="mt-5 text-tone-500 text-xs" set:html={t("securitypage.79")}></p>
                     </div>
                 </div>
             </div>
@@ -420,18 +420,18 @@ import ChapterRule from "../ChapterRule.astro";
         <!-- Vulnerability Disclosure Section -->
         <section class="py-chapter">
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
-                <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 md:p-12 ring-1 ring-inset ring-surface-800">
+                <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 md:p-12 ring-1 ring-inset ring-tone-800">
                     <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-6">
                         <svg class="lucide lucide-bug text-primary-light" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88" /><path d="M14.12 3.88 16 2" /><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" /><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6" /><path d="M12 20v-9" /><path d="M6.53 9C4.6 8.8 3 7.1 3 5" /><path d="M6 13H2" /><path d="M3 21c0-2.1 1.7-3.9 3.8-4" /><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4" /><path d="M22 13h-4" /><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4" /></svg>
                     </div>
-                    <h2 class="text-3xl text-white mb-4">{t("securitypage.88")}</h2>
-                    <p class="text-lg text-surface-300 mb-6" set:html={t("securitypage.80")}></p>
+                    <h2 class="text-3xl text-tone-max mb-4">{t("securitypage.88")}</h2>
+                    <p class="text-lg text-tone-300 mb-6" set:html={t("securitypage.80")}></p>
                     <div class="flex flex-col sm:flex-row gap-4">
                         <a href="https://github.com/rebasepro/rebase/blob/main/SECURITY.md"
                            target="_blank" rel="noopener noreferrer"
-                           class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all">{t("securitypage.89")}</a>
+                           class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-tone-700 bg-tone-800 px-6 py-3 text-base font-semibold text-tone-max hover:bg-tone-700 transition-all">{t("securitypage.89")}</a>
                         <a href="/.well-known/security.txt"
-                           class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all">
+                           class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-tone-700 bg-tone-800 px-6 py-3 text-base font-semibold text-tone-max hover:bg-tone-700 transition-all">
                             security.txt
                         </a>
                     </div>

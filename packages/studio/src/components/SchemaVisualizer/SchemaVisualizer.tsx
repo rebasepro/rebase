@@ -285,7 +285,7 @@ duration: 400 }
                         </Typography>
                         <Typography
                             variant="caption"
-                            className="text-[10px] text-text-disabled dark:text-text-disabled-dark font-mono"
+                            className="text-xs text-text-disabled dark:text-text-disabled-dark font-mono"
                         >
                             {stats.tables}
                         </Typography>
@@ -341,7 +341,7 @@ duration: 400 }
                                             {table !== descriptor.name && (
                                                 <Typography
                                                     variant="caption"
-                                                    className="text-[10px] text-text-disabled dark:text-text-disabled-dark font-mono truncate"
+                                                    className="text-xs text-text-disabled dark:text-text-disabled-dark font-mono truncate"
                                                 >
                                                     {table}
                                                 </Typography>
@@ -436,13 +436,13 @@ duration: 400 }
                         <div className="flex items-center justify-between">
                             <Typography
                                 variant="caption"
-                                className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
+                                className="text-xs text-text-disabled dark:text-text-disabled-dark"
                             >
                                 Tables
                             </Typography>
                             <Typography
                                 variant="caption"
-                                className="text-[10px] font-mono font-medium"
+                                className="text-xs font-mono font-medium"
                             >
                                 {stats.tables}
                             </Typography>
@@ -450,13 +450,13 @@ duration: 400 }
                         <div className="flex items-center justify-between">
                             <Typography
                                 variant="caption"
-                                className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
+                                className="text-xs text-text-disabled dark:text-text-disabled-dark"
                             >
                                 Relations
                             </Typography>
                             <Typography
                                 variant="caption"
-                                className="text-[10px] font-mono font-medium"
+                                className="text-xs font-mono font-medium"
                             >
                                 {stats.relations}
                             </Typography>
@@ -464,7 +464,7 @@ duration: 400 }
                         <div className="flex items-center justify-between">
                             <Typography
                                 variant="caption"
-                                className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
+                                className="text-xs text-text-disabled dark:text-text-disabled-dark"
                             >
                                 RLS protected
                             </Typography>
@@ -472,7 +472,7 @@ duration: 400 }
                                 <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                                 <Typography
                                     variant="caption"
-                                    className="text-[10px] font-mono font-medium"
+                                    className="text-xs font-mono font-medium"
                                 >
                                     {stats.withRls}
                                 </Typography>
@@ -660,7 +660,7 @@ duration: 400 }
                                 <div className="w-6 h-0.5 bg-indigo-500 rounded"/>
                                 <Typography
                                     variant="caption"
-                                    className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
+                                    className="text-xs text-text-disabled dark:text-text-disabled-dark"
                                 >
                                     Owning
                                 </Typography>
@@ -669,7 +669,7 @@ duration: 400 }
                                 <div className="w-6 h-0.5 bg-violet-500 rounded"/>
                                 <Typography
                                     variant="caption"
-                                    className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
+                                    className="text-xs text-text-disabled dark:text-text-disabled-dark"
                                 >
                                     M:N
                                 </Typography>
@@ -684,7 +684,7 @@ duration: 400 }
                                 />
                                 <Typography
                                     variant="caption"
-                                    className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
+                                    className="text-xs text-text-disabled dark:text-text-disabled-dark"
                                 >
                                     Inverse
                                 </Typography>
@@ -694,7 +694,7 @@ duration: 400 }
                                 <span className="text-[9px]">🔑</span>
                                 <Typography
                                     variant="caption"
-                                    className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
+                                    className="text-xs text-text-disabled dark:text-text-disabled-dark"
                                 >
                                     PK
                                 </Typography>
@@ -703,7 +703,7 @@ duration: 400 }
                                 <span className="text-[9px]">🔗</span>
                                 <Typography
                                     variant="caption"
-                                    className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
+                                    className="text-xs text-text-disabled dark:text-text-disabled-dark"
                                 >
                                     FK
                                 </Typography>

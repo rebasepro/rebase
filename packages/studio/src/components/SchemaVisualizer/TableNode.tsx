@@ -149,7 +149,7 @@ icon }}
                     {collectionName !== tableName && !isJunction && (
                         <Typography
                             variant="caption"
-                            className="text-[10px] text-text-disabled dark:text-text-disabled-dark truncate"
+                            className="text-xs text-text-disabled dark:text-text-disabled-dark truncate"
                         >
                             {collectionName}
                         </Typography>
@@ -200,7 +200,7 @@ icon }}
                         <Typography
                             variant="caption"
                             className={cls(
-                                "font-mono text-[11px] truncate flex-1 min-w-0",
+                                "font-mono text-xs truncate flex-1 min-w-0",
                                 col.isPrimaryKey
                                     ? "font-semibold text-amber-700 dark:text-amber-400"
                                     : col.isForeignKey
@@ -221,7 +221,7 @@ icon }}
                         ) : (
                             <Typography
                                 variant="caption"
-                                className="text-[10px] text-text-disabled dark:text-text-disabled-dark font-mono shrink-0"
+                                className="text-xs text-text-disabled dark:text-text-disabled-dark font-mono shrink-0"
                             >
                                 {col.typeLabel}
                             </Typography>

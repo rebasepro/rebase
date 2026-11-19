@@ -25,16 +25,16 @@ import ChapterRule from "../ChapterRule.astro";
  class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24">
             <HeroBackdrop />
             <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
-                <h1 class="mb-6 text-display-2 text-white">
+                <h1 class="mb-6 text-display-2 text-tone-max">
                     {t('agencies.hero.title')}
                 </h1>
-                <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl" set:html={t('agencies.hero.subtitle')}>
+                <p class="mb-10 text-lg leading-8 text-tone-300 lg:text-xl" set:html={t('agencies.hero.subtitle')}>
                 </p>
             </div>
         </section>
  <section class="relative isolate py-strip">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
-                <h2 class="text-center text-lg leading-8 text-surface-400">
+                <h2 class="text-center text-lg leading-8 text-tone-400">
                     {t('social.title')}
                 </h2>
                 <div class="mx-auto mt-4 mb-8 animate-on-scroll fade-in">
@@ -51,14 +51,14 @@ import ChapterRule from "../ChapterRule.astro";
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-4xl text-center animate-on-scroll fade-in-up">
                     <div class="flex items-center justify-center mb-4">
-                        <h3 class="m-0 text-3xl text-white">
+                        <h3 class="m-0 text-3xl text-tone-max">
                             {t('agencies.weapon.title')}
                         </h3>
                     </div>
-                    <p class="text-xl md:text-2xl mb-4 text-surface-300">
+                    <p class="text-xl md:text-2xl mb-4 text-tone-300">
                         {t('agencies.weapon.desc1')}
                     </p>
-                    <p class="text-lg text-surface-400">
+                    <p class="text-lg text-tone-400">
                         {t('agencies.weapon.desc2')}
                     </p>
                 </div>
@@ -74,7 +74,7 @@ import ChapterRule from "../ChapterRule.astro";
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center animate-on-scroll fade-in-up delay-100">
                     <div class="lg:col-span-6">
                         <div class="text-center mb-12 animate-on-scroll fade-in-up">
-                            <h2 class="text-3xl sm:text-4xl text-white">{t('agencies.accelerate.title')}</h2>
+                            <h2 class="text-3xl sm:text-4xl text-tone-max">{t('agencies.accelerate.title')}</h2>
                         </div>
                         <div class="flex items-start gap-4 mb-6">
                             <div class="h-10 w-10 rounded-lg bg-green-500/15 flex items-center justify-center">
@@ -96,8 +96,8 @@ import ChapterRule from "../ChapterRule.astro";
 
                             </div>
                             <div>
-                                <h3 class="text-xl text-white mb-1">{t('agencies.accelerate.f1.title')}</h3>
-                                <p class="text-surface-400">{t('agencies.accelerate.f1.desc')}</p>
+                                <h3 class="text-xl text-tone-max mb-1">{t('agencies.accelerate.f1.title')}</h3>
+                                <p class="text-tone-400">{t('agencies.accelerate.f1.desc')}</p>
                             </div>
                         </div>
                         <div class="flex items-start gap-4 mb-6">
@@ -128,8 +128,8 @@ import ChapterRule from "../ChapterRule.astro";
 
                             </div>
                             <div>
-                                <h3 class="text-xl text-white mb-1">{t('agencies.accelerate.f2.title')}</h3>
-                                <p class="text-surface-400">{t('agencies.accelerate.f2.desc')}</p>
+                                <h3 class="text-xl text-tone-max mb-1">{t('agencies.accelerate.f2.title')}</h3>
+                                <p class="text-tone-400">{t('agencies.accelerate.f2.desc')}</p>
                             </div>
                         </div>
                         <div class="flex items-start gap-4">
@@ -155,8 +155,8 @@ import ChapterRule from "../ChapterRule.astro";
 
                             </div>
                             <div>
-                                <h3 class="text-xl text-white mb-1">{t('agencies.accelerate.f3.title')}</h3>
-                                <p class="text-surface-400">{t('agencies.accelerate.f3.desc')}</p>
+                                <h3 class="text-xl text-tone-max mb-1">{t('agencies.accelerate.f3.title')}</h3>
+                                <p class="text-tone-400">{t('agencies.accelerate.f3.desc')}</p>
                             </div>
                         </div>
                     </div>
@@ -169,7 +169,7 @@ import ChapterRule from "../ChapterRule.astro";
                                 }}
                                 class={" flex content-center justify-center"}>
                             <img
-                                    class={"pointer-events-none rounded-2xl border border-surface-800 shadow-lg"}
+                                    class={"pointer-events-none rounded-2xl border border-tone-800 shadow-lg"}
                                     width="100%"
                                     alt="Rebase entity history and audit log showing data changes over time"
                                     src={"/img/history.png"}/>
@@ -185,7 +185,7 @@ import ChapterRule from "../ChapterRule.astro";
  <section class="relative isolate py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center animate-on-scroll fade-in-up">
-                    <div class="rounded-xl ring-1 ring-inset ring-surface-800 overflow-hidden bg-surface-950">
+                    <div class="rounded-xl ring-1 ring-inset ring-tone-800 overflow-hidden bg-tone-950">
                         <BodyPartsDemo client:only="react" />
                     </div>
                     <div>
@@ -209,14 +209,14 @@ import ChapterRule from "../ChapterRule.astro";
 </svg>
 
                             </div>
-                            <h3 class="m-0 text-3xl text-white">
+                            <h3 class="m-0 text-3xl text-tone-max">
                                 {t('agencies.customize.title')}
                             </h3>
                         </div>
-                        <p class="text-xl md:text-2xl mb-4 text-surface-300">
+                        <p class="text-xl md:text-2xl mb-4 text-tone-300">
                             {t('agencies.customize.desc1')}
                         </p>
-                        <p class="text-lg text-surface-400">
+                        <p class="text-lg text-tone-400">
                             {t('agencies.customize.desc2')}
                         </p>
                     </div>
@@ -228,15 +228,15 @@ import ChapterRule from "../ChapterRule.astro";
  <section class="relative isolate py-chapter">
             <div class="max-w-6xl mx-auto px-6 lg:px-8">
                 <div class="text-center mb-12">
-                    <h2 class="text-3xl sm:text-4xl text-white">{t('agencies.features.title')}</h2>
-                    <p class="text-xl text-surface-400">{t('agencies.features.subtitle')}</p>
+                    <h2 class="text-3xl sm:text-4xl text-tone-max">{t('agencies.features.title')}</h2>
+                    <p class="text-xl text-tone-400">{t('agencies.features.subtitle')}</p>
                 </div>
 
                 <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <!-- Feature Items -->
-                    <div class="p-8 rounded-lg ring-1 ring-inset ring-surface-800 bg-surface-900/50">
+                    <div class="p-8 rounded-lg ring-1 ring-inset ring-tone-800 bg-tone-900/50">
                         <div class="flex items-start space-x-3">
-                            <div class="h-8 w-8 rounded-lg bg-surface-800 flex items-center justify-center flex-shrink-0">
+                            <div class="h-8 w-8 rounded-lg bg-tone-800 flex items-center justify-center flex-shrink-0">
                                 
 <svg
   class="lucide lucide-puzzle"
@@ -255,14 +255,14 @@ import ChapterRule from "../ChapterRule.astro";
 
                             </div>
                             <div>
-                                <h3 class="text-lg mb-1 text-white">{t('agencies.features.f1.title')}</h3>
-                                <p class="text-sm text-surface-400">{t('agencies.features.f1.desc')}</p>
+                                <h3 class="text-lg mb-1 text-tone-max">{t('agencies.features.f1.title')}</h3>
+                                <p class="text-sm text-tone-400">{t('agencies.features.f1.desc')}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="p-8 rounded-lg ring-1 ring-inset ring-surface-800 bg-surface-900/50">
+                    <div class="p-8 rounded-lg ring-1 ring-inset ring-tone-800 bg-tone-900/50">
                         <div class="flex items-start space-x-3">
-                            <div class="h-8 w-8 rounded-lg bg-surface-800 flex items-center justify-center flex-shrink-0">
+                            <div class="h-8 w-8 rounded-lg bg-tone-800 flex items-center justify-center flex-shrink-0">
                                 
 <svg
   class="lucide lucide-palette"
@@ -285,14 +285,14 @@ import ChapterRule from "../ChapterRule.astro";
 
                             </div>
                             <div>
-                                <h3 class="text-lg mb-1 text-white">{t('agencies.features.f2.title')}</h3>
-                                <p class="text-sm text-surface-400">{t('agencies.features.f2.desc')}</p>
+                                <h3 class="text-lg mb-1 text-tone-max">{t('agencies.features.f2.title')}</h3>
+                                <p class="text-sm text-tone-400">{t('agencies.features.f2.desc')}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="p-8 rounded-lg ring-1 ring-inset ring-surface-800 bg-surface-900/50">
+                    <div class="p-8 rounded-lg ring-1 ring-inset ring-tone-800 bg-tone-900/50">
                         <div class="flex items-start space-x-3">
-                            <div class="h-8 w-8 rounded-lg bg-surface-800 flex items-center justify-center flex-shrink-0">
+                            <div class="h-8 w-8 rounded-lg bg-tone-800 flex items-center justify-center flex-shrink-0">
                                 
 <svg
   class="lucide lucide-shield-check"
@@ -312,14 +312,14 @@ import ChapterRule from "../ChapterRule.astro";
 
                             </div>
                             <div>
-                                <h3 class="text-lg mb-1 text-white">{t('agencies.features.f3.title')}</h3>
-                                <p class="text-sm text-surface-400">{t('agencies.features.f3.desc')}</p>
+                                <h3 class="text-lg mb-1 text-tone-max">{t('agencies.features.f3.title')}</h3>
+                                <p class="text-sm text-tone-400">{t('agencies.features.f3.desc')}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="p-8 rounded-lg ring-1 ring-inset ring-surface-800 bg-surface-900/50">
+                    <div class="p-8 rounded-lg ring-1 ring-inset ring-tone-800 bg-tone-900/50">
                         <div class="flex items-start space-x-3">
-                            <div class="h-8 w-8 rounded-lg bg-surface-800 flex items-center justify-center flex-shrink-0">
+                            <div class="h-8 w-8 rounded-lg bg-tone-800 flex items-center justify-center flex-shrink-0">
                                 
 <svg
   class="lucide lucide-rocket"
@@ -341,14 +341,14 @@ import ChapterRule from "../ChapterRule.astro";
 
                             </div>
                             <div>
-                                <h3 class="text-lg mb-1 text-white">{t('agencies.features.f4.title')}</h3>
-                                <p class="text-sm text-surface-400">{t('agencies.features.f4.desc')}</p>
+                                <h3 class="text-lg mb-1 text-tone-max">{t('agencies.features.f4.title')}</h3>
+                                <p class="text-sm text-tone-400">{t('agencies.features.f4.desc')}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="p-8 rounded-lg ring-1 ring-inset ring-surface-800 bg-surface-900/50">
+                    <div class="p-8 rounded-lg ring-1 ring-inset ring-tone-800 bg-tone-900/50">
                         <div class="flex items-start space-x-3">
-                            <div class="h-8 w-8 rounded-lg bg-surface-800 flex items-center justify-center flex-shrink-0">
+                            <div class="h-8 w-8 rounded-lg bg-tone-800 flex items-center justify-center flex-shrink-0">
                                 
 <svg
   class="lucide lucide-database"
@@ -369,14 +369,14 @@ import ChapterRule from "../ChapterRule.astro";
 
                             </div>
                             <div>
-                                <h3 class="text-lg mb-1 text-white">{t('agencies.features.f5.title')}</h3>
-                                <p class="text-sm text-surface-400">{t('agencies.features.f5.desc')}</p>
+                                <h3 class="text-lg mb-1 text-tone-max">{t('agencies.features.f5.title')}</h3>
+                                <p class="text-sm text-tone-400">{t('agencies.features.f5.desc')}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="p-8 rounded-lg ring-1 ring-inset ring-surface-800 bg-surface-900/50">
+                    <div class="p-8 rounded-lg ring-1 ring-inset ring-tone-800 bg-tone-900/50">
                         <div class="flex items-start space-x-3">
-                            <div class="h-8 w-8 rounded-lg bg-surface-800 flex items-center justify-center flex-shrink-0">
+                            <div class="h-8 w-8 rounded-lg bg-tone-800 flex items-center justify-center flex-shrink-0">
                                 
 <svg
   class="lucide lucide-code"
@@ -396,8 +396,8 @@ import ChapterRule from "../ChapterRule.astro";
 
                             </div>
                             <div>
-                                <h3 class="text-lg mb-1 text-white">{t('agencies.features.f6.title')}</h3>
-                                <p class="text-sm text-surface-400">{t('agencies.features.f6.desc')}</p>
+                                <h3 class="text-lg mb-1 text-tone-max">{t('agencies.features.f6.title')}</h3>
+                                <p class="text-sm text-tone-400">{t('agencies.features.f6.desc')}</p>
                             </div>
                         </div>
                     </div>
@@ -417,8 +417,8 @@ import ChapterRule from "../ChapterRule.astro";
             </div>
             <div class="max-w-6xl mx-auto px-6 lg:px-8">
                 <div class="mb-12 max-w-2xl">
-                    <h2 class="text-3xl sm:text-4xl text-white">{t("agenciespage.01")}</h2>
-                    <p class="mt-lead text-lg text-surface-400">{t("agenciespage.02")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-tone-max">{t("agenciespage.01")}</h2>
+                    <p class="mt-lead text-lg text-tone-400">{t("agenciespage.02")}</p>
                 </div>
             </div>
             {/* Its own composition: a project index. The home page shows these as a
@@ -426,19 +426,19 @@ import ChapterRule from "../ChapterRule.astro";
                 home-page chapter header ("05 · Built for real products") under its
                 own heading. Same data (src/data/case-studies.ts), different figure. */}
             <div class="max-w-6xl mx-auto px-6 lg:px-8">
-                <ul class="divide-y divide-surface-800 border-y border-surface-800">
+                <ul class="divide-y divide-tone-800 border-y border-tone-800">
                     {CASE_STUDIES.map((c) => (
                         <li class="grid gap-x-10 gap-y-2 py-6 md:grid-cols-[13rem_1fr_auto] md:items-baseline">
                             <div>
-                                <p class="font-mono text-2xs uppercase tracking-[0.2em] text-surface-500">{t(`showcase.${c.key}.badge`)}</p>
-                                <p class="mt-1 text-lg font-semibold text-white">{t(`showcase.${c.key}.title`)}</p>
+                                <p class="font-mono text-2xs uppercase tracking-[0.2em] text-tone-500">{t(`showcase.${c.key}.badge`)}</p>
+                                <p class="mt-1 text-lg font-semibold text-tone-max">{t(`showcase.${c.key}.title`)}</p>
                             </div>
-                            <p class="text-sm leading-relaxed text-surface-400 max-w-2xl">{t(`showcase.${c.key}.desc`)}</p>
+                            <p class="text-sm leading-relaxed text-tone-400 max-w-2xl">{t(`showcase.${c.key}.desc`)}</p>
                             {c.href ? (
                                 <a href={c.href} target="_blank" rel="noopener noreferrer"
-                                   class="text-sm text-primary-light hover:text-white transition-colors whitespace-nowrap">{c.host} ↗</a>
+                                   class="text-sm text-primary-light hover:text-tone-max transition-colors whitespace-nowrap">{c.host} ↗</a>
                             ) : (
-                                <span class="font-mono text-xs text-surface-500 whitespace-nowrap">{c.host}</span>
+                                <span class="font-mono text-xs text-tone-500 whitespace-nowrap">{c.host}</span>
                             )}
                         </li>
                     ))}

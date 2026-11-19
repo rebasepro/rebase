@@ -267,6 +267,13 @@ describe("printGroupHelp", () => {
         const page = pipedPage(printEnvHelp) as { globalFlags: Array<{ flag: string }> };
         expect(page.globalFlags.map(f => f.flag)).toContain("--json");
     });
+
+    it("has the keys an action's page has, so every page is one shape", () => {
+        // Piped, group pages had no `flags` key while action pages did.
+        const page = pipedPage(printEnvHelp) as Record<string, unknown>;
+        for (const key of ["command", "usage", "summary", "flags", "notes", "actions"]) expect(page).toHaveProperty(key);
+        expect((page.flags as Array<{ flag: string }>).map(f => f.flag)).toContain("--json");
+    });
 });
 
 /* ══════════════════════════════════════════════════════════════════

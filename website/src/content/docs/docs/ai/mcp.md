@@ -428,6 +428,20 @@ so. If an assistant seems to be reading the wrong database, call
 `rebase_project_current` first.
 :::
 
+### Which project a call acts on
+
+`activeProject` is machine-wide, and one server is often installed once for the whole machine. So every tool that acts on a project (all but the `rebase_project_*` registry tools, `rebase_cloud_projects_list`, `rebase_cloud_provision` and `rebase_dev_logs`) resolves its project **per call**, and takes an optional `project`: a registered project's name, or a Rebase Cloud slug or id. The call is checked against the Cloud link (`.rebase/cloud.json`) of the directory the session works in: the client's first [root](https://modelcontextprotocol.io/specification/latest/client/roots), else the server's working directory.
+
+| The call | The session's directory | Result |
+|---|---|---|
+| names a project | is linked to the same project | runs on it |
+| names a project | is linked to another project | **refused**, nothing runs |
+| names no project | is linked to a project the active one is not | **refused**, nothing runs |
+| names no project | is linked; the active project is a local one elsewhere | runs on the linked project |
+| names no project | is not linked | runs on the active project; a *write* to a Cloud project an earlier session selected needs the project named |
+
+A refusal names both projects. `rebase_project_current` reports the session's directory and link under `session`. `rebase_cloud_env_set` and `rebase_cloud_rollback` pass the resolved project to the CLI with `--project`; `rebase_cloud_deploy` ships the directory it runs in, so it is refused when that directory's link is another project.
+
 Tokens are stored in that registry **in plaintext**. It is a file in your home
 directory holding admin credentials for every project you have registered; treat
 it accordingly.
@@ -457,11 +471,11 @@ claim URL; `rebase_cloud_status` to see the project (while it is unclaimed,
 after a change; `rebase_cloud_logs` when something misbehaves; and
 `rebase_cloud_rollback` when production is broken.
 
-**What they act on.** The project the active directory is linked to in
-`.rebase/cloud.json`. None of them takes a project id or a directory, so an
-assistant cannot point them at another project than the one the directory is
-linked to. Switching the active project with `rebase_project_switch` switches
-the directory they run in.
+**What they act on.** The project the call resolves to, as described in
+[Which project a call acts on](#which-project-a-call-acts-on): the `project`
+argument, checked against the link of the session's directory, or that link, or
+the active project. A call that names a project the session's directory is not
+linked to is refused before anything is spawned.
 
 **Whose authority.** Whatever the CLI resolves in that directory: `REBASE_TOKEN`
 when it is set, then the token `rebase cloud init --claim` stored for an
