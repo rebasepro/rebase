@@ -15,6 +15,7 @@ import {
     applyUpgradePlan,
     classifySpec,
     detectInstaller,
+    downgradedPins,
     discoverProjectFiles,
     installCommand,
     isDowngrade,
@@ -127,6 +128,44 @@ describe("overrideTarget", () => {
 });
 
 describe("the pin rewrite", () => {
+    it.each(["0.35.0", "0.35.0-canary.g8c5a265"])("replaces the Atlas dependency at %s", target => {
+        const original = '{\n  "dependencies": {\n    "@ariga/atlas": "^1.2.3",\n    "@rebasepro/server-postgres": "^0.30.0"\n  }\n}\n';
+        write("backend/package.json", original);
+
+        const plan = planUpgrade(root, target);
+        expect(downgradedPins(plan)).toEqual([]);
+        expect(plan.changed.find(pin => pin.replaces === "@ariga/atlas")?.name).toBe("@stokaro/ptah-compat");
+        applyUpgradePlan(plan);
+
+        const spec = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "templates", "template", "backend", "package.json"), "utf8"))
+            .dependencies["@stokaro/ptah-compat"];
+        expect(read("backend/package.json")).toBe(original
+            .replace('"@ariga/atlas": "^1.2.3"', `"@stokaro/ptah-compat": "${spec}"`)
+            .replace('"@rebasepro/server-postgres": "^0.30.0"', `"@rebasepro/server-postgres": "^${target}"`));
+    });
+
+    it("replaces Atlas when it is in a different dependency block", () => {
+        const original = '{\n  "dependencies": { "@rebasepro/server-postgres": "^0.30.0" },\n  "devDependencies": { "@ariga/atlas": "^1.2.3" }\n}\n';
+        write("backend/package.json", original);
+
+        const plan = planUpgrade(root, "0.35.0");
+        expect(plan.changed.find(pin => pin.replaces === "@ariga/atlas")?.field).toBe("devDependencies");
+        applyUpgradePlan(plan);
+        const upgraded = JSON.parse(read("backend/package.json"));
+        expect(upgraded.devDependencies["@ariga/atlas"]).toBeUndefined();
+        expect(upgraded.devDependencies["@stokaro/ptah-compat"]).toBeDefined();
+    });
+
+    it.each(["0.32.0", "0.33.0", "0.34.0", "0.34.1"])("keeps Atlas when targeting Rebase %s", target => {
+        const original = '{\n  "dependencies": { "@rebasepro/server-postgres": "^0.30.0", "@ariga/atlas": "^1.2.3" }\n}\n';
+        write("backend/package.json", original);
+
+        const plan = planUpgrade(root, target);
+        applyUpgradePlan(plan);
+        expect(read("backend/package.json")).toContain('"@ariga/atlas": "^1.2.3"');
+        expect(read("backend/package.json")).not.toContain("@stokaro/ptah-compat");
+    });
+
     it("moves exact, caret and tilde pins and changes no other byte", () => {
         const original = [
             "{",

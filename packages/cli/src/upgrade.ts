@@ -29,6 +29,7 @@ import fs from "fs";
 import path from "path";
 import { execFileSync } from "child_process";
 import { isDeepStrictEqual } from "util";
+import { fileURLToPath } from "url";
 import { getPMCommands } from "./utils/package-manager";
 
 /** The dependency blocks a pin is moved in. `peerDependencies` is not one. */
@@ -44,6 +45,18 @@ export const RELEASE_PACKAGE = "@rebasepro/cli";
 /** `MAJOR.MINOR.PATCH`, with an optional prerelease and build, and nothing else. */
 const SEMVER =
     /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+/** The first Rebase release whose PostgreSQL driver uses Ptah Compat, including canaries. */
+const PTAH_COMPAT_REBASE_VERSION = [0, 35, 0] as const;
+
+function targetUsesPtahCompat(target: string): boolean {
+    const match = SEMVER.exec(target)!;
+    for (let i = 0; i < 3; i++) {
+        const difference = Number(match[i + 1]) - PTAH_COMPAT_REBASE_VERSION[i];
+        if (difference !== 0) return difference > 0;
+    }
+    return true;
+}
 
 /** Whether `value` is one exact version — `0.21.0`, `0.21.1-canary.g8c5a265`. */
 export function isExactVersion(value: string): boolean {
@@ -240,6 +253,8 @@ export interface ChangedPin {
     field: PinField | CatalogField;
     from: string;
     to: string;
+    /** A different package removed as this dependency takes its place. */
+    replaces?: string;
 }
 
 export interface SkippedSpec {
@@ -359,6 +374,13 @@ export function applyUpgradePlan(plan: UpgradePlan): void {
 /** Override blocks in a `package.json`, as paths from the root object. */
 const JSON_OVERRIDE_BLOCKS: ReadonlyArray<readonly string[]> = [["pnpm", "overrides"], ["overrides"], ["resolutions"]];
 
+/** Match the compatibility CLI version shipped in newly scaffolded backends. */
+function ptahCompatSpec(): string {
+    const template = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "templates", "template", "backend", "package.json");
+    const manifest = JSON.parse(fs.readFileSync(template, "utf8")) as { dependencies: Record<string, string> };
+    return manifest.dependencies["@stokaro/ptah-compat"];
+}
+
 function planPackageJson(
     file: string,
     original: string,
@@ -389,10 +411,33 @@ function planPackageJson(
     /** Override members to remove, as [block path, key]. */
     const removals: Array<[readonly string[], string]> = [];
 
+    const postgresProject = PIN_FIELDS.some(field => isRecord(parsed[field]) && "@rebasepro/server-postgres" in parsed[field]);
+    const installedPtah = PIN_FIELDS.flatMap(field => {
+        const block = memberValue(tree, [field]);
+        return block?.kind === "object" ? block.members.filter(member => member.key === "@stokaro/ptah-compat") : [];
+    })[0]?.value;
+
     for (const field of PIN_FIELDS) {
         const block = memberValue(tree, [field]);
         if (block?.kind !== "object") continue;
         for (const member of block.members) {
+            if (member.key === "@ariga/atlas" && postgresProject && targetUsesPtahCompat(target)) {
+                if (installedPtah) {
+                    removals.push([[field], member.key]);
+                    deletePath(expected, [field, member.key]);
+                    if (member.value.kind === "string" && installedPtah?.kind === "string") {
+                        plan.changed.push({ file, name: "@stokaro/ptah-compat", field, from: member.value.value, to: installedPtah.value, replaces: member.key });
+                    }
+                } else if (member.value.kind === "string") {
+                    const to = ptahCompatSpec();
+                    edits.push({ start: member.keyStart, end: member.keyStart + JSON.stringify(member.key).length, replacement: JSON.stringify("@stokaro/ptah-compat") });
+                    edits.push({ start: member.value.start, end: member.value.end, replacement: JSON.stringify(to) });
+                    deletePath(expected, [field, member.key]);
+                    setPath(expected, [field, "@stokaro/ptah-compat"], to);
+                    plan.changed.push({ file, name: "@stokaro/ptah-compat", field, from: member.value.value, to, replaces: member.key });
+                }
+                continue;
+            }
             if (!member.key.startsWith(FRAMEWORK_SCOPE)) continue;
             if (member.value.kind !== "string") {
                 plan.skipped.push({ file, name: member.key, field, spec: text.slice(member.value.start, member.value.end), reason: "not a string" });
@@ -1156,5 +1201,5 @@ export function prereleaseChannel(versions: readonly string[]): string | null {
 
 /** The pins a plan moves to an older release. */
 export function downgradedPins(plan: UpgradePlan): ChangedPin[] {
-    return plan.changed.filter(pin => isDowngrade(pin.from, pin.to));
+    return plan.changed.filter(pin => !pin.replaces && isDowngrade(pin.from, pin.to));
 }

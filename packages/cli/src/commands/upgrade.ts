@@ -153,7 +153,7 @@ export function npmFailure(err: unknown): string {
  * A range's `^`/`~` is not part of it: `upgrade --to` keeps each pin's operator.
  */
 function previousRelease(plan: UpgradePlan): string | null {
-    const versions = new Set(plan.changed.map(pin => pin.from.replace(/^[\^~]/, "")));
+    const versions = new Set(plan.changed.filter(pin => !pin.replaces).map(pin => pin.from.replace(/^[\^~]/, "")));
     if (versions.size !== 1) return null;
     const [version] = versions;
     return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version) ? version : null;
@@ -207,7 +207,7 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
         const planFor = (target: string) =>
             planUpgrade(projectRoot, target, { dropLocalOverrides: flags["--drop-local-overrides"] === true });
         plan = planFor(await resolveTarget(requested ?? "latest", npmView));
-        channel = prereleaseChannel(plan.changed.map(pin => pin.from));
+        channel = prereleaseChannel(plan.changed.filter(pin => !pin.replaces).map(pin => pin.from));
         // A project on a prerelease stays on its channel by default: for a
         // canary scaffold `latest` is usually the release *before* it. The
         // channel wins only when it is ahead, so a stable release that has
@@ -360,6 +360,10 @@ function printSummary(plan: UpgradePlan, dryRun: boolean): void {
         console.log(`  ${chalk.bold(file)}`);
         for (const pin of pins) {
             const field = pin.field === "dependencies" ? "" : chalk.gray(`  ${pin.field}`);
+            if (pin.replaces) {
+                console.log(`    ${pin.replaces} ${chalk.gray(pin.from)} → ${pin.name} ${chalk.green(pin.to)}${field}`);
+                continue;
+            }
             const older = isDowngrade(pin.from, pin.to) ? chalk.yellow("  (older)") : "";
             console.log(`    ${pin.name.padEnd(nameWidth)}  ${chalk.gray(pin.from)} → ${chalk.green(pin.to)}${field}${older}`);
         }
