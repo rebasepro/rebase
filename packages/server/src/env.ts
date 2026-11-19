@@ -207,7 +207,11 @@ export const rebaseEnvSchema = z.object({
     // `type` in BackendStorageConfig, so it must validate here too — otherwise
     // an app that selects GCS from this variable dies in loadEnv before its own
     // config code ever runs.
-    STORAGE_TYPE: z.enum(["local", "s3", "gcs"]).default("local"),
+    // `platform`: a prefix the hosting platform owns, reached through its
+    // storage broker (PlatformStorageController). Set by the platform.
+    STORAGE_TYPE: z.enum(["local", "s3", "gcs", "platform"]).default("local"),
+    STORAGE_BROKER_URL: z.string().url().optional(),
+    STORAGE_BROKER_PROJECT: z.string().optional(),
     STORAGE_PATH: z.string().optional(),
     S3_BUCKET: z.string().optional(),
     S3_REGION: z.string().optional(),

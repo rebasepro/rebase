@@ -595,6 +595,35 @@ export function resolveStorageBackend(
         });
     }
 
+    if (type === "platform") {
+        // Process-wide, not per source: the platform names one broker and one
+        // project for every source it serves, and the credential is the
+        // deployment's own service key. None is a binding of THIS bucket, so
+        // none is read through the per-source readers or listed in the bucket
+        // kind's `envBases` (resource-env-bases.test.ts holds those two
+        // together); the source key is what the broker knows this source by.
+        const processVar = (name: string) => {
+            const value = env[name]?.trim();
+            return value ? value : undefined;
+        };
+        const brokerUrl = processVar("STORAGE_BROKER_URL");
+        const projectId = processVar("STORAGE_BROKER_PROJECT");
+        const serviceKey = processVar("REBASE_SERVICE_KEY");
+        if (!brokerUrl || !projectId || !serviceKey) {
+            if (!explicit) return standIn("platform");
+            const missing = [
+                !brokerUrl && "STORAGE_BROKER_URL",
+                !projectId && "STORAGE_BROKER_PROJECT",
+                !serviceKey && "REBASE_SERVICE_KEY"
+            ].filter(Boolean).join(", ");
+            throw new BundleError(
+                `Storage source "${key}" is set to platform storage but ${missing} ${missing.includes(",") ? "are" : "is"} unset.`,
+                "Platform storage is configured by the hosting platform at deploy; redeploy the project."
+            );
+        }
+        return withLimit({ type: "platform", brokerUrl, projectId, serviceKey, source: key });
+    }
+
     if (type === "local") {
         return withLimit({ type: "local", basePath: localBasePath });
     }
@@ -604,7 +633,7 @@ export function resolveStorageBackend(
 
     throw new BundleError(
         `Storage source "${key}" has unsupported type "${type}".`,
-        "Supported types are local, s3 and gcs. For anything else, pass a StorageController."
+        "Supported types are local, s3, gcs and platform. For anything else, pass a StorageController."
     );
 }
 
@@ -725,6 +754,15 @@ function storageLocation(
     }
     if (config.type === "gcs") {
         return { describe: `gcs bucket "${config.bucket}"`, variable: "GCS_BUCKET", remote: `gcs|${config.bucket}` };
+    }
+    if (config.type === "platform") {
+        // The broker gives each source its own prefix, so two sources share a
+        // location only if they name the same source.
+        return {
+            describe: `platform storage source "${config.source}"`,
+            variable: "STORAGE_TYPE",
+            remote: `platform|${config.brokerUrl.replace(/\/+$/, "").toLowerCase()}|${config.projectId}|${config.source}`
+        };
     }
     return undefined;
 }

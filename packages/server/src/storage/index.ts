@@ -16,6 +16,7 @@ export * from "./types";
 export { LocalStorageController } from "./LocalStorageController";
 export { S3StorageController } from "./S3StorageController";
 export { GCSStorageController } from "./GCSStorageController";
+export { PlatformStorageController } from "./PlatformStorageController";
 export { ObjectTooLargeError } from "./streams";
 export { createStorageRoutes } from "./routes";
 export type { StorageRoutesConfig } from "./routes";
@@ -56,10 +57,14 @@ export async function createStorageController(config: BackendStorageConfig): Pro
             const { GCSStorageController } = await import("./GCSStorageController");
             return new GCSStorageController(config);
         }
+        case "platform": {
+            const { PlatformStorageController } = await import("./PlatformStorageController");
+            return new PlatformStorageController(config);
+        }
         default:
             throw new Error(
                 `Unknown storage type: ${(config as Record<string, unknown>).type}. ` +
-                "Built-in types: local, s3, gcs. " +
+                "Built-in types: local, s3, gcs, platform. " +
                 "For other providers, implement the StorageController interface directly."
             );
     }
