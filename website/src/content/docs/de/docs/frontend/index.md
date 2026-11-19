@@ -1,5 +1,5 @@
 ---
-sourceHash: d90a1098b873980d
+sourceHash: 5c63339245fe85c9
 title: Frontend-Übersicht
 sidebar_label: Frontend
 description: "Erstellen und passen Sie das Panel an — Rebase CMS und Rebase Studio — mit React: Controller, Scaffold, Routing und Ansichten."
@@ -147,6 +147,7 @@ von der Komponente nie gelesen wurden:
 | `collectionViews` | Benutzerdefinierte Collection-Ansichtsmodi, verfügbar für jede Collection über `key` |
 | `entityActions` | Datensatz-Aktionen, verfügbar für jede Tabelle, die deren `key` in ihren `entityActions` angibt |
 | `effectiveRoleController` | Simuliert eine andere Rolle, während der Dev-Modus aktiv ist |
+| `simulateAccess` | Zeigt „Zugriff simulieren“, das Werkzeug für Administratoren, das jede Datenansicht als Rolle, Benutzer oder Service-Key ausführt, schreibgeschützt und gegen die echten Row-Level-Security-Richtlinien. Aus, solange nicht `true` |
 | `modeController` | Übergibt Rebase den Light-/Dark-Mode der Host-App; Rebase fasst dann weder `<html>`, `prefers-color-scheme` noch localStorage an — siehe [Styling](#styling) |
 | `translations` | Überschreibt oder erweitert beliebige UI-Texte, nach Locale aufgeschlüsselt — siehe [Übersetzungen](/docs/frontend/i18n) |
 | `components` | Ersetzt integrierte Komponenten — siehe [Komponenten-Overrides](/docs/frontend/component-overrides) |

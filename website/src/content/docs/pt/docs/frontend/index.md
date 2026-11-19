@@ -1,5 +1,5 @@
 ---
-sourceHash: d90a1098b873980d
+sourceHash: 5c63339245fe85c9
 title: Visão Geral do Frontend
 sidebar_label: Frontend
 description: "Construa e personalize o painel — Rebase CMS e Rebase Studio — com React: controllers, scaffold, roteamento e views."
@@ -147,6 +147,7 @@ eram props que o componente nunca lia:
 | `collectionViews` | Modos de visualização de coleção personalizados, disponíveis para qualquer coleção por `key` |
 | `entityActions` | Ações de entidade, disponíveis para qualquer tabela que indique sua `key` em `entityActions` |
 | `effectiveRoleController` | Simula uma role diferente enquanto o modo de desenvolvimento estiver ativado |
+| `simulateAccess` | Mostra «Simular acesso», o controle do administrador que executa cada visualização de dados como uma role, um usuário ou uma chave de serviço, somente leitura, contra as políticas reais de segurança em nível de linha. Desativado a menos que seja `true` |
 | `modeController` | Transfere para o Rebase o controle do modo claro/escuro da aplicação hospedeira; o Rebase não manipulará `<html>`, `prefers-color-scheme` ou localStorage — consulte [Estilização](#estilização) |
 | `translations` | Sobrescreve ou estende qualquer string da UI, indexada por locale — consulte [Traduções](/docs/frontend/i18n) |
 | `components` | Substitui componentes integrados — consulte [Substituições de Componentes](/docs/frontend/component-overrides) |
