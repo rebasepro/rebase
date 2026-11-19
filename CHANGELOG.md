@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **An npm project no longer warns about its own `.npmrc` on every run.** The scaffold's `.npmrc` carried `link-workspace-packages=true`, a pnpm setting that npm reports as "Unknown env config" and says will become an error. pnpm already reads it from `pnpm-workspace.yaml`, so the line is gone and nothing changes for pnpm.
+
 ## [0.34.1] - 2026-11-19
 
 ### Changed

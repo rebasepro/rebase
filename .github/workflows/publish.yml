@@ -976,9 +976,23 @@ jobs:
           # `--yes` because there is no TTY here to answer the prompts.
           npx --yes "@rebasepro/cli@${VERSION}" init smoke --yes
           cd smoke
-          pnpm install
+          # `npx` scaffolds an npm project (init follows the tool that started
+          # it), so this installs and runs it the way its next steps say.
+          #
+          # Retried: `npm view` seeing a version does not mean its tarball is
+          # served yet. 0.34.1 passed the wait above and then 404'd on
+          # studio-0.34.1.tgz seconds later, failing a release that was fine.
+          for attempt in $(seq 1 6); do
+            npm install && break
+            if [ "$attempt" = "6" ]; then
+              echo "::error::npm install still failing after 6 attempts."
+              exit 1
+            fi
+            echo "install failed — the registry may still be serving ${VERSION}; retrying (${attempt}/6)…"
+            sleep 20
+          done
 
-          pnpm run dev > dev.log 2>&1 &
+          npm run dev > dev.log 2>&1 &
           DEV_PID=$!
           # The port is derived per project and printed; reading it back is the
           # only way to know where the server actually is.

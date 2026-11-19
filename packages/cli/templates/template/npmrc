@@ -1,10 +1,8 @@
-# Ensure pnpm links local workspace packages when version specifiers
-# like "*" are used (instead of the pnpm-specific "workspace:*" protocol).
-# This makes the project compatible with both pnpm and npm workspaces.
-link-workspace-packages=true
-
-# `verify-deps-before-run` and `confirm-modules-purge` used to be here too.
-# They moved to pnpm-workspace.yaml, in their camelCase spelling: pnpm 11 no
+# `link-workspace-packages`, `verify-deps-before-run` and
+# `confirm-modules-purge` used to be here too. `linkWorkspacePackages` already
+# lives in pnpm-workspace.yaml, which is where pnpm reads it, and npm warned
+# "Unknown env config" about this spelling on every `npm run`. The other two
+# moved to pnpm-workspace.yaml, in their camelCase spelling: pnpm 11 no
 # longer reads them from this file (it answers `undefined` for both), so they
 # were doing nothing, while npm 12 warned about them on every install and every
 # `npm run` — two lines of noise, in a first run, for settings that had already

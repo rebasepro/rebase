@@ -662,9 +662,13 @@ describe("dual PM compatibility", () => {
             expect(fs.existsSync(path.join(TEMPLATE_DIR, "npmrc"))).toBe(true);
         });
 
-        it(".npmrc enables link-workspace-packages for pnpm", () => {
+        it("links workspace packages from pnpm-workspace.yaml, not .npmrc, where npm warns about it", () => {
             const npmrc = fs.readFileSync(path.join(TEMPLATE_DIR, "npmrc"), "utf-8");
-            expect(npmrc).toContain("link-workspace-packages=true");
+            expect(npmrc).not.toMatch(/^link-workspace-packages\s*=/m);
+            for (const dir of [TEMPLATE_DIR, path.join(TEMPLATE_DIR, "..", "overlays", "baas")]) {
+                const workspace = fs.readFileSync(path.join(dir, "pnpm-workspace.yaml"), "utf-8");
+                expect(workspace).toMatch(/^linkWorkspacePackages: true$/m);
+            }
         });
 
         /**
