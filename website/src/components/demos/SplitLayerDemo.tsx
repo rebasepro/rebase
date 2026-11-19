@@ -21,6 +21,47 @@ const ADMIN_DEPS = [
     "@rebasepro/cms"
 ];
 
+// A small TS/JSON tokenizer, coloured like the page's other code panels
+// (BackendContent): keywords blue, calls amber, strings emerald, comments muted.
+const TOKEN = /(\/\/[^\n]*)|("(?:[^"\\\n]|\\.)*")|\b(export|const|typeof)\b|([A-Za-z_$][\w$]*)(?=\s*[(<])/g;
+
+function highlight(code: string): React.ReactNode[] {
+    const out: React.ReactNode[] = [];
+    let last = 0;
+    for (const m of code.matchAll(TOKEN)) {
+        const at = m.index ?? 0;
+        if (at > last) out.push(code.slice(last, at));
+        const cls = m[1] ? "text-tone-500"
+            : m[2] ? "text-emerald-400"
+                : m[3] ? "text-blue-400"
+                    : "text-amber-400";
+        out.push(<span key={at} className={cls}>{m[0]}</span>);
+        last = at + m[0].length;
+    }
+    if (last < code.length) out.push(code.slice(last));
+    return out;
+}
+
+const SCHEMA_CODE = `export const users = defineAuthTable("users", {
+  columns: {
+    id: col.uuid().primaryKey().defaultRandom(),
+    email: col.text().notNull().unique(),
+    displayName: col.text(),
+  },
+  // everyone reads their own row; admins list all
+  rls: [{ operation: "select", roles: ["admin"] }],
+});`;
+
+const CUSTOMIZE_CODE = `// frontend/src/cms/users.tsx
+customizeTable<typeof users>("users", {
+  icon: "Users",
+  group: "Settings",
+  listFields: ["displayName", "email"],
+});`;
+
+const RESPONSE_CODE = `[{ "id": "9f2…", "email": "ada@…",
+   "displayName": "Ada" }]`;
+
 export function SplitLayerDemo() {
     const [mode, setMode] = useState<Mode>("backend");
     const full = mode === "full";
@@ -99,27 +140,14 @@ export function SplitLayerDemo() {
                         backend/schema/users.ts
                     </p>
 
-                    <pre className="font-mono text-[11px] leading-relaxed text-tone-300 overflow-x-auto"><code>{`export const users = defineAuthTable("users", {
-  columns: {
-    id: col.uuid().primaryKey().defaultRandom(),
-    email: col.text().notNull().unique(),
-    displayName: col.text(),
-  },
-  // everyone reads their own row; admins list all
-  rls: [{ operation: "select", roles: ["admin"] }],
-});`}</code></pre>
+                    <pre className="font-mono text-[11px] leading-relaxed text-tone-300 overflow-x-auto"><code>{highlight(SCHEMA_CODE)}</code></pre>
 
                     <div className={`transition-all duration-300 ${full ? "opacity-100 mt-1" : "opacity-30"}`}>
                         <pre className={`font-mono text-[11px] leading-relaxed overflow-x-auto rounded-r-lg border-l-2 pl-3 py-1 transition-colors duration-300 ${
                             full
                                 ? "border-emerald-400/60 bg-emerald-400/[0.04] text-tone-300"
                                 : "border-hairline-strong text-tone-600 line-through decoration-tone-600/60"
-                        }`}><code>{`// frontend/src/cms/users.tsx
-customizeTable<typeof users>("users", {
-  icon: "Users",
-  group: "Settings",
-  listFields: ["displayName", "email"],
-});`}</code></pre>
+                        }`}><code>{full ? highlight(CUSTOMIZE_CODE) : CUSTOMIZE_CODE}</code></pre>
                     </div>
 
 
@@ -144,8 +172,7 @@ customizeTable<typeof users>("users", {
                                 <span className="text-emerald-400">GET</span> /api/data/users
                             </div>
                             <div className="mt-1 text-tone-500">200 OK · application/json</div>
-                            <pre className="mt-2 text-tone-300">{`[{ "id": "9f2…", "email": "ada@…",
-   "displayName": "Ada" }]`}</pre>
+                            <pre className="mt-2 text-tone-300">{highlight(RESPONSE_CODE)}</pre>
                         </div>
                     </div>
 

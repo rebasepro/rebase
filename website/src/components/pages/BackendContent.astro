@@ -399,7 +399,7 @@ import ChapterRule from "../ChapterRule.astro";
                 <h2 class="text-3xl sm:text-4xl text-tone-max">{t("backendpage.23")}</h2>
                 <p class="mt-lead text-lg leading-8 text-tone-400" set:html={t("backendpage.24")}></p>
             </div>
-            <SplitLayerDemo client:visible/>
+            <SplitLayerDemo client:load/>
             <div class="mt-10 text-center">
                 <a href={translatePath("/cms")}
                    class="inline-flex items-center gap-2 text-sm font-medium text-primary-light hover:text-primary/80 transition-colors">
