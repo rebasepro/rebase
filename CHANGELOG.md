@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-19
+
 ### Added
 
 - **A Rebase Cloud project's owners open its admin signed in, with nothing to set up.** A Cloud project runs in production, where the first account to register is not promoted, so a fresh project's admin was a login form its owner held no credentials for unless `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` had been set before the first deploy. Now the console's **Open CMS** (and **Continue with Rebase Cloud**, which the admin's login screen shows on a Cloud project) signs the owner or admin of the project's organization in as `admin`: the console mints a one-minute, single-use platform token for the project with the person's verified email (`POST /api/functions/admin-signin/<project>`), and the runtime's new `POST /api/auth/platform-signin` trades it for an ordinary session on the account with that email, created with no password if there is none. An existing account under that address whose email was never proven loses its password and sessions first, as a magic link does. The scope (`auth:admin-signin`) is accepted at that door only, never on the admin surfaces or the MCP endpoint. `GET /api/auth/config` carries `platformSignIn: { url }` when the platform set its key; self-hosted backends are unchanged and keep the env-var route.

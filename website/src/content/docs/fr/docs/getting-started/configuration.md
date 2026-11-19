@@ -1,5 +1,5 @@
 ---
-sourceHash: 807148298d75dcf8
+sourceHash: 1aa92066ee4f7422
 title: Environnement et configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -201,7 +201,7 @@ un hook `storageAuthorize` exporté depuis `backend/storage.ts` (ce que livre le
 | `STORAGE_RENDITION_CACHE` | Mettre en cache les rendus d'images générés (redimensionnements, conversions de format) au lieu de les produire à chaque requête. | `false` |
 
 ### E-mail (facultatif)
-<span class="since-badge" data-since="0.34">Depuis 0.34</span> `MAGIC_LINK_URL`.
+`MAGIC_LINK_URL`.
 
 | Variable | Description |
 |----------|-------------|

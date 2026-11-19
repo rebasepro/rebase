@@ -1,5 +1,5 @@
 ---
-sourceHash: 9744aa8314ae21d2
+sourceHash: 8019353a1cc3b2ed
 title: Divisão em vários processos
 sidebar_label: Dividir Processos
 description: Execute um bundle como vários processos cooperantes — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função customizada pesada deixe de competir com a API de dados.
@@ -273,7 +273,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.33.2"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.34.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Geralmente, vale a pena fixar apenas a tag: o repositório é herdado, portanto trata-se de

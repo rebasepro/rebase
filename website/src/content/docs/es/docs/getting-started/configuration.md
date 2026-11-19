@@ -1,5 +1,5 @@
 ---
-sourceHash: 807148298d75dcf8
+sourceHash: 1aa92066ee4f7422
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos Rebase.
@@ -194,7 +194,7 @@ Las tablas están protegidas por RLS en Postgres. El almacenamiento de objetos n
 | `STORAGE_RENDITION_CACHE` | Almacena en caché las transformaciones de imágenes generadas (redimensionado, cambio de formato) en lugar de procesarlas en cada petición. | `false` |
 
 ### Correo electrónico (Opcional)
-<span class="since-badge" data-since="0.34">Desde 0.34</span> `MAGIC_LINK_URL`.
+`MAGIC_LINK_URL`.
 
 | Variable | Descripción |
 |----------|-------------|

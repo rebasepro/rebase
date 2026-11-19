@@ -1,5 +1,5 @@
 ---
-sourceHash: 807148298d75dcf8
+sourceHash: 1aa92066ee4f7422
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -201,7 +201,7 @@ Voraussetzung mit genau einer der folgenden Optionen: einem aus `backend/storage
 | `STORAGE_RENDITION_CACHE` | Generierte Bilddarstellungen (Größenanpassungen, Formatkonvertierungen) zwischenspeichern, anstatt sie pro Anfrage neu zu generieren. | `false` |
 
 ### E-Mail (Optional)
-<span class="since-badge" data-since="0.34">Seit 0.34</span> `MAGIC_LINK_URL`.
+`MAGIC_LINK_URL`.
 
 | Variable | Beschreibung |
 |----------|-------------|

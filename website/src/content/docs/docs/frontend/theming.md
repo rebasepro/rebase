@@ -141,8 +141,6 @@ const darkOnly: ModeController = {
 
 ## Logo and name
 
-<span class="since-badge" data-since="0.34">Since 0.34</span>
-
 `<RebaseShell>` takes the name and logo shown in the drawer. The same logo appears on the built-in sign-in screen. Put the files in `frontend/public/`:
 
 ```tsx
@@ -163,8 +161,6 @@ The browser tab's title and icon come from `frontend/index.html`:
 ```
 
 ## The sign-in screen
-
-<span class="since-badge" data-since="0.34">Since 0.34</span>
 
 The built-in sign-in screen picks up your brand colour, fonts, surfaces and the shell's `logo` with no extra code.
 

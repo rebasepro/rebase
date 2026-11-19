@@ -1,5 +1,5 @@
 ---
-sourceHash: 807148298d75dcf8
+sourceHash: 1aa92066ee4f7422
 title: Ambiente & Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -201,7 +201,7 @@ inclui), `STORAGE_PUBLIC_READ` ou `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `STORAGE_RENDITION_CACHE` | Armazena em cache rendições de imagem geradas (redimensionamentos, conversões de formato) em vez de processá-las por requisição. | `false` |
 
 ### E-mail (Opcional)
-<span class="since-badge" data-since="0.34">Desde 0.34</span> `MAGIC_LINK_URL`.
+`MAGIC_LINK_URL`.
 
 | Variável | Descrição |
 |----------|-----------|
