@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { highlight } from "./highlight";
 
 /**
  * The BaaS / admin-panel split, made touchable.
@@ -20,27 +21,6 @@ const ADMIN_DEPS = [
     "@rebasepro/app",
     "@rebasepro/cms"
 ];
-
-// A small TS/JSON tokenizer, coloured like the page's other code panels
-// (BackendContent): keywords blue, calls amber, strings emerald, comments muted.
-const TOKEN = /(\/\/[^\n]*)|("(?:[^"\\\n]|\\.)*")|\b(export|const|typeof)\b|([A-Za-z_$][\w$]*)(?=\s*[(<])/g;
-
-function highlight(code: string): React.ReactNode[] {
-    const out: React.ReactNode[] = [];
-    let last = 0;
-    for (const m of code.matchAll(TOKEN)) {
-        const at = m.index ?? 0;
-        if (at > last) out.push(code.slice(last, at));
-        const cls = m[1] ? "text-tone-500"
-            : m[2] ? "text-emerald-400"
-                : m[3] ? "text-blue-400"
-                    : "text-amber-400";
-        out.push(<span key={at} className={cls}>{m[0]}</span>);
-        last = at + m[0].length;
-    }
-    if (last < code.length) out.push(code.slice(last));
-    return out;
-}
 
 const SCHEMA_CODE = `export const users = defineAuthTable("users", {
   columns: {
