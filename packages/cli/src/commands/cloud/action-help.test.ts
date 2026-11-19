@@ -598,3 +598,36 @@ describe("printActionHelp", () => {
         }
     });
 });
+
+/**
+ * What the compute pages say about a database change and the default size —
+ * both were wrong once: a database change "waited for the maintenance window"
+ * on a control plane that applies it on consent, and the default app "burst to
+ * 2 CPU / 2 GiB" in every region.
+ */
+describe("the compute pages", () => {
+    const text = (key: string) => {
+        const page = ACTION_HELP[key];
+        return [page.summary, ...page.flags.map(([, d]) => d), ...(page.notes ?? [])].join("\n");
+    };
+
+    it("says the default per region, once, and the CPU and memory flags point at it", () => {
+        const set = text("compute set");
+        expect(set).toContain(
+            "On Belgium (europe-west1) the default reserves 100m CPU and 384Mi and can burst to 2 CPU and 2 GiB; "
+            + "in Falkenstein and Helsinki memory may stretch to 1.4× the request and CPU to 10× (at most 1.7 vCPU). "
+            + "`rebase cloud compute` shows your project's numbers."
+        );
+        expect(set).not.toMatch(/bursting to 2/);
+    });
+
+    it("says a database change applies now, restarts the database, and is billed at the current size until it runs", () => {
+        const set = text("compute set");
+        expect(set).toContain("A database change applies now; billed at the current size until it is running.");
+        expect(set).toContain("about 30 seconds to 3 minutes; connections are dropped and reconnect");
+        expect(set).toContain("acknowledgeDatabaseRestart");
+        for (const key of ["compute", "compute set", "compute apply"]) {
+            expect(text(key)).not.toMatch(/waits for the maintenance window|scheduled for the project's maintenance window|instead of in its maintenance window/);
+        }
+    });
+});

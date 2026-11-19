@@ -1,16 +1,22 @@
 /**
- * A project's maintenance window, what its database is waiting on, and its
- * events — from the terminal.
+ * A project's database size changes, its maintenance window, and its events —
+ * from the terminal.
  *
- *   rebase cloud compute apply [--yes]          restart the database at its new size now
+ *   rebase cloud compute apply [--yes]          apply a confirmed database change again (pending or failed)
  *   rebase cloud compute window                 show the weekly window
  *   rebase cloud compute window --day sun --hour 3   move it (UTC)
  *   rebase cloud events [--limit 20]            what happened to the backend, newest first
  *
- * All of it is the control plane's `maintenance` function
- * (`saas/backend/functions/maintenance.ts`). A database change that restarts
- * Postgres never happens on `compute set`: it waits for the window, and
- * `compute apply` is how someone who would rather take the restart now says so.
+ * A database size change restarts the database, so the control plane takes it
+ * only with the owner's consent on the same write (`acknowledgeDatabaseRestart:
+ * true`); without it, it answers 409 `database_restart_unconfirmed` and saves
+ * nothing. With it the change applies now, and the project is billed at the
+ * size the database runs until the new one is running (`databaseApplied` on
+ * the project says what still runs).
+ *
+ * The window and the events are the control plane's `maintenance` function
+ * (`saas/backend/functions/maintenance.ts`), which saas `main` does not serve
+ * yet (it is on `feat/db-scaling`): those commands answer `not_served` there.
  */
 import chalk from "chalk";
 import {
@@ -22,6 +28,7 @@ import {
     note,
     noteBlank,
     parseCloudArgs,
+    reportError,
     requireClient,
     requireProject,
     success,
@@ -73,7 +80,8 @@ export function parseDay(value: string): number | undefined {
 /** What a command says on a control plane that has no `maintenance` function yet. */
 export const MAINTENANCE_UNSERVED: Unserved = {
     what: "maintenance windows",
-    hint: "Nothing was changed. On this control plane a database change from `rebase cloud compute set` is not held for a window."
+    hint: "Nothing was changed. On this control plane a database change from `rebase cloud compute set` applies when you confirm it, "
+        + "so there is no window to show or move; `rebase cloud compute apply` applies one that is waiting or failed again."
 };
 
 /** What `events` says on a control plane that has no `maintenance` function yet. */
@@ -140,38 +148,122 @@ export function describePending(open: MaintenanceBatch | null | undefined): stri
     return `${open.summary} — applies ${when}`;
 }
 
+/** How long a database restart takes, and what clients see: the control plane's measured bound. */
+export const DATABASE_RESTART_IMPACT = "about 30 seconds to 3 minutes; connections are dropped and reconnect";
+
+/** What `compute set` and `compute apply` say before they restart the database. */
+export const DATABASE_RESTART_NOTICE = `The database restarts to apply it (${DATABASE_RESTART_IMPACT}).`;
+
+/** The refusal off a terminal without `--yes`, when the change restarts the database. */
+export const DATABASE_RESTART_REFUSAL = `This change restarts the database (${DATABASE_RESTART_IMPACT}) and needs confirmation.`;
+
+/** How a database change is billed, said the same way everywhere. */
+export const DATABASE_CHANGE_BILLING = "A database change applies now; billed at the current size until it is running.";
+
+/** The control plane's refusal of a database restart sent without consent. */
+export const DATABASE_RESTART_UNCONFIRMED = "database_restart_unconfirmed";
+
+/** The dials whose change restarts a database: its size, and fewer instances. */
+const DATABASE_SIZE_DIALS = ["databaseCpu", "databaseMemory"] as const;
+
+/**
+ * Whether `patch` restarts the project's database: a new database CPU or
+ * memory, or fewer instances than it has. The control plane judges against
+ * what runs and may find no restart (asking for the size it already runs);
+ * asking then costs a question, never a restart nobody agreed to.
+ */
+export function patchRestartsDatabase(project: Record<string, unknown>, patch: Record<string, unknown>): boolean {
+    for (const field of DATABASE_SIZE_DIALS) {
+        if (field in patch && String(patch[field] ?? "") !== String(project[field] ?? "")) return true;
+    }
+    if ("databaseInstances" in patch) {
+        const asked = Number(patch.databaseInstances);
+        // An empty dial is the platform default, a single instance.
+        const has = Number(project.databaseInstances ?? 1);
+        if (Number.isFinite(asked) && Number.isFinite(has) && asked < has) return true;
+    }
+    return false;
+}
+
+/** Whether `error` is the control plane refusing a database restart sent without consent. */
+export function isRestartUnconfirmed(error: unknown): boolean {
+    return typeof error === "object" && error !== null && "code" in error && error.code === DATABASE_RESTART_UNCONFIRMED;
+}
+
+/** `databaseApplied` on a project: what its database still runs while a confirmed change waits. */
+export interface DatabaseApplied {
+    cpu?: string;
+    memory?: string;
+    instances?: number;
+    requestedAt?: string;
+    failedAt?: string;
+    error?: string;
+}
+
+/** The project's `databaseApplied`, or undefined when nothing waits (or the control plane does not record it). */
+export function databaseAppliedOf(project: Record<string, unknown> | undefined): DatabaseApplied | undefined {
+    const raw = project?.databaseApplied ?? project?.database_applied;
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return undefined;
+    const out: DatabaseApplied = {};
+    if ("cpu" in raw && typeof raw.cpu === "string" && raw.cpu) out.cpu = raw.cpu;
+    if ("memory" in raw && typeof raw.memory === "string" && raw.memory) out.memory = raw.memory;
+    if ("instances" in raw && Number.isInteger(Number(raw.instances)) && raw.instances !== null) out.instances = Number(raw.instances);
+    if ("requestedAt" in raw && typeof raw.requestedAt === "string") out.requestedAt = raw.requestedAt;
+    if ("failedAt" in raw && typeof raw.failedAt === "string") out.failedAt = raw.failedAt;
+    if ("error" in raw && typeof raw.error === "string") out.error = raw.error;
+    return out.cpu !== undefined || out.memory !== undefined || out.instances !== undefined ? out : undefined;
+}
+
+/** One line for a database change that is confirmed and not running yet. */
+export function describeDatabaseApplied(applied: DatabaseApplied | undefined): string | undefined {
+    if (!applied) return undefined;
+    const size = [
+        applied.cpu ? `${applied.cpu} CPU` : null,
+        applied.memory ? `${applied.memory} memory` : null,
+        applied.instances !== undefined ? `${applied.instances} instance${applied.instances === 1 ? "" : "s"}` : null
+    ].filter(Boolean).join(", ");
+    if (applied.failedAt) {
+        return `the database still runs ${size}: applying the new size failed${applied.error ? ` (${applied.error})` : ""}. `
+            + "Try again with `rebase cloud compute apply`";
+    }
+    return `the database runs ${size} until its restart at the new size finishes; billed at that size until then`;
+}
+
 export async function computeApplyCommand(rawArgs: string[]): Promise<void> {
     const { flags } = parseCloudArgs({ spec: {}, rawArgs, commandWords: 3, command: "cloud compute apply", maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const ref = displayProjectRef(rawArgs);
 
-    const status = await requireMaintenance(client, projectId);
-    const open = status.open;
-    if (!open || (open.state !== "pending" && open.state !== "notified")) {
-        if (open?.state === "applying") {
-            emit(() => note(`${open.summary} is being applied now.`), { status: "applying", maintenance: open });
-            return;
-        }
-        emit(() => success(`Nothing is waiting: ${ref}'s database already matches its settings.`), { status: "nothing", maintenance: null });
+    // What waits is on the project itself (`databaseApplied`): what the
+    // database still runs while the dials ask for another size. Not the
+    // `maintenance` function, which saas `main` does not serve.
+    const project = (await client.data.table("projects").findById(projectId)) as Record<string, unknown> | undefined;
+    if (!project) fail(`Project ${ref} not found.`, undefined, "not_found");
+    const applied = databaseAppliedOf(project);
+    if (!applied) {
+        emit(() => success(`Nothing is waiting: ${ref}'s database already runs at its settings.`), { status: "nothing", databaseApplied: null });
         return;
     }
 
     await confirmDestructive({
         yes: Boolean(flags["--yes"]),
-        prompt: `Apply "${open.summary}" to ${ref} now? ${open.expectedImpact ?? "The database restarts."}`
+        prompt: `Apply ${ref}'s database change now? ${DATABASE_RESTART_NOTICE}`,
+        refusal: DATABASE_RESTART_REFUSAL
     });
     try {
-        await client.functions.invoke("maintenance", {}, { path: `projects/${encodeURIComponent(projectId)}/apply` });
+        // The consent alone: the control plane applies the change it already
+        // holds, the one that is pending or whose last attempt failed.
+        await client.data.table("projects").update(projectId, { acknowledgeDatabaseRestart: true });
     } catch (error: unknown) {
-        reportCallError(error, "Could not apply the database change", MAINTENANCE_UNSERVED);
+        reportError(error, "Could not apply the database change");
     }
     emit(
         () => {
-            success(`Applying ${open.summary}.`);
-            note("The database restarts first, then the app. Follow it with `rebase cloud events`.");
+            success("Applying the database change.");
+            note(`The database restarts first, then the app (${DATABASE_RESTART_IMPACT}). \`rebase cloud compute\` shows when it is done.`);
         },
-        { status: "applying", maintenance: open }
+        { status: "applying", databaseApplied: applied }
     );
 }
 

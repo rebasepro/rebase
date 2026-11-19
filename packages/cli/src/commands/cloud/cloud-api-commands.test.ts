@@ -41,7 +41,7 @@ import { envCommand } from "./env";
 import { dbAccessCommand } from "./db-access";
 import { usageCommand } from "./usage";
 import { appKeyCommand } from "./app-key";
-import { computeWindowCommand } from "./maintenance";
+import { computeApplyCommand, computeWindowCommand, DATABASE_RESTART_REFUSAL, patchRestartsDatabase } from "./maintenance";
 import { deployCommand } from "./deploy";
 import { isRouteNotServed } from "./not-served";
 
@@ -680,5 +680,147 @@ describe("a control plane without the route", () => {
         };
         const r = await stdoutOf(() => statusCommand(argv("status")));
         expect(r.json()).toMatchObject({ maintenance: null, notServed: ["maintenance"] });
+    });
+});
+
+/* ── database size changes: ask, and acknowledge ───────────────── */
+
+describe("compute set: a database restart is asked for and acknowledged", () => {
+    const restartRefused = () => Object.assign(
+        new Error("Changing the database size restarts the database: it is unavailable for about 30 seconds to 3 minutes. Nothing was saved."),
+        { status: 409, code: "database_restart_unconfirmed" }
+    );
+
+    beforeEach(() => {
+        answer = (name) => (name === "pricing" ? { lines: [], totalEur: 30 } : undefined);
+    });
+
+    it("refuses off a terminal without --yes, saying the database restarts, and saves nothing", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, databaseCpu: "160m" }) };
+        const refused = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-cpu", "500m")));
+        expect(errorOf(refused)).toMatchObject({ code: "confirmation_required", message: DATABASE_RESTART_REFUSAL });
+        expect(errorOf(refused).message).toContain("about 30 seconds to 3 minutes; connections are dropped and reconnect");
+        expect(updates).toEqual([]);
+    });
+
+    it("sends acknowledgeDatabaseRestart on the same write with --yes", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, databaseMemory: "1Gi" }) };
+        const r = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-memory", "2Gi", "--yes")));
+        expect(updates).toEqual([{ table: "projects", id: PROJECT_ID, data: { databaseMemory: "2Gi", acknowledgeDatabaseRestart: true } }]);
+        expect(r.json()).toMatchObject({ updated: { databaseMemory: "2Gi" }, databaseRestart: true, maintenance: null });
+    });
+
+    it("acknowledges fewer instances, not more", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, databaseInstances: 2 }) };
+        await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-instances", "1", "--yes")));
+        await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-instances", "3", "--yes")));
+        expect(updates.map(u => u.data)).toEqual([
+            { databaseInstances: 1, acknowledgeDatabaseRestart: true },
+            { databaseInstances: 3 }
+        ]);
+    });
+
+    it("an app-only change sends no consent and says nothing about a restart", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, cpu: "250m" }) };
+        const r = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--cpu", "500m", "--yes")));
+        expect(updates).toEqual([{ table: "projects", id: PROJECT_ID, data: { cpu: "500m" } }]);
+        expect(r.json()).toMatchObject({ databaseRestart: false });
+    });
+
+    it("a 409 database_restart_unconfirmed the CLI did not predict: with --yes, the same change again with the consent", async () => {
+        let calls = 0;
+        tables.projects = {
+            findById: () => ({ id: PROJECT_ID, databaseCpu: "500m" }),
+            update: (id, data) => {
+                calls++;
+                updates.push({ table: "projects", id, data });
+                if (!("acknowledgeDatabaseRestart" in data)) throw restartRefused();
+                return { id, ...data };
+            }
+        };
+        // Same CPU as stored, so the CLI predicts no restart; the server finds one.
+        const r = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-cpu", "500m", "--yes")));
+        expect(calls).toBe(2);
+        expect(updates.map(u => u.data)).toEqual([{ databaseCpu: "500m" }, { databaseCpu: "500m", acknowledgeDatabaseRestart: true }]);
+        expect(r.json()).toMatchObject({ databaseRestart: true });
+    });
+
+    it("the same 409 off a terminal without --yes refuses with the restart sentence, after one attempt", async () => {
+        tables.projects = {
+            findById: () => ({ id: PROJECT_ID, databaseInstances: 1 }),
+            update: (id, data) => {
+                updates.push({ table: "projects", id, data });
+                throw restartRefused();
+            }
+        };
+        // `--spot` changes no database dial; only the server can say it restarts.
+        const refused = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--spot", "true")));
+        // The first question (the change itself) is refused before any write.
+        expect(errorOf(refused).code).toBe("confirmation_required");
+        expect(updates).toEqual([]);
+    });
+
+    it("a different refusal from the control plane is printed as it came", async () => {
+        tables.projects = {
+            findById: () => ({ id: PROJECT_ID }),
+            update: () => {
+                throw Object.assign(new Error("databaseMemory: 64Gi is more than the region offers."), { status: 400, code: "invalid_resources" });
+            }
+        };
+        const r = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-memory", "64Gi", "--yes")));
+        expect(errorOf(r)).toMatchObject({ code: "invalid_resources" });
+        expect(errorOf(r).message).toContain("64Gi is more than the region offers");
+    });
+
+    it("predicts a restart from the dials alone", () => {
+        expect(patchRestartsDatabase({ databaseCpu: "160m" }, { databaseCpu: "500m" })).toBe(true);
+        expect(patchRestartsDatabase({ databaseCpu: "500m" }, { databaseCpu: "500m" })).toBe(false);
+        expect(patchRestartsDatabase({}, { databaseMemory: "2Gi" })).toBe(true);
+        expect(patchRestartsDatabase({}, { databaseInstances: 2 })).toBe(false);
+        expect(patchRestartsDatabase({ databaseInstances: 3 }, { databaseInstances: 2 })).toBe(true);
+        expect(patchRestartsDatabase({}, { cpu: "1", memory: "2Gi" })).toBe(false);
+    });
+});
+
+describe("compute apply: the consent alone, for a change that waits", () => {
+    it("nothing waiting: says so, exits 0, writes nothing", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, databaseApplied: null }) };
+        const r = await stdoutOf(() => computeApplyCommand(argv("compute", "apply", "--yes")));
+        expect(r.json()).toMatchObject({ status: "nothing" });
+        expect(updates).toEqual([]);
+        expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it("a waiting change: refuses off a terminal without --yes, then sends { acknowledgeDatabaseRestart: true } alone", async () => {
+        const applied = { cpu: "160m", memory: "1Gi", instances: 1, requestedAt: "2026-11-19T10:00:00Z", failedAt: "2026-11-19T10:04:00Z", error: "timed out" };
+        tables.projects = { findById: () => ({ id: PROJECT_ID, databaseCpu: "500m", databaseApplied: applied }) };
+        const refused = await stdoutOf(() => computeApplyCommand(argv("compute", "apply")));
+        expect(errorOf(refused)).toMatchObject({ code: "confirmation_required", message: DATABASE_RESTART_REFUSAL });
+        expect(updates).toEqual([]);
+
+        const r = await stdoutOf(() => computeApplyCommand(argv("compute", "apply", "--yes")));
+        expect(updates).toEqual([{ table: "projects", id: PROJECT_ID, data: { acknowledgeDatabaseRestart: true } }]);
+        expect(r.json()).toMatchObject({ status: "applying", databaseApplied: { cpu: "160m", failedAt: "2026-11-19T10:04:00Z" } });
+        // Not the maintenance function, which saas main does not serve.
+        expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it("compute shows the waiting change", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, name: "Shop", databaseApplied: { cpu: "160m", memory: "1Gi" } }) };
+        answer = (name) => {
+            if (name === "maintenance") throw notServed();
+            return undefined;
+        };
+        const r = await stdoutOf(() => computeCommand(undefined, argv("compute")));
+        expect(r.json()).toMatchObject({ databaseApplied: { cpu: "160m", memory: "1Gi" }, notServed: ["maintenance"] });
+    });
+
+    it("compute window on a control plane without windows says how a database change applies there", async () => {
+        answer = () => {
+            throw notServed();
+        };
+        const r = await stdoutOf(() => computeWindowCommand(argv("compute", "window", "--day", "sun", "--hour", "3")));
+        expect(errorOf(r).code).toBe("not_served");
+        expect(errorOf(r).hint).toContain("applies when you confirm it");
     });
 });

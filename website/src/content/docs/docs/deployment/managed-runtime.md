@@ -136,10 +136,11 @@ rebase cloud compute                              # what the project reserves no
 rebase cloud compute set --cpu 500m --memory 1Gi
 ```
 
-A project that never set a dial runs as a burstable pod: it reserves `100m` CPU
-and `384Mi` memory, and can burst to 2 CPU and 2 GiB. A dialled request keeps
-that ratio between request and limit. Run `rebase cloud compute` to see what
-your project has.
+A project that never set a dial runs as a burstable pod. On Belgium
+(europe-west1) the default reserves 100m CPU and 384Mi and can burst to 2 CPU
+and 2 GiB; in Falkenstein and Helsinki memory may stretch to 1.4× the request
+and CPU to 10× (at most 1.7 vCPU). `rebase cloud compute` shows your project's
+numbers.
 
 Instances:
 

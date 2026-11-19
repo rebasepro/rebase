@@ -1564,11 +1564,20 @@ hint: hint ? stripAnsi(hint) : undefined } });
  * telling the caller to pass `--yes`. Only an interactive terminal gets a real
  * confirm prompt; declining there aborts cleanly (exit 0).
  */
-export async function confirmDestructive(opts: { yes: boolean; prompt: string }): Promise<void> {
+export async function confirmDestructive(opts: {
+    yes: boolean;
+    prompt: string;
+    /**
+     * What the refusal off a terminal says, when the generic sentence would
+     * hide what the action does — a database restart, say. The hint and the
+     * code stay the same, so a caller branching on them is unaffected.
+     */
+    refusal?: string;
+}): Promise<void> {
     if (opts.yes) return;
     if (JSON_MODE || process.stdin.isTTY !== true) {
         fail(
-            "This action is destructive and needs confirmation.",
+            opts.refusal ?? "This action is destructive and needs confirmation.",
             `Re-run with ${chalk.bold("--yes")} to proceed.`,
             "confirmation_required"
         );

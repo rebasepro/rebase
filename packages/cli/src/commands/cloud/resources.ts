@@ -6,9 +6,16 @@ import fs from "fs";
 import {
     computeApplyCommand,
     computeWindowCommand,
+    databaseAppliedOf,
+    describeDatabaseApplied,
     describePending,
-    fetchMaintenance,
+    isRestartUnconfirmed,
+    patchRestartsDatabase,
     readMaintenance,
+    DATABASE_CHANGE_BILLING,
+    DATABASE_RESTART_IMPACT,
+    DATABASE_RESTART_NOTICE,
+    DATABASE_RESTART_REFUSAL,
     MAINTENANCE_NOT_SERVED_NOTE
 } from "./maintenance";
 import arg from "arg";
@@ -2432,7 +2439,9 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                     // What a `set` scheduled and has not happened yet: a resize
                     // that restarts the database waits for this window.
                     ["Waiting", describePending(maintenance?.open)],
-                    ["Maintenance window", maintenance?.window.label]
+                    ["Maintenance window", maintenance?.window.label],
+                    // A size change that was confirmed and is not running yet.
+                    ["Database change", describeDatabaseApplied(databaseAppliedOf(project))]
                 ]);
                 // Itemised, because a total nobody can decompose is a number
                 // someone has to trust rather than check.
@@ -2469,6 +2478,7 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                 dbAutoscaleMaxMemory: project!.dbAutoscaleMaxMemory ?? null,
                 storageMode: project!.storageMode ?? null,
                 maintenance: maintenance ? { window: maintenance.window, pending: maintenance.open } : null,
+                databaseApplied: databaseAppliedOf(project) ?? null,
                 notServed
             }
         );
@@ -2491,22 +2501,44 @@ export async function computeCommand(action: string | undefined, rawArgs: string
     const price = quoteAfter
         ? ` Quoted €${quoteAfter.totalEur.toFixed(2)}/month${quoteNow ? ` (now €${quoteNow.totalEur.toFixed(2)})` : ""}.`
         : "";
+    const ref = displayProjectRef(rawArgs) || projectId;
+    const yes = Boolean(computeFlags["--yes"]);
+    // A new database size, or fewer instances, restarts the database. The
+    // control plane takes that only with consent on the same write, so the
+    // question says so and a yes is sent as `acknowledgeDatabaseRestart`.
+    let restart = patchRestartsDatabase(project!, patch);
     await confirmDestructive({
-        yes: Boolean(computeFlags["--yes"]),
-        prompt: `Change ${changes} on ${displayProjectRef(rawArgs) || projectId}?${price} The app rolls its pods now; a database change waits for the maintenance window.`
+        yes,
+        prompt: restart
+            ? `Change ${changes} on ${ref}?${price} ${DATABASE_RESTART_NOTICE} The app rolls its pods now. ${DATABASE_CHANGE_BILLING}`
+            : `Change ${changes} on ${ref}?${price} The app rolls its pods now. ${DATABASE_CHANGE_BILLING}`,
+        refusal: restart ? DATABASE_RESTART_REFUSAL : undefined
     });
 
+    const save = (acknowledge: boolean) =>
+        client.data.table("projects").update(projectId, acknowledge ? { ...patch, acknowledgeDatabaseRestart: true } : patch);
     try {
-        await client.data.table("projects").update(projectId, patch);
+        try {
+            await save(restart);
+        } catch (error: unknown) {
+            // The control plane found a restart this CLI did not predict (it
+            // judges against what runs), and saved nothing. Ask about the
+            // restart itself, then send the same change with the consent.
+            if (restart || !isRestartUnconfirmed(error)) throw error;
+            await confirmDestructive({
+                yes,
+                prompt: `${DATABASE_RESTART_NOTICE} Restart ${ref}'s database to apply ${changes}?`,
+                refusal: DATABASE_RESTART_REFUSAL
+            });
+            restart = true;
+            await save(true);
+        }
     } catch (error: unknown) {
         // The control plane's refusals are written to be read by whoever chose
         // the number — a ratio named, a field named — so they are surfaced
         // verbatim rather than replaced with a generic failure.
         reportError(error, "Could not change resources");
-        return;
     }
-    // Read back what the save scheduled: a database restart waits for the window.
-    const maintenance = await fetchMaintenance(client, projectId);
 
     emit(
         () => {
@@ -2517,14 +2549,14 @@ export async function computeCommand(action: string | undefined, rawArgs: string
             }
             noteBlank();
             note("Applied now: the app rolls its pods and your subscription is prorated from today.");
-            const pending = describePending(maintenance?.open);
-            if (pending) {
-                note(`Scheduled: ${pending}.`);
-                if (maintenance?.open?.expectedImpact) note(`  ${maintenance.open.expectedImpact}. Billed at the current size until then.`);
-                note(`  Apply it sooner with ${chalk.cyan("rebase cloud compute apply")}, or move the window with ${chalk.cyan("rebase cloud compute window")}.`);
+            if (restart) {
+                note(`The database restarts now to apply its new size (${DATABASE_RESTART_IMPACT}).`);
+                note("  Billed at the current size until it is running. `rebase cloud compute` shows when it is.");
             }
         },
-        { updated: patch, maintenance: maintenance?.open ?? null }
+        // `maintenance` stays in the shape, null, so a script reading it does
+        // not break: nothing is held for a window any more.
+        { updated: patch, databaseRestart: restart, maintenance: null }
     );
 }
 

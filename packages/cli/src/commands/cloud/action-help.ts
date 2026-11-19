@@ -1083,7 +1083,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         notes: [
             "The price is the control plane's own quote for these dials, itemised line by line — not a tier, and not a number this CLI computes.",
-            "`Waiting` is a database change a `set` scheduled for the maintenance window and has not applied yet; the project is billed at the size it runs until then.",
+            "`Database change` is a size change that was confirmed and is not running yet: its restart is under way, or it failed and `rebase cloud compute apply` tries again. The project is billed at the size the database runs until the new one is running.",
             "A control plane without maintenance windows leaves those lines out and says so; `notServed` in the JSON lists what it left out."
         ]
     },
@@ -1092,16 +1092,17 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         command: "cloud compute apply",
         usage: "cloud compute apply [--yes]",
         summary:
-            "Apply the database change this project is waiting on now, instead of in its maintenance window. "
-            + "The database restarts first and the app after it; with one database instance it is unavailable "
-            + "for about one to three minutes, with a standby for a few seconds.",
+            "Apply again a database size change that was confirmed and has not finished: one whose restart failed "
+            + "or never started. It sends the consent alone (`acknowledgeDatabaseRestart`), and the control plane "
+            + "applies the size the dials already ask for. The database restarts (about 30 seconds to 3 minutes; "
+            + "connections are dropped and reconnect), then the app.",
         flags: [],
         examples: ["rebase cloud compute apply", "rebase cloud compute apply --yes --json"],
         notes: [
             "Asks before restarting anything; `--yes` skips the question, and is required off a terminal.",
             "Needs the organization's owner or admin role.",
             "Nothing waiting is not an error: it says so and exits 0.",
-            "Follow it with `rebase cloud events`."
+            "`rebase cloud compute` shows when the database runs at its new size."
         ]
     },
 
@@ -1116,7 +1117,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--hour <0-23>", "The hour it opens, in UTC"]
         ],
         examples: ["rebase cloud compute window", "rebase cloud compute window --day sat --hour 2"],
-        notes: ["The default is Sunday at 03:00 UTC. You are emailed 24 hours before anything is applied in it."]
+        notes: [
+            "The default is Sunday at 03:00 UTC. You are emailed 24 hours before anything is applied in it.",
+            "A control plane without maintenance windows answers `not_served`: there, a database change applies when you confirm it on `rebase cloud compute set`."
+        ]
     },
 
     events: {
@@ -1137,8 +1141,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "Change one or more of a project's dials. At least one is required: a patch with nothing "
             + "in it is a typo, and reporting success for a change nobody made is worse than refusing.",
         flags: [
-            ["--cpu <n>", "App CPU request per instance, e.g. 500m or 2. Default: 100m, bursting to 2"],
-            ["--memory <size>", "App memory request per instance, e.g. 512Mi or 2Gi. Default: 384Mi, bursting to 2Gi"],
+            ["--cpu <n>", "App CPU request per instance, e.g. 500m or 2. The default, and how far it bursts, depend on the region: see the notes"],
+            ["--memory <size>", "App memory request per instance, e.g. 512Mi or 2Gi. The default, and how far it stretches, depend on the region: see the notes"],
             ["--replicas <n>", "Instances that always exist — the autoscaler's floor, and what is billed at rest"],
             ["--spot <true|false>", "Preemptible capacity: cheaper, and restarted without notice"],
             ["--db-instances <n>", "1–3. 1 is a single instance with no failover; 2 adds an automatic standby"],
@@ -1162,7 +1166,11 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "Run `rebase cloud compute` first — it prints the current dials and the €/month this project is quoted.",
             "It asks before changing anything, with the €/month the control plane quotes for the new dials beside what it quotes now. "
                 + "`--yes`, the global flag listed below, skips the question, and is required off a terminal.",
-            "Applied immediately: the app rolls its pods and the subscription is prorated from today. A change that restarts the database is scheduled for the project's maintenance window, billed from when it is applied; apply it sooner with `rebase cloud compute apply`.",
+            "Applied immediately: the app rolls its pods and the subscription is prorated from today. A database change applies now; billed at the current size until it is running.",
+            "A new database CPU or memory, or fewer database instances, restarts the database (about 30 seconds to 3 minutes; connections are dropped and reconnect). "
+                + "The question says so, and a yes is sent as `acknowledgeDatabaseRestart` on the same change; off a terminal `--yes` is that consent. "
+                + "Without it the control plane saves nothing (409 `database_restart_unconfirmed`).",
+            "On Belgium (europe-west1) the default reserves 100m CPU and 384Mi and can burst to 2 CPU and 2 GiB; in Falkenstein and Helsinki memory may stretch to 1.4× the request and CPU to 10× (at most 1.7 vCPU). `rebase cloud compute` shows your project's numbers.",
             "The valid ranges are the target cluster's, not this CLI's — GKE Autopilot bills a 250m/512Mi floor and rewrites a memory:CPU ratio outside 1:1–6.5:1, a Hetzner node has neither constraint. The control plane refuses what it cannot honour and names the field."
         ]
     },
