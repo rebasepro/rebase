@@ -1,7 +1,134 @@
 ---
+/**
+ * /pricing — what Rebase costs: nothing to run yourself, and Rebase Cloud
+ * priced per resource, with the real numbers.
+ *
+ * Every price on this page comes from `src/data/cloud-prices.json`, generated
+ * from the control plane's rate card, and every statement about what can be
+ * bought today from `CLOUD_FLAGS` (`src/data/cloud-flags.ts`). Nothing is
+ * typed in: the copy carries `{placeholders}`. Flip a flag and the hero, the
+ * examples, the calculator, the included list and the answers change together;
+ * with today's flags the page states only what a customer can buy today.
+ *
+ * Say it once: the hero states the offer, the cards the three ways to run
+ * Rebase, the examples what projects cost, the calculator any other size, the
+ * included list what is never charged, the answers what people ask. No claim
+ * appears in two of them.
+ */
 const { lang, t } = Astro.props;
 import { useTranslatedPath } from "../../i18n/ui";
+import {
+    CLOUD_FLAGS,
+    CLOUD_PRICES,
+    CLOUD_SIGNUP_URL,
+    FILE_SECOND_COPY_PLACE,
+    REGION_FACTS,
+    cpuLabel,
+    eur,
+    fill,
+    fromPrice,
+    includedItems,
+    memoryLabel,
+    offerKey,
+    regionPrices
+} from "../../data/cloud-offer";
+import ClosingCta from "../ClosingCta.astro";
+import HeroBackdrop from "../HeroBackdrop.astro";
+import ChapterRule from "../ChapterRule.astro";
+
 const translatePath = useTranslatedPath(lang);
+const region = regionPrices();
+const facts = REGION_FACTS[CLOUD_FLAGS.region];
+const from = fromPrice();
+const examples = region.examples;
+const size = (s: { cpu: string; memory: string }) => `${cpuLabel(s.cpu)} / ${memoryLabel(s.memory)}`;
+const requestsLabel = `${(CLOUD_PRICES.included.requestsPerMonth / 1_000_000).toLocaleString("en")} million`;
+
+const cloudCta = CLOUD_FLAGS.selfServe
+    ? { href: CLOUD_SIGNUP_URL, label: t("pricing.cloud.cta.open") }
+    : { href: translatePath("/contact"), label: t("pricing.cloud.cta") };
+
+const heroSubtitle = CLOUD_FLAGS.sleep
+    ? fill(t("pricing.hero.subtitle.sleep"), { place: facts.place, asleep: eur(examples.sleeping.asleepMonthlyEur) })
+    : fill(t("pricing.hero.subtitle"), { place: facts.place });
+
+// Only what the flags say is live: the sleeping card needs sleep.
+const exampleCards = [
+    ...(CLOUD_FLAGS.sleep ? [{
+        name: t("pricing.examples.sleeping.name"),
+        price: examples.sleeping.monthlyEur,
+        desc: fill(t("pricing.examples.sleeping.desc"), { awake: String(examples.sleeping.awakeHours) }),
+        note: fill(t("pricing.examples.sleeping.note"), {
+            asleep: eur(examples.sleeping.asleepMonthlyEur),
+            hour: eur(examples.sleeping.awakeHourEur, 4),
+            always: eur(examples.sleeping.alwaysOnMonthlyEur)
+        })
+    }] : []),
+    {
+        name: t("pricing.examples.small.name"),
+        price: examples.smallest.monthlyEur,
+        desc: fill(t("pricing.examples.small.desc"), { app: size(examples.smallest.app), db: size(examples.smallest.database), disk: String(examples.smallest.diskGi), files: String(CLOUD_PRICES.included.filesGb) }),
+        note: ""
+    },
+    {
+        name: t("pricing.examples.production.name"),
+        price: examples.production.monthlyEur,
+        desc: fill(t("pricing.examples.production.desc"), { app: size(examples.production.app), db: size(examples.production.database), disk: String(examples.production.diskGi), files: String(examples.production.filesGb) }),
+        note: ""
+    }
+];
+
+const included = includedItems().map((item) => fill(t(item.key), item.values));
+
+const faqs = [
+    ...(CLOUD_FLAGS.sleep ? [{
+        q: t("pricing.faq.sleep.q"),
+        a: fill(t("pricing.faq.sleep.a"), { asleep: eur(examples.sleeping.asleepMonthlyEur), hour: eur(examples.sleeping.awakeHourEur, 4) })
+    }] : []),
+    {
+        q: t("pricing.faq.backups.q"),
+        a: CLOUD_FLAGS.fileSecondCopy
+            ? fill(t("pricing.faq.backups.a.files"), { secondCopy: FILE_SECOND_COPY_PLACE })
+            : t("pricing.faq.backups.a")
+    },
+    {
+        q: t("pricing.faq.limits.q"),
+        a: fill(t("pricing.faq.limits.a"), {
+            requestRate: eur(CLOUD_PRICES.overage.requestsEurPerMillion),
+            fileRate: eur(CLOUD_PRICES.overage.filesEurPerGb)
+        })
+    },
+    { q: t("pricing.faq.location.q"), a: fill(t(offerKey("pricing.faq.location.a")), { place: facts.place, provider: facts.provider }) },
+    { q: t("pricing.faq.cancel.q"), a: t("pricing.faq.cancel.a") },
+    { q: t("pricing.faq.invoices.q"), a: t("pricing.faq.invoices.a") },
+    { q: t("pricing.faq.exit.q"), a: t("pricing.faq.exit.a") }
+];
+
+const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "@id": "https://rebase.pro/pricing#faq",
+    mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } }))
+};
+
+// What the calculator script reads: the region's sizes and prices, and the
+// strings it writes. One JSON island, no second copy of any number.
+const calcData = {
+    platformFeeEur: CLOUD_PRICES.platformFeeEur,
+    includedFilesGb: CLOUD_PRICES.included.filesGb,
+    filesEurPerGb: CLOUD_PRICES.overage.filesEurPerGb,
+    sleep: CLOUD_FLAGS.sleep ? CLOUD_PRICES.sleep : null,
+    region: { app: region.app, database: region.database, diskEurPerGib: region.diskEurPerGib, defaults: region.defaults },
+    labels: {
+        platform: t("pricing.calc.line.platform"),
+        platformAsleep: t("pricing.calc.line.platformAsleep"),
+        app: t("pricing.calc.line.app"),
+        database: t("pricing.calc.line.database"),
+        disk: t("pricing.calc.line.disk"),
+        files: fill(t("pricing.calc.line.files"), { gb: String(CLOUD_PRICES.included.filesGb) }),
+        awake: t("pricing.calc.line.awake")
+    }
+};
 
 const ossFeatures = [
     t("pricing.oss.feat1"),
@@ -11,13 +138,6 @@ const ossFeatures = [
     t("pricing.oss.feat5"),
     t("pricing.oss.feat6"),
     t("pricing.oss.feat7"),
-];
-
-const cloudFeatures = [
-    t("pricing.cloud.feat1"),
-    t("pricing.cloud.feat2"),
-    t("pricing.cloud.feat3"),
-    t("pricing.cloud.feat4"),
 ];
 
 // SSO via OIDC, MFA, scoped API keys and custom auth adapters ship in the
@@ -30,8 +150,8 @@ const entFeatures = [
     t("pricing.ent.feat4"),
     t("pricing.ent.feat5"),
 ];
-import ClosingCta from "../ClosingCta.astro";
-import HeroBackdrop from "../HeroBackdrop.astro";
+
+const fieldClass = "w-full rounded-lg border border-hairline bg-surface-field px-3 py-2 text-sm text-tone-max focus:border-primary focus:outline-none";
 ---
 
 <div class="drafted-page flex flex-col isolate">
@@ -40,146 +160,301 @@ import HeroBackdrop from "../HeroBackdrop.astro";
         <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
             <p class="hero-eyebrow">{t("pricing.badge")}</p>
             <h1 class="mt-4 text-display-2 text-tone-max">
-                {t("pricing.title")}
+                {fill(t("pricing.hero.title"), { price: eur(from.amount) })}
             </h1>
-            <p class="mt-5 text-lg leading-8 text-tone-400 max-w-2xl"
-               set:html={t("pricing.subtitle")}>
-            </p>
+            <p class="mt-5 text-lg leading-8 text-tone-300 max-w-2xl">{heroSubtitle}</p>
+            <p class="mt-4 text-sm text-tone-500 max-w-2xl">{t("pricing.hero.oss")} {t("pricing.hero.vat")}</p>
+            <div class="mt-8 flex flex-col sm:flex-row gap-3">
+                <a href={cloudCta.href} data-track="pricing-hero-cloud"
+                   class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-8 min-h-(--control-large) text-base font-semibold text-white hover:bg-primary-dark transition-all btn-glow">
+                    {cloudCta.label}
+                    <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </a>
+                <a href="#calculator"
+                   class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-tone-max/10 bg-tone-max/5 px-6 min-h-(--control-large) text-base font-semibold text-tone-max hover:bg-tone-max/10 transition-all">
+                    {t("pricing.cloud.calcLink")}
+                </a>
+            </div>
         </div>
     </section>
 
-    <section class="relative z-0 pb-28 sm:pb-36">
+    <section class="relative z-0 pb-chapter">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                <!-- Open Source tier -->
                 <div class="frame relative overflow-hidden p-8 flex flex-col">
-                    <div class="flex items-center gap-2 mb-2">
-                        <h2 class="text-xl text-tone-max">{t("pricing.oss.name")}</h2>
-                    </div>
-                    <div class="flex items-baseline gap-2 mb-1">
-                        <span class="text-4xl text-tone-max">{t("pricing.oss.price")}</span>
-                    </div>
+                    <h2 class="text-xl text-tone-max mb-2">{t("pricing.oss.name")}</h2>
+                    <p class="text-4xl text-tone-max mb-1">{t("pricing.oss.price")}</p>
                     <p class="text-sm text-tone-500 mb-5">{t("pricing.oss.priceNote")}</p>
                     <p class="text-tone-400 leading-relaxed mb-6">{t("pricing.oss.desc")}</p>
-
                     <ul class="space-y-3 mb-8 flex-1">
                         {ossFeatures.map((feat) => (
                             <li class="flex items-start gap-3 text-sm text-tone-300">
-                                <svg class="lucide lucide-check mt-0.5 flex-none text-primary-light" xmlns="http://www.w3.org/2000/svg"
-                                     width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M20 6 9 17l-5-5"/>
-                                </svg>
+                                <svg class="lucide lucide-check mt-0.5 flex-none text-primary-light" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                                 <span>{feat}</span>
                             </li>
                         ))}
                     </ul>
-
                     <a href={translatePath("/cli")}
-                       class="inline-flex items-center justify-center gap-x-2 inline-flex items-center justify-center rounded-lg border border-tone-max/10 bg-tone-max/5 px-6 py-0 min-h-(--control-large) text-base font-semibold text-tone-max hover:bg-tone-max/10 hover:border-tone-max/20 transition-all duration-200">
+                       class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-tone-max/10 bg-tone-max/5 px-6 min-h-(--control-large) text-base font-semibold text-tone-max hover:bg-tone-max/10 hover:border-tone-max/20 transition-all duration-200">
                         {t("pricing.oss.cta")}
-                        <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                             stroke-linejoin="round">
-                            <path d="M5 12h14"/>
-                            <path d="m12 5 7 7-7 7"/>
-                        </svg>
                     </a>
                 </div>
 
-                <!-- Rebase Cloud — private beta.
-                     Listed rather than hidden behind a waitlist: it is live,
-                     it has tenants, and a pricing page that omits a product we
-                     already run reads as evasion. What it does not do yet is
-                     sell itself without us in the loop, and the badge says so. -->
-                <div class="frame relative overflow-hidden p-8 flex flex-col">
-                    <div class="flex items-center justify-between mb-2">
-                        <h2 class="text-xl text-tone-max">{t("pricing.cloud.name")}</h2>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-tone-max/5 text-tone-300 text-2xs font-semibold ring-1 ring-tone-max/10">{t("pricing.cloud.badge")}</span>
-                    </div>
-                    <div class="flex items-baseline gap-2 mb-1">
-                        <span class="text-4xl text-tone-max">{t("pricing.cloud.price")}</span>
-                    </div>
-                    <p class="text-sm text-tone-500 mb-5">{t("pricing.cloud.priceNote")}</p>
-                    <p class="text-tone-400 leading-relaxed mb-6">{t("pricing.cloud.desc")}</p>
-
-                    <ul class="space-y-3 mb-8 flex-1">
-                        {cloudFeatures.map((feat) => (
-                            <li class="flex items-start gap-3 text-sm text-tone-300">
-                                <svg class="lucide lucide-check mt-0.5 flex-none text-primary-light" xmlns="http://www.w3.org/2000/svg"
-                                     width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M20 6 9 17l-5-5"/>
-                                </svg>
-                                <span>{feat}</span>
-                            </li>
-                        ))}
-                    </ul>
-
-                    <!-- The one fact a reader otherwise meets as a 402 after a
-                         bundle has finished uploading. It belongs on the page
-                         that sells the tier, not only in a deploy log. -->
-                    <p class="text-sm text-tone-500 mb-6">{t("pricing.cloud.billingNote")}</p>
-
-                    <a href={translatePath("/contact")}
-                       class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-tone-max/10 bg-tone-max/5 px-6 py-0 min-h-(--control-large) text-base font-semibold text-tone-max hover:bg-tone-max/10 hover:border-tone-max/20 transition-all duration-200">
-                        {t("pricing.cloud.cta")}
-                        <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                             stroke-linejoin="round">
-                            <path d="M5 12h14"/>
-                            <path d="m12 5 7 7-7 7"/>
-                        </svg>
-                    </a>
-                </div>
-
-                <!-- Enterprise tier -->
+                <!-- Rebase Cloud. Its price is the hero's; what it includes is the
+                     list below. This card says what it is and how to start. -->
                 <div class="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-tone-900/80 to-tone-950/70 p-8 shadow-[0_18px_44px_rgba(0,112,244,0.12)] flex flex-col">
                     <div class="flex items-center justify-between mb-2">
-                        <h2 class="text-xl text-tone-max">{t("pricing.ent.name")}</h2>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary-light text-2xs font-semibold ring-1 ring-primary/20">{t("pricing.ent.popular")}</span>
+                        <h2 class="text-xl text-tone-max">{t("pricing.cloud.name")}</h2>
+                        {!CLOUD_FLAGS.selfServe && (
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary-light text-2xs font-semibold ring-1 ring-primary/20">{t("pricing.cloud.badge")}</span>
+                        )}
                     </div>
-                    <div class="flex items-baseline gap-2 mb-1">
-                        <span class="text-4xl text-tone-max">{t("pricing.ent.price")}</span>
-                    </div>
+                    <p class="text-3xl text-tone-max mb-1">{fill(t("pricing.cloud.from"), { price: eur(from.amount) })}</p>
+                    <p class="text-sm text-tone-500 mb-5">{t("pricing.cloud.priceNote")}</p>
+                    <p class="text-tone-400 leading-relaxed mb-6 flex-1">{t(offerKey("pricing.cloud.desc"))}</p>
+                    <p class="text-sm text-tone-500 mb-6">{t("pricing.cloud.billingNote")}</p>
+                    <a href={cloudCta.href} data-track="pricing-card-cloud"
+                       class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 min-h-(--control-large) text-base font-semibold text-white hover:bg-primary-dark transition-all duration-200">
+                        {cloudCta.label}
+                    </a>
+                </div>
+
+                <div class="frame relative overflow-hidden p-8 flex flex-col">
+                    <h2 class="text-xl text-tone-max mb-2">{t("pricing.ent.name")}</h2>
+                    <p class="text-4xl text-tone-max mb-1">{t("pricing.ent.price")}</p>
                     <p class="text-sm text-tone-500 mb-5">{t("pricing.ent.priceNote")}</p>
                     <p class="text-tone-400 leading-relaxed mb-6">{t("pricing.ent.desc")}</p>
-
                     <ul class="space-y-3 mb-8 flex-1">
                         {entFeatures.map((feat) => (
                             <li class="flex items-start gap-3 text-sm text-tone-300">
-                                <svg class="lucide lucide-check mt-0.5 flex-none text-primary-light" xmlns="http://www.w3.org/2000/svg"
-                                     width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M20 6 9 17l-5-5"/>
-                                </svg>
+                                <svg class="lucide lucide-check mt-0.5 flex-none text-primary-light" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                                 <span>{feat}</span>
                             </li>
                         ))}
                     </ul>
-
                     <a href={translatePath("/contact")}
-                       class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark transition-all duration-200 btn-glow">
+                       class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-tone-max/10 bg-tone-max/5 px-6 min-h-(--control-large) text-base font-semibold text-tone-max hover:bg-tone-max/10 hover:border-tone-max/20 transition-all duration-200">
                         {t("pricing.ent.cta")}
-                        <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                             stroke-linejoin="round">
-                            <path d="M5 12h14"/>
-                            <path d="m12 5 7 7-7 7"/>
-                        </svg>
                     </a>
                 </div>
             </div>
+        </div>
+    </section>
 
-            <!-- Reassurance -->
-            <div class="frame mt-12 max-w-3xl mx-auto p-6 text-center">
-                <h3 class="text-tone-max mb-2">{t("pricing.faq.title")}</h3>
-                <p class="text-tone-400 leading-relaxed">{t("pricing.faq.desc")}</p>
+    <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <ChapterRule label={t("pricing.examples.label")} index={facts.place} dot="text-cyan-300" />
+        </div>
+        <div class="mt-lead mx-auto max-w-6xl px-6 lg:px-8">
+            <h2 class="text-3xl sm:text-4xl text-tone-max">{exampleCards.length === 3 ? t("pricing.examples.title") : t("pricing.examples.title.two")}</h2>
+            <div class:list={["mt-10 grid grid-cols-1 gap-6", exampleCards.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"]}>
+                {exampleCards.map((card) => (
+                    <div class="frame p-7 flex flex-col">
+                        <h3 class="text-base text-tone-max">{card.name}</h3>
+                        <p class="mt-4 flex items-baseline gap-2">
+                            <span class="text-4xl text-tone-max font-mono tabular-nums">{eur(card.price)}</span>
+                            <span class="text-sm text-tone-500">{t("pricing.examples.permonth")}</span>
+                        </p>
+                        <p class="mt-4 text-sm leading-relaxed text-tone-400 flex-1">{card.desc}</p>
+                        {card.note && <p class="mt-3 text-xs leading-relaxed text-tone-500">{card.note}</p>}
+                    </div>
+                ))}
+            </div>
+        </div>
+    </section>
+
+    <section id="calculator" class="relative z-0 py-chapter scroll-mt-24">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <ChapterRule label={t("pricing.calc.label")} />
+        </div>
+        <div class="mt-lead mx-auto max-w-6xl px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+            <div class="lg:col-span-5">
+                <h2 class="text-3xl sm:text-4xl text-tone-max">{t("pricing.calc.title")}</h2>
+                <p class="mt-lead text-base text-tone-400 leading-relaxed">{t("pricing.calc.subtitle")}</p>
+            </div>
+            <form id="cloud-calc" class="frame lg:col-span-7 p-6 sm:p-8 space-y-5" onsubmit="return false">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <label class="block">
+                        <span class="text-sm font-medium text-tone-300">{t("pricing.calc.app")}</span>
+                        <select name="app" class:list={[fieldClass, "mt-2"]}>
+                            {region.app.map((a) => (
+                                <option value={`${a.cpu}|${a.memory}`} selected={a.cpu === region.defaults.app.cpu && a.memory === region.defaults.app.memory}>{size(a)}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="text-sm font-medium text-tone-300">{t("pricing.calc.database")}</span>
+                        <select name="database" class:list={[fieldClass, "mt-2"]}>
+                            {region.database.map((d) => (
+                                <option value={`${d.cpu}|${d.memory}`} selected={d.cpu === region.defaults.database.cpu && d.memory === region.defaults.database.memory}>{size(d)}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="text-sm font-medium text-tone-300">{t("pricing.calc.disk")}</span>
+                        <input name="disk" type="number" inputmode="numeric" min={region.defaults.diskGi} max="500" step="1" value={region.defaults.diskGi} class:list={[fieldClass, "mt-2 font-mono tabular-nums"]} />
+                    </label>
+                    <label class="block">
+                        <span class="text-sm font-medium text-tone-300">{t("pricing.calc.files")}</span>
+                        <input name="files" type="number" inputmode="numeric" min="0" max="10000" step="1" value="0" class:list={[fieldClass, "mt-2 font-mono tabular-nums"]} />
+                    </label>
+                    {CLOUD_FLAGS.sleep && (
+                        <label class="flex items-center gap-3 sm:col-span-2">
+                            <input name="sleep" type="checkbox" class="h-4 w-4 accent-primary" />
+                            <span class="text-sm font-medium text-tone-300">{t("pricing.calc.sleep")}</span>
+                        </label>
+                    )}
+                    {CLOUD_FLAGS.sleep && (
+                        <label class="block sm:col-span-2" data-awake hidden>
+                            <span class="text-sm font-medium text-tone-300">{t("pricing.calc.awake")}</span>
+                            <input name="awake" type="number" inputmode="numeric" min="0" max={CLOUD_PRICES.sleep.hoursInMonth} step="1" value={examples.sleeping.awakeHours} class:list={[fieldClass, "mt-2 font-mono tabular-nums"]} />
+                        </label>
+                    )}
+                </div>
+                <div class="border-t border-tone-800 pt-5">
+                    <dl data-lines class="space-y-2 text-sm"></dl>
+                    <div class="mt-4 flex items-baseline justify-between gap-4">
+                        <span class="text-base text-tone-300">{t("pricing.calc.total")}</span>
+                        <output data-total class="text-4xl text-tone-max font-mono tabular-nums">{eur(examples.default.monthlyEur)}</output>
+                    </div>
+                    <p class="mt-4 text-xs leading-relaxed text-tone-500">{fill(t("pricing.calc.note"), { requests: requestsLabel })}</p>
+                </div>
+            </form>
+        </div>
+        <script type="application/json" id="cloud-calc-data" set:html={JSON.stringify(calcData)} />
+    </section>
+
+    <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <ChapterRule label={t("pricing.included.label")} index={`${String(included.length).padStart(2, "0")}`} />
+        </div>
+        <div class="mt-lead mx-auto max-w-6xl px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+            <h2 class="lg:col-span-5 text-3xl sm:text-4xl text-tone-max">{t("pricing.included.title")}</h2>
+            <ul class="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                {included.map((line) => (
+                    <li class="flex items-start gap-3 text-sm text-tone-300">
+                        <svg class="lucide lucide-check mt-0.5 flex-none text-primary-light" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                        <span>{line}</span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    </section>
+
+    <section class="relative isolate py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <ChapterRule label={t("pricing.faqs.label")} index={`${String(faqs.length).padStart(2, "0")} questions`} dot="text-cyan-300" />
+        </div>
+        <div class="mt-lead mx-auto max-w-6xl px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+            <div class="lg:col-span-5">
+                <h2 class="text-3xl sm:text-4xl text-tone-max">{t("pricing.faqs.title")}</h2>
+                <div class="frame mt-8 p-6">
+                    <h3 class="text-tone-max mb-2">{t("pricing.faq.title")}</h3>
+                    <p class="text-sm text-tone-400 leading-relaxed">{t("pricing.faq.desc")}</p>
+                </div>
+            </div>
+            <div class="lg:col-span-7 space-y-3">
+                {faqs.map((faq) => (
+                    <details class="frame group px-6 py-5">
+                        <summary class="flex items-start justify-between gap-4 cursor-pointer list-none text-tone-max font-medium leading-snug marker:content-none [&::-webkit-details-marker]:hidden">
+                            <span>{faq.q}</span>
+                            <svg class="mt-1 h-4 w-4 flex-none text-tone-500 transition-transform duration-200 group-open:rotate-45" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                        </summary>
+                        <p class="mt-4 text-tone-400 leading-relaxed text-sm sm:text-base">{faq.a}</p>
+                    </details>
+                ))}
             </div>
         </div>
     </section>
 
     <ClosingCta title={t("close.pricing.title")} blurb={t("close.pricing.blurb")} trackId="pricing" />
-
 </div>
+
+<script type="application/ld+json" set:html={JSON.stringify(faqSchema)} />
+
+<script>
+    // The calculator. Every number is read from the JSON island above, which
+    // the page built from cloud-prices.json — the same list the console quotes
+    // from. Lines are rounded to the cent and then summed, as an invoice is.
+    interface SizePrice { cpu: string; memory: string; monthlyEur: number }
+    interface CalcData {
+        platformFeeEur: number;
+        includedFilesGb: number;
+        filesEurPerGb: number;
+        sleep: { platformFeeEur: number; hoursInMonth: number } | null;
+        region: { app: SizePrice[]; database: SizePrice[]; diskEurPerGib: number };
+        labels: Record<"platform" | "platformAsleep" | "app" | "database" | "disk" | "files" | "awake", string>;
+    }
+
+    const dataEl = document.getElementById("cloud-calc-data");
+    const form = document.getElementById("cloud-calc");
+    if (dataEl && form instanceof HTMLFormElement) {
+        const data = JSON.parse(dataEl.textContent ?? "{}") as CalcData;
+        const cents = (n: number) => Math.round(n * 100) / 100;
+        const money = (n: number) => `€${n.toFixed(2)}`;
+        const find = (list: SizePrice[], value: string) => {
+            const [cpu, memory] = value.split("|");
+            return list.find((s) => s.cpu === cpu && s.memory === memory) ?? list[0];
+        };
+        const num = (name: string, fallback: number) => {
+            const el = form.elements.namedItem(name);
+            const v = el instanceof HTMLInputElement ? Number(el.value) : NaN;
+            return Number.isFinite(v) && v >= 0 ? v : fallback;
+        };
+        const linesEl = form.querySelector("[data-lines]");
+        const totalEl = form.querySelector("[data-total]");
+        const awakeEl = form.querySelector("[data-awake]");
+
+        const render = () => {
+            const appEl = form.elements.namedItem("app");
+            const dbEl = form.elements.namedItem("database");
+            const app = find(data.region.app, appEl instanceof HTMLSelectElement ? appEl.value : "");
+            const db = find(data.region.database, dbEl instanceof HTMLSelectElement ? dbEl.value : "");
+            const disk = cents(Math.max(10, Math.round(num("disk", 10))) * data.region.diskEurPerGib);
+            const files = cents(Math.max(0, num("files", 0) - data.includedFilesGb) * data.filesEurPerGb);
+            const sleepEl = form.elements.namedItem("sleep");
+            const sleeping = data.sleep !== null && sleepEl instanceof HTMLInputElement && sleepEl.checked;
+            if (awakeEl instanceof HTMLElement) awakeEl.hidden = !sleeping;
+
+            const alwaysOn = cents(data.platformFeeEur + app.monthlyEur + db.monthlyEur + disk);
+            let lines: [string, number][];
+            let total: number;
+            if (sleeping && data.sleep) {
+                // src/sleep/accounting.ts: a sleeping month is the sleeping fee,
+                // the disk and the awake hours, never more than always on.
+                const hours = Math.min(data.sleep.hoursInMonth, num("awake", 0));
+                const compute = app.monthlyEur + db.monthlyEur;
+                const rate = (compute + data.platformFeeEur - data.sleep.platformFeeEur) / data.sleep.hoursInMonth;
+                const awake = cents(Math.min(hours * rate, alwaysOn - data.sleep.platformFeeEur - disk));
+                lines = [[data.labels.platformAsleep, data.sleep.platformFeeEur], [data.labels.awake, awake], [data.labels.disk, disk]];
+                total = cents(Math.min(data.sleep.platformFeeEur + disk + awake, alwaysOn));
+            } else {
+                lines = [[data.labels.platform, data.platformFeeEur], [data.labels.app, app.monthlyEur], [data.labels.database, db.monthlyEur], [data.labels.disk, disk]];
+                total = alwaysOn;
+            }
+            if (files > 0) lines.push([data.labels.files, files]);
+            total = cents(total + files);
+
+            if (linesEl) {
+                linesEl.replaceChildren(...lines.map(([label, amount]) => {
+                    const row = document.createElement("div");
+                    row.className = "flex justify-between gap-4";
+                    const dt = document.createElement("dt");
+                    dt.className = "text-tone-400";
+                    dt.textContent = label;
+                    const dd = document.createElement("dd");
+                    dd.className = "text-tone-300 font-mono tabular-nums";
+                    dd.textContent = money(amount);
+                    row.append(dt, dd);
+                    return row;
+                }));
+            }
+            if (totalEl) totalEl.textContent = money(total);
+        };
+
+        form.addEventListener("input", render);
+        form.addEventListener("change", render);
+        render();
+    }
+</script>

@@ -1,4 +1,5 @@
 import { ui, defaultLang } from "../i18n/ui";
+import { CLOUD_FLAGS, CLOUD_PRICES, CLOUD_SIGNUP_URL, REGION_FACTS, cpuLabel, eur, fill, fromPrice, includedItems, memoryLabel, offerKey, regionPrices } from "../data/cloud-offer";
 
 type LangKey = keyof typeof ui;
 
@@ -97,13 +98,13 @@ Built by the Rebase team, each on a Postgres database its owner controls.
 
 ## Rebase Cloud
 
-${cleanHtml(tr("cloud.status"))}
+${cleanHtml(tr(offerKey("cloud.status")))}
 
 ## Where to run it
 
 - **${inline(tr("cta.lane.local.title"))}** — ${cleanHtml(tr("cta.lane.local.desc"))}
 - **${inline(tr("cta.lane.selfhost.title"))}** — ${cleanHtml(tr("cta.lane.selfhost.desc"))}
-- **${inline(tr("cta.lane.cloud.title"))}** — ${cleanHtml(tr("cta.lane.cloud.desc"))}
+- **${inline(tr("cta.lane.cloud.title"))}** — ${cleanHtml(tr(offerKey("cta.lane.cloud.desc")))}
 
 \`pnpm dlx @rebasepro/cli init\`
 `;
@@ -147,7 +148,7 @@ ${cleanHtml(tr("agencies.customize.title"))}
 - **${cleanHtml(tr("agencies.features.f2.title"))}**: ${cleanHtml(tr("agencies.features.f2.desc"))}
 - **${cleanHtml(tr("agencies.features.f3.title"))}**: ${cleanHtml(tr("agencies.features.f3.desc"))}
 - **${cleanHtml(tr("agencies.features.f4.title"))}**: ${cleanHtml(tr("agencies.features.f4.desc"))}
-- **${cleanHtml(tr("agencies.features.f5.title"))}**: ${cleanHtml(tr("agencies.features.f5.desc"))}
+- **${cleanHtml(tr("agencies.features.f5.title"))}**: ${cleanHtml(tr(offerKey("agencies.features.f5.desc")))}
 - **${cleanHtml(tr("agencies.features.f6.title"))}**: ${cleanHtml(tr("agencies.features.f6.desc"))}
 `;
   }
@@ -320,6 +321,52 @@ Rebase is the open-source backend for Postgres — REST, a typed SDK, realtime, 
 - **Rebase Studio**: the developers' side — SQL editor, a visual schema editor that writes back to your TypeScript, RLS policies and logs.
 - **Typed SDK**: an isomorphic client for typed queries, auth, storage and realtime.
 - **Component library**: the React components the admin panel is built from.
+`;
+  }
+
+  // The pricing mirror carries the real numbers, from the same generated list
+  // and flags the page renders, so what an agent reads cannot disagree with it.
+  if (page === "pricing") {
+    const region = regionPrices();
+    const facts = REGION_FACTS[CLOUD_FLAGS.region];
+    const from = fromPrice();
+    const ex = region.examples;
+    const size = (x: { cpu: string; memory: string }) => `${cpuLabel(x.cpu)} / ${memoryLabel(x.memory)}`;
+    const examples = [
+      ...(CLOUD_FLAGS.sleep ? [`- **${tr("pricing.examples.sleeping.name")}**: ${eur(ex.sleeping.monthlyEur)} a month (${eur(ex.sleeping.asleepMonthlyEur)} asleep, plus ${eur(ex.sleeping.awakeHourEur, 4)} per awake hour, ${ex.sleeping.awakeHours} hours awake)`] : []),
+      `- **${tr("pricing.examples.small.name")}**: ${eur(ex.smallest.monthlyEur)} a month — app ${size(ex.smallest.app)}, database ${size(ex.smallest.database)}, ${ex.smallest.diskGi} GB disk`,
+      `- **${tr("pricing.examples.production.name")}**: ${eur(ex.production.monthlyEur)} a month — app ${size(ex.production.app)}, database ${size(ex.production.database)}, ${ex.production.diskGi} GB disk, ${ex.production.filesGb} GB of files`
+    ].join("\n");
+    const included = includedItems().map((i) => `- ${fill(tr(i.key), i.values)}`).join("\n");
+    const subtitle = CLOUD_FLAGS.sleep
+      ? fill(tr("pricing.hero.subtitle.sleep"), { place: facts.place, asleep: eur(ex.sleeping.asleepMonthlyEur) })
+      : fill(tr("pricing.hero.subtitle"), { place: facts.place });
+    const start = CLOUD_FLAGS.selfServe ? `Create a project: ${CLOUD_SIGNUP_URL}` : `${tr("cloud.status")}`;
+    return `# Rebase pricing
+
+Rebase is MIT-licensed and free to run on your own machines. Rebase Cloud runs it for you, priced per resource, not per seat. Prices exclude VAT.
+
+## Rebase Cloud: ${fill(tr("pricing.cloud.from"), { price: eur(from.amount) })}
+
+${subtitle}
+
+${start}
+
+## What projects cost
+
+${examples}
+
+Any other size: platform fee ${eur(CLOUD_PRICES.platformFeeEur)} a month, plus the app, the database and ${eur(region.diskEurPerGib, 4)} per GB of database disk. The calculator on https://rebase.pro/pricing uses the same list the console quotes from.
+
+## Included in every project
+
+${included}
+
+Beyond them: files ${eur(CLOUD_PRICES.overage.filesEurPerGb)} per GB a month, requests ${eur(CLOUD_PRICES.overage.requestsEurPerMillion)} per million.
+
+## Enterprise
+
+${cleanHtml(tr("pricing.ent.desc"))} Contact: hello@rebase.pro
 `;
   }
 
