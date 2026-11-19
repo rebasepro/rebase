@@ -25,13 +25,18 @@
  * @type {import("jest").Config}
  */
 module.exports = {
-    // Two workers, each restarted once it holds 1.5 GB: the budget CI gives
-    // this suite (`test:unit:postgres`, verify.yml's unit-postgres job), as
-    // the default here too. Every worker keeps the PGlite and Postgres
-    // instances its files start; at jest's default of one worker per core a
-    // bare `pnpm test` exhausted a 32 GB machine. Explicit flags still win.
+    // Two workers, each restarted once its JS heap passes 1.5 GB: the budget
+    // CI gives this suite (`test:unit:postgres`, verify.yml's unit-postgres
+    // job), as the default here too. At jest's default of one worker per core
+    // a bare `pnpm test` exhausted a 32 GB machine. Explicit flags still win.
+    //
+    // The limit is measured on `heapUsed` only. A PGlite's WebAssembly memory
+    // is outside it, so this never recycles a worker for the databases its
+    // files leave behind — release-pglite-on-close.ts below is what keeps
+    // those from piling up.
     maxWorkers: 2,
     workerIdleMemoryLimit: "1536MB",
+    setupFiles: ["<rootDir>/test/helpers/release-pglite-on-close.ts"],
     transform: {
         "^.+\\.tsx?$": "ts-jest"
     },
@@ -62,6 +67,14 @@ module.exports = {
      * people learn to re-run rather than read.
      */
     testTimeout: 30_000,
+    /**
+     * The watchdog names the suites still in flight, and how much memory the
+     * runner has left, while the run is going — the default reporter only
+     * prints a suite once it finishes, so a CI job that dies partway (a hang,
+     * or the runner shut down out of memory) used to end its log on whatever
+     * passed last. See the reporter's header.
+     */
+    reporters: ["default", "<rootDir>/../../tooling/scripts/jest/suite-watchdog-reporter.cjs"],
     moduleNameMapper: {
         "^chalk$": "<rootDir>/test/mocks/chalk.cjs",
         "^\\.{1,2}/module-dir$": "<rootDir>/test/mocks/module-dir.cjs",

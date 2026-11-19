@@ -276,6 +276,21 @@ afterAll(async () => {
     rmSync(storageDir, { recursive: true, force: true });
 });
 
+/**
+ * A and B are built once, for the whole file; a backend a test builds past
+ * them is that test's own, and shut down when it ends. Kept to the end of the
+ * file, the eight extra backends and their PGlite databases held 3.6 GB at
+ * once on Linux — enough, beside one other heavy file, to run the CI runner
+ * out of memory.
+ */
+const SHARED_INSTANCES = 2;
+afterEach(async () => {
+    for (const { backend, db } of built.splice(SHARED_INSTANCES)) {
+        await backend.shutdown(0);
+        await db.close();
+    }
+});
+
 describe("createRebaseBackend writes no process global", () => {
     it("leaves every process-default slot exactly as it found it", () => {
         expect(defaultsAfter.jwtVerifiesDefaultToken).toBe("user-1");
