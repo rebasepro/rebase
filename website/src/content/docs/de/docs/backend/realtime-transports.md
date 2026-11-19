@@ -1,5 +1,5 @@
 ---
-sourceHash: 1b7c64b3c001f57d
+sourceHash: 25f7a68655385605
 title: Realtime über mehrere Instanzen
 sidebar_label: Realtime über mehrere Instanzen
 description: "Wie Broadcast-Channels und Presence über mehr als einen Server-Prozess hinweg funktionieren: der LISTEN/NOTIFY-Bus, was jede Instanz besitzt und wie Sie Ihren eigenen Transport schreiben."
@@ -96,6 +96,14 @@ Mit `REBASE_METRICS=true` meldet jede Instanz unter `/metrics`, was sie übertr�
 | `rebase_realtime_channels` | Gauge | Channels mit mindestens einem Mitglied auf dieser Instanz |
 | `rebase_realtime_bus_frames_published_total` | Counter | Frames, die diese Instanz an den Bus gesendet hat, nach `kind`: `broadcast`, `broadcast_ref`, `presence_diff` und `channels` (worüber Instanzen einander mitteilen, was sie bedienen) |
 | `rebase_realtime_bus_frames_skipped_total` | Counter | Broadcasts und Presence-Änderungen, die nicht gesendet wurden, weil keine andere Instanz Mitglieder im Channel hatte |
+| `rebase_realtime_socket_opens_total` | Counter | Auf dieser Instanz geöffnete Sockets |
+| `rebase_realtime_socket_closes_total` | Counter | Geschlossene Sockets, nach `closed_by`: `client` (ein Close-Frame), `client_watchdog` (das SDK hat einen stillen Socket aufgegeben, Code 4003), `network` (ohne Close-Frame verschwunden, 1006), `no_pong` und `backlog` (dieser Server hat ihn losgelassen), `session`, `ceiling`, `shutdown`, `oversized_frame`, `server` |
+| `rebase_realtime_socket_close_codes_total` | Counter | Geschlossene Sockets, nach Close-`code` (`other` für einen Anwendungscode, den Rebase nicht verwendet) |
+| `rebase_realtime_frames_in_total` / `rebase_realtime_bytes_in_total` | Counter | Von Clients empfangene Frames und ihre Bytes |
+| `rebase_realtime_frames_out_total` / `rebase_realtime_bytes_out_total` | Counter | Vom Realtime-Service gesendete Frames (Broadcasts, Presence, Subscription-Updates) und ihre Bytes |
+| `rebase_realtime_frames_refused_total` | Counter | Abgelehnte Frames, nach `code`: `RATE_LIMITED`, `CHANNEL_FORBIDDEN`, `CHANNEL_BUS_PAYLOAD_TOO_LARGE`, `FRAME_TOO_LARGE`, `AUTH_UNAVAILABLE` (der Auth-Store konnte die Identität nicht erneut prüfen), `UNAUTHORIZED` |
+
+Jedes Öffnen und Schließen eines Sockets ist außerdem eine Info-Zeile: `[WebSocket Server] Socket opened` mit seiner `clientId`, `affinity` und seinen Opt-ins, und `[WebSocket Server] Socket closed` mit seiner `uid`, `closedBy`, `code`, `reason`, `ageMs`, Channels, ein- und ausgehenden Frames sowie ein- und ausgehenden Bytes. Wenn Clients abgebrochene Verbindungen melden, lesen Sie zuerst `closedBy`: `network` und `client_watchdog` sind der Weg zwischen ihnen und dem Server, `no_pong` und `backlog` der Server, der loslässt, `shutdown` ein Deploy oder ein Scale-in.
 
 Zähler beginnen bei null, wenn eine Instanz startet, und zählen Frames, von denen der Bus mehrere zu einer Benachrichtigung zusammenfassen kann. Retained Messages werden immer übertragen und daher nie übersprungen. Beim standardmäßigen `memory`-Bus bleiben beide Werte bei null.
 
@@ -175,9 +183,9 @@ Die Zustellung an lokale Clients liegt nicht in Ihrer Verantwortung — der Real
 
 - **Auf einem Retained Channel** (siehe [Channel Retention](/docs/backend/realtime#channel-retention)) ist die Nachricht bereits mit einer Sequenznummer gespeichert, sodass die Benachrichtigung lediglich `(channel, seq)` transportiert und jede empfangende Instanz den Inhalt selbst nachliest. Es gibt keinerlei Größenbeschränkung. Dies gilt für jede Retained Message, ob klein oder groß: Jeder Datenbank-Login kann `LISTEN` ausführen, weshalb der Body niemals in der Benachrichtigung übertragen wird. Dies kostet einen Primary-Key-Read pro Nachricht auf jeder Instanz, die ein Mitglied in diesem Channel hat.
 - **Flüchtige (ephemerale) Broadcasts und Presence** werden weiterhin direkt in der Benachrichtigung übertragen, sodass jeder Datenbank-Login sie mitlesen kann. Übertragen Sie Daten, die auf diese Weise nicht lesbar sein dürfen, ausschließlich über einen Retained Channel.
-- **Auf einem ephemeren Channel** gibt es keinen gespeicherten Datensatz, auf den verwiesen werden könnte. Der Broadcast wird lokal zugestellt, der Sender erhält einen `CHANNEL_BUS_PAYLOAD_TOO_LARGE`-Fehler über `channel.onError()`, und eine Warnung nennt den betroffenen Channel — anstatt dass die Nachricht stillschweigend nur die Hälfte des Clusters erreicht.
+- **Auf einem ephemeren Channel** gibt es nichts, worauf verwiesen werden könnte, daher reist ein Broadcast über dem Limit in Teilen: aufgeteilt in Benachrichtigungen, die gemeinsam in einer Anweisung gesendet werden und die jede Instanz vor der Zustellung wieder zusammensetzt. Bis 1 MiB erreicht ein Broadcast jede Instanz, unabhängig von seiner Größe; nur ein größerer wird abgelehnt: lokal zugestellt, mit einem `CHANNEL_BUS_PAYLOAD_TOO_LARGE`-Fehler für den Sender auf `channel.onError()` und einer Warnung, die den Channel nennt. Ältere Versionen lehnten so alles über 8 KB ab, sodass ein Raum, dessen Mitglieder auf zwei Instanzen landeten, seine großen Nachrichten nur auf der des Senders hörte.
 
-Wenn Sie große Nachrichten übertragen, weisen Sie diesem Channel eine Retention-Regel zu. Das ist die vollständige Lösung.
+Ein Channel, der häufig große Nachrichten sendet, ist mit einer Retention-Regel weiterhin günstiger: ein Verweis pro Nachricht statt eines Teils pro 5 KB.
 
 ### Presence ist geteilter Status, nicht nur Fan-out
 

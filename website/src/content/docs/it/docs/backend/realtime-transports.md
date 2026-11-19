@@ -1,5 +1,5 @@
 ---
-sourceHash: 1b7c64b3c001f57d
+sourceHash: 25f7a68655385605
 title: Realtime su più istanze
 sidebar_label: Realtime su più istanze
 description: "Come i canali broadcast e la presence sopravvivono a più di un processo server: il bus LISTEN/NOTIFY, cosa appartiene a ciascuna istanza e come scrivere il proprio transport."
@@ -102,6 +102,14 @@ Con `REBASE_METRICS=true`, ciascuna istanza riporta ciò che sta gestendo su `/m
 | `rebase_realtime_channels` | gauge | Canali con un membro su questa istanza |
 | `rebase_realtime_bus_frames_published_total` | counter | Frame inviati da questa istanza al bus, per `kind`: `broadcast`, `broadcast_ref`, `presence_diff` e `channels` (le istanze che si comunicano ciò che gestiscono) |
 | `rebase_realtime_bus_frames_skipped_total` | counter | Broadcast e modifiche di presence non inviati perché nessun'altra istanza aveva membri nel canale |
+| `rebase_realtime_socket_opens_total` | counter | Socket aperti su questa istanza |
+| `rebase_realtime_socket_closes_total` | counter | Socket chiusi, per `closed_by`: `client` (un frame di chiusura), `client_watchdog` (l'SDK ha abbandonato un socket silenzioso, codice 4003), `network` (sparito senza frame di chiusura, 1006), `no_pong` e `backlog` (questo server l'ha lasciato andare), `session`, `ceiling`, `shutdown`, `oversized_frame`, `server` |
+| `rebase_realtime_socket_close_codes_total` | counter | Socket chiusi, per `code` di chiusura (`other` per un codice applicativo che Rebase non usa) |
+| `rebase_realtime_frames_in_total` / `rebase_realtime_bytes_in_total` | counter | Frame ricevuti dai client, e i loro byte |
+| `rebase_realtime_frames_out_total` / `rebase_realtime_bytes_out_total` | counter | Frame inviati dal servizio realtime (broadcast, presence, aggiornamenti delle sottoscrizioni), e i loro byte |
+| `rebase_realtime_frames_refused_total` | counter | Frame rifiutati, per `code`: `RATE_LIMITED`, `CHANNEL_FORBIDDEN`, `CHANNEL_BUS_PAYLOAD_TOO_LARGE`, `FRAME_TOO_LARGE`, `AUTH_UNAVAILABLE` (l'archivio di autenticazione non ha potuto ricontrollare l'identità), `UNAUTHORIZED` |
+
+Ogni apertura e chiusura di un socket è anche una riga info: `[WebSocket Server] Socket opened` con il suo `clientId`, `affinity` e i suoi opt-in, e `[WebSocket Server] Socket closed` con il suo `uid`, `closedBy`, `code`, `reason`, `ageMs`, i canali, i frame in entrata e in uscita e i byte in entrata e in uscita. Quando i client segnalano connessioni perse, leggi prima `closedBy`: `network` e `client_watchdog` sono il percorso tra loro e il server, `no_pong` e `backlog` il server che li lascia andare, `shutdown` un deploy o una riduzione di scala.
 
 I contatori partono da zero all'avvio dell'istanza e conteggiano i frame, dei quali il bus può raggrupparne diversi in una singola notifica. I messaggi conservati (retained) viaggiano sempre, quindi non vengono mai ignorati. Sul bus `memory` predefinito entrambi rimangono a zero.
 
@@ -181,9 +189,9 @@ La consegna ai client locali non è di tua competenza — il servizio realtime g
 
 - **Su un canale con retention** (vedi [Channel Retention](/docs/backend/realtime#channel-retention)) il messaggio è già memorizzato con un numero di sequenza, quindi la notifica contiene solo `(channel, seq)` e ogni istanza ricevente rilegge il corpo. Non vi è alcun limite di dimensione. Questo vale per ogni messaggio con retention, piccolo o grande: qualsiasi login al database può eseguire `LISTEN`, quindi il corpo non viaggia mai nella notifica. Ciò costa una lettura per chiave primaria per messaggio su ciascuna istanza con un membro nel canale.
 - **I broadcast temporanei (ephemeral) e la presence** viaggiano ancora all'interno della notifica stessa, quindi qualsiasi account connesso al database può leggerli. Inserisci qualsiasi dato che non debba essere leggibile in questo modo su un canale con retention.
-- **Su un canale temporaneo (ephemeral)** non c'è nulla a cui puntare. Il broadcast viene recapitato localmente, il mittente riceve un errore `CHANNEL_BUS_PAYLOAD_TOO_LARGE` su `channel.onError()` e un warning indica il canale — evitando che il messaggio raggiunga silenziosamente solo metà del cluster.
+- **Su un canale temporaneo (ephemeral)** non c'è nulla a cui puntare, quindi un broadcast oltre il limite viaggia in parti: diviso in notifiche che partono insieme in un'unica istruzione e che ogni istanza ricompone prima di recapitarlo. Fino a 1 MiB un broadcast raggiunge ogni istanza, qualunque sia la sua dimensione; solo uno più grande viene rifiutato: recapitato localmente, con un errore `CHANNEL_BUS_PAYLOAD_TOO_LARGE` al mittente su `channel.onError()` e un avviso che nomina il canale. Le versioni precedenti rifiutavano così tutto ciò che superava gli 8 KB, per cui una stanza i cui membri finivano su due istanze sentiva i messaggi grandi solo su quella del mittente.
 
-Se trasmetti messaggi di grandi dimensioni, definisci una regola di retention per quel canale. Questa è l'intera soluzione.
+Un canale che trasmette spesso messaggi grandi resta più economico con una regola di retention: un puntatore per messaggio invece di una parte ogni 5 KB.
 
 ### La presence è uno stato condiviso, non solo fan-out
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1b7c64b3c001f57d
+sourceHash: 25f7a68655385605
 title: Le temps réel entre instances
 sidebar_label: Temps réel entre instances
 description: "Comment les canaux de diffusion et la présence fonctionnent à travers plusieurs processus serveur : le bus LISTEN/NOTIFY, les responsabilités de chaque instance et l'écriture de votre propre transport."
@@ -102,6 +102,14 @@ Avec `REBASE_METRICS=true`, chaque instance rapporte ce qu'elle transporte sur `
 | `rebase_realtime_channels` | gauge | Canaux ayant un membre sur cette instance |
 | `rebase_realtime_bus_frames_published_total` | counter | Frames envoyées par cette instance au bus, par `kind` : `broadcast`, `broadcast_ref`, `presence_diff`, et `channels`, les instances s'informant mutuellement de ce qu'elles desservent |
 | `rebase_realtime_bus_frames_skipped_total` | counter | Diffusions et changements de présence non envoyés car aucune autre instance n'avait de membres dans le canal |
+| `rebase_realtime_socket_opens_total` | counter | Sockets ouverts sur cette instance |
+| `rebase_realtime_socket_closes_total` | counter | Sockets fermés, par `closed_by` : `client` (une trame de fermeture), `client_watchdog` (le SDK a abandonné un socket silencieux, code 4003), `network` (disparu sans trame de fermeture, 1006), `no_pong` et `backlog` (ce serveur l'a lâché), `session`, `ceiling`, `shutdown`, `oversized_frame`, `server` |
+| `rebase_realtime_socket_close_codes_total` | counter | Sockets fermés, par `code` de fermeture (`other` pour un code applicatif que Rebase n'utilise pas) |
+| `rebase_realtime_frames_in_total` / `rebase_realtime_bytes_in_total` | counter | Trames reçues des clients, et leurs octets |
+| `rebase_realtime_frames_out_total` / `rebase_realtime_bytes_out_total` | counter | Trames envoyées par le service temps réel (diffusions, présence, mises à jour d'abonnements), et leurs octets |
+| `rebase_realtime_frames_refused_total` | counter | Trames refusées, par `code` : `RATE_LIMITED`, `CHANNEL_FORBIDDEN`, `CHANNEL_BUS_PAYLOAD_TOO_LARGE`, `FRAME_TOO_LARGE`, `AUTH_UNAVAILABLE` (le magasin d'authentification n'a pas pu revérifier l'identité), `UNAUTHORIZED` |
+
+Chaque ouverture et fermeture de socket est aussi une ligne info : `[WebSocket Server] Socket opened` avec son `clientId`, son `affinity` et ses opt-ins, et `[WebSocket Server] Socket closed` avec son `uid`, `closedBy`, `code`, `reason`, `ageMs`, ses canaux, ses trames entrantes et sortantes, et ses octets entrants et sortants. Quand des clients signalent des connexions perdues, lisez d'abord `closedBy` : `network` et `client_watchdog` désignent le chemin entre eux et le serveur, `no_pong` et `backlog` le serveur qui les lâche, `shutdown` un déploiement ou une réduction d'échelle.
 
 Les compteurs partent de zéro au démarrage d'une instance, et comptent les frames, le bus pouvant en regrouper plusieurs au sein d'une seule notification. Les messages persistés (retained) voyagent toujours, ils ne sont donc jamais ignorés. Sur le bus `memory` par défaut, les deux restent à zéro.
 
@@ -181,9 +189,9 @@ La distribution aux clients locaux n'est pas de votre ressort — le service tem
 
 - **Sur un canal persisté** (voir [Rétention de canal](/docs/backend/realtime#channel-retention)), le message est déjà stocké avec un numéro de séquence, de sorte que la notification ne transporte que `(channel, seq)` et chaque instance réceptrice relit le corps. Il n'y a aucune limite de taille. Cela vaut pour chaque message persisté, petit ou grand : n'importe quelle connexion à la base de données peut faire un `LISTEN`, de sorte que le corps ne transite jamais dans la notification. Cela coûte une lecture par clé primaire par message sur chaque instance ayant un membre sur le canal.
 - **Les diffusions éphémères et la présence** voyagent toujours dans la notification elle-même, de sorte que tout utilisateur connecté à la base de données peut les lire. Placez tout ce qui ne doit pas être lisible de cette manière sur un canal persisté.
-- **Sur un canal éphémère**, il n'y a rien vers quoi pointer. La diffusion est distribuée localement, l'expéditeur reçoit une erreur `CHANNEL_BUS_PAYLOAD_TOO_LARGE` sur `channel.onError()`, et un avertissement nomme le canal — plutôt que de voir le message atteindre silencieusement la moitié du cluster.
+- **Sur un canal éphémère**, il n'y a rien vers quoi pointer : une diffusion au-delà de la limite voyage donc en parties, découpée en notifications envoyées ensemble dans une seule instruction, que chaque instance réassemble avant de la distribuer. Jusqu'à 1 Mio, une diffusion atteint toutes les instances, quelle que soit sa taille ; seule une plus grande est refusée : distribuée localement, avec une erreur `CHANNEL_BUS_PAYLOAD_TOO_LARGE` pour l'expéditeur sur `channel.onError()` et un avertissement nommant le canal. Les versions précédentes refusaient ainsi tout ce qui dépassait 8 Ko, si bien qu'une salle dont les membres se trouvaient sur deux instances n'entendait ses gros messages que sur celle de l'expéditeur.
 
-Si vous diffusez des messages volumineux, appliquez une règle de rétention à ce canal. C'est la solution complète.
+Un canal qui diffuse souvent de gros messages reste moins coûteux avec une règle de rétention : un pointeur par message au lieu d'une partie par tranche de 5 Ko.
 
 ### La présence est un état partagé, pas seulement une diffusion
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1b7c64b3c001f57d
+sourceHash: 25f7a68655385605
 title: Tempo real entre instâncias
 sidebar_label: Tempo real entre instâncias
 description: "Como canais de broadcast e presença sobrevivem a mais de um processo de servidor: o barramento LISTEN/NOTIFY, o que cada instância possui e como escrever seu próprio transporte."
@@ -102,6 +102,14 @@ Com `REBASE_METRICS=true`, cada instância relata o que está transportando em `
 | `rebase_realtime_channels` | gauge | Canais com um membro nesta instância |
 | `rebase_realtime_bus_frames_published_total` | counter | Frames que esta instância enviou para o barramento, por `kind`: `broadcast`, `broadcast_ref`, `presence_diff` e `channels`, as instâncias informando umas às outras o que atendem |
 | `rebase_realtime_bus_frames_skipped_total` | counter | Transmissões e alterações de presença não enviadas porque nenhuma outra instância tinha membros no canal |
+| `rebase_realtime_socket_opens_total` | counter | Sockets abertos nesta instância |
+| `rebase_realtime_socket_closes_total` | counter | Sockets fechados, por `closed_by`: `client` (um frame de fechamento), `client_watchdog` (o SDK desistiu de um socket em silêncio, código 4003), `network` (sumiu sem frame de fechamento, 1006), `no_pong` e `backlog` (este servidor o liberou), `session`, `ceiling`, `shutdown`, `oversized_frame`, `server` |
+| `rebase_realtime_socket_close_codes_total` | counter | Sockets fechados, por `code` de fechamento (`other` para um código de aplicação que o Rebase não usa) |
+| `rebase_realtime_frames_in_total` / `rebase_realtime_bytes_in_total` | counter | Frames recebidos dos clientes, e seus bytes |
+| `rebase_realtime_frames_out_total` / `rebase_realtime_bytes_out_total` | counter | Frames enviados pelo serviço de tempo real (transmissões, presença, atualizações de assinaturas), e seus bytes |
+| `rebase_realtime_frames_refused_total` | counter | Frames recusados, por `code`: `RATE_LIMITED`, `CHANNEL_FORBIDDEN`, `CHANNEL_BUS_PAYLOAD_TOO_LARGE`, `FRAME_TOO_LARGE`, `AUTH_UNAVAILABLE` (o armazenamento de autenticação não conseguiu verificar a identidade de novo), `UNAUTHORIZED` |
+
+Cada abertura e fechamento de socket também é uma linha info: `[WebSocket Server] Socket opened` com seu `clientId`, `affinity` e opt-ins, e `[WebSocket Server] Socket closed` com seu `uid`, `closedBy`, `code`, `reason`, `ageMs`, canais, frames de entrada e saída, e bytes de entrada e saída. Quando clientes relatam conexões perdidas, leia primeiro `closedBy`: `network` e `client_watchdog` são o caminho entre eles e o servidor, `no_pong` e `backlog` o servidor liberando-os, `shutdown` um deploy ou uma redução de escala.
 
 Os contadores iniciam do zero junto com a instância e contam frames, dos quais o barramento pode agrupar vários em uma única notificação. Mensagens retidas sempre trafegam, portanto nunca são ignoradas. No barramento `memory` padrão, ambos permanecem em zero.
 
@@ -181,9 +189,9 @@ A entrega aos clientes locais não é sua preocupação — o serviço de tempo 
 
 - **Em um canal retido** (consulte [Retenção de canais](/docs/backend/realtime#channel-retention)), a mensagem já está armazenada com um número de sequência, portanto a notificação transporta apenas `(channel, seq)` e cada instância de recebimento lê o corpo de volta. Não há limite de tamanho. Isso se aplica a todas as mensagens retidas, pequenas ou grandes: qualquer login no banco de dados pode executar `LISTEN`, de modo que o corpo nunca trafega na notificação. Isso custa uma leitura de chave primária por mensagem em cada instância com um membro no canal.
 - **Transmissões efêmeras e presença** ainda trafegam na própria notificação, portanto qualquer login no banco de dados pode lê-las. Coloque qualquer coisa que não deva ser legível dessa forma em um canal retido.
-- **Em um canal efêmero** não há nada para o que apontar. A transmissão é entregue localmente, o remetente recebe um erro `CHANNEL_BUS_PAYLOAD_TOO_LARGE` em `channel.onError()`, e um aviso indica o nome do canal — em vez de a mensagem atingir silenciosamente apenas metade do cluster.
+- **Em um canal efêmero** não há nada para o que apontar, então uma transmissão acima do limite viaja em partes: dividida em notificações que saem juntas em uma única instrução, e que cada instância junta de novo antes de entregá-la. Até 1 MiB, uma transmissão chega a todas as instâncias, seja qual for seu tamanho; só uma maior é recusada: entregue localmente, com um erro `CHANNEL_BUS_PAYLOAD_TOO_LARGE` para o remetente em `channel.onError()` e um aviso que nomeia o canal. As versões anteriores recusavam assim tudo acima de 8 KB, de modo que uma sala cujos membros caíam em duas instâncias só ouvia suas mensagens grandes na do remetente.
 
-Se você transmite mensagens grandes, dê a esse canal uma regra de retenção. Essa é a solução completa.
+Um canal que transmite mensagens grandes com frequência continua mais barato com uma regra de retenção: um ponteiro por mensagem em vez de uma parte a cada 5 KB.
 
 ### Presença é estado compartilhado, não apenas fan-out
 
