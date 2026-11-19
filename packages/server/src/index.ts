@@ -577,6 +577,15 @@ export {
     isUncountedPath
 } from "./metrics";
 export type { MetricSurface, MetricsHandle } from "./metrics";
+export {
+    PROBE_HEADER,
+    PROBE_REQUESTS_METRIC,
+    UPTIME_MONITOR_AGENTS,
+    classifyProbe,
+    matchUptimeMonitor
+} from "./metrics/probes";
+export type { ProbeKind } from "./metrics/probes";
+export { SCHEDULED_JOBS_METRIC, BACKGROUND_WORKERS_METRIC } from "./metrics/scheduled-work";
 export { createContractRoutes } from "./api/contract-routes";
 export type { ContractRoutesConfig } from "./api/contract-routes";
 

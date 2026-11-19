@@ -15,6 +15,7 @@ import {
 import type { HonoEnv } from "../api/types";
 import { safeCompare } from "../auth/crypto-utils";
 import { extractBearerToken } from "../auth/bearer-token";
+import { classifyProbe, PROBE_REQUESTS_METRIC } from "./probes.js";
 
 /**
  * Runtime metrics, in Prometheus text format.
@@ -465,6 +466,21 @@ export function createMetricsMiddleware(basePath = "/api"): MetricsHandle {
         // Checked before anything is recorded, and it still calls `next()`:
         // this decides whether the request COUNTS, never whether it is served.
         if (isUncountedPath(pathname)) return next();
+        // An uptime monitor or a marked platform check: served, and counted
+        // apart, so it neither reads as activity (a sleeping project would
+        // never sleep) nor lands in the request total — see `./probes.ts`.
+        const probe = classifyProbe(name => c.req.header(name));
+        if (probe) {
+            try {
+                await next();
+            } finally {
+                registry.incrementCounter(PROBE_REQUESTS_METRIC, {
+                    ...probe,
+                    status: String(c.res?.status ?? 0)
+                });
+            }
+            return;
+        }
         const { surface, collection } = classifySurface(pathname, basePath);
 
         try {

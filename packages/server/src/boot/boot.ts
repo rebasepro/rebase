@@ -65,6 +65,7 @@ import { resolveAuthOptions, resolveLiveSchemaOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
 import { recordPoolWaits } from "../metrics/pool-wait";
 import { recordRealtimeCounts } from "../metrics/realtime";
+import { recordScheduledWork } from "../metrics/scheduled-work";
 import { recordDatabasePools, startDatabaseProbe, type MeteredSource } from "../metrics/database";
 import { fetchBundle, shouldFetchBundle, usableBundleFallback, dedupeRuntimePackages, imageModulesDir, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
 import { describeDriverSkew, readRuntimeVersion, schemaRecoveryGuidance } from "./version-skew";
@@ -620,6 +621,9 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // The sampler records per-minute request deltas from this registry.
         const registry = metrics.registry;
         backend.metricsHistory?.countRequestsFrom(() => registry.requestTotalsBySurface());
+        // Cron jobs and job workers stop while a project sleeps; the platform
+        // reads these to refuse sleep or warn — see `metrics/scheduled-work.ts`.
+        recordScheduledWork(metrics.registry, backend.cronScheduler, backend.jobQueue);
         recordRealtimeCounts(metrics.registry, backend.realtimeService);
         app.route("/metrics", createMetricsRoutes(
             metrics.registry,
@@ -889,6 +893,8 @@ async function bootStaticApp(
         // No history argument: this is the static-app path, which has no backend
         // and no database — the route reports that honestly as a 501 rather
         // than serving an empty series.
+        // Zeros, said rather than omitted: a static app schedules nothing.
+        recordScheduledWork(metrics.registry, undefined, undefined);
         app.route("/metrics", createMetricsRoutes(metrics.registry, metricsToken));
     }
 
