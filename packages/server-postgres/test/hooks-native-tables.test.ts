@@ -332,9 +332,14 @@ describe("PII through an include", () => {
             path: "posts", id: String(hello.id), include: ["author"],
             onUpdate: (row) => frames.push(row)
         });
-        await wait(150);
+        // Wait for each frame rather than a fixed time: 150ms and 300ms were
+        // too short on a loaded CI runner (run 44590978405 saw only the first).
+        const until = async (count: number): Promise<void> => {
+            for (let waited = 0; frames.length < count && waited < 10_000; waited += 25) await wait(25);
+        };
+        await until(1);
         await realtime.notifyUpdate("posts", String(hello.id), { _rebase_invalidated: true });
-        await wait(300);
+        await until(2);
         unsubscribe();
 
         expect(frames.length).toBeGreaterThanOrEqual(2);
@@ -351,7 +356,8 @@ describe("PII through an include", () => {
             path: "posts", include: ["author"], filter: { title: ["==", "Hello"] },
             onUpdate: (rows) => frames.push(rows)
         });
-        await wait(150);
+        // Waits for the frame, as the test above does, not a fixed 150ms.
+        for (let waited = 0; frames.length < 1 && waited < 10_000; waited += 25) await wait(25);
         unsubscribe();
 
         expect(frames.length).toBeGreaterThanOrEqual(1);
