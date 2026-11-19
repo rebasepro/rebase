@@ -14,7 +14,6 @@ import {
     atlasDevDatabaseUrl,
     ensureDevDatabaseExists,
     dropDevDatabase,
-    applySearchDdl,
     getSearchExcludes,
     getForeignIndexExcludes,
     getUnmanagedChildExcludes,
@@ -23,7 +22,6 @@ import {
     ExcludeIntrospectionError,
     queryGeneratedColumnDependencies,
     queryColumnTypes,
-    dropGeneratedColumns,
     withAppClient,
     closeAppClients
 } from "./cli-helpers";
@@ -47,12 +45,10 @@ import { declaredIndexesIfNotExists, indexAdoptionStatement, type IndexAdoption 
 import {
     parseColumnMutations,
     findGeneratedColumnConflicts,
-    partitionByOwnership,
-    dropGeneratedColumnStatements,
-    describeConflict
+    partitionByOwnership
 } from "./schema/generated-column-conflicts";
 import type { ExistingConstraint } from "./schema/undeclarable-constraints";
-import { finishNewMigration, preparePtahMigration } from "./schema/migration-post-process";
+import { finishNewMigration, preparePtahMigration, ptahManualMigrationWarning } from "./schema/migration-post-process";
 import { managedSelectorsForPlan, rememberManagedSelectors } from "./schema/managed-selectors";
 import { ptahApplyDesiredStateUrl } from "./schema/ptah-policy-comments";
 import { acceptsExcludes, buildAtlasArgs, migrateApplyArgs, migrateDiffExcludeValue, migrateDiffIncludeValue, readsRevisions, takesDevUrl } from "./schema/atlas-argv";
@@ -299,22 +295,6 @@ function latestMigrationVersion(): string | null {
 }
 
 /**
- * The newest migration's declared indexes as `CREATE INDEX IF NOT EXISTS`, so
- * `rebase db migrate` can adopt an identical existing index under the declared
- * name before applying it (`adoptIdenticalIndexes`) and the statement then
- * finds it there. Re-hashes the directory when it rewrote anything.
- */
-async function makeDeclaredIndexesAdoptable(schemaDir: string): Promise<void> {
-    const newest = listMigrationFiles().at(-1);
-    if (!newest) return;
-    const file = path.resolve(process.cwd(), "drizzle", "migrations", newest);
-    const result = declaredIndexesIfNotExists(fs.readFileSync(file, "utf-8"));
-    if (result.rewritten === 0) return;
-    fs.writeFileSync(file, result.sql, "utf-8");
-    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir);
-}
-
-/**
  * One line per destructive statement, as `db push` prints them — shared by
  * push, `db generate` and `db migrate --refuse-destructive`, so the three
  * describe the same statement the same way.
@@ -455,16 +435,8 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         const migrationName = argsList._[0] || "migration";
         const migrationsBefore = listMigrationFiles();
         await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", DESIRED_STATE_URL], schemaDir);
-        const wroteNewMigration = listMigrationFiles().length > migrationsBefore.length;
-        if (wroteNewMigration) await makeDeclaredIndexesAdoptable(schemaDir);
-        const newestWritten = wroteNewMigration ? listMigrationFiles().at(-1) : undefined;
-        if (newestWritten) {
-            await reportDestructiveMigration(
-                fs.readFileSync(path.resolve(process.cwd(), "drizzle", "migrations", newestWritten), "utf-8"),
-                newestWritten,
-                process.env.DATABASE_URL
-            );
-        }
+        const migrationFiles = listMigrationFiles();
+        const newestWritten = migrationFiles.length > migrationsBefore.length ? migrationFiles.at(-1) : undefined;
 
         // A role belongs to the PostgreSQL server, not the scratch database.
         // Ptah can omit its CREATE when the role already exists on the dev
@@ -472,40 +444,44 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         // policies that name it. Keep the idempotent schema rewrite used for
         // the revisions schema and update atlas.sum after either change.
         const migrationsDir = path.resolve(process.cwd(), "drizzle", "migrations");
-        const newestSql = wroteNewMigration ? listMigrationFiles().at(-1) : undefined;
-        if (newestSql) {
-            const newestMigrationFile = path.join(migrationsDir, newestSql);
+        if (newestWritten) {
+            const newestMigrationFile = path.join(migrationsDir, newestWritten);
             const finished = await finishNewMigration(newestMigrationFile, async () => {
                 const desiredSql = fs.readFileSync(path.join(generatedSqlDir(), "schema.sql"), "utf-8");
                 const migrationContent = preparePtahMigration(
                     fs.readFileSync(newestMigrationFile, "utf-8"),
                     desiredSql.includes("DO $rebase_admin_role$")
                 );
-                fs.writeFileSync(newestMigrationFile, migrationContent, "utf-8");
+                // migrate adopts an identical live index under the declared
+                // name before applying the SQL.
+                fs.writeFileSync(newestMigrationFile, declaredIndexesIfNotExists(migrationContent).sql, "utf-8");
                 await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir, { throwOnFailure: true });
             }, async () => {
                 await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir, { throwOnFailure: true });
             });
             if (!finished.ok) {
-                outError(chalk.red(`\n  ✗ Could not finish ${newestSql}: ${finished.error}`));
+                outError(chalk.red(`\n  ✗ Could not finish ${newestWritten}: ${finished.error}`));
                 outError(chalk.gray(finished.removed
-                    ? `    ${newestSql} was removed. Fix the cause and run \`rebase db generate\` again.`
-                    : `    ${newestSql} could not be removed — delete it before \`rebase db migrate\`.`));
+                    ? `    ${newestWritten} was removed. Fix the cause and run \`rebase db generate\` again.`
+                    : `    ${newestWritten} could not be removed — delete it before \`rebase db migrate\`.`));
                 if (finished.rehashError) {
                     outError(chalk.gray(`    Re-hashing failed too (${finished.rehashError}).`));
                 }
                 process.exit(1);
             }
-        }
-
-        if (!wroteNewMigration) {
+            await reportDestructiveMigration(
+                fs.readFileSync(newestMigrationFile, "utf-8"),
+                newestWritten,
+                process.env.DATABASE_URL
+            );
+        } else {
             out(chalk.gray("  ℹ No migration written — the declared schema is unchanged."));
         }
         rememberManagedSelectors();
 
         const nextStep = nextStepAfterDbGenerate({
             newestVersion: latestMigrationVersion(),
-            wrote: wroteNewMigration,
+            wrote: newestWritten !== undefined,
             first: migrationsBefore.length === 0
         });
         out("");
@@ -583,6 +559,11 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 schemaDir,
                 { captureStdout: true }
             );
+            const manualMigration = ptahManualMigrationWarning(plan);
+            if (manualMigration) {
+                outError(chalk.red(`  ✗ ${manualMigration}`));
+                throw new CommandStopped("The generated column needs a manual migration.");
+            }
             // The columns' current types, because an `ALTER COLUMN … TYPE`
             // loses data or does not depending on what the column is now.
             // Without them every type change is gated. And the CHECK and
@@ -603,17 +584,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 ? plan.trim()
                 : planStatements.map(statement => `${statement};`).join("\n");
 
-            // PostgreSQL refuses to retype or drop a column while a generated
-            // column depends on it. Rebase removes its own generated columns
-            // before applying the plan; Ptah restores them from schema.sql.
-            // If the apply fails, search.sql restores the previous definition.
+            // Ptah rebuilds managed generated columns inside its transaction.
+            // Keep changes to foreign generated columns outside this workflow.
             const generatedConflicts = databaseUrl
                 ? findGeneratedColumnConflicts(
                     parseColumnMutations(plan),
                     await queryGeneratedColumnDependencies(databaseUrl)
                 )
                 : [];
-            const { managed: rebuildable, foreign: unowned } = partitionByOwnership(
+            const { foreign: unowned } = partitionByOwnership(
                 generatedConflicts,
                 schemaDir ? await getSearchExcludes(schemaDir) : []
             );
@@ -651,15 +630,6 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     out(chalk.gray("  above lists them because they do not exist yet):"));
                     for (const name of prebuilt) {
                         out(chalk.gray(`       ${name}`));
-                    }
-                    out("");
-                }
-                if (rebuildable.length > 0) {
-                    out(chalk.gray(`  ${rebuildable.length} generated column(s) would be dropped before the apply and`));
-                    out(chalk.gray("  rebuilt from schema.sql by Ptah — Postgres cannot retype a column"));
-                    out(chalk.gray("  while one reads it:"));
-                    for (const conflict of rebuildable) {
-                        out(chalk.gray(`       ${describeConflict(conflict)}`));
                     }
                     out("");
                 }
@@ -723,29 +693,11 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 }
             }
 
-            // Without a database URL there is nothing to drop or rebuild: runAtlas
-            // refuses to run without one anyway.
-            const rebuildCount = databaseUrl ? rebuildable.length : 0;
-            await applyPushPlan({ dryRun: plan, rebuildable: rebuildCount }, {
-                dropRebuildable: async () => {
-                    if (!databaseUrl) return;
-                    for (const conflict of rebuildable) {
-                        out(chalk.gray(`  Dropping ${describeConflict(conflict)} — it reads a column this push retypes.`));
-                    }
-                    await dropGeneratedColumns(databaseUrl, dropGeneratedColumnStatements(rebuildable));
-                },
-                // Thrown, not exited: an exit from inside runAtlas skipped the
-                // rebuild below entirely, so a failed apply left the search
-                // columns it had just dropped dropped.
+            await applyPushPlan(plan, {
                 atlasApply: async () => {
                     await runAtlas("schema", ["apply", "--to", applyDesiredStateUrl, "--auto-approve"], schemaDir, { throwOnFailure: true, omitPlanEcho: true });
                 },
                 reportSynced: () => out("Schema is synced, no changes to be made"),
-                rebuildAfterFailure: async () => {
-                    if (!databaseUrl) return;
-                    out(chalk.gray("  The apply failed — rebuilding the generated columns it needed out of the way."));
-                    await applySearchDdl(databaseUrl);
-                },
                 afterApply: async () => {
                     out("");
                     if (!databaseUrl) {

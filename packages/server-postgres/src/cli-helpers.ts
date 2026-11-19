@@ -623,48 +623,7 @@ export async function dropDevDatabase(databaseUrl: string, devDatabaseUrl: strin
     }
 }
 
-/**
- * The generated SQL for the project's `search` blocks, if it has any.
- *
- * @param sqlDir directory holding the generated SQL. Defaults to
- *        `.rebase/sql` under the working directory.
- */
-export function readSearchDdl(sqlDir: string = generatedSqlDir()): string {
-    const searchFile = path.join(sqlDir, "search.sql");
-    if (!fs.existsSync(searchFile)) return "";
-    return fs.readFileSync(searchFile, "utf-8").trim();
-}
-
-/**
- * Bring the search column, its index and their helpers up to date.
- *
- * Runs *after* Atlas, not before: the statements are `ALTER TABLE ... ADD
- * COLUMN`, so the table has to exist. Atlas is told to ignore these objects
- * entirely (`getSearchExcludes`) — it cannot manage them, and left to itself it
- * would plan a `DROP COLUMN` for every one, since they are absent from the
- * desired state it was given.
- *
- * A no-op when no collection declared `search`. A failure is *not* swallowed:
- * silently pushing a schema whose search column never appeared is how a
- * collection ends up with search configured, no error anywhere, and no results.
- */
-export async function applySearchDdl(
-    databaseUrl: string,
-    sqlDir: string = generatedSqlDir()
-): Promise<void> {
-    const sql = readSearchDdl(sqlDir);
-    if (!sql) return;
-
-    await withAppClient(databaseUrl, client => client.query(sql));
-    out(chalk.gray("  ✓ Applied full-text search columns and indexes"));
-}
-
-/**
- * Glob patterns keeping Atlas away from the search objects.
- *
- * Returns an empty list — and so changes nothing — for a project with no
- * `search` block, which is every project that has not opted in.
- */
+/** Selectors identifying generated search columns declared by the project. */
 export async function getSearchExcludes(schemaDir: string): Promise<string[]> {
     const { searchExcludePatterns } = await import("./schema/generate-postgres-ddl-logic");
     return searchExcludePatterns(await tablesIn(schemaDir));
@@ -679,8 +638,8 @@ export async function getSearchExcludes(schemaDir: string): Promise<string[]> {
  * cannot be fooled by a column name that also appears inside a string literal
  * or as part of a longer identifier.
  *
- * Used by `db push` to find what has to come out of the way before Atlas runs —
- * see `generated-column-conflicts.ts` for why that is necessary at all.
+ * Used by `db push` to identify generated columns outside Rebase ownership
+ * before applying a plan that retypes or drops one of their inputs.
  */
 export async function queryGeneratedColumnDependencies(
     databaseUrl: string
@@ -718,25 +677,6 @@ export async function queryColumnTypes(databaseUrl: string): Promise<ExistingCol
 }
 
 /**
- * Drop the generated columns standing in the way of an apply.
- *
- * Their indexes and their `COMMENT ON COLUMN` stamp go with them, which is
- * exactly right: `applySearchDdl` rebuilds all three from `search.sql` and a
- * surviving stamp would make the rebuilt column look like drift.
- */
-export async function dropGeneratedColumns(
-    databaseUrl: string,
-    statements: string[]
-): Promise<void> {
-    if (statements.length === 0) return;
-    await withAppClient(databaseUrl, async client => {
-        for (const statement of statements) {
-            await client.query(statement);
-        }
-    });
-}
-
-/**
  * The generated SQL for the project's `vector` properties, if it has any.
  *
  * @param sqlDir directory holding the generated SQL. Defaults to
@@ -752,7 +692,7 @@ export function readVectorDdl(sqlDir: string = generatedSqlDir()): string {
  * Install pgvector and bring the vector columns and their ANN indexes up to
  * date.
  *
- * Runs *after* Atlas, like {@link applySearchDdl} and for the same reason: the
+ * Runs *after* planning because the
  * statements are `ALTER TABLE … ADD COLUMN`, so the table has to exist. Atlas
  * is told to ignore these objects entirely ({@link getVectorExcludes}) — it
  * cannot manage a type its dev database is structurally incapable of having,
@@ -815,7 +755,7 @@ export function readTriggersDdl(sqlDir: string = generatedSqlDir()): string {
  * Install the `updated_at` trigger function and bind it to every column that
  * asked for one.
  *
- * Runs *after* Atlas, like {@link applySearchDdl} and {@link applyVectorDdl}:
+ * Runs *after* planning:
  * a trigger needs its table and its column to exist. Atlas is told to ignore
  * the triggers ({@link getTriggerExcludes}) because it cannot manage a function
  * at all — its free tier refuses to parse a desired state containing one.

@@ -28,6 +28,39 @@ describe("splitSqlStatements", () => {
 });
 
 describe("detectDestructiveStatements", () => {
+    describe("a stored generated column rebuilt within one ALTER TABLE", () => {
+        const search = { schema: "public", table: "posts", column: "search_vector", type: "tsvector", storedGenerated: true };
+        const title = { schema: "public", table: "posts", column: "title", type: "character varying(40)" };
+        const drop = 'DROP COLUMN "search_vector"';
+        const add = 'ADD COLUMN "search_vector" tsvector GENERATED ALWAYS AS (to_tsvector(title)) STORED';
+        const retype = 'ALTER COLUMN "title" TYPE character varying(100)';
+        const plan = (...clauses: string[]) => 'ALTER TABLE "public"."posts" ' + clauses.join(", ") + ";";
+
+        it("allows a lossless retype when the generated column is restored", () => {
+            expect(detectDestructiveStatements(plan(drop, retype, add), [title, search])).toEqual([]);
+        });
+
+        it("keeps flagging a real drop, even in the same ALTER TABLE", () => {
+            const found = detectDestructiveStatements(plan(drop, retype, add, 'DROP COLUMN "legacy"'), [title, search]);
+            expect(found.map(item => item.kind)).toEqual(["DROP COLUMN"]);
+        });
+
+        it("requires a catalog match and a replacement with stored generation", () => {
+            for (const columns of [[], [{ ...search, storedGenerated: false }], [{ ...search, schema: "archive" }]]) {
+                expect(detectDestructiveStatements(plan(drop, add), columns).map(item => item.kind)).toEqual(["DROP COLUMN"]);
+            }
+            for (const clauses of [[drop], [drop, 'ADD COLUMN "search_vector" tsvector'], [drop + " CASCADE", add]]) {
+                expect(detectDestructiveStatements(plan(...clauses), [search]).map(item => item.kind)).toEqual(["DROP COLUMN"]);
+            }
+        });
+
+        it("still flags a lossy type change during a rebuild", () => {
+            const narrow = 'ALTER COLUMN "title" TYPE character varying(10)';
+            const findings = detectDestructiveStatements(plan(drop, narrow, add), [title, search]);
+            expect(findings.map(item => item.kind)).toEqual(["ALTER COLUMN TYPE"]);
+        });
+    });
+
     it("flags DROP COLUMN (field removal / rename)", () => {
         const found = detectDestructiveStatements('ALTER TABLE "users" DROP COLUMN "nickname";');
         expect(found).toHaveLength(1);

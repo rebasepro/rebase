@@ -3,11 +3,23 @@ import { REBASE_ADMIN_ROLE } from "@rebasepro/types";
 import { ADMIN_POLICY_ROLE_SQL } from "./rls-bootstrap-sql";
 
 /**
+ * Ptah can emit a generated-column warning beside valid DDL, such as a
+ * fingerprint comment. Applying the comment would make the old expression
+ * look current even though Ptah cannot change it on this PostgreSQL version.
+ */
+export function ptahManualMigrationWarning(plan: string): string | undefined {
+    return /^-- (WARNING: Generated column [^\r\n]+; manual migration required\.)\r?$/m.exec(plan)?.[1];
+}
+
+/**
  * Make generated Rebase helpers replayable after auth bootstrap. Leave other
  * functions' CREATE semantics intact. The admin role is cluster-wide, so it
  * must be created conditionally even when the scratch server lacked it.
  */
 export function preparePtahMigration(migration: string, needsAdminRole: boolean): string {
+    const warning = ptahManualMigrationWarning(migration);
+    if (warning) throw new Error(warning);
+
     let prepared = migration
         .replace(/CREATE SCHEMA (?!IF NOT EXISTS)("[^"]+");/g, "CREATE SCHEMA IF NOT EXISTS $1;")
         .replace(

@@ -3,7 +3,17 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { finishNewMigration, preparePtahMigration } from "../src/schema/migration-post-process";
+import { finishNewMigration, preparePtahMigration, ptahManualMigrationWarning } from "../src/schema/migration-post-process";
+
+const GENERATED_COLUMN_WARNING = "WARNING: Generated column public.tasks.search_vector changed, but ALTER COLUMN SET EXPRESSION requires target capability alter_generated_column_expression, unavailable on this target (PostgreSQL added it in 17); manual migration required.";
+const INCOMPLETE_SEARCH_PLAN = `-- ${GENERATED_COLUMN_WARNING}\nCOMMENT ON COLUMN "public"."tasks"."search_vector" IS 'new fingerprint';\n`;
+
+describe("ptahManualMigrationWarning", () => {
+    it("finds the warning even when Ptah plans a valid fingerprint comment", () => {
+        expect(ptahManualMigrationWarning(`Planned schema changes:\n${INCOMPLETE_SEARCH_PLAN}`)).toBe(GENERATED_COLUMN_WARNING);
+        expect(ptahManualMigrationWarning('ALTER TABLE "tasks" ALTER COLUMN "search_vector" SET EXPRESSION AS (new_expression);')).toBeUndefined();
+    });
+});
 
 describe("preparePtahMigration", () => {
     it("makes generated functions and schemas replayable after auth bootstrap", () => {
@@ -54,6 +64,18 @@ describe("finishNewMigration", () => {
         }, rehash);
 
         expect(outcome).toEqual({ ok: false, error: "search.sql could not be read", removed: true });
+        expect(fs.existsSync(file)).toBe(false);
+        expect(rehash).toHaveBeenCalledTimes(1);
+    });
+
+    it("removes an incomplete migration before its fingerprint comment can be applied", async () => {
+        fs.writeFileSync(file, INCOMPLETE_SEARCH_PLAN);
+        const rehash = jest.fn(async () => undefined);
+        const outcome = await finishNewMigration(file, async () => {
+            preparePtahMigration(fs.readFileSync(file, "utf8"), false);
+        }, rehash);
+
+        expect(outcome).toEqual({ ok: false, error: GENERATED_COLUMN_WARNING, removed: true });
         expect(fs.existsSync(file)).toBe(false);
         expect(rehash).toHaveBeenCalledTimes(1);
     });

@@ -124,19 +124,18 @@ describe("db push destructive-change gate E2E", () => {
         if (container) await stopPgContainer(container.containerName);
     }, 30_000);
 
-    /**
-     * Run `rebase db push` NON-INTERACTIVELY (stdin ignored ⇒ not a TTY) so
-     * the gate's non-interactive branch is exercised. `reject: false` lets us
-     * assert on the exit code; `all: true` merges stdout+stderr for message
-     * checks.
-     */
-    function runPush(extra: string[] = []) {
+    /** Run without a TTY and capture the complete plan or error. */
+    function runDb(command: "push" | "generate", extra: string[] = []) {
         const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
         return execa(
             tsxBin,
-            [cliScript, "db", "push", "--schema-dir", schemaDir, ...extra],
+            [cliScript, "db", command, "--schema-dir", schemaDir, ...extra],
             { cwd: workDir, env, reject: false, stdin: "ignore", all: true }
         );
+    }
+
+    function runPush(extra: string[] = []) {
+        return runDb("push", extra);
     }
 
     /** {@link runPush} against another connection string. */
@@ -245,13 +244,7 @@ describe("db push destructive-change gate E2E", () => {
         expect(row.rows).toEqual([{ rating: "123.45", type: "numeric(5,2)" }]);
     }, 150_000);
 
-    /**
-     * The same blindness, on the path that moves the search column out of the
-     * way: Postgres refuses to retype a column a generated column reads, and
-     * `db push` drops and rebuilds Rebase's own search column around the apply —
-     * but only if it sees the retype in the plan. It did not, and every push
-     * after widening a searched `varchar` failed with no hint.
-     */
+    /** PostgreSQL requires the plan to rebuild search around the type change. */
     it("widens a column a search block reads, rebuilding the search column around it", async () => {
         fs.writeFileSync(path.join(schemaDir, "prices.ts"),
             pricesTableTs({ precision: 5, scale: 2, nicknameMax: 100 }));
@@ -268,14 +261,7 @@ describe("db push destructive-change gate E2E", () => {
         expect(Object.values(byName).some((c) => (c as { generated: boolean }).generated)).toBe(true);
     }, 150_000);
 
-    /**
-     * The push drops the search column before the apply. If the apply then
-     * fails for some other reason, the column must come back: Atlas rolled its
-     * transaction back, so the old definition still fits. The rebuild was
-     * written, and never ran — the failure exited from inside the Atlas runner,
-     * past the `catch` that held it — so search was left gone.
-     */
-    it("puts the search column back when the apply it made room for fails", async () => {
+    it("keeps the search column when an apply with a rebuild fails", async () => {
         await dbClient.query(`INSERT INTO prices (nickname, rating) VALUES ('no rating', NULL)`);
         fs.writeFileSync(path.join(schemaDir, "prices.ts"),
             pricesTableTs({ precision: 5, scale: 2, nicknameMax: 200, ratingRequired: true }));
@@ -381,5 +367,29 @@ export const translations = defineTable("translations", {
         expect(planned.exitCode, planned.all).toBe(0);
         expect(planned.all).not.toMatch(/SSL is not enabled/);
         expect(await scratchDatabases()).toEqual([]);
+    }, 150_000);
+
+    it("generates a search-column rebuild once when a varchar grows", async () => {
+        for (const file of fs.readdirSync(schemaDir)) fs.rmSync(path.join(schemaDir, file));
+        fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex("prices"));
+        const pricesFile = path.join(schemaDir, "prices.ts");
+        fs.writeFileSync(pricesFile, pricesTableTs({ precision: 5, scale: 2, nicknameMax: 40 }));
+        const baseline = await runDb("generate", ["search_baseline"]);
+        expect(baseline.exitCode, baseline.all).toBe(0);
+
+        fs.writeFileSync(pricesFile, pricesTableTs({ precision: 5, scale: 2, nicknameMax: 100 }));
+        const widened = await runDb("generate", ["widen_search_input"]);
+        expect(widened.exitCode, widened.all).toBe(0);
+
+        const migrations = path.join(workDir, "drizzle", "migrations");
+        const before = fs.readdirSync(migrations).filter(name => name.endsWith(".sql")).sort();
+        expect(before).toHaveLength(2);
+        const sql = fs.readFileSync(path.join(migrations, before[1]), "utf8");
+        expect(sql).toMatch(/ALTER COLUMN "nickname" TYPE character varying\(100\)/i);
+        expect(sql).toMatch(/ADD COLUMN "search_vector"[^;]+GENERATED ALWAYS AS/i);
+
+        const repeated = await runDb("generate", ["unchanged_search"]);
+        expect(repeated.exitCode, repeated.all).toBe(0);
+        expect(fs.readdirSync(migrations).filter(name => name.endsWith(".sql")).sort()).toEqual(before);
     }, 150_000);
 });
