@@ -10,6 +10,7 @@ import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, Save
 import type { SqlScriptResult } from "@rebasepro/types";
 import { deserializeFilter, redactSqlLiterals, relationOf, UnknownFilterOperatorError } from "@rebasepro/common";
 import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
+import { closerOf, noteServerClose, socketStats } from "./services/socket-stats";
 import { DEFAULT_HEARTBEAT_INTERVAL_MS, HEARTBEAT_FRAME, helloFrame, requestedOptIns, startHeartbeats, type SocketOptIn } from "./socket-opt-ins";
 import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AccessModel, type AdminScope } from "@rebasepro/types";
 import type { CallerCredential, User } from "@rebasepro/types";
@@ -42,7 +43,15 @@ export interface SocketRealtimeService {
      * depends on one need not hear about them.
      */
     setClientOptIns?(clientId: string, optIns: ReadonlySet<SocketOptIn>): void;
+    /**
+     * What a socket is in and what it was pushed, for the line its close
+     * logs. Optional: without it the line names no channels.
+     */
+    describeClient?(clientId: string): { channels: string[]; framesOut: number; bytesOut: number };
 }
+
+/** How many channel names a socket's close line lists; the count is always there. */
+const LOGGED_CHANNELS = 5;
 
 /**
  * Narrow a bootstrapper's realtime provider to what the socket calls.
@@ -547,6 +556,14 @@ function refuseUpgrade(socket: Duplex): void {
 }
 
 /** A frame's size in bytes, however `ws` delivered it. */
+/** One query parameter of a socket's upgrade URL, cut to a length a log line can carry. */
+function socketQueryParam(url: string | undefined, name: string): string | undefined {
+    if (!url) return undefined;
+    const query = url.indexOf("?");
+    if (query === -1) return undefined;
+    return new URLSearchParams(url.slice(query + 1)).get(name)?.slice(0, 80) ?? undefined;
+}
+
 function frameBytes(data: RawData): number {
     if (Array.isArray(data)) return data.reduce((total, chunk) => total + chunk.length, 0);
     return data.byteLength;
@@ -886,6 +903,7 @@ export function createPostgresWebSocket(
         } catch {
             // Already closing.
         }
+        noteServerClose(session.ws, "session");
         session.ws.close(SESSION_ENDED_CLOSE_CODE, message.slice(0, 120));
     }
 
@@ -1080,6 +1098,47 @@ export function createPostgresWebSocket(
         const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const origin = connectionOrigin(request);
         wsDebug(`WebSocket client connected: ${clientId}`);
+        const openedAt = Date.now();
+        let framesIn = 0;
+        let bytesIn = 0;
+        /** Who it signed in as last, kept after a session that ended forgets it. */
+        let lastUid: string | undefined;
+        socketStats.noteOpened();
+        logger.info("[WebSocket Server] Socket opened", {
+            clientId,
+            affinity: socketQueryParam(request?.url, "affinity"),
+            caps: socketQueryParam(request?.url, "rebase_caps")
+        });
+        // One line per socket that closes, naming who closed it and what it
+        // carried: what "the connection keeps dropping" is read against. Then
+        // the session goes. Registered before the realtime service's own close
+        // handler, which forgets what the socket was in.
+        ws.on("close", (code: number, reasonBuffer?: Buffer) => {
+            const closedBy = closerOf(ws, code);
+            socketStats.noteClosed(closedBy, code);
+            if (code === 1009) socketStats.noteRefused("FRAME_TOO_LARGE");
+            const described = realtimeService.describeClient?.(clientId);
+            const channels = described?.channels ?? [];
+            const tcp = request?.socket;
+            logger.info("[WebSocket Server] Socket closed", {
+                clientId,
+                uid: clientSessions.get(clientId)?.user?.uid ?? lastUid,
+                closedBy,
+                code,
+                reason: reasonBuffer && reasonBuffer.length > 0 ? reasonBuffer.toString("utf8").slice(0, 120) : undefined,
+                ageMs: Date.now() - openedAt,
+                channelCount: channels.length,
+                channels: channels.slice(0, LOGGED_CHANNELS),
+                framesIn,
+                framesOut: described?.framesOut,
+                bytesIn: tcp?.bytesRead ?? bytesIn,
+                bytesOut: tcp?.bytesWritten ?? described?.bytesOut
+            });
+            wsDebug(`WebSocket client disconnected: ${clientId}`);
+            const session = clientSessions.get(clientId);
+            if (session?.expiryTimer) clearTimeout(session.expiryTimer);
+            clientSessions.delete(clientId);
+        });
 
         // What the client opted into on its URL, answered with a `hello`
         // before anything else. A client that named nothing — one that
@@ -1112,13 +1171,6 @@ fetchAllowanceAt: Date.now() });
         // frame can only ever stop a run its own socket started.
         const sqlRuns = new Map<string, AbortController>();
 
-        ws.on("close", () => {
-            wsDebug(`WebSocket client disconnected: ${clientId}`);
-            const session = clientSessions.get(clientId);
-            if (session?.expiryTimer) clearTimeout(session.expiryTimer);
-            clientSessions.delete(clientId);
-        });
-
         // A frame over `maxPayload` is refused by `ws` as an `error` on this
         // socket, then closed with 1009. An `error` with no listener is thrown
         // by the emitter — out of the process — so the socket that set the
@@ -1132,9 +1184,14 @@ fetchAllowanceAt: Date.now() });
             // Every frame is answered, so one from a client that has not read
             // its earlier answers would only add to a backlog it is not draining.
             if (terminateIfBacklogged(ws, clientId)) return;
+            const inBytes = frameBytes(message);
+            framesIn++;
+            bytesIn += inBytes;
+            socketStats.noteFrameIn(inBytes);
             let requestId: string | undefined;
             try {
                 if (!clientSessions.get(clientId)?.authenticated && frameBytes(message) > MAX_UNAUTHENTICATED_FRAME_BYTES) {
+                    noteServerClose(ws, "oversized_frame");
                     ws.close(1009, "Authenticate before sending anything larger than a token.");
                     return;
                 }
@@ -1189,6 +1246,7 @@ fetchAllowanceAt: Date.now() });
                             }
                             session.channelMessageCount++;
                             if (session.channelMessageCount > WS_CHANNEL_RATE_LIMIT) {
+                                socketStats.noteRefused("RATE_LIMITED");
                                 sendError("ERROR", "RATE_LIMITED", "Too many channel messages. Please slow down.");
                                 return;
                             }
@@ -1199,6 +1257,7 @@ fetchAllowanceAt: Date.now() });
                             }
                             session.messageCount++;
                             if (session.messageCount > WS_RATE_LIMIT) {
+                                socketStats.noteRefused("RATE_LIMITED");
                                 sendError("ERROR", "RATE_LIMITED", "Too many requests. Please slow down.");
                                 return;
                             }
@@ -1279,10 +1338,12 @@ fetchAllowanceAt: Date.now() });
                                     `This user already has ${held} realtime connections open on this server, the most it allows ` +
                                     "(REALTIME_MAX_SOCKETS_PER_USER). Close another tab or client and try again."
                                 );
+                                noteServerClose(ws, "ceiling");
                                 ws.close(TOO_MANY_SOCKETS_CLOSE_CODE, "Too many realtime connections for this user");
                                 return;
                             }
                         }
+                        lastUid = verifiedUser.uid;
                         if (session) {
                             session.user = verifiedUser;
                             session.authenticated = true;
@@ -1334,6 +1395,12 @@ roles: verifiedUser.roles }
                             session.recheckAfter = Date.now() + CHANNEL_RECHECK_MIN_MS;
                             wsDebug(`[WebSocket Server] Auth store unavailable (${outcome.unavailable.code}); honouring ${clientId}'s last check for a channel frame`);
                         } else {
+                            socketStats.noteRefused("AUTH_UNAVAILABLE");
+                            if (channelFrame) {
+                                // Past the grace: the client is told only on the channel, and an
+                                // app that rebuilds its link on it reads as a dropped connection.
+                                logger.warn(`[WebSocket Server] Refused a channel frame from ${clientId}: the auth store has not answered for ${Math.round((Date.now() - session.checkedAt) / 1000)} s (${outcome.unavailable.code})`);
+                            }
                             sendError("ERROR", outcome.unavailable.code, outcome.unavailable.message);
                             return;
                         }
@@ -1344,6 +1411,7 @@ roles: verifiedUser.roles }
                 if (requireAuth) {
                     const session = clientSessions.get(clientId);
                     if (!session?.authenticated) {
+                        socketStats.noteRefused("UNAUTHORIZED");
                         sendError("ERROR", "UNAUTHORIZED", "Authentication required");
                         return;
                     }

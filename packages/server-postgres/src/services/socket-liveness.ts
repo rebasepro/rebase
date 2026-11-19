@@ -20,6 +20,7 @@
 import { WebSocket, type WebSocketServer } from "ws";
 import { logger } from "@rebasepro/server";
 import { unref } from "@rebasepro/utils";
+import { noteServerClose } from "./socket-stats";
 
 /**
  * How often every socket is pinged. A socket that has not answered one ping by
@@ -120,6 +121,7 @@ export function enforceProcessSendBudget(budget?: number): WebSocket[] {
     const terminated: WebSocket[] = [];
     for (const { ws, bytes } of backlogged) {
         if (total <= limit) break;
+        noteServerClose(ws, "backlog");
         ws.terminate();
         total -= bytes;
         terminated.push(ws);
@@ -155,6 +157,7 @@ export function reapSilentSockets(wss: WebSocketServer, intervalMs: number = SOC
         for (const ws of clients) {
             if (awaitingPong.has(ws)) {
                 logger.debug(`[WebSocket Server] Terminated a socket that did not answer a ping within ${intervalMs}ms.`);
+                noteServerClose(ws, "no_pong");
                 ws.terminate();
                 continue;
             }
@@ -189,6 +192,7 @@ export function terminateIfBacklogged(ws: BackloggableSocket, clientId: string):
             `[WebSocket Server] Terminated ${clientId}: ${backlog} bytes sent to it are still unread, ` +
             `past the ${MAX_SOCKET_BUFFERED_BYTES}-byte ceiling for one socket.`
         );
+        noteServerClose(ws, "backlog");
         ws.terminate();
         return true;
     }

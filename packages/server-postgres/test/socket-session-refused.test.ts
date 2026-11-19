@@ -130,7 +130,12 @@ describe("the SDK in a Node script", () => {
     beforeEach(() => {
         stdout = [];
         warnings = [];
-        const toStdout = (...args: unknown[]) => { stdout.push(args.map(String).join(" ")); };
+        // The server in this test shares the process, and logs each socket's
+        // open and close: what is under test is what the SDK says.
+        const toStdout = (...args: unknown[]) => {
+            const line = args.map(String).join(" ");
+            if (!line.includes("[WebSocket Server] Socket ")) stdout.push(line);
+        };
         // Node writes all three to stdout.
         jest.spyOn(console, "log").mockImplementation(toStdout);
         jest.spyOn(console, "info").mockImplementation(toStdout);

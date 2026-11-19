@@ -13,6 +13,12 @@ import {
     REALTIME_BUS_SKIPPED_METRIC,
     REALTIME_CHANNELS_METRIC,
     REALTIME_SOCKETS_METRIC,
+    REALTIME_OPENS_METRIC,
+    REALTIME_CLOSES_METRIC,
+    REALTIME_CLOSE_CODES_METRIC,
+    REALTIME_FRAMES_IN_METRIC,
+    REALTIME_BYTES_OUT_METRIC,
+    REALTIME_REFUSED_METRIC,
     recordRealtimeCounts
 } from "../src/metrics/realtime";
 
@@ -37,6 +43,33 @@ describe("realtime counts in /metrics", () => {
         expect(text).toContain(`${REALTIME_BUS_PUBLISHED_METRIC}{kind="broadcast"} 40\n`);
         expect(text).toContain(`${REALTIME_BUS_PUBLISHED_METRIC}{kind="channels"} 2\n`);
         expect(text).toContain(`# TYPE ${REALTIME_BUS_SKIPPED_METRIC} counter\n${REALTIME_BUS_SKIPPED_METRIC} 900\n`);
+    });
+
+    it("renders what the sockets did: opens, closes by who and by code, traffic and refusals", () => {
+        const registry = new MetricsRegistry();
+        recordRealtimeCounts(registry, { counts: () => ({
+            ...quiet,
+            socketTotals: {
+                opened: 40,
+                closedBy: { network: 9, no_pong: 2, shutdown: 20 },
+                closeCodes: { "1006": 11, "1001": 20 },
+                framesIn: 500,
+                bytesIn: 64_000,
+                framesOut: 9_000,
+                bytesOut: 36_000_000,
+                refused: { RATE_LIMITED: 3, CHANNEL_BUS_PAYLOAD_TOO_LARGE: 1 }
+            }
+        }) });
+
+        const text = registry.render();
+
+        expect(text).toContain(`# TYPE ${REALTIME_OPENS_METRIC} counter\n${REALTIME_OPENS_METRIC} 40\n`);
+        expect(text).toContain(`${REALTIME_CLOSES_METRIC}{closed_by="network"} 9\n`);
+        expect(text).toContain(`${REALTIME_CLOSES_METRIC}{closed_by="shutdown"} 20\n`);
+        expect(text).toContain(`${REALTIME_CLOSE_CODES_METRIC}{code="1006"} 11\n`);
+        expect(text).toContain(`${REALTIME_FRAMES_IN_METRIC} 500\n`);
+        expect(text).toContain(`${REALTIME_BYTES_OUT_METRIC} 36000000\n`);
+        expect(text).toContain(`${REALTIME_REFUSED_METRIC}{code="RATE_LIMITED"} 3\n`);
     });
 
     it("reports zeros from a runtime that counts, so absent can mean it doesn't", () => {

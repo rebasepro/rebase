@@ -24,6 +24,7 @@ import type { CdcTableRef } from "./cdc/trigger-cdc";
 import { REALTIME_LISTENER_APPLICATION_PREFIX, realtimeListenerApplicationName } from "./cdc/capture-consumers";
 import { PgNotifyListener } from "./pg-notify-listener";
 import { terminateIfBacklogged } from "./socket-liveness";
+import { noteServerClose, socketStats } from "./socket-stats";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
 import type { RuntimeTable } from "../model/runtime-table";
 import { isNestedPath } from "./nested-path";
@@ -498,6 +499,7 @@ export interface RealtimeClientSocket {
  */
 function closeWebSockets(sockets: RealtimeClientSocket[], graceMs: number): void {
     for (const ws of sockets) {
+        noteServerClose(ws, "shutdown");
         if (ws.readyState === WebSocket.OPEN) ws.close(1001, "server shutting down");
         // A no-op on a socket that has closed by the time it fires.
         if (ws.readyState !== WebSocket.CLOSED) unref(setTimeout(() => ws.terminate(), graceMs));
@@ -579,6 +581,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private busFramesPublished = new Map<string, number>();
     /** Frames not sent because no other instance had members. See {@link counts}. */
     private busFramesSkipped = 0;
+    /** Frames and bytes pushed to each socket, for the line its close logs. */
+    private readonly trafficByClient = new Map<string, { frames: number; bytes: number }>();
     private busStartedAt = 0;
     private busGossipInterval?: ReturnType<typeof setInterval>;
 
@@ -1471,6 +1475,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     async removeClient(clientId: string) {
         this.clients.delete(clientId);
         this.clientOptIns.delete(clientId);
+        this.trafficByClient.delete(clientId);
 
         // Remove all subscriptions and callbacks for this client; a group it
         // was the last member of goes with its pending refetch.
@@ -2669,6 +2674,28 @@ roles: ["anon"] };
         if (!client || client.readyState !== WebSocket.OPEN) return;
         if (terminateIfBacklogged(client, clientId)) return;
         client.send(frame);
+        const bytes = Buffer.byteLength(frame, "utf8");
+        socketStats.noteFrameOut(bytes);
+        const traffic = this.trafficByClient.get(clientId);
+        if (traffic) {
+            traffic.frames++;
+            traffic.bytes += bytes;
+        } else {
+            this.trafficByClient.set(clientId, { frames: 1, bytes });
+        }
+    }
+
+    /**
+     * What a socket is in and what it was pushed, for the line its close
+     * logs. Read before the socket's own close handler forgets it.
+     */
+    describeClient(clientId: string): { channels: string[]; framesOut: number; bytesOut: number } {
+        const traffic = this.trafficByClient.get(clientId);
+        return {
+            channels: [...(this.channelsByClient.get(clientId) ?? [])],
+            framesOut: traffic?.frames ?? 0,
+            bytesOut: traffic?.bytes ?? 0
+        };
     }
 
     /**
@@ -2903,6 +2930,7 @@ roles: ["anon"] };
     /** Tell the client why its channel frame went nowhere, and say so in the log. */
     private denyChannelAction(clientId: string, channel: string, action: ChannelAction, reason: string): void {
         this.debugLog(`🚫 [Channels] Refused ${action} on "${channel}" for ${clientId}: ${reason}`);
+        socketStats.noteRefused("CHANNEL_FORBIDDEN");
         this.sendError(
             clientId,
             `Refused ${action} on channel "${channel}": ${reason}`,
@@ -3269,6 +3297,7 @@ roles: ["anon"] };
      * so the message says exactly that.
      */
     private reportOversizedBroadcast(clientId: string, channel: string): void {
+        socketStats.noteRefused("CHANNEL_BUS_PAYLOAD_TOO_LARGE");
         const remedy =
             `Add a retention rule for "${channel}" (realtime.channels) — retained messages travel by reference ` +
             "and have no size limit.";
@@ -3894,7 +3923,8 @@ lastSeen: Date.now() });
             sockets: this.clients.size,
             channels: this.channels.size,
             busFramesPublished: Object.fromEntries(this.busFramesPublished),
-            busFramesSkipped: this.busFramesSkipped
+            busFramesSkipped: this.busFramesSkipped,
+            socketTotals: socketStats.totals()
         };
     }
 

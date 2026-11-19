@@ -35,6 +35,11 @@ export interface WsRealtimeService extends RealtimeProvider {
      */
     setClientOptIns?(clientId: string, optIns: ReadonlySet<string>): void;
     /**
+     * What a socket is in and what it was pushed, for the line its close
+     * logs. Optional: a provider that keeps no channels need not answer.
+     */
+    describeClient?(clientId: string): { channels: string[]; framesOut: number; bytesOut: number };
+    /**
      * Whether this provider actually implements channels, presence and
      * broadcast. Declared by the provider rather than inferred, because the
      * alternative — assuming the default one does — is how these frames came to
@@ -136,6 +141,19 @@ export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsReal
             for (const p of all()) p.setClientOptIns?.(clientId, optIns);
         },
 
+        // Every source's share: channels live on one, pushes come from each.
+        describeClient(clientId) {
+            const described = { channels: [] as string[], framesOut: 0, bytesOut: 0 };
+            for (const p of all()) {
+                const one = p.describeClient?.(clientId);
+                if (!one) continue;
+                described.channels.push(...one.channels);
+                described.framesOut += one.framesOut;
+                described.bytesOut += one.bytesOut;
+            }
+            return described;
+        },
+
         // Every source: each holds its own share of the socket's
         // subscriptions, and channel memberships live on one of them.
         // A provider that keeps nothing per identity has nothing to re-scope.
@@ -223,6 +241,8 @@ export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsReal
                 const source = p.counts?.();
                 if (!source) continue;
                 counts.sockets = Math.max(counts.sockets, source.sockets);
+                // Process-wide, so every source reports the same totals.
+                counts.socketTotals ??= source.socketTotals;
                 counts.channels += source.channels;
                 counts.busFramesSkipped += source.busFramesSkipped;
                 for (const [kind, frames] of Object.entries(source.busFramesPublished)) {

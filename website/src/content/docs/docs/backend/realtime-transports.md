@@ -101,6 +101,14 @@ With `REBASE_METRICS=true`, each instance reports what it is carrying at `/metri
 | `rebase_realtime_channels` | gauge | Channels with a member on this instance |
 | `rebase_realtime_bus_frames_published_total` | counter | Frames this instance sent to the bus, by `kind`: `broadcast`, `broadcast_ref`, `presence_diff`, and `channels`, the instances telling each other what they serve |
 | `rebase_realtime_bus_frames_skipped_total` | counter | Broadcasts and presence changes not sent because no other instance had members in the channel |
+| `rebase_realtime_socket_opens_total` | counter | Sockets opened on this instance |
+| `rebase_realtime_socket_closes_total` | counter | Sockets closed, by `closed_by`: `client` (a close frame), `client_watchdog` (the SDK gave up on a silent socket, code 4003), `network` (gone without a close frame, 1006), `no_pong` and `backlog` (this server let it go), `session`, `ceiling`, `shutdown`, `oversized_frame`, `server` |
+| `rebase_realtime_socket_close_codes_total` | counter | Sockets closed, by close `code` (`other` for an application code Rebase does not use) |
+| `rebase_realtime_frames_in_total` / `rebase_realtime_bytes_in_total` | counter | Frames received from clients, and their bytes |
+| `rebase_realtime_frames_out_total` / `rebase_realtime_bytes_out_total` | counter | Frames the realtime service pushed (broadcasts, presence, subscription updates), and their bytes |
+| `rebase_realtime_frames_refused_total` | counter | Frames refused, by `code`: `RATE_LIMITED`, `CHANNEL_FORBIDDEN`, `CHANNEL_BUS_PAYLOAD_TOO_LARGE`, `FRAME_TOO_LARGE`, `AUTH_UNAVAILABLE` (the auth store could not re-check the identity), `UNAUTHORIZED` |
+
+Every socket's open and close is also an info line: `[WebSocket Server] Socket opened` with its `clientId`, `affinity` and opt-ins, and `[WebSocket Server] Socket closed` with its `uid`, `closedBy`, `code`, `reason`, `ageMs`, channels, frames in and out, and bytes in and out. When clients report dropped connections, read `closedBy` first: `network` and `client_watchdog` are the path between them and the server, `no_pong` and `backlog` the server letting go, `shutdown` a deploy or a scale-in.
 
 Counters start from zero when an instance does, and count frames, of which the bus may join several into one notification. Retained messages always travel, so they are never skipped. On the default `memory` bus both stay at zero.
 

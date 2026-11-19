@@ -503,6 +503,39 @@ export interface RealtimeCounts {
     busFramesPublished: Record<string, number>;
     /** Broadcasts and presence changes not published because no other instance had members. */
     busFramesSkipped: number;
+    /** What this process's sockets did since it started. Absent on a provider that does not count them. */
+    socketTotals?: RealtimeSocketTotals;
+}
+
+/**
+ * Running totals of what one process's sockets did, for `/metrics`.
+ * @group Backend
+ */
+export interface RealtimeSocketTotals {
+    /** Sockets opened. */
+    opened: number;
+    /**
+     * Sockets closed, by who ended them: `client`, `client_watchdog`,
+     * `network`, `no_pong`, `backlog`, `session`, `ceiling`, `shutdown`,
+     * `oversized_frame`, `server`.
+     */
+    closedBy: Record<string, number>;
+    /** Sockets closed, by close code (`other` for an application code Rebase does not use). */
+    closeCodes: Record<string, number>;
+    /** Frames received. */
+    framesIn: number;
+    /** Bytes of the frames received. */
+    bytesIn: number;
+    /** Frames the realtime service pushed: broadcasts, presence and subscription updates. */
+    framesOut: number;
+    /** Bytes of the frames pushed. */
+    bytesOut: number;
+    /**
+     * Frames refused, by code: `RATE_LIMITED`, `CHANNEL_FORBIDDEN`,
+     * `CHANNEL_BUS_PAYLOAD_TOO_LARGE`, `FRAME_TOO_LARGE`, `AUTH_UNAVAILABLE`
+     * (the identity could not be re-checked), `UNAUTHORIZED`.
+     */
+    refused: Record<string, number>;
 }
 
 // =============================================================================
