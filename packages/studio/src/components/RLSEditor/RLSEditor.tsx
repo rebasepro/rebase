@@ -13,7 +13,6 @@ import {
     IconButton,
     iconSize,
     KeyIcon,
-    Link2Icon,
     LockIcon,
     Paper,
     RefreshCwIcon,
@@ -72,7 +71,7 @@ function classifyTableClient(
     // creates a tenant's collection tables in exactly that schema. So every
     // table a customer owns was filed under a dimmed, collapsed "Rebase
     // Internal" section beside `refresh_tokens` and `mfa_factors`, the
-    // "Schema Collections" section rendered empty and disappeared, and the
+    // "Schema Tables" section rendered empty and disappeared, and the
     // console's answer to "what am I securing" was four unmapped tables the
     // project barely uses.
     //
@@ -658,10 +657,10 @@ totalPolicies };
                                             </div>
                                         ) : (
                                             <>
-                                            {/* ── Schema Collections ── */}
+                                            {/* ── Schema Tables ── */}
                                             {categorizedTables.collection.length > 0 && (
                                                 <SidebarSection
-                                                    title="Schema Collections"
+                                                    title="Schema Tables"
                                                     icon={<DatabaseIcon size={12} className="text-primary dark:text-primary-light"/>}
                                                     expanded={expandedSections.collection ?? true}
                                                     onToggle={() => setExpandedSections(prev => ({ ...prev, collection: !(prev.collection ?? true) }))}
@@ -1056,7 +1055,6 @@ message: e instanceof Error ? e.message : String(e) });
                                     {activeTableData && activeTableManaged && !savesToCodebase && (
                                         <Alert color="info">
                                             <div className="flex items-start gap-2">
-                                                <RefreshCwIcon size={16} className="shrink-0 mt-0.5"/>
                                                 <Typography variant="caption">
                                                     {t("studio_rls_reapplied_on_start", { table: activeTableData.tableName })}
                                                 </Typography>
@@ -1067,7 +1065,6 @@ message: e instanceof Error ? e.message : String(e) });
                                     {activeTableData && activeTableCategory === "internal" && (
                                         <Alert color="info">
                                             <div className="flex items-start gap-2">
-                                                <LockIcon size={16} className="shrink-0 mt-0.5"/>
                                                 <div>
                                                     <Typography variant="body2" className="mb-1 font-semibold">
                                                         Rebase System Table
@@ -1083,7 +1080,6 @@ message: e instanceof Error ? e.message : String(e) });
                                     {activeTableData && activeTableCategory === "junction" && (
                                         <Alert color="info">
                                             <div className="flex items-start gap-2">
-                                                <Link2Icon size={16} className="shrink-0 mt-0.5"/>
                                                 <div>
                                                     <Typography variant="body2" className="mb-1 font-semibold">
                                                         Junction Table
@@ -1094,22 +1090,6 @@ message: e instanceof Error ? e.message : String(e) });
                                                         are, and writable following the declaring collection&apos;s update rules
                                                         (plus the server/admin baseline). You can still add RLS policies
                                                         directly to broaden access.
-                                                    </Typography>
-                                                </div>
-                                            </div>
-                                        </Alert>
-                                    )}
-                                    {activeTableData && activeTableCategory === "other" && (
-                                        <Alert color="warning">
-                                            <div className="flex items-start gap-2">
-                                                <AlertTriangleIcon size={16} className="shrink-0 mt-0.5"/>
-                                                <div>
-                                                    <Typography variant="body2" className="mb-1 font-semibold">
-                                                        Unmapped Table
-                                                    </Typography>
-                                                    <Typography variant="caption" className="opacity-80">
-                                                        This table exists in the database but isn&apos;t mapped to a collection definition.
-                                                        Import it into a Schema configuration file to manage security policies visually.
                                                     </Typography>
                                                 </div>
                                             </div>

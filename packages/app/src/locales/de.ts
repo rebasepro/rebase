@@ -1311,7 +1311,7 @@ export const de: RebaseTranslations = {
     studio_tool_cron: "Cron-Jobs",
     studio_tool_cron_description: "Geplante Aufgaben verwalten",
     studio_tool_schema_visualizer: "Schema-Visualisierung",
-    studio_tool_schema_visualizer_description: "Entitätsdiagramm Ihrer Collections",
+    studio_tool_schema_visualizer_description: "Entitätsdiagramm Ihrer Tabellen",
     studio_tool_branches: "Branches",
     studio_tool_branches_description: "Datenbank-Branches erstellen und verwalten",
     studio_tool_backups: "Sicherungen",

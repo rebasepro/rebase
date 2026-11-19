@@ -1,5 +1,5 @@
 ---
-sourceHash: 118e606ac71718ef
+sourceHash: defb682f50c5fd28
 title: Autenticazione e accesso
 sidebar_label: Autenticazione e accesso
 description: Configura l'auth controller, la vista di login e la simulazione dei ruoli nel tuo frontend React Rebase.
@@ -100,7 +100,17 @@ Un ruolo in questo elenco è un nome che le tue [regole di sicurezza](/docs/coll
 ## Test dell'accesso: Simulazione dell'accesso
 
 Per verificare cosa può leggere un ruolo, un utente o una chiave di servizio, un amministratore utilizza
-**Simulate access**, il badge a pillola sopra il tuo avatar nel drawer del pannello di amministrazione (nella
+**Simulate access**. È disattivato per impostazione predefinita; attivalo dove monti l'app:
+
+```tsx
+<Rebase client={rebaseClient} authController={authController} simulateAccess>
+    <RebaseAuth/>
+    <RebaseCMS/>
+    <RebaseShell title="Admin"/>
+</Rebase>
+```
+
+È quindi il badge a pillola sopra il tuo avatar nel drawer del pannello di amministrazione (nella
 barra dell'app su schermi di piccole dimensioni, o quando la shell non ha un drawer). Seleziona un ruolo
 (con un ID utente opzionale, che non deve necessariamente corrispondere a un account), un utente o una
 chiave di servizio attiva.

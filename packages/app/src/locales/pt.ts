@@ -1316,7 +1316,7 @@ export const pt: RebaseTranslations = {
     studio_tool_cron: "Tarefas cron",
     studio_tool_cron_description: "Gere as tarefas agendadas",
     studio_tool_schema_visualizer: "Visualizador de esquema",
-    studio_tool_schema_visualizer_description: "Diagrama de entidades das suas coleções",
+    studio_tool_schema_visualizer_description: "Diagrama de entidades das suas tabelas",
     studio_tool_branches: "Ramos",
     studio_tool_branches_description: "Cria e gere ramos da base de dados",
     studio_tool_backups: "Cópias de segurança",

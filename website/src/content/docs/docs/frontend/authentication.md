@@ -99,7 +99,17 @@ A role in this list is a name your [security rules](/docs/collections/security-r
 ## Testing access: Simulate access
 
 To check what a role, a user or a service key can read, an administrator uses
-**Simulate access**, the pill above your avatar in the admin panel's drawer (in
+**Simulate access**. It is off by default; turn it on where you mount the app:
+
+```tsx
+<Rebase client={rebaseClient} authController={authController} simulateAccess>
+    <RebaseAuth/>
+    <RebaseCMS/>
+    <RebaseShell title="Admin"/>
+</Rebase>
+```
+
+It is then the pill above your avatar in the admin panel's drawer (in
 the app bar on a small screen, or when the shell has no drawer). Pick a role
 (with an optional user id, which need not be an account), a user, or a live
 service key.

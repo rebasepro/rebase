@@ -293,6 +293,18 @@ export type RebaseProps<USER extends User, DB = unknown> = {
     effectiveRoleController?: EffectiveRoleController;
 
     /**
+     * Show "Simulate access": the control above the avatar in the drawer (in
+     * the app bar when no drawer is on screen) that runs every data view as a
+     * role, a user or a service key, read-only, against the real row-level
+     * security policies. Only an administrator sees it.
+     *
+     * Off unless you pass `true`: it is a tool for whoever writes the
+     * policies, and an admin panel handed to a content team has no use for
+     * it. `client.simulate()` works either way.
+     */
+    simulateAccess?: boolean;
+
+    /**
      * The light/dark mode, owned by the host app.
      *
      * Without it, `<Rebase>` owns the page's theme: it puts the `dark` class on

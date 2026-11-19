@@ -11,8 +11,6 @@ import { toArray } from "@rebasepro/utils";
 // Lazy-load import/export — pulls in exceljs only on demand
 const ImportCollectionAction = lazyChunk(() => import("../../data_import/import").then(m => ({ default: m.ImportCollectionAction })));
 const ExportCollectionAction = lazyChunk(() => import("../../data_export/export").then(m => ({ default: m.ExportCollectionAction })));
-import { EditorCollectionAction } from "../../collection_editor/ui/EditorCollectionAction";
-import { useCollectionEditorController } from "../../collection_editor/useCollectionEditorController";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { useToolbarLabels } from "../CollectionTableBinding/internal/CollectionTableToolbar";
 import { CollectionAddButton } from "./CollectionAddButton";
@@ -70,10 +68,6 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     // and labels that fit; their icon-only forms otherwise.
     const labelled = !compact && toolbarLabels;
     const { t } = useTranslation();
-
-    // Check if the collection editor context is available (ConfigControllerProvider present)
-    const collectionEditorController = useCollectionEditorController();
-    const hasCollectionEditor = Boolean(collectionEditorController?.editCollection);
 
     const { selectedCount, hasSelection } = selectionController;
 
@@ -209,11 +203,9 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
                     </Suspense>
                 </ErrorBoundary>
             )}
-            {hasCollectionEditor && (
-                <ErrorBoundary>
-                    <EditorCollectionAction {...builtInActionProps}/>
-                </ErrorBoundary>
-            )}
+            {/* No collection editor here: a collection view is CMS, and the
+                editor is a Studio view (`/schema`). Its gear sat in this
+                toolbar for everyone who edits content. */}
         </>
     );
 

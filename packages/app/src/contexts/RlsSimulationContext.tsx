@@ -23,8 +23,9 @@ export type RlsSimulationLabel =
  */
 export interface RlsSimulationController {
     /**
-     * Whether simulation is possible here: the client can derive a simulated
-     * one, and the default data source is that client (not a direct driver).
+     * Whether simulation is offered here: `<Rebase simulateAccess>` asked for
+     * it, the client can derive a simulated one, and the default data source
+     * is that client (not a direct driver).
      */
     available: boolean;
     simulation: AccessSimulation | null;

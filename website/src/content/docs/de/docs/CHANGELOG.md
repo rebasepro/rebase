@@ -11,6 +11,14 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Changed
+
+- **"Simulate access" is opt-in.** The pill above the avatar was shown to every administrator of every admin panel. It now appears only when the app passes `<Rebase simulateAccess>`; add the prop to keep it. `client.simulate()` and the server's simulation headers are unchanged.
+
+### Fixed
+
+- **"Edit collections" no longer appears in CMS mode.** An app with `<RebaseStudio>` and no `collectionEditor` prop on `<RebaseCMS>` listed the collection editor in the CMS drawer and home page, for everyone who edits content, and left it out of the Studio's. It is a Studio view in every app now, under `tools: ["schema"]` as before, and is named "Collections" in the Studio drawer as on its home card. The gear that opened it from a collection's toolbar is gone too: a collection view is CMS, so the editor is reached from the Studio.
+
 ## [0.34.0] - 2026-11-19
 
 ### Added

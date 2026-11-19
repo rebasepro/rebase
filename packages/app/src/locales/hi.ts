@@ -1311,7 +1311,7 @@ export const hi: RebaseTranslations = {
     studio_tool_cron: "क्रॉन जॉब",
     studio_tool_cron_description: "निर्धारित कार्य प्रबंधित करें",
     studio_tool_schema_visualizer: "स्कीमा विज़ुअलाइज़र",
-    studio_tool_schema_visualizer_description: "आपके कलेक्शनों का एंटिटी डायग्राम",
+    studio_tool_schema_visualizer_description: "आपकी टेबलों का एंटिटी डायग्राम",
     studio_tool_branches: "ब्रांच",
     studio_tool_branches_description: "डेटाबेस ब्रांच बनाएँ और प्रबंधित करें",
     studio_tool_backups: "बैकअप",

@@ -1,5 +1,5 @@
 ---
-sourceHash: 118e606ac71718ef
+sourceHash: defb682f50c5fd28
 title: Autenticação & Login
 sidebar_label: Autenticação & Login
 description: Configure o controlador de autenticação, a tela de login e a simulação de papéis no seu frontend React do Rebase.
@@ -87,7 +87,17 @@ Um papel nessa lista é um nome com o qual suas [regras de segurança](/docs/col
 
 ## Testando o acesso: Simular acesso
 
-Para verificar o que um papel, um usuário ou uma chave de serviço pode ler, um administrador usa **Simular acesso** (Simulate access), o botão em formato de pílula acima do seu avatar no menu lateral (drawer) do painel de administração (na barra do aplicativo em telas menores, ou quando o shell não possui menu lateral). Escolha um papel (com um ID de usuário opcional, que não precisa ser uma conta real), um usuário ou uma chave de serviço ativa.
+Para verificar o que um papel, um usuário ou uma chave de serviço pode ler, um administrador usa **Simular acesso** (Simulate access). Ele vem desativado por padrão; ative-o onde você monta a aplicação:
+
+```tsx
+<Rebase client={rebaseClient} authController={authController} simulateAccess>
+    <RebaseAuth/>
+    <RebaseCMS/>
+    <RebaseShell title="Admin"/>
+</Rebase>
+```
+
+Ele é então o botão em formato de pílula acima do seu avatar no menu lateral (drawer) do painel de administração (na barra do aplicativo em telas menores, ou quando o shell não possui menu lateral). Escolha um papel (com um ID de usuário opcional, que não precisa ser uma conta real), um usuário ou uma chave de serviço ativa.
 Cada visualização de dados e a aba Histórico de um registro leem através do servidor como essa identidade, contra as políticas reais de segurança a nível de linha (RLS): uma grade exibe exatamente as linhas que ela pode ler, campos que seus papéis não podem ler são mascarados e o banner contabiliza as tabelas nas quais ela não vê nada. O servidor verifica a cada requisição se você é um administrador.
 
 O acesso simulado é somente leitura. Enquanto estiver ativo, as visualizações não oferecem criação, edição, exclusão ou reversão de histórico, e o servidor recusa qualquer gravação que carregue uma simulação com `403 SIMULATION_READ_ONLY`, garantindo que nada seja salvo como se fosse outra pessoa. Interrompa a simulação para fazer alterações.

@@ -13,6 +13,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
  */
 
 const navigateTo: string[] = [];
+const mockAdminMode = { current: "cms" };
 const setMode = jest.fn();
 
 jest.mock("react-router", () => ({
@@ -26,15 +27,19 @@ jest.mock("react-router", () => ({
 const navigationState = {
     loading: false,
     topLevelNavigation: {
-        navigationEntries: [{ id: "posts", url: "/c/posts", name: "Posts", type: "collection", group: "Content", collection: { slug: "posts", name: "Posts" } }],
-        groups: ["Content"]
+        navigationEntries: [
+            { id: "posts", url: "/c/posts", name: "Posts", type: "collection", group: "Content", collection: { slug: "posts", name: "Posts" } },
+            // The collection editor's route, as `RebaseNavigation` injects it.
+            { id: "schema", slug: "schema", url: "/schema", name: "Edit collections", type: "view", group: "Database" }
+        ],
+        groups: ["Content", "Database"]
     }
 };
 
 jest.mock("@rebasepro/app", () => {
     const translation = { t: (key: string) => `t:${key}` };
     const registry = { cmsConfig: {}, studioConfig: {} };
-    const adminMode = { mode: "cms", setMode: (mode: string) => setMode(mode) };
+    const adminMode = { get mode() { return mockAdminMode.current; }, setMode: (mode: string) => setMode(mode) };
     const themeMode = { mode: "light", setMode: () => undefined };
     const auth = { user: null, initialLoading: false };
     const collapsed = { isGroupCollapsed: () => false, toggleGroupCollapsed: () => undefined };
@@ -89,6 +94,7 @@ function Shell({ drawerOpen, drawerHovered }: { drawerOpen: boolean, drawerHover
 beforeEach(() => {
     navigateTo.length = 0;
     setMode.mockClear();
+    mockAdminMode.current = "cms";
 });
 
 describe("the drawer's CMS / Studio switch", () => {
@@ -119,5 +125,26 @@ describe("the drawer's CMS / Studio switch", () => {
 
         rerender(<Shell drawerOpen={false} drawerHovered={true}/>);
         expect(screen.getByRole("group", { name: "t:panel_mode" }).closest("[inert]")).toBeNull();
+    });
+});
+
+/**
+ * The registry mocked above has a Studio and a CMS with no `collectionEditor`
+ * prop, the app that showed "Edit collections" to everyone editing content:
+ * the route was injected because a Studio was registered, and the drawer only
+ * called it a Studio view when the prop was there too.
+ */
+describe("the collection editor's drawer entry", () => {
+    test("is not in the CMS drawer", () => {
+        render(<Shell drawerOpen={true} drawerHovered={false}/>);
+        expect(screen.getByText("Posts")).toBeTruthy();
+        expect(screen.queryByText("Edit collections")).toBeNull();
+    });
+
+    test("is in the Studio drawer", () => {
+        mockAdminMode.current = "studio";
+        render(<Shell drawerOpen={true} drawerHovered={false}/>);
+        expect(screen.getByText("Edit collections")).toBeTruthy();
+        expect(screen.queryByText("Posts")).toBeNull();
     });
 });

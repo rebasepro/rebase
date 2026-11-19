@@ -1,5 +1,5 @@
 ---
-sourceHash: 118e606ac71718ef
+sourceHash: defb682f50c5fd28
 title: Authentifizierung & Login
 sidebar_label: Authentifizierung & Login
 description: Richten Sie den Auth-Controller, die Login-Ansicht und die Rollensimulation in Ihrem Rebase React-Frontend ein.
@@ -87,7 +87,17 @@ Eine Rolle in dieser Liste ist ein Name, auf den Ihre [Sicherheitsregeln](/docs/
 
 ## Zugriff testen: Zugriff simulieren
 
-Um zu prüfen, was eine Rolle, ein Benutzer oder ein Service-Key lesen kann, verwendet ein Administrator **Simulate access**, die Pill-Schaltfläche über Ihrem Avatar im Drawer des Admin-Panels (in der App-Leiste auf kleinen Bildschirmen oder wenn die Shell keinen Drawer hat). Wählen Sie eine Rolle (mit einer optionalen Benutzer-ID, bei der es sich nicht um ein Konto handeln muss), einen Benutzer oder einen aktiven Service-Key.
+Um zu prüfen, was eine Rolle, ein Benutzer oder ein Service-Key lesen kann, verwendet ein Administrator **Simulate access**. Es ist standardmäßig deaktiviert; aktivieren Sie es dort, wo Sie die App einbinden:
+
+```tsx
+<Rebase client={rebaseClient} authController={authController} simulateAccess>
+    <RebaseAuth/>
+    <RebaseCMS/>
+    <RebaseShell title="Admin"/>
+</Rebase>
+```
+
+Es ist dann die Pill-Schaltfläche über Ihrem Avatar im Drawer des Admin-Panels (in der App-Leiste auf kleinen Bildschirmen oder wenn die Shell keinen Drawer hat). Wählen Sie eine Rolle (mit einer optionalen Benutzer-ID, bei der es sich nicht um ein Konto handeln muss), einen Benutzer oder einen aktiven Service-Key.
 Jede Datenansicht sowie der Verlaufs-Tab (History) eines Datensatzes liest dann über den Server unter dieser Identität und unter Anwendung der echten Row-Level-Security-Richtlinien: Ein Raster zeigt genau die Zeilen an, die gelesen werden können, Felder, die die Rollen nicht lesen dürfen, werden maskiert, und das Banner zählt die Tabellen, in denen nichts sichtbar ist. Der Server prüft bei jeder Anfrage, ob Sie ein Administrator sind.
 
 Der simulierte Zugriff ist schreibgeschützt. Während er aktiv ist, bieten die Ansichten keine Funktionen zum Erstellen, Bearbeiten, Löschen oder Wiederherstellen des Verlaufs, und der Server lehnt jeden Schreibvorgang, der eine Simulation enthält, mit `403 SIMULATION_READ_ONLY` ab, sodass nichts im Namen einer anderen Person gespeichert wird. Beenden Sie die Simulation, um Änderungen vorzunehmen.

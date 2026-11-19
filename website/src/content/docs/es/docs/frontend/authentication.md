@@ -1,5 +1,5 @@
 ---
-sourceHash: 118e606ac71718ef
+sourceHash: defb682f50c5fd28
 title: Autenticación e inicio de sesión
 sidebar_label: Autenticación e inicio de sesión
 description: Configura el controlador de autenticación, la vista de inicio de sesión y la simulación de roles en tu frontend React de Rebase.
@@ -87,7 +87,17 @@ Un rol en esta lista es un nombre con el que tus [reglas de seguridad](/docs/col
 
 ## Probar el acceso: Simular acceso
 
-Para comprobar qué puede leer un rol, un usuario o una clave de servicio, un administrador utiliza **Simular acceso** (*Simulate access*), la píldora situada sobre tu avatar en el menú lateral del panel de administración (en la barra de la aplicación en pantallas pequeñas o cuando el shell no tiene menú lateral). Elige un rol (con un ID de usuario opcional, que no necesita corresponder a una cuenta real), un usuario o una clave de servicio activa.
+Para comprobar qué puede leer un rol, un usuario o una clave de servicio, un administrador utiliza **Simular acceso** (*Simulate access*). Está desactivado por defecto; actívalo donde montas la aplicación:
+
+```tsx
+<Rebase client={rebaseClient} authController={authController} simulateAccess>
+    <RebaseAuth/>
+    <RebaseCMS/>
+    <RebaseShell title="Admin"/>
+</Rebase>
+```
+
+Entonces es la píldora situada sobre tu avatar en el menú lateral del panel de administración (en la barra de la aplicación en pantallas pequeñas o cuando el shell no tiene menú lateral). Elige un rol (con un ID de usuario opcional, que no necesita corresponder a una cuenta real), un usuario o una clave de servicio activa.
 A partir de ese momento, cada vista de datos y la pestaña Historial de un registro leen a través del servidor bajo esa identidad, aplicando las políticas reales de seguridad a nivel de fila: una cuadrícula muestra exactamente las filas que puede leer, los campos que sus roles no pueden leer aparecen enmascarados y el banner cuenta las tablas en las que no puede ver nada. El servidor comprueba en cada solicitud que seas un administrador.
 
 El acceso simulado es de solo lectura. Mientras está activo, las vistas no permiten crear, editar, eliminar ni revertir el historial, y el servidor rechaza cualquier escritura que conlleve una simulación con `403 SIMULATION_READ_ONLY`, de modo que nada se guarde como otra persona. Detén la simulación para realizar cambios.

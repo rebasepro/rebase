@@ -1311,7 +1311,7 @@ export const it: RebaseTranslations = {
     studio_tool_cron: "Processi cron",
     studio_tool_cron_description: "Gestisci le attività pianificate",
     studio_tool_schema_visualizer: "Visualizzatore di schema",
-    studio_tool_schema_visualizer_description: "Diagramma delle entità delle tue collection",
+    studio_tool_schema_visualizer_description: "Diagramma delle entità delle tue tabelle",
     studio_tool_branches: "Rami",
     studio_tool_branches_description: "Crea e gestisci i rami del database",
     studio_tool_backups: "Backup",
