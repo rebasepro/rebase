@@ -124,6 +124,7 @@ export type { PushClient, PushSubscribeOptions, PushRegistrationOptions } from "
 // but re-exported (see @internal on the class) so a data-source driver can
 // construct it directly. Not a stable app-facing API.
 export { RebaseWebSocketClient } from "./websocket";
+export type { RealtimeDisconnectInfo, RealtimeDisconnectCause } from "./websocket";
 export { RebaseRealtimeChannel } from "./realtime-channel";
 export type {
     PresenceState,

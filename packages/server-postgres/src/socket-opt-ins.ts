@@ -33,6 +33,11 @@ import { unref } from "@rebasepro/utils";
  * - `cancel_sql`: the server takes `CANCEL_SQL { requestId }`, which stops a
  *   console run (`EXECUTE_SQL`, `mode: "script"`) of the same socket. A client
  *   sends it only to a server whose `hello` listed it.
+ * - `ping`: the server answers `{ "type": "ping" }` with a heartbeat at once.
+ *   A page that slept (a locked phone, a frozen tab) cannot tell a socket
+ *   that died meanwhile from one the sleep merely kept quiet; it asks, and
+ *   keeps the socket if it answers. Before this it judged the silence, and
+ *   dropped healthy sockets on every wake.
  *
  * @module
  */
@@ -41,7 +46,7 @@ import { unref } from "@rebasepro/utils";
 export const SOCKET_OPT_IN_PARAM = "rebase_caps";
 
 /** Every behaviour this server can be asked for. */
-export const SOCKET_OPT_INS = ["heartbeat", "channel_seq", "cancel_sql"] as const;
+export const SOCKET_OPT_INS = ["heartbeat", "channel_seq", "cancel_sql", "ping"] as const;
 
 export type SocketOptIn = typeof SOCKET_OPT_INS[number];
 
@@ -82,7 +87,8 @@ export function helloFrame(optIns: ReadonlySet<SocketOptIn>, heartbeatMs: number
     });
 }
 
-const HEARTBEAT_FRAME = JSON.stringify({ type: "heartbeat" });
+/** A heartbeat, also the answer to a `ping`. */
+export const HEARTBEAT_FRAME = JSON.stringify({ type: "heartbeat" });
 
 /**
  * Send a heartbeat every `intervalMs` to each socket `sockets()` lists. One

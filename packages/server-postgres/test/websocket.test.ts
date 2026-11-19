@@ -1071,6 +1071,26 @@ describe("WebSocket Server SQL console scripts", () => {
             expect(helloFor("/?rebase_caps=cancel_sql")).toEqual({ type: "hello", capabilities: ["cancel_sql"] });
         });
 
+        /**
+         * A page that slept cannot tell a socket that died from one the sleep
+         * kept quiet. It asks with `ping`, and a server that offers it
+         * answers with a heartbeat at once — before any sign-in, since being
+         * there is all it asks.
+         */
+        it("answers a ping with a heartbeat, to a socket that asked for ping, signed in or not", async () => {
+            const connectionCallback = mockWssInstance.on.mock.calls.find((call: any[]) => call[0] === "connection")[1];
+            const mockWs = fakeClientSocket();
+            connectionCallback(mockWs, { url: "/?rebase_caps=heartbeat,ping", headers: {} });
+            expect(sent(mockWs)[0]).toMatchObject({ type: "hello", capabilities: ["heartbeat", "ping"] });
+
+            await listenerOn(mockWs, "message")(Buffer.from(JSON.stringify({ type: "ping" })));
+            expect(sent(mockWs)[1]).toEqual({ type: "heartbeat" });
+        });
+
+        it("lists no ping to a client that did not ask for it", () => {
+            expect(helloFor("/?rebase_caps=heartbeat")).toEqual({ type: "hello", capabilities: ["heartbeat"], heartbeatMs: expect.any(Number) });
+        });
+
         it("lists no cancel_sql to a client that did not ask for it", () => {
             expect(helloFor("/?rebase_caps=heartbeat,channel_seq")).toMatchObject({ capabilities: ["heartbeat", "channel_seq"] });
             // A client that names no opt-in at all is sent no hello.

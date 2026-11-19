@@ -192,7 +192,7 @@ const OUTAGE_REPORT_AFTER_MS = 14_000;
  * client goes on as it did before there were any.
  */
 const SOCKET_OPT_IN_PARAM = "rebase_caps";
-const SOCKET_OPT_INS = ["heartbeat", "channel_seq", "cancel_sql"];
+const SOCKET_OPT_INS = ["heartbeat", "channel_seq", "cancel_sql", "ping"];
 
 /**
  * The query parameter naming the group a socket belongs to. A platform that
@@ -203,6 +203,45 @@ const SOCKET_AFFINITY_PARAM = "affinity";
 
 /** Slack on top of two heartbeat intervals before a silent socket is given up on. */
 const HEARTBEAT_GRACE_MS = 5_000;
+
+/**
+ * How long a socket has to answer the `ping` sent when the page wakes, in ms,
+ * before it is given up on. Long enough for a phone's radio to come back.
+ */
+const WAKE_PROBE_TIMEOUT_MS = 10_000;
+
+/**
+ * Who ended a socket, as the `disconnect` event says it.
+ *
+ * - `server`: a close frame or a dropped connection (deploy, scale-in, proxy
+ *   reload, network) — the close code says which.
+ * - `heartbeat`: this client gave up on it after two missed heartbeats.
+ * - `probe`: this client gave up on it when it did not answer the `ping` sent
+ *   as the page woke.
+ * - `client`: this client closed it to sign in again (close code 4000).
+ */
+export type RealtimeDisconnectCause = "server" | "heartbeat" | "probe" | "client";
+
+/** What the `disconnect` event carries. */
+export interface RealtimeDisconnectInfo {
+    /** The close code, when a close frame said one (1006 for a connection that just went). */
+    code?: number;
+    /** The close reason the other side gave, when it gave one. */
+    reason?: string;
+    cause: RealtimeDisconnectCause;
+    /** How long the socket had been open, in ms (0 when it never opened). */
+    openForMs: number;
+    /** How long since anything arrived on it, in ms. */
+    silentForMs: number;
+}
+
+/** The code and reason of a `close` event, read without trusting its shape. */
+function closeEventDetails(event: unknown): { code?: number; reason?: string } {
+    if (typeof event !== "object" || event === null) return {};
+    const code = "code" in event && typeof event.code === "number" ? event.code : undefined;
+    const reason = "reason" in event && typeof event.reason === "string" && event.reason !== "" ? event.reason : undefined;
+    return { code, reason };
+}
 
 /**
  * `url` with the opt-ins named on it, and `affinity` when there is one.
@@ -500,9 +539,18 @@ export class RebaseWebSocketClient {
     private serverClientId: string | undefined;
     /** When the current socket last delivered anything, heartbeats included. */
     private lastFrameAt = 0;
+    /** When the current socket opened, for the `disconnect` event. */
+    private socketOpenedAt = 0;
     private livenessTimer: ReturnType<typeof setInterval> | null = null;
+    /** The current wake probe: when it was sent, and when it must have been answered by. */
+    private wakeProbe: { sentAt: number; deadline: number } | null = null;
+    /**
+     * Why this client is about to close the current socket itself, read by its
+     * close handler so the `disconnect` event names the cause.
+     */
+    private closingFor: RealtimeDisconnectCause | null = null;
     /** Give up on the current socket as though it had closed. Set per socket. */
-    private dropSocket: (() => void) | null = null;
+    private dropSocket: ((cause: RealtimeDisconnectCause) => void) | null = null;
 
     /** Whether the server agreed, in its `hello`, to `name` for this socket. */
     public hasServerOptIn(name: string): boolean {
@@ -776,7 +824,12 @@ export class RebaseWebSocketClient {
         window.addEventListener("online", this.onlineListener);
         if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
             this.visibilityListener = () => {
-                if (document.visibilityState === "visible") this.retryNow("Tab is visible again");
+                if (document.visibilityState !== "visible") return;
+                this.retryNow("Tab is visible again");
+                // A socket that says it is open may have died while the page
+                // slept: ask it, rather than judge it on a silence the page
+                // itself caused.
+                this.probeAfterWake();
             };
             document.addEventListener("visibilitychange", this.visibilityListener);
         }
@@ -1044,6 +1097,8 @@ export class RebaseWebSocketClient {
                 this.hadConnection = true;
                 this.isConnected = true;
                 this.gaveUp = false;
+                this.socketOpenedAt = Date.now();
+                this.lastFrameAt = this.socketOpenedAt;
                 // Connected, unless an outage is being reported: then only once
                 // the socket is let in, below.
                 if (!this.outageReported) this.setState("connected");
@@ -1082,6 +1137,7 @@ export class RebaseWebSocketClient {
                             // the socket lived, with nothing to sign in again.
                             // Close it, and the redial signs in afresh.
                             if (token && this.ws === socket && !this.refusedSession) {
+                                this.closingFor = "client";
                                 socket.close(4000, "Could not authenticate; reconnecting");
                                 return;
                             }
@@ -1131,8 +1187,17 @@ export class RebaseWebSocketClient {
                 }
             };
 
-            const onClosed = () => {
+            const onClosed = (event?: unknown, cause?: RealtimeDisconnectCause) => {
                 this.connectionDebug("Disconnected from PostgreSQL backend");
+                const now = Date.now();
+                const info: RealtimeDisconnectInfo = {
+                    ...closeEventDetails(event),
+                    cause: cause ?? this.closingFor ?? "server",
+                    openForMs: this.socketOpenedAt ? now - this.socketOpenedAt : 0,
+                    silentForMs: this.lastFrameAt ? now - this.lastFrameAt : 0
+                };
+                this.closingFor = null;
+                this.socketOpenedAt = 0;
                 // The next socket says hello again; nothing agreed for this one carries over.
                 this.stopLivenessWatch();
                 this.forgetServerOptIns();
@@ -1147,7 +1212,7 @@ export class RebaseWebSocketClient {
                 // The reconnect path re-subscribes everything; a watchdog firing
                 // in the meantime would tear down healthy subscriptions.
                 this.suspendSubscribeWatchdogs();
-                this.emit("disconnect");
+                this.emit("disconnect", info);
 
                 // Every request still waiting here was written to this socket,
                 // so the server may have run it: the answer is what got lost,
@@ -1175,18 +1240,19 @@ export class RebaseWebSocketClient {
             // reset and cannot send a ping. Dropped here instead, when the
             // heartbeats it asked for stop arriving — handlers first, so its
             // close (if one ever comes) does not run `onClosed` twice.
-            this.dropSocket = () => {
+            this.dropSocket = (cause: RealtimeDisconnectCause) => {
                 if (this.ws !== socket) return;
                 socket.onclose = null;
                 socket.onmessage = null;
                 socket.onerror = null;
                 socket.onopen = null;
                 try {
-                    socket.close();
+                    // 4003: what the server's log says this client gave up on it for.
+                    socket.close(4003, cause === "probe" ? "No answer to a ping after waking" : "Two heartbeats missed");
                 } catch {
                     // Already closing.
                 }
-                onClosed();
+                onClosed(undefined, cause);
             };
 
             this.ws!.onerror = (error) => {
@@ -1216,19 +1282,74 @@ export class RebaseWebSocketClient {
     /**
      * Redial when two heartbeats in a row have not arrived. Anything the
      * server sends counts as a beat, so a busy socket is never judged on them.
+     *
+     * Never on a silence the page caused. A phone that locked, a tab the
+     * browser froze or a laptop that slept runs no timers and reads no frames,
+     * and on waking this interval used to fire before the frames waiting on
+     * the socket were read: it saw a minute of silence and tore down a socket
+     * that was fine, and every app on it saw a disconnect. A tick that comes
+     * far later than it was due is a wake: the socket is asked (`ping`, which
+     * a server that offers it answers at once) and given
+     * {@link WAKE_PROBE_TIMEOUT_MS} to say anything — or, from a server that
+     * does not offer `ping`, a whole deadline from now.
      */
     private watchLiveness(heartbeatMs: number): void {
         this.stopLivenessWatch();
         const deadline = 2 * heartbeatMs + Math.min(HEARTBEAT_GRACE_MS, heartbeatMs);
+        const period = Math.max(250, Math.floor(heartbeatMs / 2));
         this.lastFrameAt = Date.now();
+        let lastTick = Date.now();
         this.livenessTimer = setInterval(() => {
-            const silentFor = Date.now() - this.lastFrameAt;
+            const now = Date.now();
+            const late = now - lastTick > 2 * period + 1_000;
+            lastTick = now;
+            if (late) {
+                this.probeAfterWake();
+                return;
+            }
+            const probe = this.wakeProbe;
+            if (probe) {
+                if (this.lastFrameAt >= probe.sentAt) {
+                    this.wakeProbe = null;
+                } else if (now > probe.deadline) {
+                    console.warn(`[Rebase] Realtime: no answer ${Math.round((now - probe.sentAt) / 1000)} s after waking. Reconnecting.`);
+                    this.stopLivenessWatch();
+                    this.dropSocket?.("probe");
+                    return;
+                } else {
+                    return;
+                }
+            }
+            const silentFor = now - this.lastFrameAt;
             if (silentFor <= deadline) return;
             console.warn(`[Rebase] Realtime: nothing from the server for ${Math.round(silentFor / 1000)} s, two missed heartbeats. Reconnecting.`);
             this.stopLivenessWatch();
-            this.dropSocket?.();
-        }, Math.max(250, Math.floor(heartbeatMs / 2)));
+            this.dropSocket?.("heartbeat");
+        }, period);
         unref(this.livenessTimer);
+    }
+
+    /**
+     * The page has just woken (a late liveness tick, or the tab shown again):
+     * ask an open socket whether it is still there instead of judging it on
+     * the silence of the sleep. Does nothing while no heartbeats are watched.
+     */
+    private probeAfterWake(): void {
+        if (!this.livenessTimer || !this.ws || !this.isConnected) return;
+        const now = Date.now();
+        if (this.wakeProbe && now <= this.wakeProbe.deadline) return;
+        if (this.serverOptIns.has("ping")) {
+            try {
+                this.ws.send(JSON.stringify({ type: "ping" }));
+                this.wakeProbe = { sentAt: now, deadline: now + WAKE_PROBE_TIMEOUT_MS };
+                return;
+            } catch {
+                // The send failed: the close that follows says so.
+            }
+        }
+        // No way to ask: start the deadline over from the wake. A dead socket
+        // is found one deadline later; a live one is never dropped for a sleep.
+        this.lastFrameAt = now;
     }
 
     private stopLivenessWatch(): void {
@@ -1236,6 +1357,7 @@ export class RebaseWebSocketClient {
             clearInterval(this.livenessTimer);
             this.livenessTimer = null;
         }
+        this.wakeProbe = null;
     }
 
     private forgetServerOptIns(): void {

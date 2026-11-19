@@ -10,7 +10,7 @@ import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, Save
 import type { SqlScriptResult } from "@rebasepro/types";
 import { deserializeFilter, redactSqlLiterals, relationOf, UnknownFilterOperatorError } from "@rebasepro/common";
 import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
-import { DEFAULT_HEARTBEAT_INTERVAL_MS, helloFrame, requestedOptIns, startHeartbeats, type SocketOptIn } from "./socket-opt-ins";
+import { DEFAULT_HEARTBEAT_INTERVAL_MS, HEARTBEAT_FRAME, helloFrame, requestedOptIns, startHeartbeats, type SocketOptIn } from "./socket-opt-ins";
 import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AccessModel, type AdminScope } from "@rebasepro/types";
 import type { CallerCredential, User } from "@rebasepro/types";
 
@@ -1204,6 +1204,14 @@ fetchAllowanceAt: Date.now() });
                             }
                         }
                     }
+                }
+
+                // A page that just woke asks whether its socket is still
+                // here (see `ping` in socket-opt-ins.ts): answered before any
+                // sign-in check, since being here is all it asks.
+                if (type === "ping" && optIns?.has("ping")) {
+                    ws.send(HEARTBEAT_FRAME);
+                    return;
                 }
 
                 if (type === "AUTHENTICATE") {

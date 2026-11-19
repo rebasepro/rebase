@@ -98,7 +98,7 @@ export class FaultSocket {
     readyState = CONNECTING;
     onopen: (() => void) | null = null;
     onmessage: ((event: { data: string }) => void) | null = null;
-    onclose: (() => void) | null = null;
+    onclose: ((event?: { code?: number; reason?: string }) => void) | null = null;
     onerror: ((error: unknown) => void) | null = null;
 
     /** Every frame the client wrote to this socket, parsed — whether or not it got through. */
