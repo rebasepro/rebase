@@ -107,6 +107,8 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "clusters verify": null,
     "clusters baseline": CLUSTER_BASELINE_FLAGS,
     "clusters registry": CLUSTER_REGISTRY_FLAGS,
+    "clusters open": {},
+    "clusters close": {},
     // The graph. Neither listing nor pruning declares a flag of its own —
     // `prune`'s `--yes` is the global one.
     resources: null,
@@ -163,6 +165,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
         "--base-domain": String,
         "--ingress-address": String,
         "--platform-capacity": Boolean,
+        "--open-to-customers": Boolean,
         "--backup-bucket": String,
         "--backup-endpoint": String,
         "--backup-access-key-id": String,

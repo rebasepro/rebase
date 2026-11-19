@@ -1227,7 +1227,7 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
 /* ─── clusters ─────────────────────────────────────────────────── */
 
 /** The action words `rebase cloud clusters` dispatches. No word means `list`. */
-export const CLUSTERS_ACTIONS = ["list", "add", "verify", "registry", "baseline"] as const;
+export const CLUSTERS_ACTIONS = ["list", "add", "verify", "registry", "baseline", "open", "close"] as const;
 
 /**
  * `rebase cloud clusters` — list, register and verify the clusters tenants run on.
@@ -1242,6 +1242,7 @@ export async function clustersCommand(action: string | undefined, rawArgs: strin
     if (action === "add") return clustersAddCommand(rawArgs);
     if (action === "registry") return clustersRegistryCommand(rawArgs);
     if (action === "baseline") return clustersBaselineCommand(rawArgs);
+    if (action === "open" || action === "close") return clustersOpenCommand(action, rawArgs);
     // `clusters verifyy` used to LIST the clusters and exit 0 — the one command
     // whose whole purpose is to answer a yes/no question about a specific one.
     requireKnownAction("clusters", action, CLUSTERS_ACTIONS);
@@ -1462,6 +1463,12 @@ export interface ClusterAddArgs {
     ingressAddress?: string;
     /** This is capacity we operate: projects placed in its region deploy here. */
     platformCapacity: boolean;
+    /**
+     * Offer the region to customers for new projects. Present only when
+     * `--open-to-customers` was given: left out, the field is not sent and the
+     * row keeps the server's default (NULL, closed).
+     */
+    openToCustomers?: true;
     backupBucket?: string;
     backupEndpoint?: string;
     backupAccessKeyId?: string;
@@ -1492,6 +1499,7 @@ export function resolveClusterAddArgs(rawArgs: string[]): ClusterAddArgs {
             "--base-domain": String,
             "--ingress-address": String,
             "--platform-capacity": Boolean,
+            "--open-to-customers": Boolean,
             "--backup-bucket": String,
             "--backup-endpoint": String,
             "--backup-access-key-id": String,
@@ -1510,7 +1518,7 @@ export function resolveClusterAddArgs(rawArgs: string[]): ClusterAddArgs {
     if (!name || !provider || !region || !kubeconfigPath) {
         fail(
             "Usage: rebase cloud clusters add --name <n> --provider <gcp|aws|hetzner> --region <r> --kubeconfig <path> " +
-                "[--base-domain <d>] [--ingress-address <ip>] [--platform-capacity] " +
+                "[--base-domain <d>] [--ingress-address <ip>] [--platform-capacity] [--open-to-customers] " +
                 "[--backup-bucket <b> --backup-endpoint <url> --backup-access-key-id <k> --backup-secret-access-key <s>]",
             undefined,
             "bad_request"
@@ -1553,8 +1561,90 @@ export function resolveClusterAddArgs(rawArgs: string[]): ClusterAddArgs {
         baseDomain: flags["--base-domain"],
         ingressAddress: flags["--ingress-address"],
         platformCapacity: flags["--platform-capacity"] === true,
+        // Only when given, like the backup store: an absent key is not sent, so
+        // the column keeps its default (NULL, closed) and a control plane that
+        // predates the column is never handed a field it would refuse.
+        ...(flags["--open-to-customers"] === true ? { openToCustomers: true as const } : {}),
         ...(anyBackup ? backup : {})
     };
+}
+
+/** The fields of a `clusters` row the open/close and DNS hints read. */
+export interface ClusterRowSummary {
+    id: string;
+    name: string | null;
+    region: string | null;
+    baseDomain: string | null;
+    platformCapacity: boolean;
+    baselineStatus: string | null;
+    openToCustomers: boolean | null;
+}
+
+/** A `clusters` row as the data API answers it, narrowed to what these commands read. */
+export function clusterRowSummary(row: Record<string, unknown> & { id: string | number }): ClusterRowSummary {
+    const text = (value: unknown): string | null => (typeof value === "string" && value.trim() !== "" ? value : null);
+    return {
+        id: String(row.id),
+        name: text(row.name),
+        region: text(row.region),
+        baseDomain: text(row.baseDomain),
+        platformCapacity: row.platformCapacity === true,
+        baselineStatus: text(row.baselineStatus),
+        openToCustomers: typeof row.openToCustomers === "boolean" ? row.openToCustomers : null
+    };
+}
+
+/**
+ * The other clusters serving the same base domain as `target`.
+ *
+ * Compared case-insensitively, and only between rows that name one: a row with
+ * no base domain is served at the platform's, which this CLI does not know.
+ */
+export function clustersSharingBaseDomain(target: ClusterRowSummary, rows: ClusterRowSummary[]): ClusterRowSummary[] {
+    const domain = target.baseDomain?.trim().toLowerCase();
+    if (!domain) return [];
+    return rows.filter((row) => row.id !== target.id && row.baseDomain?.trim().toLowerCase() === domain);
+}
+
+/**
+ * The closing hint of `clusters add` for platform capacity: where projects
+ * deploy, when customers are offered the region, and which DNS records to add.
+ *
+ * `shared` is whether another registered cluster already serves the base
+ * domain — `undefined` when that is not known (no base domain given, or the
+ * cluster list could not be read), and then both DNS sentences are printed.
+ */
+export function clusterAddHint(
+    args: Pick<ClusterAddArgs, "region" | "baseDomain" | "ingressAddress">,
+    id: string | number,
+    shared: boolean | undefined
+): string[] {
+    const domain = args.baseDomain ?? "<baseDomain>";
+    const address = args.ingressAddress ?? "its ingress address";
+    const lines = [
+        `Projects placed in ${args.region} deploy here once the baseline is ready; customers are offered the region only after ` +
+            `--open-to-customers (or \`rebase cloud clusters open ${id}\`).`
+    ];
+    if (shared === true) {
+        lines.push(
+            `Another cluster already serves ${domain}, so add explicit records for ingress.${domain}, s3.${domain} and each project, ` +
+                `and leave *.${domain} alone until the last project has moved.`
+        );
+    } else if (shared === false) {
+        lines.push(`Point *.${domain} at ${address}.`);
+    } else {
+        lines.push(
+            `If another cluster already serves ${domain}, add explicit records for ingress.${domain}, s3.${domain} and each project, ` +
+                `and leave *.${domain} alone until the last project has moved. Otherwise point *.${domain} at ${address}.`
+        );
+    }
+    return lines;
+}
+
+/** Every registered cluster, narrowed. The collection is admin-only and small. */
+async function listClusterRows(client: CloudClient): Promise<ClusterRowSummary[]> {
+    const page = await client.data.table<Record<string, unknown> & { id: string | number }>("clusters").find({ limit: 100 });
+    return page.data.map(clusterRowSummary);
 }
 
 async function clustersAddCommand(rawArgs: string[]): Promise<void> {
@@ -1584,6 +1674,23 @@ async function clustersAddCommand(rawArgs: string[]): Promise<void> {
         return;
     }
 
+    // Whether another cluster already serves this base domain decides which DNS
+    // records the operator adds: moving a shared wildcard takes every tenant on
+    // the old cluster with it. Best effort — unknown prints both sentences.
+    let shared: boolean | undefined;
+    if (args.platformCapacity && args.baseDomain) {
+        try {
+            const rows = await listClusterRows(client);
+            const self: ClusterRowSummary = {
+                id: String(created.id), name: args.name, region: args.region, baseDomain: args.baseDomain,
+                platformCapacity: true, baselineStatus: null, openToCustomers: args.openToCustomers ?? null
+            };
+            shared = clustersSharingBaseDomain(self, rows).length > 0;
+        } catch {
+            shared = undefined;
+        }
+    }
+
     emit(
         () => {
             success(`Registered ${args.name} (${created.id}).`);
@@ -1593,10 +1700,118 @@ async function clustersAddCommand(rawArgs: string[]): Promise<void> {
             note(chalk.cyan(`  rebase cloud clusters verify ${created.id} --baseline`));
             if (args.platformCapacity) {
                 noteBlank();
-                note(`Projects placed in ${args.region} now deploy here. Point *.${args.baseDomain ?? "<baseDomain>"} at ${args.ingressAddress ?? "its ingress address"} first.`);
+                for (const line of clusterAddHint(args, created.id, shared)) note(line);
             }
         },
-        { id: created.id, name: args.name, provider: args.provider, region: args.region, platformCapacity: args.platformCapacity }
+        {
+            id: created.id,
+            name: args.name,
+            provider: args.provider,
+            region: args.region,
+            platformCapacity: args.platformCapacity,
+            openToCustomers: args.openToCustomers === true,
+            baseDomainShared: shared ?? null
+        }
+    );
+}
+
+/** Which cluster `clusters open` / `clusters close` was asked about: an id or a name. */
+export function resolveClusterOpenArgs(rawArgs: string[], action: "open" | "close"): { ref?: string } {
+    const { positionals } = parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 2, // cloud clusters — `open` / `close` is the action positional
+        command: `cloud clusters ${action}`,
+        maxPositionals: 2
+    });
+    return { ref: positionals[1] };
+}
+
+/**
+ * The row `ref` names: its id, or else its name. A name two rows share is
+ * refused rather than guessed, since the write that follows changes what
+ * customers are offered.
+ */
+export function findClusterRow(rows: ClusterRowSummary[], ref: string): ClusterRowSummary {
+    const byId = rows.find((row) => row.id === ref);
+    if (byId) return byId;
+    const byName = rows.filter((row) => row.name === ref);
+    if (byName.length === 1) return byName[0];
+    if (byName.length > 1) {
+        fail(`${byName.length} clusters are named "${ref}" (${byName.map((row) => row.id).join(", ")}).`, "Name one by its id.", "bad_request");
+    }
+    fail(`No cluster with the id or name "${ref}".`, `List them with ${chalk.cyan("rebase cloud clusters")}.`, "not_found");
+}
+
+/**
+ * Offer a cluster's region to customers for new projects (`open`), or stop
+ * offering it (`close`). Platform-admin only, like the rest of `clusters`.
+ *
+ * Writes `openToCustomers` as `true` or `null` — NULL is the closed state a
+ * newly registered row starts in. Operators can deploy to the cluster either
+ * way; this decides only what customers are offered.
+ *
+ * No confirmation: both are a one-column flip the other action undoes. When
+ * the base domain is shared with another cluster, `open` warns first and
+ * states what must already be true — the CLI cannot check who a DNS record
+ * points at reliably, so it says the requirement instead.
+ */
+async function clustersOpenCommand(action: "open" | "close", rawArgs: string[]): Promise<void> {
+    const { ref } = resolveClusterOpenArgs(rawArgs, action);
+    if (!ref) fail(`Usage: rebase cloud clusters ${action} <id-or-name>`, undefined, "bad_request");
+    const { client } = await requireClient(rawArgs);
+
+    let rows: ClusterRowSummary[];
+    try {
+        rows = await listClusterRows(client);
+    } catch (error: unknown) {
+        reportError(error, "Could not read the clusters");
+        return;
+    }
+    const target = findClusterRow(rows, ref!);
+    const label = target.name ?? target.id;
+    const sharing = clustersSharingBaseDomain(target, rows);
+
+    if (action === "open" && sharing.length > 0) {
+        warn(
+            `${target.baseDomain} is also served by ${sharing.map((row) => row.name ?? row.id).join(", ")}: open ${label} only once ` +
+                `the wildcard record for ${target.baseDomain} points at this cluster.`
+        );
+    }
+
+    const openToCustomers = action === "open" ? true : null;
+    try {
+        await client.data.table("clusters").update(target.id, { openToCustomers });
+    } catch (error: unknown) {
+        reportError(error, action === "open" ? "Could not open the cluster to customers" : "Could not close the cluster to customers");
+        return;
+    }
+
+    emit(
+        () => {
+            const region = target.region ?? "its region";
+            if (action === "close") {
+                success(`${label} (${target.id}) is closed to customers.`);
+                note(`New projects are no longer offered ${region}; projects already there stay, and operators can still deploy to it.`);
+                return;
+            }
+            success(`${label} (${target.id}) is open to customers.`);
+            if (!target.platformCapacity) {
+                note("It is not platform capacity, so customers are not offered it until it is registered as such.");
+            } else if (target.baselineStatus !== "ready") {
+                note(`Customers are offered ${region} once its baseline is ready (${chalk.cyan(`rebase cloud clusters baseline ${target.id}`)}).`);
+            } else {
+                note(`New projects can be placed in ${region}.`);
+            }
+        },
+        {
+            id: target.id,
+            name: target.name,
+            region: target.region,
+            openToCustomers,
+            baseDomain: target.baseDomain,
+            baseDomainShared: sharing.length > 0
+        }
     );
 }
 

@@ -105,13 +105,14 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     clusters: {
         command: "cloud clusters",
-        usage: "cloud clusters [list|add|verify|registry|baseline] [options]",
+        usage: "cloud clusters [list|add|verify|registry|baseline|open|close] [options]",
         summary: "The compute clusters tenants run on. Platform-admin only.",
         flags: [],
         examples: [
             "rebase cloud clusters",
             "rebase cloud clusters verify <cluster-id> --baseline",
             "rebase cloud clusters baseline <cluster-id> --install",
+            "rebase cloud clusters open <cluster-id>",
             "rebase cloud clusters add --name gke-eu --provider gcp --region europe-west1 --kubeconfig ./kubeconfig",
             "rebase cloud clusters registry <cluster-id> --repository europe-west1-docker.pkg.dev/p/rlc-acme --push-service-account rlc-acme-push@p.iam.gserviceaccount.com --pull-key-file ./rlc-acme-pull.json"
         ]
@@ -413,9 +414,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--provider <gcp|aws|hetzner>", "Where it runs"],
             ["--region <r>", "Its region id (europe-west1, fsn1, hel1). Projects placed here deploy to it"],
             ["--kubeconfig <path>", "A kubeconfig for the control plane's identity on it"],
-            ["--base-domain <d>", "Tenants on it are served at <subdomain>.<d>. Convention: <region>.rebase.website"],
-            ["--ingress-address <ip>", "Its pinned ingress address — what the wildcard DNS record points at"],
+            ["--base-domain <d>", "Tenants on it are served at <subdomain>.<d>. Empty = the platform's base domain"],
+            ["--ingress-address <ip>", "Its pinned ingress address — what this cluster's DNS records point at"],
             ["--platform-capacity", "This is capacity Rebase operates: projects placed in its region deploy here. Leave off for a customer's own cluster"],
+            ["--open-to-customers", "Offer this region to customers for new projects. Leave off while its hostnames are reachable only through explicit DNS records (a base domain shared with another cluster); operators can deploy there either way"],
             ["--backup-bucket <b>", "Its own object-storage bucket for database backups (with the three below)"],
             ["--backup-endpoint <url>", "S3 endpoint of that bucket, e.g. https://fsn1.your-objectstorage.com"],
             ["--backup-access-key-id <k>", "Key for the bucket"],
@@ -424,14 +426,41 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         examples: [
             "rebase cloud clusters add --name gke-eu --provider gcp --region europe-west1 --kubeconfig ./kubeconfig",
             "rebase cloud clusters add --name rebase-fsn1 --provider hetzner --region fsn1 --kubeconfig ./control-plane.kubeconfig "
-            + "--base-domain fsn1.rebase.website --ingress-address 49.13.1.1 --platform-capacity "
+            + "--base-domain rebase.website --ingress-address 49.13.1.1 --platform-capacity "
             + "--backup-bucket rebase-fsn1-db-backups --backup-endpoint https://fsn1.your-objectstorage.com "
             + "--backup-access-key-id … --backup-secret-access-key …"
         ],
         notes: [
             "The backup flags go together; a bucket without a key is a cluster with no backup store.",
-            "A Hetzner cluster registered with --platform-capacity must bring its own backup store."
+            "A Hetzner cluster registered with --platform-capacity must bring its own backup store.",
+            "`--platform-capacity` does not open the region to customers; `--open-to-customers` does."
         ]
+    },
+
+    "clusters open": {
+        command: "cloud clusters open",
+        usage: "cloud clusters open <id-or-name>",
+        summary:
+            "Offer a platform cluster's region to customers for new projects. A newly registered cluster stays closed "
+            + "until this (or `clusters add --open-to-customers`); operators can deploy there either way. Platform-admin only.",
+        flags: [],
+        examples: ["rebase cloud clusters open rebase-fsn1"],
+        notes: [
+            "When another cluster serves the same base domain it warns first: open only once the wildcard record for that "
+            + "domain points at this cluster. The CLI cannot check DNS, so it states the requirement and does not ask.",
+            "Customers are offered the region once the cluster's baseline is ready."
+        ]
+    },
+
+    "clusters close": {
+        command: "cloud clusters close",
+        usage: "cloud clusters close <id-or-name>",
+        summary:
+            "Stop offering a cluster's region to customers for new projects. Projects already there stay, and operators "
+            + "can still deploy to it. Platform-admin only.",
+        flags: [],
+        examples: ["rebase cloud clusters close rebase-fsn1"],
+        notes: ["Closed is the state a newly registered cluster starts in (`openToCustomers` NULL)."]
     },
 
     "clusters registry": {

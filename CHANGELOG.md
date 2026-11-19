@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`rebase cloud clusters add --open-to-customers`, `clusters open <id-or-name>` and `clusters close <id-or-name>`.** A platform cluster stays closed to customers for new projects until an operator opens it (`openToCustomers` on the control plane's `clusters` row); operators can deploy there either way. `open` writes `true` and `close` writes `null`, the closed state a new row starts in. `add` sends the field only when the flag is given. When another cluster serves the same base domain, `open` warns first that the wildcard record for that domain must already point at this cluster; it does not ask, so it stays usable from a script.
+
 ### Changed
+
+- **`rebase cloud clusters add` no longer tells you to point `*.<baseDomain>` at a cluster that shares its base domain.** Moving a shared wildcard takes every tenant on the other cluster with it. When another registered cluster serves the domain, the closing hint now says to add records for `ingress.<baseDomain>`, `s3.<baseDomain>` and each project, and to move the wildcard after the last project. When it cannot tell, it prints both cases. `--platform-capacity` alone does not offer the region to customers; the hint and `--help` say so.
 
 - **"Simulate access" is opt-in.** The pill above the avatar was shown to every administrator of every admin panel. It now appears only when the app passes `<Rebase simulateAccess>`; add the prop to keep it. `client.simulate()` and the server's simulation headers are unchanged.
 

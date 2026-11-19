@@ -9,6 +9,7 @@
  * refuses off a terminal without `--yes` and sends nothing.
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { setJsonModeForTest } from "./context";
@@ -431,6 +432,132 @@ describe("rebase cloud clusters baseline", () => {
         const started = await stdoutOf(() => clustersCommand("baseline", argv("clusters", "baseline", "c1", "--install", "--yes")));
         expect(invoke).toHaveBeenCalledWith("cluster-baseline", {}, { method: "POST", path: "c1" });
         expect(started.json()).toEqual({ clusterId: "c1", started: true });
+    });
+});
+
+/* ── clusters add --open-to-customers, clusters open|close ─────── */
+
+describe("rebase cloud clusters add", () => {
+    const GKE = { id: "gke", name: "rebase-gke", region: "europe-west1", baseDomain: "rebase.website", platformCapacity: true, baselineStatus: "ready", openToCustomers: true };
+    let kubeconfig = "";
+    const created: Array<Record<string, unknown>> = [];
+
+    beforeEach(() => {
+        kubeconfig = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-cl-")), "kubeconfig");
+        fs.writeFileSync(kubeconfig, "apiVersion: v1\n");
+        created.length = 0;
+    });
+
+    function addLine(...extra: string[]): string[] {
+        return argv(
+            "clusters", "add", "--name", "rebase-fsn1", "--provider", "hetzner", "--region", "fsn1", "--kubeconfig", kubeconfig,
+            "--base-domain", "rebase.website", "--ingress-address", "49.13.1.1", "--platform-capacity",
+            "--backup-bucket", "b", "--backup-access-key-id", "AK", "--backup-secret-access-key", "SK", ...extra
+        );
+    }
+
+    function clustersTable(existing: Array<Record<string, unknown>>): CollectionAnswers {
+        return {
+            create: (data) => {
+                created.push(data);
+                return { id: "c_new", ...data };
+            },
+            find: () => ({ data: [...existing, ...created.map((row) => ({ id: "c_new", ...row }))] })
+        };
+    }
+
+    it("sends openToCustomers only when the flag is given", async () => {
+        tables.clusters = clustersTable([]);
+        const closed = await stdoutOf(() => clustersCommand("add", addLine()));
+        expect(created[0]).not.toHaveProperty("openToCustomers");
+        expect(closed.json()).toMatchObject({ id: "c_new", openToCustomers: false, baseDomainShared: false });
+
+        const open = await stdoutOf(() => clustersCommand("add", addLine("--open-to-customers")));
+        expect(created[1]).toMatchObject({ openToCustomers: true, platformCapacity: true, baseDomain: "rebase.website" });
+        expect(open.json()).toMatchObject({ openToCustomers: true });
+    });
+
+    it("prints the shared-domain DNS sentence when another cluster serves the base domain", async () => {
+        tables.clusters = clustersTable([GKE]);
+        setJsonModeForTest(false);
+        const err = vi.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            await clustersCommand("add", addLine());
+            const printed = err.mock.calls.map((c) => String(c[0])).join("\n");
+            expect(printed).toContain("customers are offered the region only after --open-to-customers (or `rebase cloud clusters open c_new`)");
+            expect(printed).toContain("Another cluster already serves rebase.website, so add explicit records for ingress.rebase.website, s3.rebase.website");
+            expect(printed).not.toContain("Point *.rebase.website");
+        } finally {
+            err.mockRestore();
+        }
+    });
+
+    it("prints the wildcard sentence when no other cluster serves it", async () => {
+        tables.clusters = clustersTable([{ ...GKE, baseDomain: "eu.rebase.website" }]);
+        setJsonModeForTest(false);
+        const err = vi.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            await clustersCommand("add", addLine());
+            const printed = err.mock.calls.map((c) => String(c[0])).join("\n");
+            expect(printed).toContain("Point *.rebase.website at 49.13.1.1.");
+            expect(printed).not.toContain("explicit records");
+        } finally {
+            err.mockRestore();
+        }
+    });
+});
+
+describe("rebase cloud clusters open|close", () => {
+    const FSN1 = { id: "c_fsn1", name: "rebase-fsn1", region: "fsn1", baseDomain: "rebase.website", platformCapacity: true, baselineStatus: "ready", openToCustomers: null };
+    const GKE = { id: "gke", name: "rebase-gke", region: "europe-west1", baseDomain: "Rebase.Website", platformCapacity: true, baselineStatus: "ready", openToCustomers: true };
+    const HEL1 = { id: "c_hel1", name: "rebase-hel1", region: "hel1", baseDomain: "hel1.rebase.website", platformCapacity: true, baselineStatus: "ready", openToCustomers: null };
+
+    it("opens by name: writes true to the row's id and says the domain is shared, on stderr, first", async () => {
+        tables.clusters = { find: () => ({ data: [GKE, FSN1, HEL1] }) };
+        const stderr: string[] = [];
+        const write = vi.spyOn(process.stderr, "write").mockImplementation((s) => {
+            stderr.push(String(s));
+            return true;
+        });
+        let r: Awaited<ReturnType<typeof stdoutOf>>;
+        try {
+            r = await stdoutOf(() => clustersCommand("open", argv("clusters", "open", "rebase-fsn1")));
+        } finally {
+            write.mockRestore();
+        }
+        expect(updates).toEqual([{ table: "clusters", id: "c_fsn1", data: { openToCustomers: true } }]);
+        expect(r.json()).toEqual({
+            id: "c_fsn1", name: "rebase-fsn1", region: "fsn1", openToCustomers: true, baseDomain: "rebase.website", baseDomainShared: true
+        });
+        expect(stderr.join("")).toContain("the wildcard record for rebase.website points at this cluster");
+    });
+
+    it("opens by id without a warning when nobody else serves the domain", async () => {
+        tables.clusters = { find: () => ({ data: [GKE, FSN1, HEL1] }) };
+        const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        try {
+            const r = await stdoutOf(() => clustersCommand("open", argv("clusters", "open", "c_hel1")));
+            expect(r.json()).toMatchObject({ id: "c_hel1", openToCustomers: true, baseDomainShared: false });
+            expect(write.mock.calls.map((c) => String(c[0])).join("")).not.toContain("wildcard");
+        } finally {
+            write.mockRestore();
+        }
+        expect(updates).toEqual([{ table: "clusters", id: "c_hel1", data: { openToCustomers: true } }]);
+    });
+
+    it("closes by writing null, the state a new row starts in", async () => {
+        tables.clusters = { find: () => ({ data: [GKE, FSN1] }) };
+        const r = await stdoutOf(() => clustersCommand("close", argv("clusters", "close", "gke")));
+        expect(updates).toEqual([{ table: "clusters", id: "gke", data: { openToCustomers: null } }]);
+        expect(r.json()).toMatchObject({ id: "gke", openToCustomers: null });
+    });
+
+    it("refuses an unknown id or name, a shared name, and a missing one, writing nothing", async () => {
+        tables.clusters = { find: () => ({ data: [GKE, FSN1, { ...HEL1, name: "rebase-fsn1" }] }) };
+        expect(errorOf(await stdoutOf(() => clustersCommand("open", argv("clusters", "open", "nope")))).code).toBe("not_found");
+        expect(errorOf(await stdoutOf(() => clustersCommand("open", argv("clusters", "open", "rebase-fsn1")))).message).toMatch(/2 clusters are named/);
+        expect(errorOf(await stdoutOf(() => clustersCommand("close", argv("clusters", "close")))).message).toMatch(/Usage: rebase cloud clusters close/);
+        expect(updates).toEqual([]);
     });
 });
 

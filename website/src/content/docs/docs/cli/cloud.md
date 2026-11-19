@@ -383,7 +383,7 @@ rebase cloud storage             # list storage buckets
 rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
 rebase cloud notifications [list] | add <url> | test <id> | remove <id>   # deploy, backup, billing and usage events to Slack, Discord or any URL
-rebase cloud clusters list | add | verify | registry   # the clusters tenants run on; `add` registers one from a kubeconfig
+rebase cloud clusters list | add | verify | registry | open | close   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
 rebase cloud billing checkout    # a Stripe session for one project
@@ -418,6 +418,17 @@ rollback targets. The three values go together; `--clear` forgets them. The key
 is sealed when it is written and never read back. Like the rest of `clusters`,
 it needs the platform-admin role. The operator creates the repository and both
 accounts with Terraform (`saas/infra/gcp/registry-linked-clusters.tf`).
+
+`clusters add --platform-capacity` registers capacity Rebase operates: projects
+placed in its region deploy there once its baseline is ready. It does not offer
+the region to customers. `--open-to-customers` does, at registration, or later
+`clusters open <id-or-name>`; `clusters close <id-or-name>` stops offering it.
+Operators can deploy to a closed cluster. Leave a cluster closed while its
+base domain is shared with another cluster: until the wildcard record moves, its
+hostnames resolve only through explicit records (`ingress.<baseDomain>`,
+`s3.<baseDomain>` and one per project), and `clusters add` prints which records
+to add. When the domain is shared, `open` warns that the wildcard record must
+already point at the cluster. It does not ask, so it works from a script.
 
 `billing invoices` and `billing upcoming` read the same Stripe data as the
 console's Billing page, and are open to the organization's owners and admins
