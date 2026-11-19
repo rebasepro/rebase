@@ -48,6 +48,7 @@ foldFrontendIntoBundle: vi.fn(async () => undefined) };
 
 import { buildBundle } from "../bundle";
 import { buildCommand, dockerBuildHint } from "./build";
+import { getPMCommands } from "../utils/package-manager";
 
 let projectRoot: string;
 let cwd: string;
@@ -278,9 +279,9 @@ describe("the resource graph a build writes", () => {
  */
 describe("the docker build command printed for a custom runtime", () => {
     it("builds in place when the context is the project", () => {
-        expect(dockerBuildHint("/repo", "backend", { dockerfile: "backend/Dockerfile" }))
+        expect(dockerBuildHint("/repo", "backend", { dockerfile: "backend/Dockerfile" }, getPMCommands("npm")))
             .toEqual([
-                "    npm run build --workspace backend  then  docker build -f backend/Dockerfile ."
+                "    npm run build -w backend  then  docker build -f backend/Dockerfile ."
             ]);
     });
 
@@ -292,8 +293,8 @@ describe("the docker build command printed for a custom runtime", () => {
         expect(dockerBuildHint("/repo/app", "backend", {
             dockerfile: "backend/Dockerfile",
             context: ".."
-        })).toEqual([
-            "    npm run build --workspace backend",
+        }, getPMCommands("npm"))).toEqual([
+            "    npm run build -w backend",
             "    cd .. && docker build -f app/backend/Dockerfile ."
         ]);
     });
@@ -304,8 +305,8 @@ describe("the docker build command printed for a custom runtime", () => {
         expect(dockerBuildHint("/repo", "backend", {
             dockerfile: "backend/Dockerfile",
             context: "frontend"
-        })).toEqual([
-            "    npm run build --workspace backend",
+        }, getPMCommands("npm"))).toEqual([
+            "    npm run build -w backend",
             "    ⚠ backend/Dockerfile is outside the build context (frontend) — nothing it COPYs is reachable.",
             "      Widen \"context\" in rebase.json, or move the Dockerfile inside it."
         ]);

@@ -20,7 +20,7 @@ import type { RebaseAppConfig, RebaseStaticAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
 import { assertBackendGuarded } from "../utils/backend-guard";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
-import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+import { detectPackageManager, getPMCommands, type PMCommands } from "../utils/package-manager";
 import { cliVersion } from "../utils/version";
 import { toolStdio } from "../utils/tool-stdio";
 import {
@@ -100,14 +100,15 @@ ${chalk.bold("Examples")}
 export function dockerBuildHint(
     projectRoot: string,
     name: string,
-    app: { dockerfile?: string; context?: string }
+    app: { dockerfile?: string; context?: string },
+    pm: PMCommands = getPMCommands(detectPackageManager(projectRoot))
 ): string[] {
     const dockerfile = app.dockerfile ?? "Dockerfile";
     const context = app.context ?? ".";
     const contextDir = path.resolve(projectRoot, context);
     const fromContext = path.relative(contextDir, path.resolve(projectRoot, dockerfile));
 
-    const build = `${chalk.cyan(`npm run build --workspace ${name}`)}`;
+    const build = `${chalk.cyan(pm.runWorkspace(name, "build").join(" "))}`;
 
     // A Dockerfile outside its own context is legal to `docker build` but means
     // nothing it copies is reachable, so there is no command to offer. Say what

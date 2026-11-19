@@ -112,12 +112,12 @@ export async function promptForConsent(options: PromptOptions = {}): Promise<boo
                 type: "confirm",
                 name: "accepted",
                 message: "Share anonymous usage data?",
-                // Defaults to no. Telemetry is off until somebody says yes, and
-                // a bare Enter is the commonest answer to any prompt — so a
-                // pre-selected yes would make pressing through `init` the
-                // consent. `y` is one keystroke, and `rebase telemetry enable`
-                // is the same answer later.
-                default: false
+                // Defaults to yes. The question is still asked, with the
+                // payload described above it, and nothing is sent before an
+                // answer; `n` is one keystroke, and `rebase telemetry disable`
+                // is the same answer later. DO_NOT_TRACK, CI and a project's
+                // `"telemetry": false` still suppress the prompt entirely.
+                default: true
             }
         ] as Parameters<typeof inquirer.prompt>[0]) as { accepted: boolean };
 
