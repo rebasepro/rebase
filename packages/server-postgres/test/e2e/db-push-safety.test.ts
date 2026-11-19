@@ -74,6 +74,7 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    env.PTAH_DEV_SERVER_DISPOSABLE = "1";
     // The schema modules import `@rebasepro/types` from outside the workspace;
     // the typecheck config maps every `@rebasepro/*` onto source, so the driver
     // and the modules share one copy of the builders.
@@ -139,12 +140,12 @@ describe("db push destructive-change gate E2E", () => {
     }
 
     /** {@link runPush} against another connection string. */
-    function runPushAt(databaseUrl: string, extra: string[] = []) {
+    function runPushAt(databaseUrl: string, extra: string[] = [], overrides: Record<string, string> = {}) {
         const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
         return execa(
             tsxBin,
             [cliScript, "db", "push", "--schema-dir", schemaDir, ...extra],
-            { cwd: workDir, env: cleanEnv(databaseUrl), reject: false, stdin: "ignore", all: true }
+            { cwd: workDir, env: { ...cleanEnv(databaseUrl), ...overrides }, reject: false, stdin: "ignore", all: true }
         );
     }
 
@@ -198,12 +199,10 @@ describe("db push destructive-change gate E2E", () => {
 
         // ── 3. Opt in explicitly → the drop is applied ───────────────────
         const allowed = await runPush(["--allow-destructive"]);
-        expect(allowed.exitCode).toBe(0);
+        expect(allowed.exitCode, allowed.all).toBe(0);
         expect(await noteColumnExists()).toBe(false);
-        // Atlas's report shows the statement it applies once: the plan it
-        // prints before applying is the one the push already listed.
-        expect(allowed.all?.match(/->\s+ALTER TABLE "public"\."tasks" DROP COLUMN "note"/g) ?? []).toHaveLength(1);
-        expect(allowed.all).toMatch(/Applying approved migration/);
+        expect(allowed.all).toContain('ALTER TABLE "public"."tasks" DROP COLUMN "note"');
+        expect(allowed.all).toMatch(/Proceeding because --allow-destructive was passed/);
     }, 150_000);
 
     /**
@@ -220,9 +219,10 @@ describe("db push destructive-change gate E2E", () => {
         fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex("prices"));
         fs.writeFileSync(path.join(schemaDir, "prices.ts"),
             pricesTableTs({ precision: 5, scale: 2, nicknameMax: 40 }));
-        const created = await runPush();
+        // This fixture replaces the table from the preceding case.
+        const created = await runPush(["--allow-destructive"]);
         expect(created.all ?? "").not.toMatch(/UNREADABLE PLAN/);
-        expect(created.exitCode).toBe(0);
+        expect(created.exitCode, created.all).toBe(0);
         await dbClient.query(`INSERT INTO prices (nickname, rating) VALUES ('first', 123.45)`);
 
         fs.writeFileSync(path.join(schemaDir, "prices.ts"),
@@ -257,7 +257,7 @@ describe("db push destructive-change gate E2E", () => {
             pricesTableTs({ precision: 5, scale: 2, nicknameMax: 100 }));
         const pushed = await runPush();
         expect(pushed.all ?? "").not.toMatch(/cannot alter type of a column used by a generated column/);
-        expect(pushed.exitCode).toBe(0);
+        expect(pushed.exitCode, pushed.all).toBe(0);
 
         const columns = await dbClient.query(`SELECT attname, format_type(atttypid, atttypmod) AS type,
                 attgenerated <> '' AS generated
@@ -324,7 +324,8 @@ export const translations = defineTable("translations", {
         for (const file of fs.readdirSync(schemaDir)) fs.rmSync(path.join(schemaDir, file));
         fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex("translations"));
         fs.writeFileSync(path.join(schemaDir, "translations.ts"), translationsTs(false));
-        const created = await runPush();
+        // This fixture replaces the table from the preceding cases.
+        const created = await runPush(["--allow-destructive"]);
         expect(created.all ?? "").toMatch(/completed successfully/);
         expect(created.exitCode).toBe(0);
         await dbClient.query(`INSERT INTO translations (id, locale, title) VALUES (1, 'en', 'Hello'), (2, 'en', 'Bye')`);
@@ -349,35 +350,27 @@ export const translations = defineTable("translations", {
         ]);
     }, 150_000);
 
-    /**
-     * Atlas speaks to Postgres through lib/pq, whose default `sslmode` is
-     * `require`; node-postgres, which the app and the CLI's own steps use,
-     * asks for no SSL. So a hand-written URL with no `sslmode` passed the
-     * CLI's connection check, then Atlas failed on `querying system
-     * variables: pq: SSL is not enabled on the server` — and the scratch
-     * database made for it stayed behind, kept as "evidence" of a run that
-     * planned nothing.
-     */
-    it("drops the scratch database when Atlas fails before planning", async () => {
-        // Not loopback, so the URL is handed to Atlas as written.
-        const address = Object.values(os.networkInterfaces()).flat()
-            .find(net => net !== undefined && !net.internal && net.family === "IPv4")?.address;
-        if (!address) throw new Error("This test needs a non-loopback IPv4 address to reach the container by.");
-        const url = container.connectionString.replace("localhost", address).replace("?sslmode=disable", "");
+    it("drops the scratch database when Ptah refuses untrusted replay on a shared server", async () => {
+        await dbClient.query("CREATE DATABASE untrusted");
+        const url = new URL(container.connectionString);
+        url.pathname = "/untrusted";
         await dropScratchDatabases();
         for (const file of fs.readdirSync(schemaDir)) fs.rmSync(path.join(schemaDir, file));
         fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex("tasks"));
         fs.writeFileSync(path.join(schemaDir, "tasks.ts"), tasksTableTs(true));
 
-        const failed = await runPushAt(url, ["--dry-run"]);
+        const failed = await runPushAt(url.href, ["--dry-run"], {
+            PTAH_DEV_SERVER_DISPOSABLE: "0",
+            PTAH_TRUST_REPLAY_SQL: "0"
+        });
         expect(failed.exitCode, failed.all).toBe(1);
-        expect(failed.all).toMatch(/SSL is not enabled on the server/);
+        expect(failed.all).toMatch(/postgres migration replay rejects CREATE (?:ROLE|routine)/);
         expect(await scratchDatabases()).toEqual([]);
     }, 150_000);
 
     // The same URL on this machine is the common case — a `.env` written by
-    // hand, or by an older `init` — and Atlas is given the app's default.
-    it("connects Atlas without SSL to a database on this machine whose URL names no sslmode", async () => {
+    // hand, or by an older `init` — and Ptah is given the app's default.
+    it("connects Ptah without SSL to a database on this machine whose URL names no sslmode", async () => {
         const url = container.connectionString.replace("?sslmode=disable", "");
         await dropScratchDatabases();
         for (const file of fs.readdirSync(schemaDir)) fs.rmSync(path.join(schemaDir, file));

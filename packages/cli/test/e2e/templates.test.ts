@@ -200,7 +200,7 @@ describe.each(CMS_CASES)("cms template: $preset", (testCase) => {
         // destructive gate it was presumably reaching for never fires.
         await execa("node", [cliBin, "db", "push"], {
             cwd: projectDir,
-            env
+            env: { ...env, PTAH_DEV_SERVER_DISPOSABLE: "1" }
         });
 
         client = new pg.Client({ connectionString: databaseUrl });

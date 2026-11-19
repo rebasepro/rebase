@@ -1545,11 +1545,11 @@ runtime: "managed" });
 
     /**
      * `rebase db push`, `db generate` and `db migrate` run the driver with
-     * `cwd: backend/` and need the `atlas` binary from that workspace's
+     * `cwd: backend/` and need the `atlas` executable from that workspace's
      * `node_modules/.bin`. The overlay ships `"db:migrate": "rebase db migrate"`,
-     * and `init --headless --introspect` ends on "You can now run `rebase db
-     * generate`", yet its backend did not install Atlas: both failed on "The
-     * atlas binary is missing", and the printed fix failed at the project root.
+     * and `init --headless --introspect` points users to `rebase db generate`.
+     * The backend must include `@stokaro/ptah-compat` so database commands can
+     * find the `atlas` executable.
      */
     it.each([
         ["template", TEMPLATE_DIR],
@@ -1561,31 +1561,10 @@ runtime: "managed" });
 
         const atlasScripts = Object.values<string>(pkg.scripts ?? {}).filter(script => /\brebase db (push|generate|migrate)\b/.test(script));
         expect(atlasScripts.length).toBeGreaterThan(0);
-        // The same range the CMS backend ships, so `rebase upgrade` and the
-        // template gates see one Atlas, not two.
-        expect(backend.optionalDependencies?.["@ariga/atlas"]).toBe(shipped.optionalDependencies["@ariga/atlas"]);
-        expect(pkg.pnpm?.onlyBuiltDependencies).toContain("@ariga/atlas");
-    });
-
-    /**
-     * `@ariga/atlas` ships Linux and macOS builds only: on Windows its
-     * `preinstall` exits 1 with "Unsupported platform". As a plain dependency
-     * that failed the whole `pnpm install`, so a scaffold could not be installed
-     * on Windows at all — although only `db push`, `db generate` and `db
-     * migrate` ever run Atlas. An optional dependency whose install script fails
-     * is skipped, by pnpm and npm alike, and the install carries on.
-     */
-    it.each([
-        ["template", TEMPLATE_DIR],
-        ["baas overlay", overlay]
-    ])("%s: Atlas is optional, so a Windows install does not fail on it", (_name, root) => {
-        const backend = JSON.parse(fs.readFileSync(path.join(root, "backend", "package.json"), "utf8"));
-        const rootPkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-        expect(backend.optionalDependencies?.["@ariga/atlas"]).toBeDefined();
-        for (const manifest of [backend, rootPkg]) {
-            expect(manifest.dependencies?.["@ariga/atlas"]).toBeUndefined();
-            expect(manifest.devDependencies?.["@ariga/atlas"]).toBeUndefined();
-        }
+        // Keep the same range as the shipped backend so upgrade and template
+        // installs use one Ptah version.
+        expect(backend.dependencies?.["@stokaro/ptah-compat"]).toBe(shipped.dependencies["@stokaro/ptah-compat"]);
+        expect(backend.dependencies?.["@ariga/atlas"]).toBeUndefined();
     });
 
     /**
@@ -1839,20 +1818,19 @@ describe("choosing a free port for the local database", () => {
 });
 
 /**
- * The scaffold has to tell *both* supported package managers that
- * `@ariga/atlas` may run its install script, in each one's own dialect.
+ * Atlas needed *both* supported package managers to allow its install script
+ * in each one's own dialect.
  *
  * pnpm 10 and npm 12 both refuse a dependency's lifecycle scripts unless the
  * project allowlists them, and `@ariga/atlas` downloads its binary in
- * `preinstall`. The scaffold has carried pnpm's key for a long time; npm's
- * (`allowScripts`) was missing, so on npm the install exited 0 with a warning,
+ * `preinstall`. The scaffold carried pnpm's key for a long time. It omitted
+ * npm's `allowScripts`, so on npm the install exited 0 with a warning,
  * `node_modules/.bin/atlas` never appeared, and `db:push` — the command the
  * quickstart points at for your own Postgres — failed on a binary nobody had
  * been told was skipped.
  *
- * Asserted as a pair rather than as two separate facts, because the failure is
- * silent on whichever manager gets forgotten and is only ever noticed by
- * somebody who already has a broken project.
+ * Ptah ships platform binaries without install scripts. The paired checks
+ * prevent either manager from retaining an Atlas allowance or adding a Ptah one.
  */
 describe("the template's install-script allowlists", () => {
     const templates: Array<[string, string]> = [
@@ -1860,10 +1838,10 @@ describe("the template's install-script allowlists", () => {
         ["baas overlay", path.join(findCliRoot(), "templates", "overlays", "baas", "package.json")]
     ];
 
-    it.each(templates)("%s allows @ariga/atlas under both pnpm and npm", (_name, pkgPath) => {
+    it.each(templates)("%s needs no migration CLI install-script allowance under pnpm", (_name, pkgPath) => {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-        expect(pkg.pnpm?.onlyBuiltDependencies).toContain("@ariga/atlas");
-        expect(pkg.allowScripts?.["@ariga/atlas"]).toBe(true);
+        expect(pkg.pnpm?.onlyBuiltDependencies).not.toContain("@ariga/atlas");
+        expect(pkg.pnpm?.onlyBuiltDependencies).not.toContain("@stokaro/ptah-compat");
     });
 
     it.each(templates)("%s grants npm no more than it needs", (_name, pkgPath) => {
@@ -1875,7 +1853,7 @@ describe("the template's install-script allowlists", () => {
         // needed is a grant with no benefit, so this fails if one is added here
         // without a reason.
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-        expect(Object.keys(pkg.allowScripts ?? {})).toEqual(["@ariga/atlas"]);
+        expect(Object.keys(pkg.allowScripts ?? {})).toEqual([]);
     });
 });
 
