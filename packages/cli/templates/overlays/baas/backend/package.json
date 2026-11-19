@@ -7,6 +7,7 @@
         "build": "tsc && rebase normalize-imports dist"
     },
     "dependencies": {
+        "@stokaro/ptah-compat": "^0.33.1",
         "@rebasepro/server": "workspace:*",
         "@rebasepro/server-postgres": "workspace:*",
         "@rebasepro/types": "workspace:*",
@@ -17,9 +18,6 @@
         "ws": "^8.16.0",
         "dotenv": "^17.4.2",
         "zod": "^4.4.3"
-    },
-    "optionalDependencies": {
-        "@ariga/atlas": "^1.2.3"
     },
     "devDependencies": {
         "@types/pg": "^8.6.5",

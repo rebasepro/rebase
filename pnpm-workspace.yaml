@@ -80,7 +80,6 @@ packages:
   - saas/frontend
   - saas
 allowBuilds:
-  '@ariga/atlas': true
   '@firebase/util': true
   '@google/genai': false
   cpu-features: true

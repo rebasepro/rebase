@@ -401,89 +401,69 @@ function checkInstallAllowlistsAgree() {
     return problems;
 }
 
-/**
- * The PGlite stack a scaffold installs must be pinned exactly.
- *
- * These three packages peer-depend on each other at exact versions —
- * `pglite-pgvector@0.0.7` wants `pglite@0.5.6`, not `^0.5.6` — so a caret range
- * here is not flexibility, it is a guarantee of an unmet peer the first time any
- * of them publishes. `@rebasepro/cli@0.17.3` shipped `^0.5.6` / `^0.0.7` /
- * `^0.2.9`, and every `pnpm install` in a fresh project then printed two unmet
- * peers before the reader had run anything. Nothing breaks; it is simply the
- * first thing a new user sees.
- *
- * A range is the whole failure, so a range is what this refuses. Nothing here
- * can check that the pinned set actually satisfies itself — that needs a
- * resolve, and this gate runs offline — but a set that did when it was pinned
- * cannot drift while the pins are exact.
- */
-/**
- * The Windows Atlas download the CLI prints is one the scaffold's range accepts.
- *
- * `@ariga/atlas` has no Windows build, so on Windows `rebase db push` and
- * `rebase doctor` print a pinned `atlas-windows-amd64-v<version>.exe` URL
- * instead. The npm package's version is the Atlas version, so that URL names
- * the floor of the scaffold's `@ariga/atlas` range — the oldest release it
- * accepts. Raise the floor and forget the constants, and Windows readers are
- * sent an Atlas the project has just said is too old, with nothing failing.
- *
- * It must also stay an optionalDependency: as a plain one its failing
- * `preinstall` aborts the whole install on Windows.
- */
-function checkAtlasWindowsPin() {
+/** The driver, scaffolds and runtime must use the same Ptah Compat release. */
+function ptahDependencyProblems(manifests) {
     const problems = [];
-    const ranges = new Set();
-    for (const [label, root] of [["template", templateRoot], ["baas overlay", baasOverlay]]) {
-        const manifestPath = path.join(root, "backend", "package.json");
-        if (!fs.existsSync(manifestPath)) continue;
-        const pkg = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-        for (const field of ["dependencies", "devDependencies"]) {
+    const driver = manifests.find(({ label }) => label === "PostgreSQL driver");
+    const expected = driver?.pkg.peerDependencies?.["@stokaro/ptah-compat"];
+    if (!expected) problems.push("PostgreSQL driver: no @stokaro/ptah-compat peer dependency");
+
+    for (const { label, pkg } of manifests.filter(item => item.label !== "PostgreSQL driver")) {
+        const actual = pkg.dependencies?.["@stokaro/ptah-compat"];
+        if (!actual || actual !== expected) {
+            problems.push(`${label}: @stokaro/ptah-compat must be a dependency at the driver's ${expected ?? "declared"} range`);
+        }
+    }
+    for (const { label, pkg } of manifests) {
+        for (const field of ["dependencies", "devDependencies", "optionalDependencies"]) {
             if (pkg[field]?.["@ariga/atlas"]) {
-                problems.push(
-                    `${label}: backend/package.json declares @ariga/atlas in ${field}. It has no Windows `
-                    + "build, and its preinstall exits 1 there — keep it in optionalDependencies so a "
-                    + "Windows install skips it instead of failing"
-                );
-            }
-        }
-        const range = pkg.optionalDependencies?.["@ariga/atlas"];
-        if (range) ranges.add(range);
-    }
-    const floors = [...ranges].map(range => range.replace(/^[\^~>=\s]+/, ""));
-    const sources = [
-        "packages/server-postgres/src/cli-helpers.ts",
-        "packages/cli/src/doctor-environment.ts"
-    ];
-    for (const relative of sources) {
-        const text = fs.readFileSync(path.join(repoRoot, relative), "utf8");
-        const pinned = /export const ATLAS_WINDOWS_VERSION = "([^"]+)"/.exec(text)?.[1];
-        if (!pinned) {
-            problems.push(`${relative} no longer exports ATLAS_WINDOWS_VERSION — update this check`);
-            continue;
-        }
-        for (const floor of floors) {
-            if (floor !== pinned) {
-                problems.push(
-                    `${relative} sends Windows readers Atlas ${pinned}, but the scaffold's range for `
-                    + `@ariga/atlas starts at ${floor}. Set ATLAS_WINDOWS_VERSION to ${floor}`
-                );
+                problems.push(`${label}: remove @ariga/atlas from ${field}`);
             }
         }
     }
-    // The Windows guide pins the same download for readers who start there.
-    const guide = "website/src/content/docs/docs/getting-started/windows.md";
-    const guidePath = path.join(repoRoot, guide);
-    if (fs.existsSync(guidePath)) {
-        const text = fs.readFileSync(guidePath, "utf8");
-        for (const floor of floors) {
-            if (!text.includes(`atlas-windows-amd64-v${floor}.exe`)) {
-                problems.push(`${guide} does not download atlas-windows-amd64-v${floor}.exe, the floor of the scaffold's Atlas range`);
-            }
-        }
-    }
+    if (manifests.length !== 4) problems.push("Expected the driver, both scaffolds and runtime manifests");
     return problems;
 }
 
+function checkPtahDependency() {
+    const files = [
+        ["PostgreSQL driver", "packages/server-postgres/package.json"],
+        ["template", "packages/cli/templates/template/backend/package.json"],
+        ["BaaS overlay", "packages/cli/templates/overlays/baas/backend/package.json"],
+        ["runtime", "app/backend/package.json"]
+    ];
+    const manifests = files.map(([label, file]) => ({
+        label,
+        pkg: JSON.parse(fs.readFileSync(path.join(repoRoot, file), "utf8"))
+    }));
+    return ptahDependencyProblems(manifests);
+}
+
+if (process.argv.includes("--selftest")) {
+    const spec = "^1.2.3";
+    const good = [
+        { label: "PostgreSQL driver", pkg: { peerDependencies: { "@stokaro/ptah-compat": spec } } },
+        ...["template", "BaaS overlay", "runtime"].map(label => ({
+            label, pkg: { dependencies: { "@stokaro/ptah-compat": spec } }
+        }))
+    ];
+    if (ptahDependencyProblems(good).length > 0) throw new Error("Valid Ptah dependency set failed");
+    const missing = structuredClone(good);
+    delete missing[1].pkg.dependencies["@stokaro/ptah-compat"];
+    if (ptahDependencyProblems(missing).length === 0) throw new Error("Missing Ptah dependency passed");
+    const stale = structuredClone(good);
+    stale[2].pkg.dependencies["@ariga/atlas"] = "^1.2.3";
+    if (ptahDependencyProblems(stale).length === 0) throw new Error("Stale Atlas dependency passed");
+    console.log("Ptah dependency check selftest passed");
+    process.exit(0);
+}
+
+/**
+ * The PGlite stack a scaffold installs must be pinned exactly.
+ *
+ * These packages peer-depend on each other at exact versions. A caret range
+ * would allow an update that leaves the scaffold with unmet peer dependencies.
+ */
 function checkPgliteStackIsPinned() {
     const manifestPath = path.join(repoRoot, "packages/cli/package.json");
     if (!fs.existsSync(manifestPath)) return [];
@@ -986,13 +966,13 @@ if (duplicateDepProblems.length > 0) {
     console.log("  ok   no dependency is declared twice at different ranges in a scaffold");
 }
 
-const atlasWindowsProblems = checkAtlasWindowsPin();
-if (atlasWindowsProblems.length > 0) {
+const ptahDependencyFindings = checkPtahDependency();
+if (ptahDependencyFindings.length > 0) {
     failed++;
-    console.log("  FAIL Atlas stays optional and the Windows download names the floor of the scaffold's Atlas range");
-    for (const p of atlasWindowsProblems) console.error(`    ${p}`);
+    console.log("  FAIL the driver, scaffolds and runtime use the same Ptah Compat release");
+    for (const p of ptahDependencyFindings) console.error(`    ${p}`);
 } else {
-    console.log("  ok   Atlas stays optional and the Windows download names the floor of the scaffold's Atlas range");
+    console.log("  ok   the driver, scaffolds and runtime use the same Ptah Compat release");
 }
 
 const pgliteProblems = checkPgliteStackIsPinned();
