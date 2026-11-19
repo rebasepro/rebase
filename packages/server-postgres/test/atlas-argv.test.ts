@@ -1,20 +1,9 @@
 /**
- * What `runAtlas` hands the Atlas binary.
- *
- * The flag that made this worth a test is `--exclude`. Atlas rejects an
- * unknown flag before doing any work, so a flag on the wrong subcommand is not
- * a degraded run — it is no run at all. Only `atlas schema apply` takes it;
- * `migrate diff` and `migrate apply` both answer `unknown flag: --exclude`.
- *
- * The guard that shipped was `args.includes("apply") || args.includes("diff")`,
- * which cannot tell `schema apply` from `migrate apply` — so both
- * `rebase db generate` and `rebase db migrate` exited 1 for every project
- * declaring a `search` block, from the day search shipped until it was
- * measured three weeks later. Nothing covered the argv, so nothing said so.
- *
- * Hence the matrix below is over (domain, subcommand) pairs, not subcommands.
+ * The Ptah Compat argument matrix. Schema apply takes --exclude; migrate diff
+ * takes the selectors through PTAH_ATLAS_MIGRATE_DIFF_EXCLUDE and
+ * PTAH_ATLAS_MIGRATE_DIFF_INCLUDE.
  */
-import { acceptsExcludeFlag, buildAtlasArgs, readsRevisions } from "../src/schema/atlas-argv";
+import { acceptsExcludeFlag, acceptsExcludes, buildAtlasArgs, migrateDiffExcludeValue, migrateDiffIncludeValue, readsRevisions } from "../src/schema/atlas-argv";
 
 const URL = "postgres://u:p@localhost:5432/app";
 const DEV_URL = "postgres://u:p@localhost:5432/app_dev_diff";
@@ -23,7 +12,7 @@ const EXCLUDES = ["public.talents.search_vector", "public.talents.talents_search
 const build = (domain: string, args: string[], excludes: string[] = EXCLUDES) =>
     buildAtlasArgs({ domain, args, url: URL, devUrl: DEV_URL, excludes });
 
-describe("--exclude goes only where Atlas accepts it", () => {
+describe("--exclude goes only where ptah-compat accepts it", () => {
     it("`schema apply` takes it — that is the whole protection on the push path", () => {
         const argv = build("schema", ["apply", "--to", "file://drizzle/schema.sql"]);
         expect(argv).toContain("--exclude");
@@ -33,10 +22,12 @@ describe("--exclude goes only where Atlas accepts it", () => {
         }
     });
 
-    it("`migrate diff` never does — Atlas answers `unknown flag: --exclude` and exits 1", () => {
+    it("`migrate diff` uses the environment variable without an unsupported flag", () => {
         const argv = build("migrate", ["diff", "init", "--dir", "file://drizzle/migrations", "--to", "file://drizzle/schema.sql"]);
         expect(argv).not.toContain("--exclude");
-        expect(argv.join(" ")).not.toContain("search_vector");
+        expect(acceptsExcludes("migrate", ["diff"])).toBe(true);
+        expect(migrateDiffExcludeValue("migrate", ["diff"], EXCLUDES)).toBe(EXCLUDES.join(","));
+        expect(migrateDiffExcludeValue("migrate", ["apply"], EXCLUDES)).toBeUndefined();
     });
 
     it("`migrate apply` never does either — it is not `schema apply`", () => {
@@ -77,6 +68,20 @@ describe("--exclude goes only where Atlas accepts it", () => {
 
     it("`schema apply` with nothing to exclude passes no empty flag", () => {
         expect(build("schema", ["apply"], [])).not.toContain("--exclude");
+    });
+
+    it("positively scopes schema apply without changing migrate diff's flag surface", () => {
+        const invocation = { url: URL, devUrl: DEV_URL, includes: ["public.notes", "rebase.uid[type=function]"] };
+        const apply = buildAtlasArgs({ ...invocation, domain: "schema", args: ["apply"] });
+        expect(apply).toEqual([
+            "schema", "apply", "--url", URL, "--dev-url", DEV_URL,
+            "--include", "public.notes", "--include", "rebase.uid[type=function]"
+        ]);
+        const diff = buildAtlasArgs({ ...invocation, domain: "migrate", args: ["diff", "init"] });
+        expect(diff).not.toContain("--include");
+        expect(migrateDiffIncludeValue("migrate", ["diff", "init"], invocation.includes)).toBe(invocation.includes.join(","));
+        expect(migrateDiffIncludeValue("migrate", ["hash"], invocation.includes)).toBeUndefined();
+        expect(migrateDiffIncludeValue("schema", ["apply"], invocation.includes)).toBeUndefined();
     });
 });
 
@@ -172,20 +177,14 @@ describe("migrate on a single-session database", () => {
         expect(build("migrate", ["apply", "--dir", "file://drizzle/migrations"], [])).not.toContain("--skip-lock");
     });
 
-    // `migrate set` takes no `--skip-lock`, and opened three connections: its
-    // own, the lock's, and a second client for `--revisions-schema`. Beside a
-    // dev server's two, the third was closed unanswered — `EOF`, five times
-    // out of five, on every second `--baseline`. Bound to the `rebase` schema
-    // the revisions table is in, it needs no second client: two connections.
-    it("`migrate set` is bound to the revisions schema instead of opening a second client for it", () => {
+    it("`migrate set` writes the same revisions schema that `migrate apply` reads", () => {
         expect(managed("migrate", ["set", "20260101000000", "--dir", "file://d"])).toEqual([
-            "migrate", "set", "20260101000000", "--dir", "file://d", "--url", `${URL}?search_path=rebase`
+            "migrate", "set", "20260101000000", "--dir", "file://d", "--url", URL, "--revisions-schema", "rebase"
         ]);
-        expect(managed("migrate", ["set", "1", "--dir", "file://d"])).not.toContain("--revisions-schema");
-        // Whatever the URL already carries is kept, and a search_path it names is replaced.
+        // Existing connection options remain untouched.
         expect(buildAtlasArgs({
             domain: "migrate", args: ["set", "1"], url: `${URL}?sslmode=disable&search_path=public`, devUrl: DEV_URL, singleSession: true
-        })).toContain(`${URL}?sslmode=disable&search_path=rebase`);
+        })).toContain(`${URL}?sslmode=disable&search_path=public`);
     });
 
     it("a real server's `migrate set` keeps its URL and names the revisions schema", () => {
