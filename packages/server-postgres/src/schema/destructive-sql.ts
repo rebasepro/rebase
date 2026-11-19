@@ -44,6 +44,7 @@ const DESTRUCTIVE_PATTERNS: { label: string; re: RegExp }[] = [
     { label: "DROP SCHEMA", re: /\bDROP\s+SCHEMA\b/i },
     { label: "DROP VIEW", re: /\bDROP\s+(MATERIALIZED\s+)?VIEW\b/i },
     { label: "DROP TYPE", re: /\bDROP\s+TYPE\b/i },
+    { label: "DROP EXTENSION", re: /\bDROP\s+EXTENSION\b/i },
     { label: "TRUNCATE", re: /\bTRUNCATE\b/i }
 ];
 
@@ -255,7 +256,7 @@ export function detectDestructiveStatements(
         found.push({
             statement: `Planning migration statements (${announced} in total)`,
             kind: "UNREADABLE PLAN",
-            detail: `Atlas announced ${announced} statement(s) and ${statements.length} could be read — `
+            detail: `The planner reported ${announced} statement(s) and ${statements.length} could be read — `
                 + "read the plan yourself before allowing it"
         });
     }

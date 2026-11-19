@@ -91,8 +91,8 @@ export function describeBaselinePlan(version: string, plan: BaselinePlan): strin
         case "atlas-baseline":
             return `Recording ${version} as already applied, then migrating from the next one.`;
         case "set":
-            return `This database already records migrations up to ${plan.latest}, and Atlas applies --baseline only ` +
-                `to a database with none.\n  Marking every migration up to ${version} as applied with \`atlas migrate set\`, ` +
+            return `This database already records migrations up to ${plan.latest}, and Ptah applies --baseline only ` +
+                `to a database with none.\n  Marking every migration up to ${version} as applied with \`ptah-compat migrate set\`, ` +
                 "then migrating from the next one.";
         case "already-recorded":
             return `Nothing to record: this database already records migrations up to ${plan.latest}, which ` +

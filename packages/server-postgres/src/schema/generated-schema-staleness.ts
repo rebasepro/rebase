@@ -395,7 +395,7 @@ export function staleVerdict(input: {
             ...(input.stale.length > 0
                 ? ["  The database column has already been renamed at boot."]
                 : []),
-            "  The server reads the database, so it will still start — but `db push`, Atlas, `eject` "
+            "  The server reads the database, so it will still start — but `db push`, `db generate`, `eject` "
             + "and any code importing this file are all reading a description that no longer matches.",
             "  Run `rebase schema generate` to regenerate it."
         ],

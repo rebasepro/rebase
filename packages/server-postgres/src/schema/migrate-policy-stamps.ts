@@ -2,19 +2,16 @@
  * The stamps `rebase db migrate` leaves on the policies it applied.
  *
  * A boot leaves a table's policies alone only when each carries the stamp a
- * boot or a push writes (`COMMENT ON POLICY … IS 'rebase:<hash>'`, see
- * `policyStampSql`). `db push` stamps what `policies.sql` just created. A
- * migration runs the same statements — `db generate` appends `policies.sql` to
- * it — and stamped nothing, so the first boot after every migrate dropped and
- * re-created every policy once, an ACCESS EXCLUSIVE lock per table: 44 on the
- * blog scaffold.
+ * boot or a database command writes (`COMMENT ON POLICY … IS 'rebase:<hash>'`,
+ * see `policyStampSql`). Ptah applies policies through its plan; this module
+ * verifies their stored definitions before stamping them after either push
+ * or migrate.
  *
- * Migrate cannot stamp what the files hold, the way push stamps what it just
- * ran: a migration was written from the tables of its day, and the
- * database may hold something a later one, or a hand, made since. A stamp
- * there would tell the boot a policy is what the rule makes when it is not, and
- * the boot would never put it right. So each declared policy without a current
- * stamp is asked of Postgres instead, as `db push --dry-run` asks it
+ * A migration was written from the tables of its day, and a live database
+ * may hold something a later one, or a hand, made since. A push plan may
+ * also leave an existing policy untouched. Stamping either one without a
+ * comparison could tell boot that a stale policy is current. Each declared
+ * policy without a current stamp is therefore asked of Postgres
  * (`probeRenderedPolicies`): made again from its rule under a probe name, in a
  * transaction that is rolled back, and compared. Only a policy whose stored
  * definition is exactly what its rule makes is stamped. Any other keeps no
@@ -32,8 +29,8 @@ import { underSearchPath } from "./push-policy-plan";
 import { loadTables } from "./load-tables";
 
 /**
- * `rebase db migrate`'s last step: stamp what the migration left as its rules
- * make it, on this process's connection. Never fatal — a policy left
+ * Stamp what a push or migration left as its rules make it, on this process's
+ * connection. Never fatal — a policy left
  * unstamped costs the next boot a re-apply of its table, which is what every
  * boot after a migrate did before this.
  */

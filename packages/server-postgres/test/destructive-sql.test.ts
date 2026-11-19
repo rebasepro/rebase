@@ -34,16 +34,17 @@ describe("detectDestructiveStatements", () => {
         expect(found[0].kind).toBe("DROP COLUMN");
     });
 
-    it("flags DROP TABLE, DROP SCHEMA, DROP VIEW, DROP TYPE and TRUNCATE", () => {
+    it("flags dropped data and schema prerequisites", () => {
         const plan = [
             'DROP TABLE "orders";',
             'DROP SCHEMA "sales";',
             'DROP MATERIALIZED VIEW "mv";',
             'DROP TYPE "status";',
+            'DROP EXTENSION "vector";',
             'TRUNCATE "logs";'
         ].join("\n");
         const kinds = detectDestructiveStatements(plan).map((d) => d.kind);
-        expect(kinds).toEqual(["DROP TABLE", "DROP SCHEMA", "DROP VIEW", "DROP TYPE", "TRUNCATE"]);
+        expect(kinds).toEqual(["DROP TABLE", "DROP SCHEMA", "DROP VIEW", "DROP TYPE", "DROP EXTENSION", "TRUNCATE"]);
     });
 
     it("does NOT flag additive/safe changes", () => {
@@ -163,7 +164,7 @@ describe("an ALTER COLUMN … TYPE in the plan", () => {
         expect(detectDestructiveStatements(plan, columns).map(d => d.detail)).toEqual(["\"views\" integer → smallint"]);
     });
 
-    it("refuses to call a plan safe when it read fewer statements than Atlas announced", () => {
+    it("refuses to call a plan safe when it read fewer statements than the planner reported", () => {
         const plan = [
             "Planning migration statements (2 in total):",
             "",
@@ -174,7 +175,7 @@ describe("an ALTER COLUMN … TYPE in the plan", () => {
         ].join("\n");
         const found = detectDestructiveStatements(plan, columns);
         expect(found.map(d => d.kind)).toEqual(["UNREADABLE PLAN"]);
-        expect(found[0].detail).toMatch(/announced 2 statement\(s\) and 1 could be read/);
+        expect(found[0].detail).toMatch(/reported 2 statement\(s\) and 1 could be read/);
     });
 
     it("still reports a DROP in the same statement as a DROP", () => {

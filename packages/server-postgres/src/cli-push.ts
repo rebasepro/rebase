@@ -4,20 +4,20 @@ import { isSyncedPlan } from "./schema/destructive-sql";
  * The steps `rebase db push` takes once the dry-run has been read and gated.
  *
  * Callbacks rather than calls, so the order is testable without a database or
- * an Atlas binary: `cli.ts` itself cannot be loaded by the jest suite.
+ * a Ptah binary: `cli.ts` itself cannot be loaded by the jest suite.
  */
 export interface PushApplySteps {
     /** Drop the generated columns that read a column the plan retypes. */
     dropRebuildable: () => Promise<void>;
-    /** `atlas schema apply --auto-approve`: Atlas plans again, then applies. */
+    /** `ptah-compat schema apply --auto-approve` plans again, then applies. */
     atlasApply: () => Promise<void>;
     /** Say what the skipped apply would have printed. */
     reportSynced: () => void;
     /** Put those generated columns back after a failed apply. */
     rebuildAfterFailure: () => Promise<void>;
     /**
-     * Everything Atlas cannot see: RLS locks, auth tables, vector, search,
-     * triggers, policies, the user role. Runs whether or not Atlas had work.
+     * Rebase's post-apply provisioning: locks, auth tables and user role.
+     * Runs whether or not Ptah had work.
      */
     afterApply: () => Promise<void>;
 }

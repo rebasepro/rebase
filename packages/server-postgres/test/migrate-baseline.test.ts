@@ -48,7 +48,7 @@ describe("describeBaselinePlan", () => {
 
     it("says why `migrate set` runs, and that nothing is recorded when there is nothing to record", () => {
         expect(describeBaselinePlan("2", { kind: "set", latest: "1" }))
-            .toMatch(/already records migrations up to 1, and Atlas applies --baseline only to a database with none/);
+            .toMatch(/already records migrations up to 1, and Ptah applies --baseline only to a database with none/);
         expect(describeBaselinePlan("1", { kind: "already-recorded", latest: "2" }))
             .toMatch(/^Nothing to record: this database already records migrations up to 2, which includes 1/);
     });
