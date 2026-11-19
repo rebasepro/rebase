@@ -110,6 +110,13 @@ const NOT_OURS = new Map([
     // sets it; a reader who did would only be lying to the driver about which
     // database they are on.
     ["REBASE_DEV_DATABASE_KIND", "set by the CLI for the driver child it spawns"],
+    ["REBASE_PTAH_DEV_PGLITE", "set by the CLI when its own PGlite instance supplies Ptah's dev database"],
+    // Rebase computes these selectors for each Ptah invocation. The disposable
+    // server setting is Ptah's own option, documented in the driver's README.
+    ["PTAH_ATLAS_ALLOW_UNMATCHED_EXCLUDE", "set by the driver for its Ptah subprocess"],
+    ["PTAH_ATLAS_MIGRATE_DIFF_EXCLUDE", "computed by the driver from protected objects for its Ptah subprocess"],
+    ["PTAH_ATLAS_MIGRATE_DIFF_INCLUDE", "computed by the driver from declared objects for its Ptah subprocess"],
+    ["PTAH_DEV_SERVER_DISPOSABLE", "Ptah's option; set by the CLI for the disposable PGlite dev server"],
     // `rebase cloud init --claim` asks for the app's key itself once the deploy
     // it runs is done, so it tells that child deploy not to ask too: a second
     // key would revoke the first. Nobody sets it by hand.
