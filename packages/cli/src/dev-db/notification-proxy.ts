@@ -328,6 +328,8 @@ interface Connection {
     parser: BackendMessageParser;
     frontend: FrontendMessageParser;
     ledger: ReadyForQueryLedger;
+    terminating: boolean;
+    replacement?: net.Socket;
 }
 
 /**
@@ -350,7 +352,10 @@ export class NotificationProxy {
         const host = this.options.host ?? "127.0.0.1";
 
         return new Promise((resolve, reject) => {
-            const server = net.createServer((client) => this.accept(client, host));
+            const server = net.createServer(client => {
+                client.on("error", () => client.destroy());
+                this.accept(client, host);
+            });
             server.once("error", reject);
             server.listen(this.options.listenPort, host, () => {
                 this.server = server;
@@ -361,7 +366,13 @@ export class NotificationProxy {
 
     private accept(client: net.Socket, host: string): void {
         if (this.connections.size >= (this.options.maxConnections ?? MANAGED_SERVER_MAX_CONNECTIONS)) {
-            this.refuse(client);
+            // A client may open its replacement immediately after sending
+            // Terminate. Reserve one replacement for each closing socket
+            // and wait for its upstream slot before connecting.
+            const closing = [...this.connections].find(connection =>
+                connection.terminating && (!connection.replacement || connection.replacement.destroyed));
+            if (closing) closing.replacement = client;
+            else this.refuse(client);
             return;
         }
         const upstream = net.connect(this.options.upstreamPort, host);
@@ -370,7 +381,8 @@ export class NotificationProxy {
             upstream,
             parser: new BackendMessageParser(),
             frontend: new FrontendMessageParser(),
-            ledger: new ReadyForQueryLedger()
+            ledger: new ReadyForQueryLedger(),
+            terminating: false
         };
         this.connections.add(connection);
 
@@ -382,7 +394,10 @@ export class NotificationProxy {
         client.on("data", (chunk: Buffer) => {
             if (isSslRequest(chunk)) connection.parser.expectSslReply();
             // Noted before it is forwarded, so every answer finds its request.
-            for (const type of connection.frontend.push(chunk)) connection.ledger.sent(type);
+            for (const type of connection.frontend.push(chunk)) {
+                if (type === "X") connection.terminating = true;
+                connection.ledger.sent(type);
+            }
             upstream.write(chunk);
         });
 
@@ -392,7 +407,7 @@ export class NotificationProxy {
                 // `ReadyForQueryLedger`.
                 if (!connection.ledger.deliver(message)) continue;
                 // The rest of a response to a client that has gone is read
-                // and dropped — see `close`.
+                // and dropped until its upstream socket closes.
                 if (!client.destroyed) client.write(message);
                 if (isNotificationFrame(message)) this.broadcast(message, connection);
             }
@@ -408,15 +423,17 @@ export class NotificationProxy {
         // until the daemon restarted, and the next `rebase db migrate` beside
         // a running `rebase dev` got `Error: EOF`. Ended, the server reads an
         // ordinary close, and the proxy's upstream closes once it has.
-        const close = () => {
-            this.connections.delete(connection);
-            client.destroy();
+        client.on("close", () => {
+            connection.terminating = true;
             upstream.end();
-        };
-        client.on("close", close);
-        client.on("error", close);
-        upstream.on("close", close);
-        upstream.on("error", close);
+        });
+        upstream.on("error", () => client.destroy());
+        upstream.on("close", () => {
+            if (!this.connections.delete(connection)) return;
+            client.destroy();
+            const replacement = connection.replacement;
+            if (replacement && !replacement.destroyed) this.accept(replacement, host);
+        });
     }
 
     /**
@@ -432,7 +449,6 @@ export class NotificationProxy {
      * to an SSLRequest, and the refusal to the startup packet.
      */
     private refuse(client: net.Socket): void {
-        client.on("error", () => client.destroy());
         client.on("data", (chunk: Buffer) => {
             if (isSslRequest(chunk)) {
                 client.write("N");
@@ -452,7 +468,7 @@ export class NotificationProxy {
     private broadcast(message: Buffer, origin: Connection): void {
         let copies = 0;
         for (const connection of this.connections) {
-            if (connection === origin) continue;
+            if (connection === origin || connection.terminating) continue;
             if (connection.client.destroyed || !connection.client.writable) continue;
             connection.client.write(message);
             copies += 1;
@@ -464,6 +480,7 @@ export class NotificationProxy {
 
     async stop(): Promise<void> {
         for (const connection of [...this.connections]) {
+            connection.replacement?.destroy();
             connection.client.destroy();
             connection.upstream.destroy();
         }
