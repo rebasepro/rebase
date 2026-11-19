@@ -13,8 +13,13 @@
  *    is the same trick the entity path uses (notify an address, refetch the
  *    row), applied to a different table, and for the same reason: any database
  *    login can `LISTEN`. On an ephemeral channel there is nothing to point at,
- *    so the frame carries the message, and an oversized one is refused loudly
- *    instead of reaching some instances and not others.
+ *    so a frame over the ceiling is cut into parts that leave together, in one
+ *    statement, and each instance puts them back together (see
+ *    {@link FrameAssembler}). It used to be refused instead: delivered on the
+ *    sender's instance and nowhere else, with an error frame to a sender that
+ *    had no reason to read one — a game screen's ~10 KB state reached the
+ *    phones on its own pod and silently never the others. Only a frame over
+ *    {@link PG_BUS_MAX_FRAME_BYTES} is refused now.
  *
  *  - **A notify is a query on the primary database.** Not a slow one, but it
  *    competes with the application's real queries, and that — not throughput —
@@ -28,6 +33,7 @@
  *    than correctness. That is what makes coalescing safe.
  */
 
+import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { logger } from "@rebasepro/server";
 import { PgNotifyListener, type PgNotifyListenerStatus } from "../pg-notify-listener";
@@ -44,6 +50,33 @@ export const CHANNEL_BUS_NOTIFY_CHANNEL = "rebase_channel_bus";
  * check cannot fail at the server for being a few bytes over.
  */
 export const PG_NOTIFY_MAX_PAYLOAD_BYTES = 7500;
+
+/**
+ * The largest frame the Postgres bus carries, cut into parts, in bytes of
+ * encoded JSON. A frame larger than this is refused to its sender, as every
+ * oversized frame used to be. One MiB is ~190 notifications in one statement:
+ * far past any state a realtime app should broadcast, short of making the bus
+ * a file transfer.
+ */
+export const PG_BUS_MAX_FRAME_BYTES = 1024 * 1024;
+
+/**
+ * Base64 characters of a frame per part. The envelope around them
+ * (`{"part":{"id":"…","i":…,"n":…,"data":"…"}}`) stays under 100 bytes, so a
+ * part is always under {@link PG_NOTIFY_MAX_PAYLOAD_BYTES}.
+ */
+const PART_DATA_CHARS = 7200;
+
+/** A frame whose parts have not all arrived after this long is given up on, in ms. */
+const PART_ASSEMBLY_TIMEOUT_MS = 30_000;
+
+/**
+ * How many bytes of unfinished parts an instance holds at most. Past it the
+ * oldest unfinished frame is dropped: parts from one statement arrive
+ * together, so a frame that waits at all has lost a part, and memory must not
+ * be what an unlucky reconnect costs.
+ */
+const MAX_PENDING_PART_BYTES = 16 * 1024 * 1024;
 
 /**
  * How long a batching window stays open.
@@ -68,10 +101,17 @@ interface PendingFrame {
 
 export class PostgresChannelBus implements ChannelBus {
     readonly kind = "postgres" as const;
-    readonly maxFrameBytes = PG_NOTIFY_MAX_PAYLOAD_BYTES;
+    /**
+     * What the bus carries, not what one notification does: a frame over
+     * {@link PG_NOTIFY_MAX_PAYLOAD_BYTES} travels in parts.
+     */
+    readonly maxFrameBytes = PG_BUS_MAX_FRAME_BYTES;
     readonly publishesOnDemand = true;
 
     private listener?: PgNotifyListener;
+    private readonly assembler = new FrameAssembler();
+    /** Frames this instance cut into parts, so its own listener skips putting them back together. */
+    private readonly ownPartIds = new Set<string>();
     private readonly batchWindowMs: number;
 
     /**
@@ -102,7 +142,19 @@ export class PostgresChannelBus implements ChannelBus {
             connectionString: this.connectionString,
             channel: CHANNEL_BUS_NOTIFY_CHANNEL,
             logLabel: "[ChannelBus]",
-            onPayload: async (payload) => {
+            onPayload: async (raw) => {
+                const part = parsePart(raw);
+                let payload = raw;
+                if (part) {
+                    if (this.ownPartIds.has(part.id)) {
+                        // Our own frame, which the service drops on arrival anyway.
+                        if (part.i === part.n - 1) this.ownPartIds.delete(part.id);
+                        return;
+                    }
+                    const whole = this.assembler.add(part);
+                    if (whole === undefined) return;
+                    payload = whole;
+                }
                 const frames = parseChannelBusPayload(payload);
                 if (!frames.length) {
                     logger.warn("⚠️ [ChannelBus] Dropping unparseable payload.");
@@ -144,9 +196,17 @@ export class PostgresChannelBus implements ChannelBus {
 
         const bytes = frameByteLength(frame) + BATCH_SEPARATOR_BYTES;
 
+        // Too large for any notification: it leaves on its own, in parts,
+        // after what is already queued, so it does not overtake it.
+        if (bytes > PG_NOTIFY_MAX_PAYLOAD_BYTES) {
+            this.flush();
+            await this.send([frame]);
+            return;
+        }
+
         // A batch is one NOTIFY payload, so the 8 KB ceiling applies to the
         // whole batch. Send what we have rather than let the frame push it over.
-        if (this.pending.length && this.pendingBytes + bytes > this.maxFrameBytes) {
+        if (this.pending.length && this.pendingBytes + bytes > PG_NOTIFY_MAX_PAYLOAD_BYTES) {
             this.flush();
         }
 
@@ -173,6 +233,8 @@ export class PostgresChannelBus implements ChannelBus {
         this.flush();
         await this.listener?.stop();
         this.listener = undefined;
+        this.assembler.clear();
+        this.ownPartIds.clear();
     }
 
     private openWindow(): void {
@@ -221,7 +283,139 @@ export class PostgresChannelBus implements ChannelBus {
             ? JSON.stringify(frames[0])
             : JSON.stringify({ batch: frames });
 
-        await this.db.execute(sql`SELECT pg_notify(${CHANNEL_BUS_NOTIFY_CHANNEL}, ${payload})`);
+        if (Buffer.byteLength(payload, "utf8") <= PG_NOTIFY_MAX_PAYLOAD_BYTES) {
+            await this.db.execute(sql`SELECT pg_notify(${CHANNEL_BUS_NOTIFY_CHANNEL}, ${payload})`);
+            return;
+        }
+
+        // One statement, so the parts commit together and every listener
+        // receives them in a row: nothing can be lost between two of them but
+        // the whole frame.
+        const parts = splitIntoParts(payload, randomUUID());
+        this.ownPartIds.add(parts[0].id);
+        // A frame whose own copy never comes back (the listener down) must not stay here.
+        if (this.ownPartIds.size > 1000) this.ownPartIds.delete(this.ownPartIds.values().next().value!);
+        const notifies = parts.map(part => sql`pg_notify(${CHANNEL_BUS_NOTIFY_CHANNEL}, ${JSON.stringify({ part })})`);
+        await this.db.execute(sql`SELECT ${sql.join(notifies, sql`, `)}`);
+    }
+}
+
+/** One part of a frame too large for a single notification. */
+export interface ChannelBusPart {
+    /** The same for every part of one frame. */
+    id: string;
+    /** This part's place, from 0. */
+    i: number;
+    /** How many parts the frame has. */
+    n: number;
+    /** A slice of the payload's UTF-8 bytes, base64: no character is ever cut in two. */
+    data: string;
+}
+
+/** Cut a bus payload into parts, each of which fits one notification. */
+export function splitIntoParts(payload: string, id: string): ChannelBusPart[] {
+    const data = Buffer.from(payload, "utf8").toString("base64");
+    const n = Math.ceil(data.length / PART_DATA_CHARS);
+    return Array.from({ length: n }, (_, i) => ({
+        id,
+        i,
+        n,
+        data: data.slice(i * PART_DATA_CHARS, (i + 1) * PART_DATA_CHARS)
+    }));
+}
+
+/** Most parts one frame can have, so a forged `n` cannot reserve unbounded memory. */
+const MAX_PARTS = Math.ceil((PG_BUS_MAX_FRAME_BYTES * 4) / 3 / PART_DATA_CHARS) + 1;
+
+/** The part a notification carries, or undefined when it carries a whole frame. */
+export function parsePart(payload: string): ChannelBusPart | undefined {
+    // Cheap test first: every whole frame starts `{"kind"` or `{"batch"`.
+    if (!payload.startsWith("{\"part\"")) return undefined;
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(payload);
+    } catch {
+        return undefined;
+    }
+    const part = parsed && typeof parsed === "object" ? (parsed as { part?: unknown }).part : undefined;
+    if (!part || typeof part !== "object") return undefined;
+    const { id, i, n, data } = part as Record<string, unknown>;
+    if (typeof id !== "string" || typeof data !== "string") return undefined;
+    if (!Number.isInteger(i) || !Number.isInteger(n)) return undefined;
+    const index = i as number;
+    const count = n as number;
+    if (count < 1 || count > MAX_PARTS || index < 0 || index >= count) return undefined;
+    return { id, i: index, n: count, data };
+}
+
+/**
+ * Puts frames that travelled in parts back together.
+ *
+ * The parts of one frame are sent in one statement, so they arrive in a row;
+ * a frame still waiting after {@link PART_ASSEMBLY_TIMEOUT_MS} lost one (the
+ * listener reconnected between them) and is dropped, as a lost notification
+ * always was.
+ */
+export class FrameAssembler {
+    private readonly pending = new Map<string, { parts: (string | undefined)[]; got: number; bytes: number; at: number }>();
+    private pendingBytes = 0;
+
+    constructor(private readonly now: () => number = Date.now) {}
+
+    /** Add a part; the whole payload once its last part is in, otherwise undefined. */
+    add(part: ChannelBusPart): string | undefined {
+        this.expire();
+        let entry = this.pending.get(part.id);
+        if (!entry) {
+            if (part.n === 1) return Buffer.from(part.data, "base64").toString("utf8");
+            entry = { parts: new Array<string | undefined>(part.n), got: 0, bytes: 0, at: this.now() };
+            this.pending.set(part.id, entry);
+        }
+        if (entry.parts.length !== part.n || entry.parts[part.i] !== undefined) return undefined;
+        entry.parts[part.i] = part.data;
+        entry.got++;
+        entry.bytes += part.data.length;
+        this.pendingBytes += part.data.length;
+        if (entry.got < part.n) {
+            while (this.pendingBytes > MAX_PENDING_PART_BYTES && this.pending.size > 1) this.dropOldest();
+            return undefined;
+        }
+        this.forget(part.id);
+        return Buffer.from(entry.parts.join(""), "base64").toString("utf8");
+    }
+
+    /** How many frames are waiting for parts. */
+    get size(): number {
+        return this.pending.size;
+    }
+
+    clear(): void {
+        this.pending.clear();
+        this.pendingBytes = 0;
+    }
+
+    private expire(): void {
+        const cutoff = this.now() - PART_ASSEMBLY_TIMEOUT_MS;
+        for (const [id, entry] of this.pending) {
+            // Insertion order is arrival order: the first one young enough ends the scan.
+            if (entry.at >= cutoff) break;
+            logger.warn(`⚠️ [ChannelBus] Dropping a frame that arrived ${entry.got} of ${entry.parts.length} parts.`);
+            this.forget(id);
+        }
+    }
+
+    private dropOldest(): void {
+        const oldest = this.pending.keys().next().value;
+        if (oldest === undefined) return;
+        logger.warn("⚠️ [ChannelBus] Dropping an unfinished multi-part frame: too many parts waiting.");
+        this.forget(oldest);
+    }
+
+    private forget(id: string): void {
+        const entry = this.pending.get(id);
+        if (!entry) return;
+        this.pendingBytes -= entry.bytes;
+        this.pending.delete(id);
     }
 }
 

@@ -213,9 +213,13 @@ describe("Channel bus (E2E, two backend instances)", () => {
         expect(received.map(e => e.event)).toEqual(["op", "snapshot", "op"]);
     });
 
-    it("refuses an oversized ephemeral broadcast instead of delivering it to only one instance", async () => {
-        const aliceClient = connect(one);
-        const alice = new RebaseRealtimeChannel(EPHEMERAL, aliceClient);
+    it("delivers an oversized ephemeral broadcast to clients on both instances", async () => {
+        // A game room's shape: one screen broadcasting a ~10 KB state on an
+        // ephemeral channel, a phone in the same room on the other instance.
+        // The message used to reach the phone next to the screen and never the
+        // one across the bus; the screen got an error frame it had no reason
+        // to read, and the far phone simply stopped hearing states.
+        const alice = new RebaseRealtimeChannel(EPHEMERAL, connect(one));
         const bobSameInstance = new RebaseRealtimeChannel(EPHEMERAL, connect(one));
         const bobOtherInstance = new RebaseRealtimeChannel(EPHEMERAL, connect(two));
 
@@ -228,13 +232,16 @@ describe("Channel bus (E2E, two backend instances)", () => {
         await joined(bobSameInstance);
         await joined(bobOtherInstance);
 
-        await alice.broadcast("snapshot", { scene: OVERSIZED });
+        const emoji = "é🎵".repeat(400);
+        await alice.broadcast("op", { n: 1 });
+        await alice.broadcast("snapshot", { scene: OVERSIZED, emoji });
+        await alice.broadcast("op", { n: 3 });
 
-        // Local delivery is unaffected — the refusal is about the hop it could
-        // not make, and pretending otherwise would break single-instance apps.
-        await waitFor(() => near.length === 1, "the client on the same instance still received it");
-        await new Promise(r => setTimeout(r, 750));
-        expect(far).toEqual([]);
+        await waitFor(() => near.length === 3, "the client on the same instance received all three");
+        await waitFor(() => far.length === 3, "the client on the other instance received all three", 5_000);
+        expect((far[1].payload as { scene: string }).scene).toBe(OVERSIZED);
+        expect((far[1].payload as { emoji: string }).emoji).toBe(emoji);
+        expect(far.map(e => e.event)).toEqual(["op", "snapshot", "op"]);
     });
 
     // =========================================================================

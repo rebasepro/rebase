@@ -26,7 +26,11 @@ export {
     PostgresChannelBus,
     CHANNEL_BUS_NOTIFY_CHANNEL,
     PG_NOTIFY_MAX_PAYLOAD_BYTES,
+    PG_BUS_MAX_FRAME_BYTES,
     DEFAULT_BATCH_WINDOW_MS,
+    FrameAssembler,
+    splitIntoParts,
+    parsePart,
     parseChannelBusFrame,
     parseChannelBusPayload
 } from "./PostgresChannelBus";

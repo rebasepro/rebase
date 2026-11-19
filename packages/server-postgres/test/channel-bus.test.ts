@@ -15,11 +15,16 @@ import { WebSocket } from "ws";
 import type { ChannelBus, ChannelBusFrame, ChannelBusHandler } from "../src/services/channel-bus";
 import { MemoryChannelBus, frameByteLength, isChannelBusInstance } from "../src/services/channel-bus";
 import {
+    FrameAssembler,
     parseChannelBusFrame,
     parseChannelBusPayload,
+    parsePart,
     PostgresChannelBus,
-    PG_NOTIFY_MAX_PAYLOAD_BYTES
+    PG_BUS_MAX_FRAME_BYTES,
+    PG_NOTIFY_MAX_PAYLOAD_BYTES,
+    splitIntoParts
 } from "../src/services/channel-bus/PostgresChannelBus";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { resolveChannelBusSetting, createChannelBus } from "../src/services/channel-bus";
 import type { RealtimeClientSocket } from "../src/services/realtimeService";
 import { answerStatements, queryResult, spiedDrizzle } from "./helpers/spg-a-db";
@@ -877,6 +882,103 @@ describe("Postgres bus — notify coalescing", () => {
 
         expect(notified).toHaveLength(5);
         await bus.stop();
+    });
+});
+
+describe("Postgres bus — frames over the NOTIFY ceiling", () => {
+    /** A bus whose every statement is recorded with all its notify payloads. */
+    function createBus(batchWindowMs?: number) {
+        const statements: string[][] = [];
+        const dialect = new PgDialect();
+        const { db, execute } = spiedDrizzle();
+        answerStatements(execute, async (query) => {
+            const { params } = dialect.sqlToQuery(query);
+            // pg_notify(channel, payload), pairwise.
+            statements.push(params.filter((_, i) => i % 2 === 1).map(String));
+            return queryResult();
+        });
+        return { bus: new PostgresChannelBus(db, "postgres://unused", { batchWindowMs }), statements };
+    }
+
+    /** A ~10 KB game state, with characters that take more than one byte. */
+    const bigFrame = (): ChannelBusFrame => ({
+        kind: "broadcast", sid: "i1", channel: "songbuzz:ABCD", event: "state",
+        payload: { blob: "x".repeat(9_000), names: "Zoë 🎵 Ñandú ".repeat(80) }
+    });
+
+    /** What a receiving instance makes of a statement's notifications. */
+    function receive(assembler: FrameAssembler, payloads: string[]): ChannelBusFrame[] {
+        return payloads.flatMap((payload) => {
+            const part = parsePart(payload);
+            const whole = part ? assembler.add(part) : payload;
+            return whole === undefined ? [] : parseChannelBusPayload(whole);
+        });
+    }
+
+    it("sends a frame too large for one notification in parts, in one statement, each under the ceiling", async () => {
+        const { bus, statements } = createBus(20);
+        const frame = bigFrame();
+        await bus.publish(frame);
+
+        expect(statements).toHaveLength(1);
+        expect(statements[0].length).toBeGreaterThan(1);
+        for (const payload of statements[0]) {
+            expect(Buffer.byteLength(payload, "utf8")).toBeLessThanOrEqual(PG_NOTIFY_MAX_PAYLOAD_BYTES);
+        }
+        expect(receive(new FrameAssembler(), statements[0])).toEqual([frame]);
+        await bus.stop();
+    });
+
+    it("sends one arriving inside an open window after what was queued, not batched with it", async () => {
+        const { bus, statements } = createBus(10_000);
+        const small = (n: number): ChannelBusFrame => ({ kind: "broadcast", sid: "i1", channel: "c", event: "op", payload: { n } });
+        await bus.publish(small(0));                 // opens the window
+        const queued = bus.publish(small(1));
+        const big = bigFrame();
+        await bus.publish(big);
+        await queued;
+
+        const assembler = new FrameAssembler();
+        const delivered = statements.flatMap(payloads => receive(assembler, payloads));
+        expect(delivered).toEqual([small(0), small(1), big]);
+        await bus.stop();
+    });
+
+    it("puts parts back together in any order, once, and ignores a repeat", () => {
+        const payload = JSON.stringify(bigFrame());
+        const parts = splitIntoParts(payload, "f1");
+        const assembler = new FrameAssembler();
+
+        const reversed = [...parts].reverse();
+        const results = reversed.map(part => assembler.add(part));
+        expect(results.slice(0, -1).every(r => r === undefined)).toBe(true);
+        expect(results[results.length - 1]).toBe(payload);
+        // A part repeated after its frame was delivered starts nothing complete.
+        expect(assembler.add(parts[0])).toBeUndefined();
+    });
+
+    it("gives up on a frame that lost a part, rather than holding it forever", () => {
+        let now = 0;
+        const assembler = new FrameAssembler(() => now);
+        const parts = splitIntoParts(JSON.stringify(bigFrame()), "lost");
+        assembler.add(parts[0]);
+        expect(assembler.size).toBe(1);
+
+        now = 31_000;
+        assembler.add(splitIntoParts("{}", "other")[0]);
+        expect(assembler.size).toBe(0);
+    });
+
+    it("reads a whole frame as no part, and refuses a part that could reserve unbounded memory", () => {
+        expect(parsePart(JSON.stringify(bigFrame()))).toBeUndefined();
+        expect(parsePart(JSON.stringify({ part: { id: "x", i: 0, n: 1e9, data: "" } }))).toBeUndefined();
+        expect(parsePart(JSON.stringify({ part: { id: "x", i: 3, n: 2, data: "" } }))).toBeUndefined();
+        expect(parsePart(JSON.stringify({ part: { id: "x", i: 0, n: 2, data: "QQ==" } }))).toEqual({ id: "x", i: 0, n: 2, data: "QQ==" });
+    });
+
+    it("carries up to a mebibyte, and the realtime service refuses only past that", () => {
+        expect(new PostgresChannelBus(spiedDrizzle().db, "postgres://unused").maxFrameBytes).toBe(PG_BUS_MAX_FRAME_BYTES);
+        expect(PG_BUS_MAX_FRAME_BYTES).toBeGreaterThan(PG_NOTIFY_MAX_PAYLOAD_BYTES * 100);
     });
 });
 

@@ -175,12 +175,12 @@ export type ChannelBusConfig =
     /**
      * Postgres LISTEN/NOTIFY, reusing infrastructure the deployment already has.
      *
-     * `pg_notify` caps a payload at 8000 bytes, so a broadcast larger than that
-     * is delivered cross-instance only on a *retained* channel, where the
+     * `pg_notify` caps a payload at 8000 bytes. On a *retained* channel the
      * notification carries a pointer (`seq`) instead of the message and each
-     * receiver reads the body back from `rebase.channel_messages`. An oversized
-     * broadcast on an ephemeral channel is refused rather than silently
-     * delivered to half the cluster.
+     * receiver reads the body back from `rebase.channel_messages`. On an
+     * ephemeral channel a broadcast over the cap travels in parts, sent
+     * together in one statement and put back together by each receiver, up to
+     * 1 MiB; only a larger one is refused to its sender.
      *
      * NOTE: `LISTEN` needs a session-mode connection. Behind PgBouncer in
      * transaction mode this must point at the database directly
