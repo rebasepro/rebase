@@ -11,6 +11,8 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+## [0.34.1] - 2026-11-19
+
 ### Changed
 
 - **The CLI uses the package manager you started it with.** `npx @rebasepro/cli init` scaffolds, installs and suggests commands with npm, and `pnpm dlx` does all three with pnpm. Before this, a machine with pnpm installed got a pnpm project from `npx` too, so the setup and the commands printed did not match how the user ran the CLI. An existing lockfile still wins. Yarn and bun are not supported yet: the CLI says so and continues with pnpm, or npm if pnpm is not installed. The Docker build line `rebase build` prints for a custom runtime now uses the project's package manager instead of always npm.
