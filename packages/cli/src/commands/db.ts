@@ -255,15 +255,15 @@ const OWN_SUBCOMMAND_PARSERS: Readonly<Record<string, ((rawArgs: readonly string
  * push `rebase dev` performs during start-up reaches the managed database too.
  */
 /**
- * The `db` subcommands that plan their work with Atlas.
+ * The `db` subcommands that plan their work with Ptah.
  *
- * Atlas computes a diff by replaying the desired schema into a **second, empty
- * database** and comparing. That is why these three are listed and `backup` and
- * `restore` are not — those shell out to `pg_dump`, which fails loudly on its
- * own. `branch` is refused too, but for its own reason and with its own
- * message: see {@link refuseBranchOnManagedDatabase}.
+ * Ptah computes a diff by replaying the desired schema into a **second, empty
+ * database** and comparing. Push and generate use that database. Migration
+ * application does not. Backup and restore use `pg_dump`, which fails loudly
+ * on its own. Branch has its own guard; see
+ * {@link refuseBranchOnManagedDatabase}.
  */
-const ATLAS_BACKED_SUBCOMMANDS = new Set(["push", "generate", "migrate"]);
+const ATLAS_BACKED_SUBCOMMANDS = new Set(["push", "generate"]);
 
 /**
  * A managed-database refusal, raised so the caller decides what it costs.
