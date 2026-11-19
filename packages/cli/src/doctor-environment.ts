@@ -27,37 +27,25 @@ export interface EnvironmentFinding {
 
 // ── Atlas ────────────────────────────────────────────────────────────────
 
-/** What is on disk for `@ariga/atlas`, read by `commands/doctor.ts`. */
+/** What is on disk for `@stokaro/ptah-compat`, read by `commands/doctor.ts`. */
 export interface AtlasBinaryState {
-    /** A `node_modules/.bin/atlas` the project's commands would find. */
-    onPath: boolean;
-    /** `@ariga/atlas/package.json` resolves from the project. */
+    /** `@stokaro/ptah-compat/package.json` resolves from the project. */
     packageInstalled: boolean;
-    /** The binary the package's `bin` names exists as a file. */
+    /** The package entry point and native executable both exist. */
     binaryOnDisk: boolean;
     /** For the remedy: the reader's own package manager. */
     manager: string;
     /**
      * The workspace member the install goes into (`backend` in a scaffold),
      * or absent at a project that is no workspace. A scaffold's root refuses
-     * `pnpm add` without `-w`, and atlas belongs to the backend anyway.
+     * `pnpm add` without `-w`, and the compatibility CLI belongs to the backend.
      */
     workspaceDir?: string | null;
-    /** `process.platform`, for the one platform where the npm package cannot install. */
-    platform?: NodeJS.Platform;
 }
 
-/**
- * The Atlas release Windows readers are sent: the floor of the scaffold's
- * `@ariga/atlas` range, the oldest release it accepts (the npm version is the
- * Atlas version). `tooling/scripts/check-templates.mjs` holds it to that range,
- * beside the same constant in `@rebasepro/server-postgres`.
- */
-export const ATLAS_WINDOWS_VERSION = "1.2.3";
-
-/** `@ariga/atlas` added as a dev dependency where the project keeps it. */
+/** The compatibility CLI added where the project keeps its dependencies. */
 function atlasAddCommand(manager: string, workspaceDir: string | null | undefined): string {
-    const pkg = "@ariga/atlas";
+    const pkg = "@stokaro/ptah-compat";
     if (!workspaceDir) return `${manager} add -D ${pkg}`;
     switch (manager) {
         case "npm": return `npm install -D ${pkg} -w ${workspaceDir}`;
@@ -70,45 +58,20 @@ function atlasAddCommand(manager: string, workspaceDir: string | null | undefine
 /**
  * Whether `db push`, `db generate` and `db migrate` can run at all.
  *
- * They shell out to `atlas`, and its absence is invisible until one of them is
- * run: `@ariga/atlas` downloads its platform binary in `preinstall`, pnpm 10+
- * and npm 12+ refuse a dependency's lifecycle scripts unless allowlisted, and
- * the install exits 0 either way. The scaffold allowlists it, so this is a
- * problem for the person who added `@rebasepro/server-postgres` to a project
- * they already had — five lines of `ERR_PNPM_IGNORED_BUILDS` and
- * `Failed to create bin … ENOENT`, several screens up, with nothing saying that
- * a schema push will fail later.
- *
- * Three states, because two of them need opposite advice. The package absent is
- * an install; the package present with no binary is an allowlist; the binary
- * present with no `.bin` shim is a re-install, and telling that reader their
- * build scripts are blocked sends them to a command that does nothing.
+ * The driver runs the entry point from `@stokaro/ptah-compat` directly.
+ * Ptah ships it without an install script, so approving build scripts cannot
+ * repair a missing package or executable.
  */
 export function checkAtlasBinary(state: AtlasBinaryState | null): EnvironmentFinding[] {
-    if (!state || state.onPath) return [];
-
-    // `@ariga/atlas` ships Linux and macOS builds only, so on Windows every
-    // remedy below — install it, allow its script, re-install — ends where it
-    // started. Atlas's own Windows binary on PATH is the way.
-    if (state.platform === "win32") {
-        return [{
-            check: "atlas",
-            severity: "warning",
-            message: "atlas.exe is not on PATH — the @ariga/atlas npm package has no Windows build, so "
-                + "`db push`, `db generate` and `db migrate` will fail. `rebase dev` does not need it.",
-            fix: `Download https://release.ariga.io/atlas/atlas-windows-amd64-v${ATLAS_WINDOWS_VERSION}.exe, `
-                + "save it as atlas.exe in a folder on PATH, and open a new terminal. "
-                + "Step by step: https://rebase.pro/docs/getting-started/windows/"
-        }];
-    }
+    if (!state) return [];
 
     if (!state.packageInstalled) {
         return [{
             check: "atlas",
             severity: "warning",
-            message: "The atlas binary is not on PATH and @ariga/atlas is not installed — "
-                + "`db push`, `db generate` and `db migrate` will fail.",
-            fix: `Install it: ${atlasAddCommand(state.manager, state.workspaceDir)}, and allow its install script.`
+            message: "@stokaro/ptah-compat is not installed — `db push`, `db generate` "
+                + "and `db migrate` need its command.",
+            fix: `Install it: ${atlasAddCommand(state.manager, state.workspaceDir)}.`
         }];
     }
 
@@ -116,21 +79,12 @@ export function checkAtlasBinary(state: AtlasBinaryState | null): EnvironmentFin
         return [{
             check: "atlas",
             severity: "warning",
-            message: "@ariga/atlas is installed and its binary is missing — its `preinstall` "
-                + "script was blocked, so `db push` and `db migrate` will fail.",
-            fix: "Allow the build script (pnpm: `allowBuilds` in pnpm-workspace.yaml or "
-                + "`pnpm approve-builds`; npm: `allowScripts` in package.json), then re-install."
+            message: "@stokaro/ptah-compat is installed but its executable is missing.",
+            fix: "Reinstall with optional dependencies enabled to restore the Ptah executable."
         }];
     }
 
-    return [{
-        check: "atlas",
-        severity: "warning",
-        message: "The atlas binary is on disk but node_modules/.bin/atlas is missing, "
-            + "so nothing can invoke it.",
-        fix: "Re-resolve the tree so the link is recreated: `pnpm install --force`, or delete "
-            + "node_modules and install again."
-    }];
+    return [];
 }
 
 // ── Node ─────────────────────────────────────────────────────────────────

@@ -185,22 +185,21 @@ describe("version skew", () => {
 });
 
 /**
- * The atlas binary, which `db push`, `db generate` and `db migrate` shell out
- * to and whose absence is invisible until one of them runs.
+ * The Ptah compatibility binary used by database commands.
  *
- * Three states with three different remedies — and the one that used to be
- * conflated is the third: a binary on disk with no `.bin` shim is not a blocked
- * build script, and telling that reader to approve builds sends them to a
- * command that does nothing.
+ * A missing package and a missing native executable need different remedies.
  */
 describe("atlas binary", () => {
-    const base = { onPath: false,
-packageInstalled: true,
-binaryOnDisk: true,
-manager: "pnpm" };
+    const base = { packageInstalled: true, binaryOnDisk: true, manager: "pnpm" };
 
-    it("says nothing when the binary is on PATH", () => {
-        expect(checkAtlasBinary({ ...base, onPath: true })).toEqual([]);
+    it("says nothing when the package and binary are installed", () => {
+        expect(checkAtlasBinary(base)).toEqual([]);
+    });
+
+    it("does not mistake an installed package for a present native binary", () => {
+        expect(checkAtlasBinary({ ...base, packageInstalled: false })).toHaveLength(1);
+        expect(checkAtlasBinary({ ...base, binaryOnDisk: false })[0].fix)
+            .toContain("optional dependencies");
     });
 
     it("says nothing when the state could not be read", () => {
@@ -211,88 +210,58 @@ manager: "pnpm" };
         const [finding] = checkAtlasBinary({ ...base, packageInstalled: false, manager: "npm" });
         expect(finding.check).toBe("atlas");
         expect(finding.message).toContain("not installed");
-        expect(finding.fix).toContain("npm add -D @ariga/atlas");
+        expect(finding.fix).toContain("npm add -D @stokaro/ptah-compat");
     });
 
     it("installs into the workspace member that runs it, where the root would refuse", () => {
-        // A scaffold is a workspace and `@ariga/atlas` belongs to `backend/`:
+        // A scaffold is a workspace and `@stokaro/ptah-compat` belongs to `backend/`:
         // `pnpm add -D` at its root fails with ERR_PNPM_ADDING_TO_ROOT.
         const fixes = (["pnpm", "npm", "yarn", "bun"] as const).map(manager =>
             checkAtlasBinary({ ...base, packageInstalled: false, manager, workspaceDir: "backend" })[0].fix);
         expect(fixes).toEqual([
-            expect.stringContaining("pnpm --dir backend add -D @ariga/atlas"),
-            expect.stringContaining("npm install -D @ariga/atlas -w backend"),
-            expect.stringContaining("yarn --cwd backend add -D @ariga/atlas"),
-            expect.stringContaining("bun add -d @ariga/atlas --cwd backend")
+            expect.stringContaining("pnpm --dir backend add -D @stokaro/ptah-compat"),
+            expect.stringContaining("npm install -D @stokaro/ptah-compat -w backend"),
+            expect.stringContaining("yarn --cwd backend add -D @stokaro/ptah-compat"),
+            expect.stringContaining("bun add -d @stokaro/ptah-compat --cwd backend")
         ]);
     });
 
-    it("names the allowlist when the package is there and the binary is not", () => {
+    it("reinstalls when the package is there and the binary is not", () => {
         const [finding] = checkAtlasBinary({ ...base, binaryOnDisk: false });
-        expect(finding.message).toContain("preinstall");
-        expect(finding.fix).toContain("allowBuilds");
+        expect(finding.message).toContain("executable is missing");
+        expect(finding.fix).toContain("Reinstall");
     });
 
-    it("asks for a re-install, not an allowlist, when only the .bin link is gone", () => {
-        const [finding] = checkAtlasBinary(base);
-        expect(finding.message).toContain("node_modules/.bin/atlas");
-        expect(finding.fix).toContain("--force");
-        // The wrong advice for this state, and the advice it used to give.
-        expect(finding.fix).not.toContain("approve-builds");
-    });
-
-    /**
-     * `@ariga/atlas` has no Windows build — its `preinstall` exits "Unsupported
-     * platform" — so every npm remedy is a loop there. Each of the three states
-     * gets the same answer on Windows: Atlas's own binary, on PATH.
-     */
-    it.each([
-        ["not installed", { packageInstalled: false }],
-        ["script blocked", { binaryOnDisk: false }],
-        ["link missing", {}]
-    ])("on Windows, points at atlas.exe instead of npm (%s)", (_state, overrides) => {
-        const [finding] = checkAtlasBinary({
-            ...base,
-            ...overrides,
-            platform: "win32"
-        });
-        expect(finding.message).toContain("no Windows build");
-        expect(finding.fix).toContain("atlas-windows-amd64-v");
-        expect(finding.fix).toContain(".exe");
-        expect(finding.fix).not.toContain("add -D");
-        expect(finding.fix).not.toContain("allowBuilds");
-    });
-
-    it("on Windows, says nothing once atlas.exe is on PATH", () => {
-        expect(checkAtlasBinary({
-            ...base,
-            onPath: true,
-            platform: "win32"
-        })).toEqual([]);
-    });
 });
 
 describe("atlas binary state on disk", () => {
     /**
-     * pnpm's isolated layout — the scaffold default. `@ariga/atlas` is a
-     * dependency of the driver, not of the project, so it lives under `.pnpm/`
-     * and only the driver's own `node_modules` links to it. A directory walk
-     * from the project root never sees it; the doctor once told a healthy
-     * scaffold the binary was missing.
+     * pnpm's isolated layout — the scaffold default. The compatibility CLI
+     * can live under `.pnpm/` with a link from the driver's `node_modules`.
+     * A directory walk from the project root alone would miss it.
      */
-    it("finds the binary through the driver under pnpm's isolated layout", () => {
-        const root = fs.mkdtempSync(path.join(os.tmpdir(), "doctor-atlas-"));
+    it("finds the binary through the driver and a direct pnpm symlink", () => {
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "doctor-atlas-")));
         const store = path.join(root, "node_modules", ".pnpm");
-        const atlasDir = path.join(store, "@ariga+atlas@1.0.0", "node_modules", "@ariga", "atlas");
+        const atlasDir = path.join(store, "@stokaro+ptah-compat@1.0.0", "node_modules", "@stokaro", "ptah-compat");
         const driverDir = path.join(store, "@rebasepro+server-postgres@0.0.0", "node_modules", "@rebasepro", "server-postgres");
         fs.mkdirSync(atlasDir, { recursive: true });
         fs.mkdirSync(driverDir, { recursive: true });
-        fs.writeFileSync(path.join(atlasDir, "package.json"), JSON.stringify({ name: "@ariga/atlas", version: "1.0.0", bin: { atlas: "atlas" } }));
-        fs.writeFileSync(path.join(atlasDir, "atlas"), "#!/bin/sh\n");
-        fs.writeFileSync(path.join(driverDir, "package.json"), JSON.stringify({ name: "@rebasepro/server-postgres", version: "0.0.0", dependencies: { "@ariga/atlas": "1.0.0" } }));
+        fs.writeFileSync(path.join(atlasDir, "package.json"), JSON.stringify({ name: "@stokaro/ptah-compat", version: "1.0.0", bin: { atlas: "bin/ptah-compat.mjs" } }));
+        fs.mkdirSync(path.join(atlasDir, "bin"));
+        fs.writeFileSync(path.join(atlasDir, "bin", "ptah-compat.mjs"), "#!/usr/bin/env node\n");
+        const ptahDir = path.join(atlasDir, "node_modules", "@stokaro", "ptah");
+        const nativeDir = path.join(ptahDir, "node_modules", "@stokaro", `ptah-${process.platform}-${process.arch}`);
+        fs.mkdirSync(nativeDir, { recursive: true });
+        fs.writeFileSync(path.join(ptahDir, "package.json"), JSON.stringify({ name: "@stokaro/ptah", version: "1.0.0" }));
+        fs.writeFileSync(path.join(nativeDir, "package.json"), JSON.stringify({ name: `@stokaro/ptah-${process.platform}-${process.arch}`, version: "1.0.0" }));
+        fs.mkdirSync(path.join(nativeDir, "bin"));
+        const nativeBinary = path.join(nativeDir, "bin", `ptah-compat${process.platform === "win32" ? ".exe" : ""}`);
+        fs.writeFileSync(nativeBinary, "");
+        fs.writeFileSync(path.join(driverDir, "package.json"), JSON.stringify({ name: "@rebasepro/server-postgres", version: "0.0.0", dependencies: { "@stokaro/ptah-compat": "1.0.0" } }));
         // The driver's own node_modules links to atlas, and carries the .bin shim.
-        fs.mkdirSync(path.join(driverDir, "node_modules", "@ariga"), { recursive: true });
-        fs.symlinkSync(atlasDir, path.join(driverDir, "node_modules", "@ariga", "atlas"));
+        fs.mkdirSync(path.join(driverDir, "node_modules", "@stokaro"), { recursive: true });
+        fs.symlinkSync(atlasDir, path.join(driverDir, "node_modules", "@stokaro", "ptah-compat"));
         fs.mkdirSync(path.join(driverDir, "node_modules", ".bin"), { recursive: true });
         fs.writeFileSync(path.join(driverDir, "node_modules", ".bin", "atlas"), "#!/bin/sh\n");
         // The project depends on the driver only.
@@ -300,11 +269,35 @@ describe("atlas binary state on disk", () => {
         fs.symlinkSync(driverDir, path.join(root, "node_modules", "@rebasepro", "server-postgres"));
         fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "app", dependencies: { "@rebasepro/server-postgres": "0.0.0" } }));
 
-        const state = readAtlasBinaryState(root);
+        // Vitest resolves workspace packages from this repository, even when
+        // createRequire starts in the temporary project. Keep this probe on
+        // the fixture's module graph.
+        const resolveFixture = (from: string, request: string): string | null => {
+            if (from === path.join(root, "package.json") && request === "@rebasepro/server-postgres/package.json") {
+                return path.join(driverDir, "package.json");
+            }
+            if (from === path.join(driverDir, "package.json") && request === "@stokaro/ptah-compat/package.json") {
+                return path.join(atlasDir, "package.json");
+            }
+            if (from === path.join(atlasDir, "package.json") && request === "@stokaro/ptah/package.json") {
+                return path.join(ptahDir, "package.json");
+            }
+            if (from === path.join(ptahDir, "package.json") && request === `@stokaro/ptah-${process.platform}-${process.arch}/package.json`) {
+                return path.join(nativeDir, "package.json");
+            }
+            return null;
+        };
+        const state = readAtlasBinaryState(root, resolveFixture);
         expect(state).not.toBeNull();
         expect(state!.packageInstalled).toBe(true);
         expect(state!.binaryOnDisk).toBe(true);
-        expect(state!.onPath).toBe(true);
+        const backendDir = path.join(root, "backend");
+        fs.mkdirSync(path.join(backendDir, "node_modules", "@stokaro"), { recursive: true });
+        fs.writeFileSync(path.join(backendDir, "package.json"), JSON.stringify({ name: "backend", dependencies: { "@stokaro/ptah-compat": "1.0.0" } }));
+        fs.symlinkSync(atlasDir, path.join(backendDir, "node_modules", "@stokaro", "ptah-compat"));
+        expect(readAtlasBinaryState(root, resolveFixture)?.binaryOnDisk).toBe(true);
+        fs.rmSync(nativeBinary);
+        expect(readAtlasBinaryState(root, resolveFixture)?.binaryOnDisk).toBe(false);
         fs.rmSync(root, { recursive: true, force: true });
     });
 
