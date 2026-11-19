@@ -855,6 +855,29 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
                 + chalk.gray("the API is derived from your database schema. Once it serves a table, its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true).")
         : chalk.gray("This starts both the backend (Hono + PostgreSQL)")
             + chalk.gray(" and the frontend (Vite + React) concurrently."));
+
+    // What to do once it runs: the first run is one command, and the reader's
+    // next question is where their own code goes.
+    lines.push("");
+    lines.push(chalk.bold("Once it is running:"));
+    lines.push("");
+    if (headless) {
+        lines.push(note("1. Open the URL dev prints. Ports come from the project's path, so trust the terminal."));
+        lines.push(note("2. Every table with row-level security and a policy is served at /api/data/<table>."));
+        lines.push(note("3. Ship it to Rebase Cloud:"));
+        lines.push(cmd(pm.run("deploy")));
+        lines.push(note("   or self-host it with Docker. README.md has both."));
+    } else {
+        lines.push(note("1. Open the admin panel at the URL dev prints."));
+        lines.push(note("   Ports come from the project's path, so trust the terminal over 3001/5173."));
+        lines.push(note("2. Add a table: a file in backend/schema/ with defineTable(...), exported from"));
+        lines.push(note("   backend/schema/index.ts. dev regenerates the schema and SDK and creates it."));
+        lines.push(note("3. Choose how it looks in the admin in frontend/src/cms/<table>.tsx."));
+        lines.push(note("4. Call the API from your own code: scripts/example.ts uses the typed client."));
+        lines.push(note("5. Ship it to Rebase Cloud:"));
+        lines.push(cmd(pm.run("deploy")));
+        lines.push(note("   or self-host it with docker compose. README.md has both."));
+    }
     return lines;
 }
 
@@ -1142,36 +1165,19 @@ async function createProject(options: InitOptions) {
     console.log("");
     console.log(`${chalk.green.bold("✓")} Project ${chalk.bold(options.projectName)} created successfully!`);
     console.log("");
-    console.log(chalk.bold("Next steps:"));
+    console.log(chalk.bold("🤖 AI Agent Skills"));
     console.log("");
-    const nextSteps = initNextSteps({
-        headless: options.headless,
-        ownDatabase: Boolean(options.databaseUrl),
-        introspect: Boolean(options.introspect),
-        introspected,
-        installed,
-        // The path the user has to type, not the project's basename: `init
-        // apps/my-app` must say `cd apps/my-app`, and `init .` needs no cd at all
-        // because they are already standing in the project.
-        cdTarget: formatCdTarget(process.cwd(), options.targetDirectory),
-        pm: pmCommands
-    });
-    for (const line of nextSteps) console.log(line);
+    for (const line of agentNextSteps(options.agents, options.interactive === true, pmCommands)) console.log(line);
     console.log("");
     console.log(chalk.gray("Docs: https://rebase.pro/docs"));
     const repo = initRepoLine(hasSeenStarNudge(), { isTTY: Boolean(process.stdout.isTTY), env: process.env });
     console.log(repo.nudge ? repo.line : chalk.gray(repo.line));
     if (repo.nudge) markStarNudgeSeen();
-    console.log("");
-    console.log(chalk.bold("🤖 AI Agent Skills"));
-    console.log("");
-    for (const line of agentNextSteps(options.agents, options.interactive === true, pmCommands)) console.log(line);
-    console.log("");
 
-    // Asked here, at the very end, and never before: the project exists, it
-    // worked, and the user has something to judge us on. Nothing has been
-    // written or transmitted up to this line — declining leaves no id and no
-    // file. See telemetry/consent.ts for why the order matters.
+    // Asked once the project exists and has been reported, and before the
+    // next steps: nothing has been written or transmitted up to this line —
+    // declining leaves no id and no file. See telemetry/consent.ts for why
+    // the order matters.
     //
     // `--yes` and non-TTY runs never reach the prompt, so CI behaviour is
     // unchanged.
@@ -1191,6 +1197,26 @@ async function createProject(options: InitOptions) {
     if (await promptForConsent({ reAskDeclined: true })) {
         await recordEvent("cli.init", initProperties, { projectRoot: options.targetDirectory });
     }
+
+    // The next steps are the last thing printed, so what to do is what the
+    // reader sees when init returns.
+    console.log("");
+    console.log(chalk.bold("Next steps:"));
+    console.log("");
+    const nextSteps = initNextSteps({
+        headless: options.headless,
+        ownDatabase: Boolean(options.databaseUrl),
+        introspect: Boolean(options.introspect),
+        introspected,
+        installed,
+        // The path the user has to type, not the project's basename: `init
+        // apps/my-app` must say `cd apps/my-app`, and `init .` needs no cd at all
+        // because they are already standing in the project.
+        cdTarget: formatCdTarget(process.cwd(), options.targetDirectory),
+        pm: pmCommands
+    });
+    for (const line of nextSteps) console.log(line);
+    console.log("");
 }
 
 /**

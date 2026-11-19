@@ -4,6 +4,9 @@
 
 ### Changed
 
+- **The CLI uses the package manager you started it with.** `npx @rebasepro/cli init` scaffolds, installs and suggests commands with npm, and `pnpm dlx` does all three with pnpm. Before this, a machine with pnpm installed got a pnpm project from `npx` too, so the setup and the commands printed did not match how the user ran the CLI. An existing lockfile still wins. Yarn and bun are not supported yet: the CLI says so and continues with pnpm, or npm if pnpm is not installed. The Docker build line `rebase build` prints for a custom runtime now uses the project's package manager instead of always npm.
+- **`rebase init` ends on its next steps.** The telemetry question, agent skills, docs and repository lines now come before the "Next steps" list, so the last thing on screen is what to run next. The list also continues past the first run, under "Once it is running": where the admin panel is, where to add a table and set how it looks in the admin, how to call the API from code, and `deploy` to ship it.
+- **The telemetry question at the end of an interactive `init` defaults to yes.** It is still asked every time, and the text above it still says what would be sent. Press `n` to decline, or run `rebase telemetry disable` later. `DO_NOT_TRACK`, `CI` and a project's `"telemetry": false` still skip the question.
 - **"Simulate access" is opt-in.** The pill above the avatar was shown to every administrator of every admin panel. It now appears only when the app passes `<Rebase simulateAccess>`; add the prop to keep it. `client.simulate()` and the server's simulation headers are unchanged.
 
 ### Fixed

@@ -118,6 +118,18 @@ describe("the steps, per flavour", () => {
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",
             "This starts both the backend (Hono + PostgreSQL) and the frontend (Vite + React) concurrently.",
+            "",
+            "Once it is running:",
+            "",
+            "  # 1. Open the admin panel at the URL dev prints.",
+            "  #    Ports come from the project's path, so trust the terminal over 3001/5173.",
+            "  # 2. Add a table: a file in backend/schema/ with defineTable(...), exported from",
+            "  #    backend/schema/index.ts. dev regenerates the schema and SDK and creates it.",
+            "  # 3. Choose how it looks in the admin in frontend/src/cms/<table>.tsx.",
+            "  # 4. Call the API from your own code: scripts/example.ts uses the typed client.",
+            "  # 5. Ship it to Rebase Cloud:",
+            "  pnpm run deploy",
+            "  #    or self-host it with docker compose. README.md has both.",
           ]
         `);
     });
@@ -139,6 +151,18 @@ describe("the steps, per flavour", () => {
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",
             "This starts both the backend (Hono + PostgreSQL) and the frontend (Vite + React) concurrently.",
+            "",
+            "Once it is running:",
+            "",
+            "  # 1. Open the admin panel at the URL dev prints.",
+            "  #    Ports come from the project's path, so trust the terminal over 3001/5173.",
+            "  # 2. Add a table: a file in backend/schema/ with defineTable(...), exported from",
+            "  #    backend/schema/index.ts. dev regenerates the schema and SDK and creates it.",
+            "  # 3. Choose how it looks in the admin in frontend/src/cms/<table>.tsx.",
+            "  # 4. Call the API from your own code: scripts/example.ts uses the typed client.",
+            "  # 5. Ship it to Rebase Cloud:",
+            "  pnpm run deploy",
+            "  #    or self-host it with docker compose. README.md has both.",
           ]
         `);
     });
@@ -161,6 +185,18 @@ describe("the steps, per flavour", () => {
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",
             "This starts both the backend (Hono + PostgreSQL) and the frontend (Vite + React) concurrently.",
+            "",
+            "Once it is running:",
+            "",
+            "  # 1. Open the admin panel at the URL dev prints.",
+            "  #    Ports come from the project's path, so trust the terminal over 3001/5173.",
+            "  # 2. Add a table: a file in backend/schema/ with defineTable(...), exported from",
+            "  #    backend/schema/index.ts. dev regenerates the schema and SDK and creates it.",
+            "  # 3. Choose how it looks in the admin in frontend/src/cms/<table>.tsx.",
+            "  # 4. Call the API from your own code: scripts/example.ts uses the typed client.",
+            "  # 5. Ship it to Rebase Cloud:",
+            "  pnpm run deploy",
+            "  #    or self-host it with docker compose. README.md has both.",
           ]
         `);
     });
@@ -188,6 +224,14 @@ describe("the steps, per flavour", () => {
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",
             "This starts a headless API (Hono + PostgreSQL). There is no backend/schema: the API is derived from your database schema. Once it serves a table, its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true).",
+            "",
+            "Once it is running:",
+            "",
+            "  # 1. Open the URL dev prints. Ports come from the project's path, so trust the terminal.",
+            "  # 2. Every table with row-level security and a policy is served at /api/data/<table>.",
+            "  # 3. Ship it to Rebase Cloud:",
+            "  pnpm run deploy",
+            "  #    or self-host it with Docker. README.md has both.",
           ]
         `);
     });
@@ -215,6 +259,14 @@ describe("the steps, per flavour", () => {
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",
             "This starts a headless API (Hono + PostgreSQL). There is no backend/schema: the API is derived from your database schema. Once it serves a table, its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true).",
+            "",
+            "Once it is running:",
+            "",
+            "  # 1. Open the URL dev prints. Ports come from the project's path, so trust the terminal.",
+            "  # 2. Every table with row-level security and a policy is served at /api/data/<table>.",
+            "  # 3. Ship it to Rebase Cloud:",
+            "  pnpm run deploy",
+            "  #    or self-host it with Docker. README.md has both.",
           ]
         `);
     });
@@ -233,6 +285,14 @@ describe("the steps, per flavour", () => {
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",
             "This starts a headless API (Hono + PostgreSQL) over the tables just generated from your database in backend/schema. Edit them to change what the API exposes; its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true).",
+            "",
+            "Once it is running:",
+            "",
+            "  # 1. Open the URL dev prints. Ports come from the project's path, so trust the terminal.",
+            "  # 2. Every table with row-level security and a policy is served at /api/data/<table>.",
+            "  # 3. Ship it to Rebase Cloud:",
+            "  pnpm run deploy",
+            "  #    or self-host it with Docker. README.md has both.",
           ]
         `);
     });

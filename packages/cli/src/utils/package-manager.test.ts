@@ -46,11 +46,27 @@ force: true });
 // =============================================================================
 
 describe("detectPackageManager", () => {
-    describe("invocation is not a project signal", () => {
-        it("ignores an npm user agent and prefers pnpm when installed", () => {
-            // Running `npx @rebasepro/cli init` must not pin the project to npm.
-            process.env.npm_config_user_agent = "npm/10.2.0 node/v20.11.0 darwin arm64";
-            expect(detectPackageManager(tmpDir)).toBe("pnpm");
+    describe("the tool that started the CLI", () => {
+        // `npx @rebasepro/cli init` used to suggest npm in one place and set the
+        // project up with pnpm in another. Following the launcher keeps them one.
+        it("follows npm when started with npx", () => {
+            expect(detectPackageManager(tmpDir, { npm_config_user_agent: "npm/10.2.0 node/v20.11.0 darwin arm64" })).toBe("npm");
+        });
+
+        it("follows pnpm when started with pnpm dlx", () => {
+            expect(detectPackageManager(tmpDir, { npm_config_user_agent: "pnpm/9.15.0 npm/? node/v20.11.0 darwin arm64" })).toBe("pnpm");
+        });
+
+        it("says so, once, when started with yarn, and falls back to pnpm or npm", () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const env = { npm_config_user_agent: "yarn/1.22.22 npm/? node/v20.11.0 darwin arm64" };
+
+            expect(["pnpm", "npm"]).toContain(detectPackageManager(tmpDir, env));
+            detectPackageManager(tmpDir, env);
+
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(warn.mock.calls[0][0]).toContain("yarn is not supported yet");
+            warn.mockRestore();
         });
 
         it("an existing lock file still wins over invocation", () => {
@@ -94,7 +110,7 @@ describe("detectPackageManager", () => {
                 const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
                 fs.writeFileSync(path.join(tmpDir, lock), "");
 
-                const pm = detectPackageManager(tmpDir);
+                const pm = detectPackageManager(tmpDir, {});
 
                 expect(["pnpm", "npm"]).toContain(pm);
                 expect(warn).toHaveBeenCalledTimes(1);
@@ -121,12 +137,12 @@ describe("detectPackageManager", () => {
         it("defaults to pnpm when installed and no lock file is present", () => {
             delete process.env.npm_config_user_agent;
             // Test runs in the pnpm-based Rebase monorepo, so pnpm is available.
-            expect(detectPackageManager(tmpDir)).toBe("pnpm");
+            expect(detectPackageManager(tmpDir, {})).toBe("pnpm");
         });
 
         it("defaults to pnpm when no target dir is provided", () => {
             delete process.env.npm_config_user_agent;
-            expect(detectPackageManager()).toBe("pnpm");
+            expect(detectPackageManager(undefined, {})).toBe("pnpm");
         });
     });
 });
@@ -362,8 +378,8 @@ describe("pnpm probe caching", () => {
 
         // ...and through the caller that matters: an empty dir has no lock file,
         // so detection falls through to the probe every time.
-        detectPackageManager(tmpDir);
-        detectPackageManager(tmpDir);
+        detectPackageManager(tmpDir, {});
+        detectPackageManager(tmpDir, {});
         expect(probeCalls()).toBe(1);
     });
 
