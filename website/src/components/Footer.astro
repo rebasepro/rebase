@@ -1,6 +1,7 @@
 ---
 import { getLangFromUrl, useTranslations, useTranslatedPath } from "../i18n/ui";
 import { DEMO_URL } from "../utils/links";
+import { CLOUD_FLAGS, CLOUD_SIGNUP_URL } from "../data/cloud-offer";
 
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
@@ -122,6 +123,19 @@ const footerNavs = [
                 </a>
 
             </div>
+                {/* Self-serve open (CLOUD_FLAGS.selfServe): nothing to wait for, so
+                    the waitlist gives way to the sign-up. The id stays, because the
+                    home page's Cloud lane links to #footer-waitlist. */}
+                {CLOUD_FLAGS.selfServe ? (
+                <div id="footer-waitlist" class="w-full max-w-sm">
+                    <p class="text-sm font-semibold text-tone-max">{t("footer.waitlistTitle")}</p>
+                    <p class="mt-1 text-sm text-tone-400">{t("cloud.status.open")}</p>
+                    <div class="mt-3 flex gap-2">
+                        <a href={CLOUD_SIGNUP_URL} data-track class="shrink-0 inline-flex items-center justify-center rounded-lg bg-primary border border-transparent px-4 py-0 min-h-(--control-medium) text-sm font-semibold text-white transition-colors hover:bg-primary-light">{t("pricing.cloud.cta.open")}</a>
+                        <a href={translatePath("/pricing")} class="shrink-0 inline-flex items-center justify-center rounded-lg border border-hairline px-4 py-0 min-h-(--control-medium) text-sm font-semibold text-tone-max hover:bg-tone-max/5">{t("cta.lane.cloud.link.open")}</a>
+                    </div>
+                </div>
+                ) : (
                 <form
                     id="footer-waitlist"
                     class="w-full max-w-sm"
@@ -161,6 +175,7 @@ const footerNavs = [
                     </div>
                     <p id="footer-waitlist-status" class="mt-2 text-sm text-tone-400" role="status" aria-live="polite"></p>
                 </form>
+                )}
             </div>
             <div class="grid grid-cols-2 gap-8 sm:gap-6 sm:grid-cols-3 lg:grid-cols-6 xl:gap-8">
                 {footerNavs.map((nav) => (
@@ -219,7 +234,9 @@ const footerNavs = [
 <script>
     // Astro hoists this into its own module, so it cannot see the component's
     // `t()` — the localized copy travels on the form's data-* attributes.
-    const form = document.getElementById("footer-waitlist") as HTMLFormElement | null;
+    // A <div> when self-serve is open (no form to wire), a <form> otherwise.
+    const waitlist = document.getElementById("footer-waitlist");
+    const form = waitlist instanceof HTMLFormElement ? waitlist : null;
 
     if (form) {
         const emailEl = document.getElementById("footer-waitlist-email") as HTMLInputElement;

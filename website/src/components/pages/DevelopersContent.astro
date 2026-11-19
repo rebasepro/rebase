@@ -1,4 +1,5 @@
 ---
+import { offerKey } from "../../data/cloud-offer";
 const { lang, t } = Astro.props;
 
 import CollectionPowerSection from '../../components/CollectionPowerSection.astro';
@@ -335,7 +336,7 @@ import ChapterRule from "../ChapterRule.astro";
                     <h2 class="text-3xl sm:text-4xl text-tone-max mb-5">{t("devpage.21")}</h2>
                     <p class="text-base text-tone-400 leading-relaxed mb-4">{t("devpage.22")}</p>
                     <p class="text-base text-tone-400 leading-relaxed mb-4" set:html={t("devpage.23")}></p>
-                    <p class="text-base text-tone-400 leading-relaxed mb-6">{t("devpage.24")}</p>
+                    <p class="text-base text-tone-400 leading-relaxed mb-6">{t(offerKey("devpage.24"))}</p>
                     <a href="/docs/deployment/self-hosting"
                        class="inline-flex items-center gap-2 text-sm font-medium text-primary-light hover:text-primary/80 transition-colors">
                         Self-hosting guide

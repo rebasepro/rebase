@@ -1,4 +1,5 @@
 ---
+import { offerKey } from "../../data/cloud-offer";
 const { lang, t } = Astro.props;
 
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
@@ -21,7 +22,7 @@ import ChapterRule from "../ChapterRule.astro";
 
             <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
                 <p class="hero-eyebrow mb-label" set:html={t("securitypage.00")}></p>
-                <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t("securitypage.01")}</span></div>
+                <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t(offerKey("securitypage.01"))}</span></div>
                 <h1 class="mb-6 text-display-2 text-tone-max" set:html={t("securitypage.02")}></h1>
                 <p class="mb-10 text-lg leading-8 text-tone-300 lg:text-xl" set:html={t("securitypage.03")}></p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-start">
@@ -300,7 +301,7 @@ import ChapterRule from "../ChapterRule.astro";
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-12">
                     <h2 class="text-3xl sm:text-4xl text-tone-max">{t("securitypage.46")}</h2>
-                    <p class="mt-lead text-lg leading-8 text-tone-400" set:html={t("securitypage.47")}></p>
+                    <p class="mt-lead text-lg leading-8 text-tone-400" set:html={t(offerKey("securitypage.47"))}></p>
                 </div>
                 <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
                     <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
@@ -318,7 +319,7 @@ import ChapterRule from "../ChapterRule.astro";
                             Rebase Cloud · Private beta
                         </div>
                         <h3 class="text-2xl text-tone-max mb-4">{t("securitypage.51")}</h3>
-                        <p class="text-tone-400 mb-4" set:html={t("securitypage.52")}></p>
+                        <p class="text-tone-400 mb-4" set:html={t(offerKey("securitypage.52"))}></p>
                         <p class="text-tone-500 text-sm">{t("securitypage.53")}</p>
                     </div>
                 </div>
@@ -334,7 +335,7 @@ import ChapterRule from "../ChapterRule.astro";
                         Rebase Cloud · Private beta
                     </div>
                     <h2 class="text-3xl sm:text-4xl text-tone-max">{t("securitypage.54")}</h2>
-                    <p class="mt-lead text-lg leading-8 text-tone-400" set:html={t("securitypage.55")}></p>
+                    <p class="mt-lead text-lg leading-8 text-tone-400" set:html={t(offerKey("securitypage.55"))}></p>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -343,14 +344,14 @@ import ChapterRule from "../ChapterRule.astro";
                             <svg class="lucide lucide-map-pin text-blue-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
                         </div>
                         <h3 class="text-xl text-tone-max mb-3">{t("securitypage.56")}</h3>
-                        <p class="text-tone-400 text-sm" set:html={t("securitypage.57")}></p>
+                        <p class="text-tone-400 text-sm" set:html={t(offerKey("securitypage.57"))}></p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-violet-500/10 mb-6">
                             <svg class="lucide lucide-users text-violet-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><path d="M16 3.128a4 4 0 0 1 0 7.744" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /></svg>
                         </div>
                         <h3 class="text-xl text-tone-max mb-3">{t("securitypage.58")}</h3>
-                        <p class="text-tone-400 text-sm" set:html={t("securitypage.59")}></p>
+                        <p class="text-tone-400 text-sm" set:html={t(offerKey("securitypage.59"))}></p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-tone-900/50 p-8 ring-1 ring-inset ring-tone-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10 mb-6">
@@ -404,12 +405,12 @@ import ChapterRule from "../ChapterRule.astro";
                         </ul>
                     </div>
                     <div class="p-8 rounded-2xl border bg-tone-900/50 border-tone-800">
-                        <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">{t("securitypage.87")}</div>
+                        <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">{t(offerKey("securitypage.87"))}</div>
                         <h3 class="text-xl text-tone-max mb-4">{t("securitypage.75")}</h3>
                         <ul class="space-y-3 text-tone-400 text-sm">
                             <li set:html={t("securitypage.76")}></li>
-                            <li set:html={t("securitypage.77")}></li>
-                            <li set:html={t("securitypage.78")}></li>
+                            <li set:html={t(offerKey("securitypage.77"))}></li>
+                            <li set:html={t(offerKey("securitypage.78"))}></li>
                         </ul>
                         <p class="mt-5 text-tone-500 text-xs" set:html={t("securitypage.79")}></p>
                     </div>

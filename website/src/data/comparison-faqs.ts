@@ -1,3 +1,4 @@
+import { offerKey } from "./cloud-offer";
 /**
  * The questions a buyer actually asks on each comparison page.
  *
@@ -30,7 +31,8 @@ export interface Faq {
 }
 
 /** Repeated verbatim wherever hosting comes up, so the story cannot drift. */
-const HOSTING: Faq = { q: "cfaq.hosting.q", a: "cfaq.hosting.a" };
+// The answer names Cloud's access state, so it follows the offer flags.
+const HOSTING: Faq = { q: "cfaq.hosting.q", a: offerKey("cfaq.hosting.a") };
 
 export const COMPARISON_FAQS: Record<string, Faq[]> = {
     supabase: [
