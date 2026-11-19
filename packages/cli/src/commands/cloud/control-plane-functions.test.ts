@@ -53,6 +53,7 @@ const CONTROL_PLANE_FUNCTIONS: Record<string, Status> = {
     resources: "served",
     "runtime-logs": "served",
     "runtime-token": "served",
+    sleep: "served",
     "storage-provision": "served",
     "stripe-billing": "served",
     studio: "served",

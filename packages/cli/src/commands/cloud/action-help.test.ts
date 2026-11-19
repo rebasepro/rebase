@@ -47,6 +47,7 @@ import { GUESTS_ACTIONS, GUESTS_FLAGS } from "./guests";
 import { ACTIVITY_FLAGS } from "./activity";
 import { NOTIFICATIONS_ADD_FLAGS } from "./notifications";
 import { COMPUTE_WINDOW_FLAGS, EVENTS_FLAGS } from "./maintenance";
+import { SLEEP_ON_FLAGS } from "./sleep";
 import { DEPLOY_HOOKS_ACTIONS, DEPLOY_HOOKS_FLAGS } from "./deploy-hooks";
 import { ALERTS_ACTIONS, ALERTS_FLAGS } from "./alerts";
 
@@ -120,6 +121,12 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "compute apply": {},
     "compute window": COMPUTE_WINDOW_FLAGS,
     events: EVENTS_FLAGS,
+    // Sleep when idle: only `on` takes a flag of its own.
+    sleep: null,
+    "sleep status": {},
+    "sleep on": SLEEP_ON_FLAGS,
+    "sleep off": {},
+    "sleep wake": {},
     // Session, link and the operations whose only options are the global ones.
     // `{}` rather than `null` on purpose: it says "this command declares nothing
     // of its own", which turns the reverse check on — a page inventing a flag

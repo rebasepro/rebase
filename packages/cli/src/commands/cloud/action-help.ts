@@ -1175,6 +1175,66 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
+    /* ── Sleep when idle ─────────────────────────────────────────────────
+     *
+     * Two columns of the project row (`sleepWhenIdle`, `sleepAfterMinutes`)
+     * and the control plane's `sleep` function for waking and credits. */
+
+    sleep: {
+        command: "cloud sleep",
+        usage: "cloud sleep [status|on|off|wake] [options]",
+        summary:
+            "Put the project to sleep after a period with no requests, and wake it on the next one. Asleep, it holds "
+            + "no CPU or memory; its database, backups and files are kept. Bare, or `status`, it says whether sleep is on, "
+            + "after how long, and whether the project sleeps now.",
+        flags: [],
+        examples: [
+            "rebase cloud sleep",
+            "rebase cloud sleep on --after 1h",
+            "rebase cloud sleep off",
+            "rebase cloud sleep wake",
+            "rebase cloud sleep status --json"
+        ],
+        notes: [
+            "While asleep, scheduled jobs and background work do not run, uptime monitors see 503, and the first request wakes it (up to about a minute).",
+            "Where a project cannot sleep (no backend, reserved capacity, a customer cluster, its own database, or a region without it) the control plane refuses and says why; the sentence is printed as it came."
+        ]
+    },
+
+    "sleep status": {
+        command: "cloud sleep status",
+        usage: "cloud sleep status",
+        summary: "Whether sleep when idle is on, after how long, whether the project sleeps now and since when, and its last request.",
+        flags: [],
+        examples: ["rebase cloud sleep status", "rebase cloud sleep status --json"]
+    },
+
+    "sleep on": {
+        command: "cloud sleep on",
+        usage: "cloud sleep on [--after 15m|30m|1h|4h]",
+        summary: "Turn sleep when idle on. Without `--after`, the project keeps the period it has (30 minutes when none was set).",
+        flags: [["--after <period>", "How long without requests before it sleeps: 15m, 30m, 1h or 4h"]],
+        examples: ["rebase cloud sleep on", "rebase cloud sleep on --after 4h --json"],
+        notes: ["The control plane refuses it where the project cannot sleep, and says why."]
+    },
+
+    "sleep off": {
+        command: "cloud sleep off",
+        usage: "cloud sleep off",
+        summary: "Turn sleep when idle off. A project asleep now stays asleep until its next request or `rebase cloud sleep wake`.",
+        flags: [],
+        examples: ["rebase cloud sleep off"]
+    },
+
+    "sleep wake": {
+        command: "cloud sleep wake",
+        usage: "cloud sleep wake",
+        summary: "Wake a sleeping project now, instead of on its next request. The database starts first, then the app; it serves again in about a minute.",
+        flags: [],
+        examples: ["rebase cloud sleep wake", "rebase cloud sleep wake --json"],
+        notes: ["A project its owner stopped is not woken: start it with `rebase cloud start`."]
+    },
+
     /* ── Session, link, and the operations with no flags of their own ────
      *
      * Every one of these fell through to the index page, which lists groups

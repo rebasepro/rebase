@@ -42,6 +42,7 @@ import { dbAccessCommand } from "./db-access";
 import { usageCommand } from "./usage";
 import { appKeyCommand } from "./app-key";
 import { computeApplyCommand, computeWindowCommand, DATABASE_RESTART_REFUSAL, patchRestartsDatabase } from "./maintenance";
+import { sleepCommand, parseSleepAfter } from "./sleep";
 import { deployCommand } from "./deploy";
 import { isRouteNotServed } from "./not-served";
 
@@ -822,5 +823,104 @@ describe("compute apply: the consent alone, for a change that waits", () => {
         const r = await stdoutOf(() => computeWindowCommand(argv("compute", "window", "--day", "sun", "--hour", "3")));
         expect(errorOf(r).code).toBe("not_served");
         expect(errorOf(r).hint).toContain("applies when you confirm it");
+    });
+});
+
+/* ── sleep when idle ───────────────────────────────────────────── */
+
+describe("rebase cloud sleep", () => {
+    const ASLEEP = {
+        id: PROJECT_ID, status: "sleeping", sleepWhenIdle: true, sleepAfterMinutes: 60,
+        sleptAt: "2026-11-19T09:00:00Z", lastActivityAt: "2026-11-19T07:58:00Z"
+    };
+
+    it("status: the setting, whether it sleeps now, and the credits", async () => {
+        tables.projects = { findById: () => ASLEEP };
+        answer = () => ({ billingOn: false, credits: [] });
+        const r = await stdoutOf(() => sleepCommand("status", argv("sleep", "status")));
+        expect(invoke).toHaveBeenCalledWith("sleep", undefined, { method: "GET", path: `${PROJECT_ID}/credits` });
+        expect(r.json()).toMatchObject({
+            sleepWhenIdle: true, sleepAfterMinutes: 60, asleep: true, status: "sleeping",
+            sleptAt: "2026-11-19T09:00:00Z", credits: [], sleepBillingOn: false
+        });
+    });
+
+    it("bare is status, and an empty period is the default 30 minutes", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, status: "active", sleepWhenIdle: false, sleepAfterMinutes: null }) };
+        answer = () => {
+            throw notServed();
+        };
+        const r = await stdoutOf(() => sleepCommand(undefined, argv("sleep")));
+        expect(r.json()).toMatchObject({ sleepWhenIdle: false, sleepAfterMinutes: 30, asleep: false, credits: null });
+    });
+
+    it("on --after 1h writes both columns; on alone writes only the switch", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, sleepWhenIdle: false }) };
+        const r = await stdoutOf(() => sleepCommand("on", argv("sleep", "on", "--after", "1h")));
+        await stdoutOf(() => sleepCommand("on", argv("sleep", "on")));
+        expect(updates.map(u => u.data)).toEqual([{ sleepWhenIdle: true, sleepAfterMinutes: 60 }, { sleepWhenIdle: true }]);
+        expect(r.json()).toEqual({ sleepWhenIdle: true, sleepAfterMinutes: 60 });
+    });
+
+    it("off writes the switch off", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, sleepWhenIdle: true }) };
+        const r = await stdoutOf(() => sleepCommand("off", argv("sleep", "off")));
+        expect(updates).toEqual([{ table: "projects", id: PROJECT_ID, data: { sleepWhenIdle: false } }]);
+        expect(r.json()).toEqual({ sleepWhenIdle: false, sleepAfterMinutes: null });
+    });
+
+    it("refuses a period the control plane would, before any call", async () => {
+        const r = await stdoutOf(() => sleepCommand("on", argv("sleep", "on", "--after", "10m")));
+        expect(errorOf(r).code).toBe("bad_request");
+        expect(updates).toEqual([]);
+        expect(parseSleepAfter("4h")).toBe(240);
+        expect(parseSleepAfter("15m")).toBe(15);
+        expect(parseSleepAfter("30")).toBe(30);
+        expect(parseSleepAfter("2h")).toBeUndefined();
+    });
+
+    it("prints the control plane's refusal unchanged", async () => {
+        const why = "sleepWhenIdle: this project's region cannot wake a sleeping project yet.";
+        tables.projects = {
+            findById: () => ({ id: PROJECT_ID, sleepWhenIdle: false }),
+            update: () => {
+                throw Object.assign(new Error(why), { status: 400, code: "invalid_resources" });
+            }
+        };
+        const r = await stdoutOf(() => sleepCommand("on", argv("sleep", "on")));
+        expect(errorOf(r)).toMatchObject({ code: "invalid_resources" });
+        expect(errorOf(r).message).toContain(why);
+    });
+
+    it("a control plane without the setting answers not_served and writes nothing", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, status: "active" }) };
+        const on = await stdoutOf(() => sleepCommand("on", argv("sleep", "on")));
+        expect(errorOf(on).code).toBe("not_served");
+        expect(updates).toEqual([]);
+        const status = await stdoutOf(() => sleepCommand("status", argv("sleep", "status")));
+        expect(errorOf(status).code).toBe("not_served");
+    });
+
+    it("wake: POST sleep/<project>/wake, and the state it answered", async () => {
+        answer = () => ({ state: "waking" });
+        const r = await stdoutOf(() => sleepCommand("wake", argv("sleep", "wake")));
+        expect(invoke).toHaveBeenCalledWith("sleep", {}, { path: `${PROJECT_ID}/wake` });
+        expect(r.json()).toEqual({ state: "waking" });
+    });
+
+    it("wake on a control plane without the function answers not_served", async () => {
+        answer = () => {
+            throw notServed();
+        };
+        const r = await stdoutOf(() => sleepCommand("wake", argv("sleep", "wake")));
+        expect(errorOf(r)).toMatchObject({ code: "not_served", message: "This control plane does not serve sleep when idle yet." });
+    });
+
+    it("refuses an unknown action, and --after anywhere but on", async () => {
+        const typo = await stdoutOf(() => sleepCommand("of", argv("sleep", "of")));
+        expect(errorOf(typo).code).toBe("unknown_command");
+        const misplaced = await stdoutOf(() => sleepCommand("off", argv("sleep", "off", "--after", "1h")));
+        expect(errorOf(misplaced).code).toBe("bad_request");
+        expect(updates).toEqual([]);
     });
 });
