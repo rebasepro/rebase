@@ -29,16 +29,9 @@
  * same index twice, differently. `contracts/derived-names.txt` records the
  * names both produce, and CI fails if they diverge.
  *
- * ## And why the column itself is described here too
- *
- * `VECTOR(n)` is a type Atlas cannot be shown. It has to materialise the
- * desired state in a dev database to diff against, that database is created
- * empty and *emptied again* by Atlas at the start of every run, and nothing in
- * the free tier can put `CREATE EXTENSION vector` back — so a `schema.sql`
- * mentioning the type fails with `type "vector" does not exist` on every push,
- * for good. Search hit the same wall for its own reasons and took the same way
- * out: the objects leave `schema.sql`, Atlas is told to exclude them, and
- * Rebase applies them itself. See `generatePostgresVectorDdl`.
+ * The full desired schema includes vector columns and their declared indexes
+ * for Ptah Compat to plan. The same specification also supplies vector.sql for
+ * boot and recovery. See `generatePostgresVectorDdl`.
  */
 import type {
     TableDescriptor,

@@ -21,6 +21,8 @@ import {
     renderPoliciesDdl,
     renderPolicyStatements,
     renderPostgresDdl,
+    renderPtahDdl,
+    ptahManagedSelectors,
     renderSearchDdl,
     renderTriggersDdl,
     renderViewsDdl,
@@ -57,7 +59,7 @@ export const generatePolicyStatements = (
         .flatMap(policy => renderPolicyStatements({ schema: table.schema, table: table.table }, policy));
 
 /**
- * `.rebase/sql/schema.sql` — the desired state Atlas diffs the database against.
+ * `.rebase/sql/schema.sql` — the desired state Ptah compares with the database.
  *
  * Synchronous. It was `async` with nothing to await, which made every caller
  * (the writer script, the doctor, the live editor, two gates) carry a promise
@@ -69,52 +71,40 @@ export const generatePostgresDdl = (
     options: DdlRenderOptions = {}
 ): string => renderPostgresDdl(planSchema(tables), options);
 
-/** `.rebase/sql/policies.sql` — the RLS policies. Atlas has no model for a policy. */
+/** One declarative schema for Ptah, including Rebase's sidecar objects. */
+export const generatePtahDdl = (
+    tables: readonly CompiledTable[],
+    options: { extensions?: readonly string[] } = {}
+): string => renderPtahDdl(planSchema(tables, { databaseExtensions: options.extensions }));
+
+/** Positive scope for `schema apply`, from the same plan as its desired SQL. */
+export const generatePtahManagedSelectors = (
+    tables: readonly CompiledTable[],
+    options: { extensions?: readonly string[] } = {}
+): string[] => ptahManagedSelectors(planSchema(tables, { databaseExtensions: options.extensions }));
+
+/** `.rebase/sql/policies.sql` — the RLS policies. */
 export const generatePostgresPoliciesDdl = (tables: readonly CompiledTable[]): string =>
     renderPoliciesDdl(planSchema(tables));
 
 /**
- * `.rebase/sql/search.sql` — everything a `search` block needs, as a file Rebase
- * applies itself.
- *
- * Search is one of the parts of the schema Atlas does not own, for two
- * independent reasons and either alone would be enough:
- *
- * 1. Its free tier refuses to *parse* a desired-state file that so much as
- *    contains a function — "functions and procedures are available to
- *    logged-in users only". A generated `tsvector` column cannot avoid one:
- *    `unaccent` is STABLE and jsonb flattening needs a set-returning function,
- *    so both have to be wrapped in an IMMUTABLE helper to be legal in a
- *    generated column at all.
- * 2. Even with the file accepted, Atlas *wipes* the dev database it diffs
- *    against, so a helper seeded there beforehand is gone by the time the plan
- *    is analysed. There is no hook to reinstate it.
- *
- * Empty when nothing opted in — the caller writes no file then.
+ * `.rebase/sql/search.sql` — search DDL retained for boot and recovery.
+ * The ordinary Ptah plan reads these objects from schema.sql. Empty when no
+ * table opts in to search.
  */
 export const generatePostgresSearchDdl = (tables: readonly CompiledTable[]): string =>
     renderSearchDdl(planSchema(tables));
 
 /**
- * Glob patterns telling Atlas to leave the search column and its index alone.
- *
- * Without these, a desired state that omits search reads to Atlas as an
- * instruction to drop the column — taking the index and the whole search
- * feature with it on the next push.
+ * Glob patterns naming the search column and its index for callers that still
+ * use the sidecar file outside the Ptah plan.
  */
 export const searchExcludePatterns = (tables: readonly CompiledTable[]): string[] =>
     searchExcludePatternsOf(planSchema(tables));
 
 /**
- * `.rebase/sql/vector.sql` — the `vector` columns, their ANN indexes and, when a
- * database declared it, the extension.
- *
- * Vector is out of Atlas's hands for a narrower reason than search: not that
- * Atlas refuses to parse the file, but that it cannot *execute* it. To compute
- * a desired state Atlas materialises `schema.sql` in a dev database, that
- * database is created empty, and Atlas empties it again at the start of every
- * run — so `VECTOR(384)` resolves against a database that structurally cannot
- * have pgvector, and every push dies with `type "vector" does not exist`.
+ * `.rebase/sql/vector.sql` — vector columns, ANN indexes and the declared
+ * extension retained for boot and recovery. Ptah plans them from schema.sql.
  */
 export const generatePostgresVectorDdl = (
     tables: readonly CompiledTable[],
@@ -126,20 +116,15 @@ export const vectorExcludePatterns = (tables: readonly CompiledTable[]): string[
     vectorExcludePatternsOf(planSchema(tables));
 
 /**
- * `.rebase/sql/triggers.sql` — the `BEFORE UPDATE` triggers behind
- * `autoValue: "on_update"`, and the one function they share.
- *
- * A trigger is a function plus a binding, so it is carved out of Atlas's view
- * for the first of the two reasons search is. Empty when no property declares
- * `on_update` — the caller writes no file then, and removes a stale one.
+ * `.rebase/sql/triggers.sql` — `BEFORE UPDATE` triggers and their shared
+ * function, retained for boot and recovery. Empty without `on_update`.
  */
 export const generatePostgresTriggersDdl = (tables: readonly CompiledTable[]): string =>
     renderTriggersDdl(planSchema(tables));
 
 /**
- * `.rebase/sql/views.sql` — the views of the collections that declare `view`,
- * which Atlas's free tier does not manage. Empty when none does — the caller
- * writes no file then, and removes a stale one.
+ * `.rebase/sql/views.sql` — declared views retained for boot and recovery.
+ * Empty when no table declares a view.
  */
 export const generatePostgresViewsDdl = (tables: readonly CompiledTable[]): string =>
     renderViewsDdl(planSchema(tables));

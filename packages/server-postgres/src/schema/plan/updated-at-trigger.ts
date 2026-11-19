@@ -20,14 +20,8 @@
  * "now" — the trigger's `now()` is the transaction's start time, which is the
  * same instant the driver's own timestamp is written under.
  *
- * ## Why it is carved out of Atlas
- *
- * Atlas's free tier refuses to *parse* a desired-state file containing a
- * function ("functions and procedures are available to logged-in users only"),
- * and a trigger is a function plus a binding. This is the same arrangement the
- * search helpers already have: excluded from Atlas's view by pattern, written
- * to a file Rebase applies itself, applied at boot by the schema ensure, and
- * appended to migrations by the CLI so a replay is complete.
+ * Ptah Compat plans the function and trigger from the full desired schema.
+ * Rebase retains triggers.sql for boot and recovery.
  *
  * ## Why one function for every column
  *

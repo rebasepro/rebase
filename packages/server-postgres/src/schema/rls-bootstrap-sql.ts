@@ -2,50 +2,16 @@ import { LEGACY_RLS_SCHEMA, REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE, REBASE
 import { sqlRows } from "@rebasepro/common";
 
 /**
- * Canonical SQL bootstrap for the RLS helper functions.
+ * Canonical SQL bootstrap for RLS helpers used by generated policies.
  *
- * Generated RLS policies reference `rebase.uid()` / `rebase.roles()` /
- * `rebase.jwt()`, so any SQL stream that can contain policies must be
- * self-contained: it has to (re)create these helpers first. This matters for
- * the migration directory in particular — Atlas replays migrations against a
- * clean dev database where no out-of-band bootstrap has ever run, so a
- * migration carrying policies without this preamble fails with
- * "function rebase.uid() does not exist".
- *
- * Idempotent (`IF NOT EXISTS` / `OR REPLACE`) so it can be prepended to every
- * policies block and re-applied freely. The runtime boot path
- * (`auth/ensure-tables.ts`) creates the same functions under an advisory lock
- * for HMR-safety; keep the definitions in sync.
- *
- * ## Creating the `rebase` schema here is now safe, and required
- *
- * It deliberately did not, once. These functions lived in a schema called
- * `auth`, and the note here read: creating `rebase` would leak it into Atlas's
- * replayed migration state, and — absent from the desired `schema.sql` — Atlas
- * would then plan `DROP SCHEMA "rebase" CASCADE`, taking the auth tables with
- * it. That reasoning still holds; what changed is the second half of it. The
- * DDL generator now emits `CREATE SCHEMA IF NOT EXISTS "rebase"`
- * unconditionally, so the schema is always in the desired state and the diff is
- * empty. (It used to appear only when some collection happened to declare
- * `schema: "rebase"` — true for the scaffold's users collection, and not a
- * property anything guaranteed.) `db push` additionally excludes the whole
- * schema from the declarative apply.
- *
- * See `@rebasepro/types`' `rls-functions` for why the functions moved out of
- * `auth` at all: the short version is that the name was Supabase's, and
- * `CREATE OR REPLACE FUNCTION auth.uid() RETURNS text` cannot be applied over
- * Supabase's `RETURNS uuid` — Postgres refuses, and the refusal used to be
- * swallowed.
+ * The desired state declares these functions before the policies that call
+ * them. Migration files also need the definitions because Ptah replays the
+ * directory without the application's boot-time provisioning. The boot path
+ * in auth/ensure-tables.ts uses the same definitions under an advisory lock.
  */
 /**
- * The bootstrap as individual statements.
- *
- * Kept as an array because the two consumers need different shapes and only one
- * of them can take a multi-command string: the migration preamble is written to
- * a file and replayed by Atlas, but the boot path runs through drizzle, whose
- * node-postgres handle speaks the extended query protocol and rejects more than
- * one command per call. Splitting a joined string back apart on `$$;` would be
- * a parser for a problem that does not need one.
+ * Keep statements separate for the boot path: node-postgres uses the extended
+ * query protocol there and accepts one SQL statement per call.
  */
 /*
  * Every helper is `PARALLEL SAFE`: it reads a setting, which Postgres hands to
@@ -634,6 +600,19 @@ EXCEPTION
     WHEN insufficient_privilege THEN
         RAISE EXCEPTION 'Rebase writes its server-or-admin policies TO ${REBASE_ADMIN_ROLE}, which does not exist, and % may not create it.', current_user
             USING HINT = 'Run CREATE ROLE ${REBASE_ADMIN_ROLE} NOLOGIN; as an administrator, or declare database({ rls: { adminPolicies: "public" } }) (REBASE_RLS_ADMIN_POLICIES=public) to write them TO public.';
+END
+$rebase_admin_role$`;
+
+/**
+ * The declarative subset of the admin-role bootstrap accepted by Ptah's SQL
+ * schema reader. PostgreSQL defaults a new role to NOBYPASSRLS; the deployment
+ * bootstrap above also names that default and handles concurrent creators.
+ */
+export const ADMIN_POLICY_ROLE_DESIRED_SQL = `DO $rebase_admin_role$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_ADMIN_ROLE}') THEN
+        CREATE ROLE ${REBASE_ADMIN_ROLE} NOLOGIN NOSUPERUSER NOINHERIT;
+    END IF;
 END
 $rebase_admin_role$`;
 

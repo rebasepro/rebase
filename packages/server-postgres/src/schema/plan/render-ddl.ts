@@ -1,29 +1,10 @@
 /**
- * The SQL files, rendered from a {@link SchemaPlan}.
- *
- * Four files, because Atlas owns exactly one of them:
- *
- * - `schema.sql` — the desired state Atlas diffs the database against.
- * - `policies.sql` — the RLS policies. Atlas has no model for a policy.
- * - `search.sql` — the generated `tsvector` column, its GIN index and the
- *   IMMUTABLE helpers its expression calls. Atlas's free tier refuses to
- *   *parse* a file containing a function, and it wipes the dev database it
- *   diffs against, so a helper seeded there is gone by the time the plan runs.
- * - `vector.sql` — the `vector` columns and their ANN indexes. Atlas cannot
- *   *execute* these: it materialises `schema.sql` in a dev database that is
- *   created empty and emptied again on every run, so `VECTOR(384)` resolves
- *   against a database that structurally cannot have pgvector.
- * - `triggers.sql` — `autoValue: "on_update"`, which is a function plus a
- *   binding, so it is out for the same reason search is.
- *
- * Everything not in `schema.sql` is excluded from Atlas's view by pattern
- * (`…ExcludePatterns` below) and applied by Rebase — at push time by the CLI,
- * at boot by the schema ensure. Without the excludes a desired state that omits
- * an object reads to Atlas as an instruction to drop it.
+ * Render Rebase's declared schema as SQL for Ptah planning. The legacy
+ * sidecar renderers remain for boot and recovery paths that consume them.
  */
-import { REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE } from "@rebasepro/types";
-import { adminRequestPolicyName } from "@rebasepro/utils";
-import { ADMIN_POLICY_ROLE_SQL } from "../rls-bootstrap-sql";
+import { REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE, declaredRlsPolicyShape } from "@rebasepro/types";
+import { adminRequestPolicyName, toPostgresIdentifier } from "@rebasepro/utils";
+import { ADMIN_POLICY_ROLE_DESIRED_SQL, ADMIN_POLICY_ROLE_SQL, REQUEST_ROLE_FUNCTION_SQL, RLS_BOOTSTRAP_SQL, RLS_BOOTSTRAP_STATEMENTS } from "../rls-bootstrap-sql";
 import {
     fuzzyColumnDefinition,
     searchColumnDefinition,
@@ -59,6 +40,8 @@ export interface DdlRenderOptions {
     includeSearch?: boolean;
     /** The vector columns and their ANN indexes. See `vector.sql`. */
     includeVector?: boolean;
+    /** Emit a declarative Ptah input, including objects kept in sidecar files. */
+    desiredState?: boolean;
 }
 
 /**
@@ -74,7 +57,7 @@ export const renderPgType = (type: PgType): string => {
         case "varchar": return `VARCHAR(${type.length})`;
         case "char": return `CHAR(${type.length})`;
         case "uuid": return "UUID";
-        case "enum": return `"${type.schema}"."${type.name}"`;
+        case "enum": return `"${type.schema}"."${toPostgresIdentifier(type.name)}"`;
         case "smallint": return "SMALLINT";
         case "integer": return "INTEGER";
         case "bigint": return "BIGINT";
@@ -164,10 +147,6 @@ export const renderPolicyStatements = (
     policy: PolicyPlan
 ): string[] => {
     const target = `"${table.schema}"."${table.table}"`;
-    let create = `CREATE POLICY "${policy.name}" ON ${target} AS ${policy.mode.toUpperCase()} ` +
-        `FOR ${policy.operation.toUpperCase()} TO ${policy.roles.map(r => `"${r}"`).join(", ")}`;
-    if (policy.using) create += ` USING (${policy.using})`;
-    if (policy.withCheck) create += ` WITH CHECK (${policy.withCheck})`;
     // The one policy an older naming stored this rule's operations under —
     // see `PolicyPlan.supersedes`. In the same per-table transaction, so a
     // request sees the old policy or the new ones, never neither.
@@ -192,7 +171,24 @@ export const renderPolicyStatements = (
         : keepsCompanion
             ? [mismatchedCompanionDropSql(table, companionName, policy.operation)]
             : [`DROP POLICY IF EXISTS "${companionName}" ON ${target};`];
-    return [...superseded, ...companion, `DROP POLICY IF EXISTS "${policy.name}" ON ${target};`, `${create};`];
+    return [...superseded, ...companion, `DROP POLICY IF EXISTS "${policy.name}" ON ${target};`, renderCreatePolicyStatement(table, policy)];
+};
+
+/** The declarative statement for a policy, without deployment-time drops. */
+export const renderCreatePolicyStatement = (
+    table: Pick<TablePlan, "schema" | "table">,
+    policy: PolicyPlan,
+    desiredState = false
+): string => {
+    const target = `"${table.schema}"."${table.table}"`;
+    const roles = desiredState && policy.roles.includes("public")
+        ? ["PUBLIC"]
+        : policy.roles.map(role => `"${role}"`);
+    let create = `CREATE POLICY "${policy.name}" ON ${target} AS ${policy.mode.toUpperCase()} ` +
+        `FOR ${policy.operation.toUpperCase()} TO ${roles.join(", ")}`;
+    if (policy.using) create += ` USING (${policy.using})`;
+    if (policy.withCheck) create += ` WITH CHECK (${policy.withCheck})`;
+    return `${create};`;
 };
 
 /**
@@ -248,8 +244,25 @@ export function renderPostgresDdl(plan: SchemaPlan, options: DdlRenderOptions = 
     const includePolicies = options.includePolicies !== false;
     const includeSearch = options.includeSearch !== false;
     const includeVector = options.includeVector !== false;
+    const desiredState = options.desiredState === true;
+    if (desiredState && plan.tables.some(t => t.vectorColumns.length > 0) && !vectorExtensionDeclared(plan.options.databaseExtensions)) {
+        throw new Error("Declare the vector database extension before planning vector columns with Ptah.");
+    }
 
     let ddl = "-- This file is auto-generated by the Rebase DDL generator. Do not edit manually.\n\n";
+
+    // Policies in the desired state must be valid when Ptah replays the file
+    // on an empty dev database. The auth helpers are provisioned separately on
+    // the target, but their declarations are still required for planning.
+    if (desiredState) {
+        const adminRole = plan.tables.some(table => table.policies.some(policy => policy.roles.includes(REBASE_ADMIN_ROLE)))
+            ? `${ADMIN_POLICY_ROLE_DESIRED_SQL};\n\n`
+            : "";
+        const requestRoleFunction = declaredRlsPolicyShape().policyTarget === "requestRole"
+            ? `${REQUEST_ROLE_FUNCTION_SQL};\n\n`
+            : "";
+        ddl += `${RLS_BOOTSTRAP_SQL}\n${requestRoleFunction}${adminRole}`;
+    }
 
     // 1. Custom schemas.
     //
@@ -282,25 +295,25 @@ export function renderPostgresDdl(plan: SchemaPlan, options: DdlRenderOptions = 
         }
     }
 
-    // 1c. Vector support. Only ever a note, never a statement — unlike 1b.
-    // `CREATE EXTENSION vector` is the one thing this file must never carry
-    // whichever way the flag goes: Atlas rejects an extension in a desired
-    // state as a paid feature.
+    if (desiredState && plan.tables.some(t => t.vectorColumns.length > 0)) {
+        ddl += `${vectorExtensionStatement()}\n\n`;
+    }
+
+    // A partial DDL caller can still omit vector objects. Ptah's desired
+    // state includes the extension when the database declares it.
     if (!includeVector && plan.tables.some(t => t.vectorColumns.length > 0)) {
         ddl += "-- Vector columns and their ANN indexes live in `vector.sql`, applied separately.\n\n";
     }
 
     // 1d. `autoValue: "on_update"`. A trigger is a function plus a binding, so
-    // it is out of Atlas's sight for the reason search is — and out
-    // unconditionally, because `schema.sql` has no flag that would make Atlas
-    // able to read one.
-    if (plan.tables.some(t => t.triggers.length > 0)) {
+    // it is out of Atlas's sight for the reason search is.
+    if (!desiredState && plan.tables.some(t => t.triggers.length > 0)) {
         ddl += "-- `autoValue: \"on_update\"` triggers live in `triggers.sql`, applied separately.\n\n";
     }
 
     // 2. Enum types.
     plan.enums.forEach(enumPlan => {
-        ddl += `CREATE TYPE "${enumPlan.schema}"."${enumPlan.name}" AS ENUM (${enumPlan.labels.map(quoteSqlLiteral).join(", ")});\n`;
+        ddl += `CREATE TYPE "${enumPlan.schema}"."${toPostgresIdentifier(enumPlan.name)}" AS ENUM (${enumPlan.labels.map(quoteSqlLiteral).join(", ")});\n`;
     });
     if (ddl.endsWith(";\n")) ddl += "\n";
 
@@ -371,7 +384,9 @@ export function renderPostgresDdl(plan: SchemaPlan, options: DdlRenderOptions = 
             ddl += `${renderEnableRls(table)}\n`;
             ddl += "\n";
             for (const policy of table.policies) {
-                policyStatements.push(statementsToDdl(renderPolicyStatements(table, policy)));
+                policyStatements.push(statementsToDdl(desiredState
+                    ? [renderCreatePolicyStatement(table, policy, true)]
+                    : renderPolicyStatements(table, policy)));
             }
         }
     }
@@ -392,12 +407,68 @@ export function renderPostgresDdl(plan: SchemaPlan, options: DdlRenderOptions = 
 
     if (policyStatements.length > 0) {
         ddl += "-- Row Level Security Policies\n";
-        ddl += adminRolePreamble(plan);
+        if (!desiredState) ddl += adminRolePreamble(plan);
         ddl += policyStatements.join("");
         ddl += "\n";
     }
 
+    if (desiredState) {
+        for (const statement of plan.functions.filter(isTriggerFunction)) {
+            ddl += `${statement}\n\n`;
+        }
+        for (const table of plan.tables) {
+            for (const trigger of table.triggers) {
+                ddl += `${triggerStatements(trigger)[1]}\n`;
+            }
+            if (table.search) {
+                for (const stamp of searchColumnStamps(table.search)) ddl += `${stamp.sql}\n`;
+            }
+        }
+
+        for (const view of plan.views) {
+            for (const statement of viewCreateStatements(view)) {
+                ddl += `${statement.replace(/;\s*$/, "")};\n`;
+            }
+            ddl += "\n";
+        }
+    }
+
     return ddl;
+}
+
+/** A single declarative file for Ptah schema comparison. */
+export function renderPtahDdl(plan: SchemaPlan): string {
+    return renderPostgresDdl(plan, { includePolicies: true, includeSearch: true, includeVector: true, desiredState: true });
+}
+
+/** The resources a declarative push may change; child objects follow their table. */
+export function ptahManagedSelectors(plan: SchemaPlan): string[] {
+    const nameParts = (statement: string, kind: "FUNCTION" | "EXTENSION"): string[] => {
+        const name = /\bCREATE(?: OR REPLACE)? (?:FUNCTION|EXTENSION)(?: IF NOT EXISTS)?\s+((?:"[^"]+"|[\w$]+))(?:\.((?:"[^"]+"|[\w$]+)))?/i.exec(statement);
+        if (!name) throw new Error(`Cannot select a generated ${kind.toLowerCase()}: ${statement}`);
+        return [name[1], name[2]].filter((part): part is string => part !== undefined).map(part => part.replace(/"/g, ""));
+    };
+    const includes = [
+        ...plan.enums.map(type => `${atlasExcludePattern(type.schema, toPostgresIdentifier(type.name))}[type=enum]`),
+        ...plan.tables.map(table => atlasExcludePattern(table.schema, table.table)),
+        ...plan.views.flatMap(view => [
+            atlasExcludePattern(view.schema, view.name),
+            ...(view.materialized ? [atlasExcludePattern(view.schema, viewRowsName(view.name))] : [])
+        ]),
+        ...[...RLS_BOOTSTRAP_STATEMENTS, ...plan.functions,
+            ...(declaredRlsPolicyShape().policyTarget === "requestRole" ? [REQUEST_ROLE_FUNCTION_SQL] : [])]
+            .filter(statement => /\bCREATE OR REPLACE FUNCTION\b/i.test(statement))
+            .map(statement => `${atlasExcludePattern(...nameParts(statement, "FUNCTION"))}[type=function]`),
+        ...plan.extensions.map(statement => {
+            const schema = /\bWITH SCHEMA\s+("[^"]+"|[\w$]+)/i.exec(statement)?.[1]?.replace(/"/g, "");
+            if (!schema) throw new Error(`Cannot select a generated extension: ${statement}`);
+            return `${atlasExcludePattern(schema, ...nameParts(statement, "EXTENSION"))}[type=extension]`;
+        }),
+        ...(plan.tables.some(table => table.policies.some(policy => policy.roles.includes(REBASE_ADMIN_ROLE)))
+            ? [`${atlasExcludePattern(REBASE_ADMIN_ROLE)}[type=role]`]
+            : [])
+    ];
+    return [...new Set(includes)];
 }
 
 // ── policies.sql ─────────────────────────────────────────────────────────────
@@ -414,7 +485,7 @@ export function adminRolePreamble(plan: SchemaPlan): string {
 }
 
 export function renderPoliciesDdl(plan: SchemaPlan): string {
-    let ddl = "-- This file contains RLS policies generated by Rebase. Applied separately from migrations.\n\n";
+    let ddl = "-- This file contains RLS policies generated by Rebase for boot and recovery.\n\n";
     ddl += adminRolePreamble(plan);
 
     // Collections first, then the junctions no collection declares — the order
@@ -471,7 +542,7 @@ export function renderSearchDdl(plan: SchemaPlan): string {
     let ddl = "-- This file is auto-generated by the Rebase DDL generator. Do not edit manually.\n";
     ddl += "--\n";
     ddl += "-- Full-text search for the collections declaring a `search` block.\n";
-    ddl += "-- Applied by Rebase, not by Atlas — see generatePostgresSearchDdl.\n\n";
+    ddl += "-- Used by boot and recovery; Ptah plans declared search objects from schema.sql.\n\n";
 
     extensions.forEach(s => { ddl += `${s}\n`; });
     if (extensions.length > 0) ddl += "\n";
@@ -532,8 +603,8 @@ export function renderVectorDdl(plan: SchemaPlan): string {
     let ddl = "-- This file is auto-generated by the Rebase DDL generator. Do not edit manually.\n";
     ddl += "--\n";
     ddl += "-- Vector columns and their ANN indexes, for the collections declaring a\n";
-    ddl += "-- `vector` property. Applied by Rebase, not by Atlas — see\n";
-    ddl += "-- generatePostgresVectorDdl.\n\n";
+    ddl += "-- `vector` property. Retained for boot and recovery; db generate and\n";
+    ddl += "-- db push plan these objects from schema.sql.\n\n";
     // The note is not decoration. Someone reading this file after a failed push
     // is looking for the reason the type does not exist, and "no CREATE
     // EXTENSION here" is invisible unless it is written down.
@@ -592,8 +663,8 @@ export function renderTriggersDdl(plan: SchemaPlan): string {
     ddl += "--\n";
     ddl += "-- `updated_at` triggers, for the properties declaring `autoValue: \"on_update\"`,\n";
     ddl += "-- and the triggers that keep a row in its tenant.\n";
-    ddl += "-- Applied by Rebase, not by Atlas — a trigger is a function plus a binding,\n";
-    ddl += "-- and Atlas's free tier refuses to parse a desired state containing one.\n\n";
+    ddl += "-- Retained for boot and recovery; db generate and db push plan these\n";
+    ddl += "-- objects from schema.sql.\n\n";
 
     for (const statement of plan.functions.filter(isTriggerFunction)) {
         ddl += `${statement}\n\n`;
@@ -696,7 +767,8 @@ export function renderViewsDdl(plan: SchemaPlan): string {
 
     let ddl = "-- This file is auto-generated by the Rebase DDL generator. Do not edit manually.\n";
     ddl += "--\n";
-    ddl += "-- The views of the collections that declare `view`. Applied by Rebase, not by Atlas.\n\n";
+    ddl += "-- The views of the collections that declare `view`. Retained for boot\n";
+    ddl += "-- and recovery; db generate and db push plan them from schema.sql.\n\n";
     ddl += "DO $rebase_views$\nDECLARE\n    kind \"char\";\n    note text;\nBEGIN\n";
     for (const view of [...plan.views].reverse()) {
         const qualified = `${quoteIdentifier(view.schema)}.${quoteIdentifier(view.name)}`;
