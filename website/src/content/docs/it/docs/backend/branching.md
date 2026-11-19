@@ -1,5 +1,5 @@
 ---
-sourceHash: f9ad18cf03580c13
+sourceHash: cc7b9aa6ef9d67c5
 title: Database Branching
 sidebar_label: Branching
 description: Crea branch di database isolati per sviluppo, staging e test utilizzando CREATE DATABASE ... TEMPLATE di PostgreSQL — copie istantanee e ad alta fedeltà con zero tempi di inattività.
@@ -304,7 +304,7 @@ rebase db branch prune --older-than 2w      # and anything older than two weeks
 
 Nulla scade a meno che non venga richiesto esplicitamente: un branch può essere l'unica copia del lavoro di un pomeriggio, quindi `--older-than` è facoltativo e le età vengono arrotondate per difetto; inoltre il comando mostra il proprio piano e chiede conferma prima di rimuovere qualsiasi elemento, a meno che non si passi `--yes`.
 
-Inoltre, `prune` rileva i due modi in cui i branch si disallineano dai rispettivi metadati — una voce il cui database è stato eliminato tramite SQL semplice (che `list` continuerebbe a segnalare indefinitamente) e un database di branch la cui voce non è mai stata registrata (un arresto anomalo tra le due istruzioni eseguite da `create`). I database temporanei di Atlas `<db>_dev_diff` vengono segnalati contestualmente ma rimossi solo con `--include-dev-diff`: non sono branch e uno di essi potrebbe appartenere a un `db push` attualmente in esecuzione.
+Inoltre, `prune` rileva i due modi in cui i branch si disallineano dai rispettivi metadati — una voce il cui database è stato eliminato tramite SQL semplice (che `list` continuerebbe a segnalare indefinitamente) e un database di branch la cui voce non è mai stata registrata (un arresto anomalo tra le due istruzioni eseguite da `create`). I database temporanei `<db>_dev_diff` vengono segnalati contestualmente ma rimossi solo con `--include-dev-diff`: non sono branch e uno di essi potrebbe appartenere a un `db push` attualmente in esecuzione.
 
 ### Compatibilità con pgBouncer
 Quando si effettua il deployment dietro pgBouncer o connection pooler, assicurati che il pooler supporti le operazioni amministrative sul database. La creazione e l'eliminazione di database bypassano i pool standard a livello di transazione e richiedono connessioni dirette al server Postgres (utilizzando privilegi utente elevati) tramite la configurazione `adminConnectionString`.

@@ -1,5 +1,5 @@
 ---
-sourceHash: fc0bdfb0ae7ceb1b
+sourceHash: b13d6bddec0b3b48
 title: Tables dans le CMS
 sidebar_label: Tables dans le CMS
 description: "Comment le CMS affiche chaque table Postgres sans aucune configuration frontend : libellés, widget associé à chaque type de colonne, champs obligatoires et en lecture seule, relations, emplacements d'affichage et contrôles Créer, Modifier et Supprimer respectant la sécurité au niveau des lignes de la table."
@@ -144,7 +144,7 @@ Les personnalisations qui désignent une table non fournie à l'appelant sont ig
 
 ## Grand nombre de tables
 
-Rien ne limite le nombre de tables. Le panneau a besoin de chaque collection pour construire la navigation, les descripteurs sont donc récupérés après la connexion, et ce dont l'ouverture d'une collection a besoin (la table, les vues d'enregistrements, le formulaire) n'est chargé qu'à ce moment-là. Un schéma volumineux ralentit davantage `rebase db push` que le panneau : avec 400 tables ou plus, un push prend plusieurs dizaines de secondes ; voir [combien de temps prend un push](/docs/cli/schema#rebase-db-push).
+Rien ne limite le nombre de tables. Le panneau a besoin de chaque collection pour construire la navigation, les descripteurs sont donc récupérés après la connexion, et ce dont l'ouverture d'une collection a besoin (la table, les vues d'enregistrements, le formulaire) n'est chargé qu'à ce moment-là. Un schéma volumineux ralentit davantage `rebase db push` que le panneau : avec 400 tables ou plus, un push prend plusieurs dizaines de secondes ; voir [quelles modifications sont planifiées](/docs/cli/schema#rebase-db-push).
 
 ## Prochaines étapes
 

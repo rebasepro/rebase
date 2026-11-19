@@ -26,29 +26,22 @@ All configuration is done via environment variables in your `.env` file at the p
 | `DATABASE_URL` | PostgreSQL connection string. **Optional in development** — unset, `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. Required everywhere else. | `postgresql://user:pass@localhost:5432/mydb` |
 | `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). **Required in production** (auto-generated in development). | `a1b2c3d4e5...` |
 
-> **On a managed database, `sslmode=require` may not mean what it says.**
+> **SSL settings for PostgreSQL clients**
 >
-> To `psql` and every libpq tool, `require` means "encrypted, certificate not
-> checked". The Node driver Rebase runs on reads it as `verify-full`, so a
-> database whose certificate no public authority signed — common on managed
-> Postgres — refuses the runtime with `self-signed certificate`, while `psql`
-> connects with the same URL. The runtime and `rebase db` commands stop with a
-> message that says this.
+> With the default node-postgres URL handling, `sslmode=require` verifies the
+> certificate. In libpq tools such as `psql` and `pg_dump`, it requests
+> encryption with weaker certificate checks.
 >
-> Pick one:
+> - Use `sslmode=verify-full&sslrootcert=/path/to/ca.pem` to verify the
+>   provider's CA and the server hostname across clients.
+> - If your provider requires encryption with certificate verification
+>   disabled, use `sslmode=no-verify` in the Rebase URL. Rebase passes it to
+>   Ptah Compat and PostgreSQL backup and restore tools as `sslmode=require`.
+>   For a direct libpq connection, use `sslmode=require`. Libpq rejects
+>   `no-verify`.
 >
-> - **`sslmode=no-verify`** — encrypted, not checked: what `require` means to
->   libpq. It is a node-postgres spelling that libpq lacks, so `psql`, `pg_dump`
->   and Atlas refuse it with `invalid sslmode value: "no-verify"`. Rebase's own
->   commands (`rebase db push`, `rebase db backup`, `rebase db restore`) pass it
->   to them as `sslmode=require`, so they work with the URL as configured; for
->   `psql` by hand, swap in `sslmode=require`.
-> - **`sslmode=verify-full&sslrootcert=/path/to/ca.pem`** — checked against the
->   provider's CA certificate. The same for every tool.
->
-> `uselibpqcompat=true&sslmode=require`, which the Node driver's own warning
-> suggests, works for the runtime too; Rebase's commands drop `uselibpqcompat`
-> before handing the URL to libpq tools, which reject it.
+> The Node driver also supports `uselibpqcompat=true&sslmode=require`. Rebase
+> strips `uselibpqcompat` when it passes the URL to other database tools.
 
 ### Frontend
 
@@ -407,7 +400,9 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
 | `REBASE_TOKEN` | A token from `rebase cloud tokens create`. Set, every `rebase cloud` command authenticates with it instead of the `rebase cloud login` session, and never reads or writes the stored session. In a directory `rebase cloud init --claim` linked, it is set aside for that project's own token when it holds no scope on the project. The way to run `rebase cloud` in CI — see [CI and agents](/docs/deployment/cloud/#ci-and-agents). The [MCP server](/docs/ai/mcp/) passes it to the CLI its cloud tools spawn, and never sends it to the app: set `REBASE_API_TOKEN` for that. | — |
 | `REBASE_DEBUG` | `1` prints the underlying error and request detail instead of the short message. The first thing to set when a `rebase cloud` command fails unhelpfully. | — |
-| `REBASE_ATLAS_DEV_URL` | The empty database `rebase db push`, `db generate` and `db migrate` plan against, instead of the `<db>_dev_diff` they create beside `DATABASE_URL`. Rebase neither creates nor drops a database named here, and refuses one equal to `DATABASE_URL`. On the managed development database the CLI sets it to a throwaway in-memory PGlite of its own. Set it where `CREATE DATABASE` is not granted. | `<db>_dev_diff` |
+| `REBASE_ATLAS_DEV_URL` | Empty dev database for `db push` and `db generate`. The name remains for existing projects. Rebase does not manage a database set here and refuses the target URL. Managed PGlite gets a disposable in-memory dev database. Use this setting when `CREATE DATABASE` is unavailable; `db migrate` does not need it. | `<db>_dev_diff` |
+| `PTAH_TRUST_REPLAY_SQL` | Allows `db push` (including `--dry-run`) and `db generate` to replay trusted SQL on a shared PostgreSQL dev server. Set to `1` only if you trust the SQL to run with the dev connection's privileges. Roles it creates can remain on the server. | unset |
+| `PTAH_DEV_SERVER_DISPOSABLE` | Set to `1` only when the whole dev server is disposable. Rebase sets it automatically for its managed PGlite dev server. | unset |
 | `REBASE_DEV_NO_DB` | `rebase dev` starts no database and provisions nothing — you bring your own. Same as `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Pins the frontend dev server's port, which `rebase dev` otherwise derives from the project's path. | — |
 | `REBASE_DEV_READY_TIMEOUT_MS` | How long `rebase dev` waits for the backend to announce itself before saying it has not started. `0` disables the report. | `30000` |

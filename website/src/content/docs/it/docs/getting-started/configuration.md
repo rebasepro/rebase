@@ -1,5 +1,5 @@
 ---
-sourceHash: 1aa92066ee4f7422
+sourceHash: 2685a77f978aeef3
 title: Ambiente e configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -27,29 +27,13 @@ Tutta la configurazione viene eseguita tramite variabili d'ambiente nel file `.e
 | `DATABASE_URL` | Stringa di connessione a PostgreSQL. **Opzionale in sviluppo** — se non impostata, `rebase dev` esegue un'istanza PostgreSQL gestita per il progetto, con i relativi dati in `.rebase/`. Obbligatoria ovunque altrove. | `postgresql://user:pass@localhost:5432/mydb` |
 | `JWT_SECRET` | Chiave segreta per la firma dei token JWT. Utilizzare una stringa casuale robusta (minimo 32 caratteri). **Obbligatoria in produzione** (generata automaticamente in sviluppo). | `a1b2c3d4e5...` |
 
-> **Su un database gestito, `sslmode=require` potrebbe non significare ciò che sembra.**
->
-> Per `psql` e per ogni strumento basato su libpq, `require` significa "crittografato, certificato
-> non verificato". Il driver Node su cui si basa Rebase lo interpreta come `verify-full`, quindi un
-> database il cui certificato non è firmato da un'autorità pubblica — comune nei
-> Postgres gestiti — rifiuta il runtime con `self-signed certificate`, mentre `psql`
-> si connette con lo stesso URL. Il runtime e i comandi `rebase db` si arrestano con un
-> messaggio che spiega questo comportamento.
->
-> Scegliere una delle seguenti opzioni:
->
-> - **`sslmode=no-verify`** — crittografato, non verificato: ciò che `require` significa per
->   libpq. È una sintassi specifica di node-postgres che libpq non possiede, pertanto `psql`, `pg_dump`
->   e Atlas la rifiutano con `invalid sslmode value: "no-verify"`. I comandi nativi di Rebase
->   (`rebase db push`, `rebase db backup`, `rebase db restore`) la passano a questi strumenti come
->   `sslmode=require`, funzionando quindi con l'URL così come configurato; per usare `psql`
->   manualmente, sostituire con `sslmode=require`.
-> - **`sslmode=verify-full&sslrootcert=/path/to/ca.pem`** — verificato rispetto al certificato
->   CA del provider. Uguale per ogni strumento.
->
-> Anche `uselibpqcompat=true&sslmode=require`, suggerito dall'avviso stesso del driver Node,
-> funziona per il runtime; i comandi di Rebase rimuovono `uselibpqcompat` prima di passare
-> l'URL agli strumenti libpq, che altrimenti lo rifiuterebbero.
+> Per impostazione predefinita node-postgres verifica il certificato con
+> `sslmode=require`. Gli strumenti libpq come `psql` accettano `require` con
+> controlli più deboli e rifiutano `no-verify`. Usa
+> `sslmode=verify-full&sslrootcert=/path/to/ca.pem` per verificare la CA e il nome
+> host. Per cifrare senza verificare il certificato, imposta `sslmode=no-verify` in
+> Rebase. Rebase passa `sslmode=require` a Ptah Compat e agli strumenti PostgreSQL di
+> backup e ripristino. Per chiamate dirette a libpq, usa `sslmode=require`.
 
 ### Frontend
 
@@ -404,7 +388,9 @@ Letto da `rebase`, non dal server. Nessun parametro qui presente influisce su un
 | `REBASE_CLOUD_PASSWORD` | La relativa password, consentendo a un gestore di segreti di fornirla senza che compaia nella cronologia della shell. | — |
 | `REBASE_TOKEN` | Un token generato da `rebase cloud tokens create`. Se impostato, ogni comando `rebase cloud` si autentica tramite esso anziché con la sessione di `rebase cloud login`, senza leggere o modificare la sessione memorizzata. In una directory collegata tramite `rebase cloud init --claim`, viene accantonato a favore del token specifico del progetto se privo di permessi (scope) su di esso. È la modalità consigliata per eseguire `rebase cloud` in CI — vedere [CI e agenti](/docs/deployment/cloud/#ci-and-agents). Il [server MCP](/docs/ai/mcp/) lo passa alla CLI avviata dai propri cloud tool e non lo invia mai all'app: per tale scopo impostare `REBASE_API_TOKEN`. | — |
 | `REBASE_DEBUG` | `1` stampa l'errore sottostante e i dettagli della richiesta invece del messaggio breve. La prima variabile da impostare quando un comando `rebase cloud` fallisce senza fornire dettagli utili. | — |
-| `REBASE_ATLAS_DEV_URL` | Il database vuoto rispetto al quale `rebase db push`, `db generate` e `db migrate` calcolano il piano, invece del database `<db>_dev_diff` creato accanto a `DATABASE_URL`. Rebase non crea né elimina alcun database specificato qui, e rifiuta un valore identico a `DATABASE_URL`. Nel database di sviluppo gestito, la CLI lo imposta su un'istanza PGlite in memoria temporanea. Da impostare nei contesti in cui il privilegio `CREATE DATABASE` non è concesso. | `<db>_dev_diff` |
+| `REBASE_ATLAS_DEV_URL` | Database di sviluppo vuoto per `db push` e `db generate`. Il nome resta invariato per i progetti esistenti. Rebase non gestisce un database indicato qui e rifiuta l’URL del database di destinazione. PGlite gestito riceve un database temporaneo in memoria. Usalo senza `CREATE DATABASE`; `db migrate` non ne ha bisogno. | `<db>_dev_diff` |
+| `PTAH_TRUST_REPLAY_SQL` | Con PostgreSQL esterno, incluso un servizio Docker Compose locale, Ptah può rieseguire SQL per `db push`, `db push --dry-run` e `db generate`. Usa `PTAH_DEV_SERVER_DISPOSABLE=1` solo se puoi eliminare tutto il server di sviluppo. Su un server condiviso, `PTAH_TRUST_REPLAY_SQL=1` autorizza l’esecuzione con i privilegi della connessione di sviluppo. Attivalo solo se ti fidi di quel SQL. PGlite gestito è già temporaneo. | — |
+| `PTAH_DEV_SERVER_DISPOSABLE` | Impostare a `1` solo se l'intero server di sviluppo può essere eliminato. Rebase lo imposta automaticamente per il server di sviluppo PGlite gestito. | non impostato |
 | `REBASE_DEV_NO_DB` | `rebase dev` non avvia alcun database e non esegue il provisioning — è necessario fornirne uno proprio. Equivale a `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Fissa la porta del server di sviluppo frontend, che altrimenti `rebase dev` deduce dal percorso del progetto. | — |
 | `REBASE_DEV_READY_TIMEOUT_MS` | Tempo di attesa di `rebase dev` per la notifica di avvio del backend prima di segnalare la mancata partenza. `0` disattiva la segnalazione. | `30000` |
@@ -413,7 +399,7 @@ Letto da `rebase`, non dal server. Nessun parametro qui presente influisce su un
 | `REBASE_TELEMETRY_DISABLED` | Lo stesso parametro, specifico per Rebase. Non richiede alcun file, motivo per cui è l'opzione da utilizzare in CI e all'interno delle immagini. | — |
 | `REBASE_TELEMETRY_ENDPOINT` | Destinazione a cui viene inviata la telemetria, per collettori self-hosted. | — |
 
-## Segreti in sviluppo
+## Segreti in fase di sviluppo
 
 `JWT_SECRET` è obbligatoria in produzione. Essa e `REBASE_SERVICE_KEY` vengono
 generate automaticamente al di fuori della produzione, consentendo di iniziare senza alcuna configurazione preliminare.

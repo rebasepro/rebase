@@ -1,5 +1,5 @@
 ---
-sourceHash: fc0bdfb0ae7ceb1b
+sourceHash: b13d6bddec0b3b48
 title: Tabelas no CMS
 sidebar_label: Tabelas no CMS
 description: "Como o CMS exibe todas as tabelas do Postgres sem nenhuma configuração de frontend: rótulos, o widget atribuído a cada tipo de coluna, campos obrigatórios e somente leitura, relações, slots de exibição e controles de Criação, Edição e Exclusão que respeitam a segurança em nível de linha (RLS) da tabela."
@@ -229,7 +229,7 @@ e o que for necessário para abrir uma coleção (a tabela, as visualizações d
 registro, o formulário) é carregado apenas nesse momento. Um esquema grande torna
 o `rebase db push` mais lento do que o painel: com 400 ou mais tabelas, um push
 leva dezenas de segundos; consulte
-[quanto tempo um push leva](/docs/cli/schema#rebase-db-push).
+[quais mudanças o push planeja](/docs/cli/schema#rebase-db-push).
 
 ## Próximos passos
 

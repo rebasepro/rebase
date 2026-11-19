@@ -1,5 +1,5 @@
 ---
-sourceHash: 4040537e5cc9b4d3
+sourceHash: 95b02ddd03d482c6
 title: KI & Agenten
 sidebar_label: Übersicht
 description: Was Rebase für KI-Coding-Assistenten und autonome Agenten bereitstellt – ein MCP-Server, projektlokale Agent Skills, vorgefertigte Anweisungsdateien und das Berechtigungsmodell, das bestimmt, worauf ein Agent tatsächlich zugreifen kann.
@@ -81,12 +81,10 @@ Dies ist bereits dokumentiert, und zwar an zwei Stellen:
 Drei Dinge, die man vor dem Entwurf wissen sollte. **Rebase speichert und durchsucht
 Embeddings; es berechnet sie nicht** – es gibt in Rebase weder einen Embedding-Provider
 noch Modelleinstellungen oder API-Schlüssel, daher ist die Erstellung der Vektoren deine
-Aufgabe. **pgvector ist eine Voraussetzung und die Installation ist optional (Opt-in).**
-Durch `database({ extensions: ["vector"] })` in `backend/resources.ts` führen `rebase db
-push` und die Schema-Prüfung beim Start `CREATE EXTENSION IF NOT EXISTS vector` für
-dich aus; andernfalls erstellen sie die Spalte und überlassen die Extension dir. In jedem
-Fall benötigt der Server ein Image, das die Bibliothek enthält, sowie eine Rolle mit den
-Rechten, sie zu installieren. Und **jede Vektorspalte erhält einen HNSW-Index für die
+Deklarieren Sie `database({ extensions: ["vector"] })` in `backend/resources.ts`,
+damit Ptah Vektorspalten planen kann. Das gilt auch, wenn die Erweiterung im Ziel
+bereits vorhanden ist.
+Und **jede Vektorspalte erhält einen HNSW-Index für die
 Cosine-Distanz**, da Cosine das ist, womit `vectorSearch` standardmäßig misst, sofern du nicht
 `distance` übergibst – ein Index bedient genau einen Operator. Du kannst ihn anpassen oder
 deaktivieren: siehe [The index](/docs/sdk/aggregates-and-search#the-index).

@@ -1,47 +1,44 @@
 ---
 title: Windows
 sidebar_label: Windows
-description: Install and run a Rebase project on Windows — what works natively, the one tool (Atlas) that needs its own Windows binary for db push, db generate and db migrate, and when to use WSL2 instead.
+description: Install a Rebase project and use its database commands on Windows.
 ---
 
-A Rebase project installs and runs on Windows. One tool needs an extra step:
-[Atlas](https://atlasgo.io/), the engine that plans schema migrations. Its npm
-package, `@ariga/atlas`, ships Linux and macOS builds only, so on Windows you
-install Atlas's own Windows binary instead.
+Rebase projects run on Windows. Since Rebase 0.35, the scaffold installs
+Ptah Compat and its Windows executable through the package manager. You do not need to
+download a database migration tool separately.
 
-Only three commands use Atlas: [`rebase db push`, `rebase db generate` and
-`rebase db migrate`](/docs/cli/database/#commands). Running the app does not. `rebase dev` creates missing
-tables and columns at boot without it, so you can start building before you
-install it.
+## Create a project
 
-Rebase's CI runs on Linux and macOS. If you want your machine to match a Linux
-server exactly, use [WSL2](#alternative-wsl2) instead.
-
-## 1. Prerequisites
-
-- **Node.js** 22.22+ and **pnpm**, as in the [Quickstart](/docs/getting-started/quickstart/#prerequisites)
-- PowerShell, for the Atlas step below
-
-## 2. Create the project
+Install Node.js 22.22+ and pnpm, then run:
 
 ```bash
 pnpm dlx @rebasepro/cli init my-app
-```
-
-The install prints a failed `preinstall` for `@ariga/atlas`, with
-`Unsupported platform`, and then finishes. That is expected. The scaffold
-declares `@ariga/atlas` as an optional dependency, so a platform it cannot
-install on skips it and the install carries on.
-
-```bash
 cd my-app
 pnpm dev
 ```
 
-This needs nothing more. The app, the admin panel and the managed development
-database all run without Atlas.
+The database commands use the installed Ptah Compat package:
 
-## 3. Install Atlas for the schema commands
+```bash
+pnpm run db:push
+pnpm run db:generate
+pnpm run db:migrate
+```
+
+The package provides native executables for Windows x64 and Arm64. If
+[`rebase doctor`](/docs/cli/#rebase-doctor) reports a missing executable,
+reinstall the project's dependencies with optional dependencies enabled.
+
+## Upgrade an older project
+
+See [Upgrade a PostgreSQL project to Rebase 0.35](/docs/cli/#upgrade-a-postgresql-project-to-rebase-035) for the package switch.
+
+## Rebase 0.34 and earlier
+
+### Install Atlas for the schema commands
+
+Install Atlas for the schema commands while your PostgreSQL driver still uses it.
 
 Download Atlas's Windows binary, save it as `atlas.exe` and put its folder on
 your user `PATH`. In PowerShell:
@@ -74,7 +71,7 @@ pnpm run db:push
 [`rebase doctor`](/docs/cli/#rebase-doctor) checks it too. Until `atlas.exe` is on `PATH` it warns, and links
 back to this page.
 
-## A project created before this
+### If an older scaffold fails to install
 
 A project scaffolded by an older `@rebasepro/cli` declares `@ariga/atlas` under
 `dependencies`, and its install fails on Windows with
@@ -90,24 +87,15 @@ in `backend/package.json`:
 ```
 
 Remove it from `dependencies`, run `pnpm install`, and then follow
-[step 3](#3-install-atlas-for-the-schema-commands). On Linux and macOS nothing
+the Atlas installation above. On Linux and macOS nothing
 changes, because an optional dependency that can install is installed. That
 includes CI and the deploy image.
 
-## Alternative: WSL2
+## WSL2
 
-[WSL2](https://learn.microsoft.com/windows/wsl/install) runs a real Linux
-distribution, so the npm package installs normally and none of the steps above
-apply. It is also what Docker Desktop runs on.
+[WSL2](https://learn.microsoft.com/windows/wsl/install) is an alternative
+if you prefer a Linux development environment. Keep the project in the
+Linux filesystem (`~/code/my-app`) for faster installs and file watching.
 
-Keep the project inside the Linux filesystem (`~/code/my-app`), not under
-`/mnt/c/`. Reading files across that boundary makes installs and the file watcher
-slow. Open the project from Windows with the
-[VS Code WSL extension](https://code.visualstudio.com/docs/remote/wsl), or
-through `\\wsl$\`.
-
-## Where to go next
-
-- [Quickstart](/docs/getting-started/quickstart/): the rest of a first run, the same on every platform
-- [Database commands](/docs/cli/database/): what `db push`, `db generate` and `db migrate` each do
-- [Troubleshooting](/docs/troubleshooting/): the failures that stop a backend from starting, and what each one looks like
+Continue with the [Quickstart](/docs/getting-started/quickstart/) or the
+[database command guide](/docs/cli/database/).

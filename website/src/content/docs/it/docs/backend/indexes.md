@@ -1,5 +1,5 @@
 ---
-sourceHash: f957d9b26ce4636f
+sourceHash: 48b7860d4b5eff97
 title: Indici
 sidebar_label: Indici
 description: Dichiara i normali indici Postgres su una tabella — btree, GIN e BRIN, parziali, compositi, covering e univoci — e perché quelli scritti a mano tendevano a scomparire.
@@ -38,11 +38,12 @@ dietro una clausola `where` — non aveva affatto una sede di dichiarazione.
 Quindi l'unico modo per averne uno era scriverlo a mano. E inoltre:
 
 :::caution[Se hai indici scritti a mano su una tabella gestita da Rebase]
-`rebase db push` è dichiarativo. Un indice su una tabella gestita che risultava assente
-da `schema.sql` veniva conteggiato come deriva (drift), e Atlas pianificava un `DROP INDEX` per esso —
-che non è nella lista delle istruzioni distruttive, quindi l'applicazione approvata automaticamente lo
-eseguiva senza chiedere conferma. Ogni indice scritto a mano su una tabella gestita viveva con
-il tempo contato.
+`rebase db push` è dichiarativo. Prima della regola di proprietà descritta sotto, un
+indice su una tabella gestita che risultava assente da `schema.sql` veniva conteggiato
+come deriva (drift), e Atlas pianificava un `DROP INDEX` per esso — che non è nella
+lista delle istruzioni distruttive, quindi l'applicazione approvata automaticamente lo
+eseguiva senza chiedere conferma. Ogni indice scritto a mano su una tabella gestita
+viveva con il tempo contato.
 
 Questo problema è stato risolto dalla regola di proprietà sottostante: un indice non creato da Rebase ora
 è escluso dal diff in base al nome e non viene mai toccato. Dichiarare gli indici scritti a mano
@@ -171,15 +172,12 @@ colonna con ordinamento naturale su una tabella append-only — minuscolo, e inu
 in cui le righe cominciano ad arrivare fuori ordine. Nessuno dei due ha un ordinamento, per cui `direction` e
 `nulls` non sono proprio rappresentabili su di essi, anziché venire rifiutati successivamente da Postgres.
 
-Non ci sono `gist` né `hash`: ogni classe di operatori gist interessante fa parte di
-un'estensione, e gli indici hash non possono essere univoci, compositi o ordinati. Questa
-restrizione è ciò che mantiene l'intero modello compatibile con Atlas — `rebase db push`
-materializza lo stato desiderato in un database di scratch minimale su cui pianificare, e
-`CREATE EXTENSION` non può rientrare in quel file. **La ricerca con trigrammi è
-[`search:`](/docs/backend/search); l'ANN è una
-[colonna `col.vector()`](/docs/sdk/aggregates-and-search#the-index).** Un indice che necessita di
-`gin_trgm_ops` o `vector_cosine_ops` viene rifiutato in fase di build anziché
-essere generato per poi fallire in seguito su un database mai visto prima.
+Questa dichiarazione non prevede `gist` né `hash`: gli indici hash non possono essere
+univoci, compositi o ordinati. Rebase espone i metodi di indice basati su estensioni
+tramite le relative funzionalità. **La ricerca con trigrammi è
+[`search:`](/docs/backend/search); l’ANN è una [colonna
+`col.vector()`](/docs/sdk/aggregates-and-search#the-index).** Un indice che richiede
+`gin_trgm_ops` o `vector_cosine_ops` viene rifiutato in fase di build.
 
 ### `reason`
 
@@ -270,7 +268,7 @@ Entrambi i generatori li emettono, aspetto importante dato che non tutti i deplo
 `db push`:
 
 - **`rebase db push` / `rebase db generate`** li inseriscono in `schema.sql`, nel consueto
-  flusso di Atlas — beneficiando così di migrazioni, drift detection e rollback
+  flusso di Ptah — beneficiando così di migrazioni, drift detection e rollback
   come qualsiasi altro oggetto.
 - **`rebase schema generate`** li scrive anche all'interno di `schema.generated.ts`, in modo che
   lo schema Drizzle descriva la medesima tabella presente nel database. Le colonne `INCLUDE` di un
@@ -372,12 +370,12 @@ li costruiscono con modalità differenti:
   alle medesime condizioni del boot: `CREATE INDEX CONCURRENTLY`, uno per volta,
   in modo che letture e scritture proseguano durante l'esecuzione (circa 0.4 s per 1M di righe e 6 s per
   10M con una compilazione normale su SSD per laptop, `maintenance_work_mem` a 64 MB; una
-  creazione concorrente richiede più tempo ma non blocca nulla). Atlas trova quindi ciascun indice
+  creazione concorrente richiede più tempo ma non blocca nulla). Ptah trova quindi ciascun indice
   già presente e non pianifica alcuna operazione per esso. Un indice che non è stato possibile costruire prima — per
-  via di una tabella rimasta occupata da un'altra sessione per l'intera durata del lock — viene delegato ad Atlas,
+  via di una tabella rimasta occupata da un'altra sessione per l'intera durata del lock — viene delegato ad Ptah,
   che lo costruirà all'interno della transazione del push bloccando di conseguenza le scritture su quella
   tabella per tutta la durata del build; il comando push specificherà di quale indice si tratta. Una colonna foreign-key
-  aggiunta direttamente dal push riceve il suo indice da Atlas assieme alla colonna, prima che vi sia
+  aggiunta direttamente dal push riceve il suo indice da Ptah assieme alla colonna, prima che vi sia
   inserito alcun dato. L'opzione `--dry-run` non compila nulla: elenca i nomi degli indici che un vero push
   costruirebbe per primi, e il piano stampato li mostra, non essendo ancora presenti.
 

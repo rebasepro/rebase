@@ -1,51 +1,50 @@
 ---
-sourceHash: 3f66e135e36c529b
+sourceHash: f1a8ff20d10b3dbd
 title: Windows
 sidebar_label: Windows
-description: "Instala y ejecuta un proyecto Rebase en Windows: qué funciona de forma nativa, la única herramienta (Atlas) que necesita su propio binario de Windows para db push, db generate y db migrate, y cuándo usar WSL2 en su lugar."
+description: Instala un proyecto Rebase y usa sus comandos de base de datos en Windows.
 ---
 
-Un proyecto de Rebase se instala y ejecuta en Windows. Una herramienta requiere un paso adicional:
-[Atlas](https://atlasgo.io/), el motor que planifica las migraciones de esquemas. Su paquete
-npm, `@ariga/atlas`, solo incluye compilaciones para Linux y macOS, por lo que en Windows
-debes instalar el binario propio de Atlas para Windows en su lugar.
+**Rebase 0.35+**
 
-Solo tres comandos utilizan Atlas: [`rebase db push`, `rebase db generate` y
-`rebase db migrate`](/docs/cli/database/#commands). Ejecutar la aplicación no lo necesita. `rebase dev` crea las
-tablas y columnas faltantes al iniciar sin él, por lo que puedes comenzar a construir antes de
-instalarlo.
+Los proyectos Rebase funcionan en Windows. El proyecto generado instala
+Ptah Compat y su ejecutable para Windows mediante el gestor de paquetes.
+No necesitas descargar otra herramienta de migración.
 
-El CI de Rebase se ejecuta en Linux y macOS. Si deseas que tu máquina coincida
-exactamente con un servidor Linux, usa [WSL2](#alternativa-wsl2) en su lugar.
+## Crear un proyecto
 
-## 1. Requisitos previos
-
-- **Node.js** 22.22+ y **pnpm**, como en el [Inicio rápido](/docs/getting-started/quickstart/#prerequisites)
-- PowerShell, para el paso de Atlas a continuación
-
-## 2. Crear el proyecto
+Instala Node.js 22.22+ y pnpm. Después, ejecuta:
 
 ```bash
 pnpm dlx @rebasepro/cli init my-app
-```
-
-La instalación muestra un `preinstall` fallido para `@ariga/atlas`, con
-`Unsupported platform`, y luego finaliza. Esto es lo esperado. El scaffold
-declara `@ariga/atlas` como una dependencia opcional, por lo que si una plataforma
-no puede instalarlo, lo omite y la instalación continúa.
-
-```bash
 cd my-app
 pnpm dev
 ```
 
-Esto no necesita nada más. La aplicación, el panel de administración y la base de datos
-de desarrollo administrada funcionan sin Atlas.
+Los comandos de base de datos usan el paquete Ptah Compat instalado:
 
-## 3. Instalar Atlas para los comandos de esquema
+```bash
+pnpm run db:push
+pnpm run db:generate
+pnpm run db:migrate
+```
 
-Descarga el binario de Windows de Atlas, guárdalo como `atlas.exe` y añade su carpeta al
-`PATH` de tu usuario. En PowerShell:
+El paquete ofrece ejecutables nativos para Windows x64 y Arm64. Si
+[`rebase doctor`](/docs/cli/#rebase-doctor) indica que falta el ejecutable,
+reinstala las dependencias del proyecto con las dependencias opcionales
+habilitadas.
+
+## Actualizar un proyecto PostgreSQL a Rebase 0.35
+
+Ejecuta la CLI de Rebase 0.35 desde la raíz del proyecto en Linux, macOS o Windows.
+Sustituye `@ariga/atlas` por `@stokaro/ptah-compat` en el backend PostgreSQL.
+Conserva los archivos de migración, `atlas.sum` y las revisiones registradas.
+
+```bash
+pnpm dlx @rebasepro/cli@0.35.0 upgrade --to 0.35.0 # version-pin: ignore
+```
+
+## Rebase 0.34 y anteriores
 
 ```powershell
 $dir = "$env:LOCALAPPDATA\Programs\atlas"
@@ -75,40 +74,19 @@ pnpm run db:push
 [`rebase doctor`](/docs/cli/#rebase-doctor) también lo comprueba. Hasta que `atlas.exe` esté en el `PATH`, mostrará
 una advertencia y enlazará a esta página.
 
-## Un proyecto creado con anterioridad
+### Si falla la instalación de un proyecto anterior
 
-Un proyecto generado con una versión anterior de `@rebasepro/cli` declara `@ariga/atlas` en
-`dependencies`, y su instalación falla en Windows con
-`ELIFECYCLE Command failed with exit code 1`. Muévelo a `optionalDependencies`
-en `backend/package.json`:
+Si la instalación de un proyecto anterior falla con `ELIFECYCLE`, mueve
+`@ariga/atlas` de `dependencies` a `optionalDependencies` en
+`backend/package.json`. Ejecuta `pnpm install` e instala `atlas.exe` como se
+indica arriba.
 
-```json
-{
-    "optionalDependencies": {
-        "@ariga/atlas": "^1.2.3"
-    }
-}
-```
+## WSL2
 
-Elimínalo de `dependencies`, ejecuta `pnpm install` y luego sigue el
-[paso 3](#3-instalar-atlas-para-los-comandos-de-esquema). En Linux y macOS nada
-cambia, ya que una dependencia opcional que se puede instalar, se instala. Esto
-incluye el CI y la imagen de despliegue.
+[WSL2](https://learn.microsoft.com/windows/wsl/install) es una alternativa
+si prefieres desarrollar en Linux. Guarda el proyecto en el sistema de
+archivos de Linux (`~/code/my-app`) para acelerar la instalación y la
+observación de archivos.
 
-## Alternativa: WSL2
-
-[WSL2](https://learn.microsoft.com/windows/wsl/install) ejecuta una distribución
-de Linux real, por lo que el paquete npm se instala con normalidad y ninguno de los pasos
-anteriores aplica. También es sobre lo que se ejecuta Docker Desktop.
-
-Mantén el proyecto dentro del sistema de archivos de Linux (`~/code/my-app`), no bajo
-`/mnt/c/`. Leer archivos a través de ese límite ralentiza las instalaciones y el observador
-de archivos (file watcher). Abre el proyecto desde Windows con la
-[extensión de WSL para VS Code](https://code.visualstudio.com/docs/remote/wsl), o
-a través de `\\wsl$\`.
-
-## Próximos pasos
-
-- [Inicio rápido](/docs/getting-started/quickstart/): el resto de una primera ejecución, igual en todas las plataformas
-- [Comandos de base de datos](/docs/cli/database/): qué hace cada uno de los comandos `db push`, `db generate` y `db migrate`
-- [Solución de problemas](/docs/troubleshooting/): los fallos que impiden que un backend se inicie y cómo se ve cada uno
+Continúa con el [inicio rápido](/docs/getting-started/quickstart/) o la
+[guía de comandos de base de datos](/docs/cli/database/).

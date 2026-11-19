@@ -22,6 +22,8 @@ Nothing on this page is Azure-specific about your project. A Rebase deployment i
    `postgresql://your_admin:YOUR_PASSWORD@your-server-name.postgres.database.azure.com:5432/postgres`
 
 If your tables declare a `col.vector()` column, enable the extension once: Azure gates it behind the server parameter `azure.extensions`, then `CREATE EXTENSION vector;`.
+Declare `database({ extensions: ["vector"] })` in `backend/resources.ts`
+so Ptah can plan the column, even if the extension is already installed.
 
 ## 2. Build the bundle and bake it into an image
 

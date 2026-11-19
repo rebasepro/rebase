@@ -118,7 +118,7 @@ that point the project has tables in code and the boot-time introspection stops
 being what defines the API.
 
 The headless
-scaffold installs Atlas in `backend/`, so `rebase db push`, `rebase db generate`
+scaffold installs Ptah Compat in `backend/`, so `rebase db push`, `rebase db generate`
 and `pnpm run db:migrate` work on those tables as in any project.
 
 ## Use it

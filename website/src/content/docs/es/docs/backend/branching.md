@@ -1,5 +1,5 @@
 ---
-sourceHash: f9ad18cf03580c13
+sourceHash: cc7b9aa6ef9d67c5
 title: Ramificación de bases de datos
 sidebar_label: Branching
 description: Cree ramas de bases de datos aisladas para desarrollo, staging y pruebas utilizando CREATE DATABASE ... TEMPLATE de PostgreSQL — copias instantáneas de fidelidad total sin tiempo de inactividad.
@@ -304,7 +304,7 @@ rebase db branch prune --older-than 2w      # and anything older than two weeks
 
 Nada expira a menos que lo solicite: una rama puede ser la única copia del trabajo de una tarde, por lo que `--older-than` es opcional (opt-in) y las antigüedades se redondean hacia abajo (floored), y el comando muestra su plan y solicita confirmación antes de eliminar nada, a menos que pase `--yes`.
 
-Prune también detecta las dos formas en que las ramas se desvían de sus metadatos: una entrada cuya base de datos se eliminó con SQL simple (que `list` seguiría reportando para siempre) y una base de datos de rama cuya entrada nunca se escribió (una caída entre las dos sentencias que ejecuta `create`). Las bases de datos temporales `<db>_dev_diff` de Atlas se reportan junto con ellas, pero solo se eliminan con `--include-dev-diff`: no son ramas y una de ellas podría pertenecer a un `db push` que se esté ejecutando en este momento.
+Prune también detecta las dos formas en que las ramas se desvían de sus metadatos: una entrada cuya base de datos se eliminó con SQL simple (que `list` seguiría reportando para siempre) y una base de datos de rama cuya entrada nunca se escribió (una caída entre las dos sentencias que ejecuta `create`). Las bases de datos temporales `<db>_dev_diff` se reportan junto con ellas, pero solo se eliminan con `--include-dev-diff`: no son ramas y una de ellas podría pertenecer a un `db push` que se esté ejecutando en este momento.
 
 ### Compatibilidad con pgBouncer
 Al implementar detrás de pgBouncer o agrupadores de conexiones (connection poolers), asegúrese de que el pooler admita operaciones administrativas de base de datos. La creación y eliminación de bases de datos elude los pools estándar a nivel de transacción y requiere conexiones directas al servidor Postgres (utilizando privilegios elevados de usuario) mediante la configuración `adminConnectionString`.

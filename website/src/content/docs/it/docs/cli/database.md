@@ -1,5 +1,5 @@
 ---
-sourceHash: 535fb9801df93ad9
+sourceHash: 1823d98cb985e205
 title: Comandi del database
 sidebar_label: Comandi del database
 description: I comandi rebase db — push, generate e migrate, backup e ripristini, estrazione di una copia, stringa di connessione, database di sviluppo gestito e branch.
@@ -326,12 +326,12 @@ Scrive le righe che un branch ha inserito, aggiornato ed eliminato nel database 
 
 :::note[Sul database di sviluppo gestito]
 `push`, `generate` e `migrate` funzionano qui come su qualsiasi altro database.
-`push` e `generate` pianificano le operazioni tramite Atlas, che richiede un secondo
+`push` e `generate` pianificano le operazioni tramite Ptah Compat, che richiede un secondo
 database vuoto per il confronto — e il PGlite gestito ne serve esattamente uno. Di conseguenza,
 sul database gestito ciascuno di essi avvia una seconda istanza PGlite temporanea in memoria
-per Atlas, arrestandola al termine del comando. È in questo modo che una colonna viene eliminata,
+per Ptah Compat, arrestandola al termine del comando. È in questo modo che una colonna viene eliminata,
 rinominata o ristretta: `rebase dev` si limita solo ad aggiungere. Il controllo per le operazioni distruttive è
-identico a quello applicato altrove. Per fare in modo che Atlas pianifichi le modifiche confrontandosi con un database vuoto
+identico a quello applicato altrove. Per fare in modo che Ptah Compat pianifichi le modifiche confrontandosi con un database vuoto
 personalizzato, imposta `REBASE_ATLAS_DEV_URL`; Rebase non creerà né eliminerà il
 database specificato.
 

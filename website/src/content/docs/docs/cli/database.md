@@ -327,12 +327,12 @@ Writes the rows a branch inserted, updated and deleted onto the database it was 
 
 :::note[On the managed development database]
 `push`, `generate` and `migrate` work here as on any database.
-`push` and `generate` plan their work with Atlas, which needs a second
+`push` and `generate` plan their work with Ptah Compat, which needs a second
 empty database to compare against — and the managed PGlite serves exactly one. So
 on the managed database each of them starts a second, throwaway PGlite in memory
-for Atlas, and stops it when the command ends. That is how a column is dropped,
+for Ptah, and stops it when the command ends. That is how a column is dropped,
 renamed or narrowed there: `rebase dev` only ever adds. The destructive gate is the
-same as everywhere. To have Atlas plan against an empty database of your own
+same as everywhere. To have Ptah plan against an empty database of your own
 instead, set `REBASE_ATLAS_DEV_URL` to it; Rebase neither creates nor drops a
 database named that way.
 

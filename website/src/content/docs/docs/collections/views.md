@@ -27,12 +27,9 @@ table — `find`, `findById`, `count`, [`aggregate`](/docs/sdk/aggregates-and-se
 `listen`, the REST routes, MCP and the CMS — and it is never written: every
 write is a `405 TABLE_READ_ONLY`. Write to the tables the view reads.
 
-`rebase db push` creates the view after the tables, `rebase db generate`
-appends it to the migration, and a managed boot creates it in its schema step.
-A view whose query has not changed is left alone; one whose query changed is
-dropped and created again, together with any of your views that read it.
-Rebase refuses to replace a table, or a view it did not create, that already
-has the name.
+Ptah Compat plans the declared view with its dependencies in `rebase db push`
+and `rebase db generate`. A managed boot can create views in its schema step.
+Review a change to a view with `rebase db push --dry-run`.
 
 ## Options
 

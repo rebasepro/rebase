@@ -1,5 +1,5 @@
 ---
-sourceHash: 1974d7d32fb837b2
+sourceHash: 823c16191069602b
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
 description: "Zählen, summieren und gruppieren mit dem SDK, innerhalb von JSON-Spalten filtern sowie Volltext- und Vektorsuche vom Client aus ausführen."
@@ -232,20 +232,22 @@ Mit einem `threshold` enthält das Ergebnis kein `meta.total` – das Zählen de
 
 ### Was Sie bereitstellen müssen
 
-- **pgvector.** Eine `vector`-Eigenschaft wird zu einer `VECTOR(n)`-Spalte kompiliert, und dieser Typ stammt aus der `vector`-Extension. Rebase installiert sie für Sie, jedoch nur dort, wo Sie es ausdrücklich erlauben:
+- **pgvector.** Deklarieren Sie die Erweiterung `vector` für jede Vektorspalte:
 
   ```ts
   // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 
-  Diese Zeile ist eher eine Berechtigung als eine Anforderung – Rebase führt `CREATE EXTENSION IF NOT EXISTS vector` nur dann aus, wenn etwas in Ihrem Schema dies benötigt. Dies ist Opt-in, da die Installation einer Extension von Voraussetzungen abhängt, die Rebase aus der Verbindung heraus nicht einsehen kann: Das Image muss die Bibliothek enthalten (das `pgvector/pgvector:pg18` des Scaffolds tut dies, ein Standard-`postgres:18` nicht), die Rolle muss die Berechtigung zur Installation haben und ein Managed Provider muss sie auf einer Allowlist führen.
+  Deklarieren Sie `database({ extensions: ["vector"] })` in `backend/resources.ts`,
+  damit Ptah Vektorspalten planen kann. Das gilt auch, wenn die Erweiterung im Ziel
+  bereits vorhanden ist.
 
-  Geben Sie nichts an, installiert Rebase auch nichts – installieren Sie sie stattdessen einmal manuell. In beiden Fällen wird die Spalte erstellt, und Postgres lehnt sie auf einer Datenbank, die keines von beiden hat, mit `type "vector" does not exist` ab, wobei beide Lösungswege genannt werden.
-
-Die Spalte, ihr ANN-Index und dieser `CREATE EXTENSION`-Befehl werden in `.rebase/sql/vector.sql` neben `schema.sql` und `policies.sql` generiert, und `rebase db push` wendet sie für Sie an. Sie befinden sich in einer eigenen Datei, weil Atlas – die Engine hinter `db push` – sein Diff berechnet, indem es `schema.sql` in einer temporären Scratch-Datenbank materialisiert, die zu Beginn jedes Laufs gelöscht wird; ein `VECTOR(n)` darin würde sonst gegen eine Datenbank aufgelöst, die niemals pgvector haben kann.
-
-`rebase db generate` hängt diese Datei an die Migration an, die es schreibt, sodass eine auf einer frischen Datenbank ausgeführte Migration auch die Spalte erstellt. Eine Änderung allein an der Vector-Eigenschaft erzeugt keine Migration, da das Schema, das Atlas vergleicht, unverändert ist – `db generate` weist darauf hin, wenn dies der Fall ist.
+Die Spalte, ihr ANN-Index und `CREATE EXTENSION` gehören zum gewünschten `schema.sql`.
+Ptah Compat plant damit `rebase db push` und `db generate`. Rebase schreibt
+`.rebase/sql/vector.sql` weiterhin für Boot und Recovery. Der normale Migrationsplan
+enthält auch Änderungen an der Vektoreigenschaft oder ihrem Index, wenn sonst nichts an
+der Tabelle geändert wurde.
 
 ### Der Index
 

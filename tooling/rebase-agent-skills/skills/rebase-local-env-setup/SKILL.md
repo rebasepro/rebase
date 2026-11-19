@@ -94,8 +94,8 @@ The first run needs no schema command.
 **There is no `rebase db push` step for a first run.** Boot's additive apply is
 the development loop; see `rebase-basics` for what it deliberately leaves alone.
 For those changes `db push` works on the managed database too (0.25+): it plans
-with [Atlas](https://atlasgo.io/), which needs a second empty database to
-compare against, and the CLI starts a throwaway in-memory one for the command.
+against a throwaway in-memory database that the CLI starts for the command.
+Rebase 0.35 and later use Ptah Compat for that plan.
 On 0.24 and earlier it refuses the managed database.
 
 `rebase db url` prints whichever database is in use, managed or not.
@@ -130,7 +130,7 @@ docker compose up -d db
 > `self-signed certificate`.** Rebase's Node driver reads `sslmode=require` as
 > "verify the certificate", where `psql` reads it as "encrypt only", so a URL
 > `psql` accepts stops boot and `rebase db push`. Use `sslmode=no-verify`
-> (encrypted, unverified; Rebase passes it to Atlas, `pg_dump` and `psql` as
+> (encrypted, unverified; Rebase passes it to Ptah Compat, `pg_dump` and `psql` as
 > `require`), or `sslmode=verify-full&sslrootcert=/path/to/ca.pem` with the
 > provider's CA. `uselibpqcompat=true&sslmode=require` also works; Rebase drops
 > `uselibpqcompat` before handing the URL to libpq tools. Changing `.env` is the
@@ -166,14 +166,10 @@ pnpm install
 
 That installs the workspace: `frontend` and `backend`.
 
-**On Windows**, `@ariga/atlas` has no Windows build, so the scaffold declares
-it under `optionalDependencies` and the install skips it. Everything runs
-except `rebase db push`, `db generate` and `db migrate`, which need Atlas's own
-`atlas.exe` on `PATH` (the CLI and `rebase doctor` say so, and link to the
-[Windows guide](https://rebase.pro/docs/getting-started/windows/)). A project
-scaffolded before 0.33 declares it under `dependencies`, and `pnpm install`
-fails with `ELIFECYCLE`: move it to `optionalDependencies` in
-`backend/package.json`, then install again. WSL2 avoids all of it.
+**On Windows**, Rebase 0.35 and later use the Ptah Compat package installed
+with the backend. Rebase 0.34 and earlier use `atlas.exe` on `PATH`.
+Use the instructions for the project's Rebase version in the
+[Windows guide](https://rebase.pro/docs/getting-started/windows/).
 
 ## 6. Start the development server
 

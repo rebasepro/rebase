@@ -1,5 +1,5 @@
 ---
-sourceHash: a4601e097ae5a5f6
+sourceHash: 0dca906999fefc66
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de la CLI de Rebase para inicialización de proyectos, generación de esquemas, migraciones de base de datos y generación de SDK.
@@ -95,6 +95,16 @@ Cada app estática que contiene el bundle recibe una copia brotli (`.br`) y gzip
 Actualiza cada paquete `@rebasepro/*` fijado en el proyecto a una misma versión y luego instala con el gestor de paquetes indicado por su lockfile. `rebase upgrade` toma la última versión; `--to 0.21.0` una versión exacta, sin búsqueda en el registro; `--to canary` un dist-tag. Cada versión fijada en `dependencies`, `devDependencies` y `optionalDependencies`, en cada `package.json` del proyecto, conserva su `^` o `~`, y nada más en el archivo cambia. Las `peerDependencies` y las especificaciones `workspace:`, `link:`, `file:`, git y tags se listan y se dejan intactas. Los overrides en `pnpm-workspace.yaml` y `package.json` también se actualizan, pero un override `link:` o `file:` tiene prioridad sobre cualquier fijación: se reporta, y `--drop-local-overrides` lo elimina. `--dry-run` no escribe nada, `--no-install` omite la instalación y `--json` imprime un único documento.
 
 Un proyecto en una versión preliminar (prerelease), como un canary, permanece en su canal a menos que `latest` sea más reciente. Un dist-tag que retrocedería una versión fijada se rechaza (`downgrade_refused` bajo `--json`) a menos que pases `--allow-downgrade`; un `--to` exacto se aplica y se marca como downgrade. Un `--dry-run` de una actualización que la ejecución real rechazaría muestra qué cambiaría y finaliza con código 0, y bajo `--json` su documento incluye el rechazo como `wouldRefuse` (`{ code, message, hint }`).
+
+#### Actualizar un proyecto PostgreSQL a Rebase 0.35
+
+Ejecuta la CLI de Rebase 0.35 desde la raíz del proyecto en Linux, macOS o Windows.
+Sustituye `@ariga/atlas` por `@stokaro/ptah-compat` en el backend PostgreSQL.
+Conserva los archivos de migración, `atlas.sum` y las revisiones registradas.
+
+```bash
+pnpm dlx @rebasepro/cli@0.35.0 upgrade --to 0.35.0 # version-pin: ignore
+```
 
 ### `rebase start`
 

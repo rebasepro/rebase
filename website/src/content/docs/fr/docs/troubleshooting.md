@@ -1,5 +1,5 @@
 ---
-sourceHash: 6403748b3ff6521b
+sourceHash: 37af460ecdc0bd6a
 slug: fr/docs/troubleshooting
 title: Dépannage
 description: Les erreurs qui empêchent un backend Rebase de démarrer ou de répondre — base de données inaccessible, mauvais identifiants, extension manquante, refus RLS, dérive de schéma, port occupé, fonction qui ne se charge pas — et à quoi ressemble chacune d'entre elles.
@@ -176,17 +176,17 @@ qui a été modifié sans régénération : exécutez `rebase schema generate` e
 
 ```
 Error: EOF
-✗ atlas schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
+✗ ptah-compat schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
 ```
 
 La base de données de développement gérée accepte un nombre limité de connexions simultanées, et
-une instance en cours de `rebase dev` en monopolise certaines. Atlas, qui planifie le push, en ouvre deux
+une instance en cours de `rebase dev` en monopolise certaines. Ptah, qui planifie le push, en ouvre deux
 supplémentaires, et l'une d'elles a été fermée inopinément. Rien n'a été appliqué, la commande peut donc
 être réexécutée en toute sécurité ; le serveur de développement ferme les connexions inactives après 30 secondes. Si
 l'échec persiste, arrêtez `rebase dev` pendant que vous poussez.
 
 Le push ferme ses
-propres connexions avant le démarrage d'Atlas, ce qui laisse généralement de la place pour Atlas,
+propres connexions avant le démarrage de Ptah, ce qui laisse généralement de la place pour Ptah,
 et l'erreur indique ce qui s'est passé.
 
 ## Le port est déjà utilisé

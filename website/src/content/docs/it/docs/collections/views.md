@@ -1,5 +1,5 @@
 ---
-sourceHash: d3c645c7930945a3
+sourceHash: 12d04c868d80e974
 title: Viste
 sidebar_label: Viste
 description: "Fornisci una vista SQL o una vista materializzata in sola lettura con defineView: viste security_invoker regolate dalle tabelle da cui leggono, viste materializzate limitate dai ruoli, aggiornate su richiesta, create da db push."
@@ -28,12 +28,9 @@ tabella — `find`, `findById`, `count`, [`aggregate`](/docs/sdk/aggregates-and-
 `listen`, le route REST, MCP e il CMS — e non viene mai modificata in scrittura: ogni
 scrittura restituisce un `405 TABLE_READ_ONLY`. Scrivi nelle tabelle da cui la vista legge.
 
-`rebase db push` crea la vista dopo le tabelle, `rebase db generate`
-la accoda alla migrazione e un avvio gestito la crea nel relativo passaggio dello schema.
-Una vista la cui query non è cambiata non viene toccata; una la cui query è cambiata viene
-eliminata e ricreata, insieme a qualsiasi altra vista che la legge.
-Rebase rifiuta di sostituire una tabella, o una vista che non ha creato, avente già
-lo stesso nome.
+Ptah Compat pianifica la vista dichiarata e le sue dipendenze con `rebase db push`
+e `rebase db generate`. L’avvio gestito può anche creare viste. Controlla le
+modifiche con `rebase db push --dry-run`.
 
 ## Opzioni
 

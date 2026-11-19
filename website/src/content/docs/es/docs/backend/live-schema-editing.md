@@ -1,5 +1,5 @@
 ---
-sourceHash: 97486e7c061d503d
+sourceHash: fbe861c484005a2e
 title: Edición de esquemas en vivo
 description: Crea y modifica tablas en un backend en ejecución; la edición se escribe en backend/schema, primero se confirma en tu repositorio y luego se aplica.
 ---
@@ -278,9 +278,9 @@ rechazarte después de haber tomado una decisión:
 
 ## Si tu proyecto mantiene migraciones versionadas
 
-Aplicar aquí **no** escribe una migración, y no puede hacerlo: una migración es el formato
-de Atlas con un archivo de integridad, generado por un binario externo contra una base de datos
-desechable, y un servidor en ejecución no cuenta con ninguno de los dos.
+Aplicar aquí **no** escribe una migración. `rebase db generate` utiliza Ptah Compat para
+comparar el esquema declarado con el historial de migraciones en una base de datos
+temporal y actualiza `atlas.sum`. El servidor en ejecución no realiza ese proceso.
 
 Lo que sí confirma en el commit es el archivo de la tabla, y a partir de él es de donde `rebase db generate`
 escribe la migración. Así que la migración está a un solo comando de distancia:
@@ -520,7 +520,7 @@ trabajando:
   ruta ensure es lo único que modifica un esquema y solo puede añadir.
 - No se escribe ningún archivo de migración. Un proyecto aprovisionado mediante boot-ensure no necesita ninguno;
   un proyecto aprovisionado mediante migraciones debe ejecutar `rebase db generate`, que
-  crea uno a través de Atlas con el hash de integridad que Atlas requiere.
+  que escribe una migración mediante Ptah Compat y actualiza `atlas.sum`.
 - Solo Postgres. La funcionalidad se detecta en el controlador, y un controlador
   que carezca de ella responde `SCHEMA_EDITING_UNSUPPORTED`.
 - Un despliegue cuyas tablas se derivan de la base de datos sirve un cambio aplicado

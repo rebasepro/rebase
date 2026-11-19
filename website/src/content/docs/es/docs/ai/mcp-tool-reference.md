@@ -1,5 +1,5 @@
 ---
-sourceHash: c84938b646f4ea6d
+sourceHash: 42fbd65cd7d89699
 title: Referencia de herramientas MCP
 sidebar_label: Referencia de herramientas MCP
 description: "Todas las herramientas que registra el servidor Rebase MCP, por grupo: qué necesita y qué hace cada una, y cuáles rechaza el loopback gate en un proyecto no local."
@@ -33,7 +33,9 @@ Ejecuta la CLI de Rebase en el directorio del proyecto activo.
 
 ## Planificación de esquema (1)
 
-Pregunta al backend qué haría un cambio a través de `POST /api/admin/schema/plan`. Sin CLI y sin escribir nada en el disco: funciona en la base de datos de desarrollo administrada, lo cual los comandos respaldados por Atlas no pueden hacer.
+Pregunta al backend qué haría un cambio mediante
+`POST /api/admin/schema/plan`. No necesita un proceso de CLI ni escribe nada
+en disco. También funciona con la base de datos de desarrollo administrada.
 
 | Herramienta | Requerido | Descripción |
 |---|---|---|

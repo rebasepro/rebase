@@ -275,17 +275,14 @@ it. Both are drops and adds to `db push`. Write `localKey` / `foreignKey` /
 
 ### Unmapped Tables Are Never Touched
 
-`rebase db push` applies the schema with **Atlas**, which works from a desired
-state — so anything in the database and absent from that state is a candidate
-for a drop. Three layers stop that from reaching a table Rebase does not own:
+`rebase db push` uses Ptah Compat to plan the declared application schema.
+These rules protect objects that Rebase does not manage:
 
-1. **A computed `--exclude` list.** Before applying, the CLI introspects the
-   database and excludes every table that is not declared in `backend/schema`, plus the
-   search functions, indexes and triggers Rebase creates itself (Atlas cannot
-   manage those, so it would plan a drop for each one).
-2. **That list fails closed.** If the introspection cannot run, the push
-   *aborts* — `✗ Aborting push: could not determine which tables to protect` —
-   rather than applying with a partial list.
+1. **An explicit scope.** Ptah plans the objects in the current declaration
+   and the names recorded in `backend/drizzle/ptah-managed.json`. Commit that
+   file with the migrations so a removed declaration can be planned.
+2. **Exclusions for custom children.** Rebase reads the catalog to protect
+   custom objects under managed tables. A failed catalog read stops planning.
 3. **A destructive-change gate.** The apply is preceded by a `--dry-run`; any
    destructive statement in the plan is printed and then either prompted for
    (interactive) or refused (non-interactive). `--allow-destructive` — or

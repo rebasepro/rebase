@@ -1,5 +1,5 @@
 ---
-sourceHash: 1974d7d32fb837b2
+sourceHash: 823c16191069602b
 title: Agregaciones y búsqueda
 sidebar_label: Agregaciones y búsqueda
 description: "Cuenta, suma y agrupa con el SDK, filtra dentro de columnas JSON y ejecuta búsquedas de texto completo y vectoriales desde el cliente."
@@ -232,20 +232,22 @@ Con un `threshold`, el resultado no incluye `meta.total`: contar las filas dentr
 
 ### Lo que debes proporcionar
 
-- **pgvector.** Una propiedad `vector` compila en una columna `VECTOR(n)`, y ese tipo proviene de la extensión `vector`. Rebase la instalará por ti, pero solo donde indiques que puede hacerlo:
+- **pgvector.** Declara la extensión `vector` para cada columna vectorial:
 
   ```ts
   // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 
-  Esa línea es un permiso más que una solicitud: Rebase ejecuta `CREATE EXTENSION IF NOT EXISTS vector` solo cuando algo en tu esquema lo necesita. Es opcional (*opt-in*) porque instalar una extensión depende de factores que Rebase no puede comprobar desde dentro de la conexión: la imagen debe incluir la biblioteca (el entorno generado `pgvector/pgvector:pg18` lo hace, un `postgres:18` estándar no), el rol debe tener permisos para instalarla y un proveedor gestionado debe tenerla en su lista de permitidos.
+  Declara `database({ extensions: ["vector"] })` en `backend/resources.ts` para que
+  Ptah pueda planificar columnas vectoriales, incluso si el destino ya tiene la
+  extensión.
 
-  Si no especificas nada, Rebase no instala nada; instálala tú manualmente una vez. De cualquier manera la columna se crea, y Postgres la rechazará con `type "vector" does not exist` en una base de datos que no disponga de ninguna de las dos opciones, indicando ambas soluciones.
-
-La columna, su índice ANN y ese `CREATE EXTENSION` se generan en `.rebase/sql/vector.sql`, junto a `schema.sql` y `policies.sql`, y `rebase db push` los aplica por ti. Tienen un archivo propio porque Atlas —el motor detrás de `db push`— calcula sus diferencias materializando `schema.sql` en una base de datos temporal que borra al inicio de cada ejecución, por lo que un `VECTOR(n)` allí se resuelve contra una base de datos que nunca puede tener pgvector.
-
-`rebase db generate` añade ese archivo a la migración que escribe, de modo que una migración reproducida contra una base de datos nueva también construye la columna. Un cambio exclusivo en la propiedad de vector no produce ninguna migración, porque el esquema que compara Atlas no cambia; `db generate` lo notificará cuando ocurra.
+La columna, su índice ANN y `CREATE EXTENSION` forman parte del `schema.sql` deseado que
+Ptah Compat utiliza para planificar `rebase db push` y `db generate`. Rebase también
+escribe `.rebase/sql/vector.sql` para el arranque y la recuperación. El plan habitual de
+migración incluye los cambios en la propiedad de vector o su índice, aunque no cambie
+nada más en la tabla.
 
 ### El índice
 

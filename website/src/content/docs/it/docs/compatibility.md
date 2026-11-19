@@ -1,5 +1,5 @@
 ---
-sourceHash: 717728adb9ef96cc
+sourceHash: 574dcb0aad3f6719
 slug: it/docs/compatibility
 title: Compatibilità
 description: Ciò che Rebase garantisce tra le versioni e ciò che non garantisce — i sei contratti con versione, come fallisce ciascuno di essi e cosa potrebbe ancora cambiare in una minor.
@@ -69,7 +69,7 @@ Le tre valutazioni significano:
 | Server MCP + agent skills | Beta | `@rebasepro/mcp` viene eseguito su stdio: cinquantatré tool, bearer auth per progetto, i tool distruttivi rifiutano target non locali a meno che non vi sia un opt-in esplicito. Dalla 0.21 il server può anche montare un endpoint `/mcp` remoto — OAuth 2.1, diciassette tool di dati (i quattro per le saved app sono sperimentali), ogni chiamata sotto l'RLS dell'utente autenticato — disattivato a meno che `REBASE_MCP_ENABLED=true`, e solo per Postgres |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Utilizzato quotidianamente su progetti reali. Il branching è presente nel pacchetto OSS e deliberatamente non esposto in Rebase Cloud, poiché il passaggio di una distribuzione attiva su un branch non è ancora supportato |
 | CMS + admin panel | Beta | Completo per CRUD, relazioni, campi di storage e ruoli. **La tabella dati non possiede semantica di griglia** — nessun `role`, nessun `aria-rowindex`, `tabIndex` rimosso — pertanto gli utenti con tastiera e screen reader non possono utilizzare la vista principale. Nessuna bozza, nessun contenuto per locale, nessun rich-text a blocchi |
-| Database di sviluppo gestito PGlite | Beta | `rebase dev` senza configurazione e senza Docker. Una sessione alla volta, quindi le richieste vengono serializzate e la concorrenza non può essere riprodotta; i comandi basati su Atlas (`db push`, `generate`, `migrate`) pianificano le modifiche su una seconda istanza PGlite temporanea avviata per il comando; `db branch` non funziona in questo contesto e restituisce un messaggio apposito |
+| Database di sviluppo gestito PGlite | Beta | `rebase dev` a configurazione zero senza Docker. Una sola sessione alla volta, quindi le richieste vengono serializzate e la concorrenza non può essere riprodotta su di esso; i comandi `db push` e `db generate` usano Ptah per pianificare su una seconda istanza PGlite temporanea; `db migrate` applica la cronologia delle migrazioni; `db branch` non funziona in questo contesto e viene segnalato chiaramente |
 | Helm chart | Beta | Esegue il rendering della topologia split-process e viene pubblicato nel registry OCI a ogni release. L'impostazione predefinita rimane un singolo container |
 | `@rebasepro/firebase` | Sperimentale | Firestore come sorgente che l'admin panel legge direttamente, accanto alle tabelle del backend: `defineFirestoreCollection` in `frontend/src/cms`, passata come `externalCollections`. Nessuna RLS, nessuna interfaccia SQL; il set di funzionalità di Postgres non viene trasferito. Il driver Firestore ignora i gruppi di filtri `or(...)`/`and(...)`, quindi una query che ne utilizza uno legge tutte le righe consentite dai suoi filtri semplici |
 | Rebase Cloud | **Beta privata** | Attivo, esegue tenant reali, con accessi aperti a scaglioni. Non self-service |

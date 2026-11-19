@@ -1,5 +1,5 @@
 ---
-sourceHash: ceff4ba3bdacfb06
+sourceHash: 15088538cf79c53c
 title: Suche
 sidebar_label: Suche
 description: Wie sich .search() standardmäßig verhält und wie eine Tabelle die gerankte Volltextsuche über von Ihnen benannte Spalten aktiviert – einschließlich JSONB- und Array-Inhalten.
@@ -97,40 +97,21 @@ Postgres berechnet die Spalte bei jedem Schreibvorgang in ein Quellfeld neu und 
 Versuch, direkt hineinzuschreiben, sodass der Index nicht von der Zeile abweichen kann. Die Spalte
 wird niemals von der API zurückgegeben.
 
-Sie werden in `.rebase/sql/search.sql` neben `schema.sql` und
-`policies.sql` generiert, und `rebase db push` wendet sie für Sie an – es muss nichts Zusätzliches
-ausgeführt werden. Sie erhalten eine eigene Datei, da eine generierte `tsvector`-Spalte voraussetzt, dass zuerst eine
-`IMMUTABLE`-Hilfsfunktion existiert (`unaccent` ist nur `STABLE`, und
-das Reduzieren eines `jsonb`-Dokuments erfordert eine Set-Returning-Funktion), und Atlas – die
-Engine hinter `db push` – in seiner kostenlosen Version keine Funktionen verwalten kann.
-
-Eine beachtenswerte Konsequenz, wenn Sie per Migration statt per Push deployen:
-Das Hinzufügen eines `search`-Blocks allein erzeugt keine Migration, da sich das Schema, das
-Atlas vergleicht, nicht geändert hat. `rebase db generate` weist darauf hin, wenn dies geschieht.
-Der Block wird weiterhin durch `rebase db push` und durch das Überprüfen des Schemas beim Start
-angewendet; um ihn explizit in eine Migration aufzunehmen, hängen Sie `.rebase/sql/search.sql`,
-die von `rebase db generate` frisch geschrieben wurde, an eine Migration an.
+Ptah Compat erhält die Hilfsfunktion, die Spalte und den Index gemeinsam in
+`schema.sql`. `rebase db push` kann `search.sql` zur Wiederherstellung nach einem
+Fehler verwenden.
 
 ### Den Block später ändern
 
-Eine generierte Spalte behält ihren Ausdruck bei, und Postgres kann diesen
-Ausdruck nicht direkt an Ort und Stelle ändern – das Hinzufügen eines Felds, das Ändern einer Gewichtung, das Wechseln der Sprache
-oder das Aktivieren von `unaccent` ist also **nichts**, was `ADD COLUMN IF NOT EXISTS` auf
-eine bereits vorhandene Spalte anwenden kann.
+Ab PostgreSQL 17 kann Ptah Compat den gespeicherten Ausdruck mit `ALTER COLUMN ...
+SET EXPRESSION` ändern. Prüfen Sie den Plan mit `rebase db push --dry-run` oder
+erzeugen Sie eine Migration. Die Änderung schreibt die Tabelle neu und kann
+Zugriffe blockieren.
 
-Rebase speichert beim Erstellen der Spalte einen Fingerprint des Ausdrucks
-und vergleicht ihn bei jedem Start und jedem `db push`. Eine Änderung wird mit deutlicher Fehlermeldung verweigert,
-zusammen mit den zwei Anweisungen, die sie anwenden – einem `DROP COLUMN` und einem `ADD COLUMN`,
-die die Tabelle neu schreiben und den GIN-Index neu aufbauen. Führen Sie diese zu einem von Ihnen
-gewählten Zeitpunkt aus; nichts schreibt eine Produktivtabelle ungefragt in Ihrem Namen um.
-
-Zwei Änderungen sind davon ausgenommen. Das Aktivieren von `fuzzy` ist additiv – eine zweite Spalte – und
-wird ohne all dies angewendet. Das Festlegen von [`mode`](#mode) ändert die Abfrage statt
-der Spalte, wird also einfach mit einem Deployment wirksam.
-
-Der Startvorgang bricht ab, anstatt Anfragen zu bedienen, denn die Alternative ist das, was diese
-Überprüfung ersetzt hat: eine Spalte, die weiterhin den vorherigen Feldsatz indexiert, und eine Suche, die
-für Inhalte, die eindeutig in der Zeile vorhanden sind, nichts zurückgibt.
+Verwenden Sie bis PostgreSQL 16 eine geprüfte SQL-Migration, die die generierte
+Spalte und ihre abhängigen Objekte neu erstellt. Prüfen Sie danach den Ausdruck und
+die Indizes. `fuzzy` fügt eine Spalte hinzu. [`mode`](#mode) ändert nur die
+Suchabfrage.
 
 ## Was Sie in `fields` angeben können
 

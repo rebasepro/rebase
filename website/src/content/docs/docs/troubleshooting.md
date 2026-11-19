@@ -175,17 +175,17 @@ again.
 
 ```
 Error: EOF
-✗ atlas schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
+✗ ptah-compat schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
 ```
 
 The managed development database takes a few connections at a time, and a
-running `rebase dev` holds some of them. Atlas, which plans the push, opens two
+running `rebase dev` holds some of them. Ptah, which plans the push, opens two
 more, and one was closed under it. Nothing was applied, so the command is safe
 to run again; the dev server closes idle connections after 30 seconds. If it
 keeps failing, stop `rebase dev` while you push.
 
 The push closes its
-own connections before Atlas starts, which leaves Atlas room in the usual case,
+own connections before Ptah starts, which leaves Ptah room in the usual case,
 and the error says what happened.
 
 ## The port is already in use

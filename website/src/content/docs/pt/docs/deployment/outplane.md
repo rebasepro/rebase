@@ -1,5 +1,5 @@
 ---
-sourceHash: 2090d639894b16c4
+sourceHash: 3beea78b32331a95
 title: Implantando o Rebase no Out Plane
 description: Faça o deploy de um projeto rebase init no Out Plane — um app compilado a partir do seu repositório, PostgreSQL gerenciado do Out Plane e uploads de arquivos em um bucket do Out Plane.
 sidebar_label: Out Plane
@@ -45,7 +45,7 @@ No painel **Connection** do banco de dados, copie a string de conexão (no forma
 postgresql://<user>:<password>@<host>:5432/<database>?sslmode=no-verify
 ```
 
-**Use `no-verify`, não `require`.** Ambos criptografam a conexão. Para o `psql`, `require` também significa "não verificar o certificado em relação a uma autoridade pública", mas o driver Postgres utilizado pelo Rebase interpreta isso como "verificar", e um certificado de banco de dados que não seja assinado publicamente falhará na primeira conexão com `self-signed certificate`. `no-verify` é a forma como o driver expressa o que `require` significa em outros lugares. O próprio guia de Node.js do Out Plane desativa a verificação pelo mesmo motivo. A mesma URL funciona para o `rebase db push` a partir da sua máquina: a CLI a repassa para o mecanismo de esquema Atlas como `sslmode=require`.
+**Use `no-verify`, não `require`.** Ambos criptografam a conexão. Para o `psql`, `require` também significa "não verificar o certificado em relação a uma autoridade pública", mas o driver Postgres utilizado pelo Rebase interpreta isso como "verificar", e um certificado de banco de dados que não seja assinado publicamente falhará na primeira conexão com `self-signed certificate`. `no-verify` é a forma como o driver expressa o que `require` significa em outros lugares. O próprio guia de Node.js do Out Plane desativa a verificação pelo mesmo motivo. A mesma URL funciona para o `rebase db push` a partir da sua máquina: a CLI a repassa para o mecanismo de esquema Ptah Compat como `sslmode=require`.
 
 ### A role para a qual o Rebase alterna
 
@@ -54,6 +54,9 @@ O Rebase impõe segurança em nível de linha (row-level security) alternando ca
 Se a primeira inicialização falhar com um `AppRoleSetupError` mencionando `rebase_user`, a role da sua string de conexão não tem permissão para criar roles ou para conceder a si mesma essa alternância. O erro exibirá o SQL que deve ser executado: execute-o uma vez, usando uma role no banco de dados que possa criar roles, e depois faça o deploy novamente.
 
 Se as suas tabelas declararem uma coluna `col.vector()`, o banco de dados precisará da extensão pgvector. O scaffold não declara nenhuma.
+Declare `database({ extensions: ["vector"] })` em `backend/resources.ts` para o
+Ptah planejar as colunas vetoriais, mesmo quando o banco de destino já tiver a
+extensão.
 
 ## 3. Crie um bucket
 
@@ -88,7 +91,6 @@ COPY --from=build --chown=node:node /app/dist-bundle /bundle
 
 Três detalhes são importantes aqui:
 
-- **`node:22`, e não `node:22-slim`.** A instalação da CLI faz o download do mecanismo de esquema Atlas, que precisa de `curl` e de certificados CA. A imagem slim não tem nenhum dos dois, e a instalação falha.
 - **`--chown=node:node`.** O runtime é executado como `node` e vincula seus próprios pacotes ao bundle na inicialização. Um bundle pertencente ao root ainda funciona, mas registra um aviso para cada pacote que não conseguiu vincular.
 - **Nenhum código-fonte na imagem final.** Ela contém apenas o runtime e o seu bundle compilado, e o diretório `dist-bundle/` permanece no gitignore.
 

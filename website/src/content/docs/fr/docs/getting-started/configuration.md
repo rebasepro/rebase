@@ -1,5 +1,5 @@
 ---
-sourceHash: 1aa92066ee4f7422
+sourceHash: 2685a77f978aeef3
 title: Environnement et configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -27,29 +27,13 @@ Toute la configuration s'effectue via des variables d'environnement dans votre f
 | `DATABASE_URL` | Chaîne de connexion PostgreSQL. **Facultatif en développement** — si non défini, `rebase dev` exécute un PostgreSQL géré pour le projet, avec ses données sous `.rebase/`. Requis partout ailleurs. | `postgresql://user:pass@localhost:5432/mydb` |
 | `JWT_SECRET` | Clé secrète pour signer les jetons JWT. Utilisez une chaîne aléatoire robuste (min. 32 caractères). **Requis en production** (généré automatiquement en développement). | `a1b2c3d4e5...` |
 
-> **Sur une base de données gérée, `sslmode=require` peut ne pas signifier ce qu'il indique.**
->
-> Pour `psql` et tous les outils libpq, `require` signifie « chiffré, certificat non
-> vérifié ». Le pilote Node sur lequel fonctionne Rebase l'interprète comme `verify-full`, de sorte
-> qu'une base de données dont le certificat n'est signé par aucune autorité publique — fréquent sur les
-> Postgres gérés — refuse le runtime avec `self-signed certificate`, tandis que `psql`
-> se connecte avec la même URL. Le runtime et les commandes `rebase db` s'arrêtent avec un
-> message l'indiquant.
->
-> Choisissez l'un d'eux :
->
-> - **`sslmode=no-verify`** — chiffré, non vérifié : ce que `require` signifie pour
->   libpq. C'est une syntaxe propre à node-postgres absente de libpq, donc `psql`, `pg_dump`
->   et Atlas la refusent avec `invalid sslmode value: "no-verify"`. Les commandes propres à Rebase
->   (`rebase db push`, `rebase db backup`, `rebase db restore`) la transmettent sous la forme
->   `sslmode=require`, fonctionnant ainsi avec l'URL telle que configurée ; pour
->   `psql` manuellement, remplacez par `sslmode=require`.
-> - **`sslmode=verify-full&sslrootcert=/path/to/ca.pem`** — vérifié par rapport au
->   certificat CA du fournisseur. Identique pour chaque outil.
->
-> `uselibpqcompat=true&sslmode=require`, suggéré par l'avertissement du pilote Node
-> lui-même, fonctionne également pour le runtime ; les commandes Rebase suppriment `uselibpqcompat`
-> avant de transmettre l'URL aux outils libpq, qui le rejettent.
+> Par défaut, node-postgres vérifie le certificat avec `sslmode=require`. Les outils
+> libpq tels que `psql` acceptent `require` avec des vérifications plus faibles et
+> refusent `no-verify`. Utilisez `sslmode=verify-full&sslrootcert=/path/to/ca.pem`
+> pour vérifier l’autorité et le nom d’hôte. Pour chiffrer sans vérifier le
+> certificat, configurez `sslmode=no-verify` dans Rebase. Rebase transmet
+> `sslmode=require` à Ptah Compat et aux outils PostgreSQL de sauvegarde et de
+> restauration. Pour un appel direct à libpq, utilisez `sslmode=require`.
 
 ### Frontend
 
@@ -364,7 +348,7 @@ Chaque base de données, bucket et topic qu'un projet déclare dans `backend/res
 Lu par `rebase`, pas par le serveur. Rien ici n'affecte un déploiement.
 
 | Variable | Description | Par défaut |
-|----------|-------------|---------|
+|----------|-------------|------------|
 | `REBASE_BASE_URL` | Où `rebase api-keys`, `rebase storage` et `rebase auth reset-password` envoient la clé de service, dans le shell ou dans `.env`. Définissez-le lorsque le serveur s'exécute autrement que par `rebase dev` dans ce projet : `rebase start`, un conteneur, un autre hôte. Non défini, ils utilisent le serveur que `rebase dev` a enregistré pendant que ce serveur est en cours d'exécution, et n'envoient rien lorsqu'il ne l'est pas. | — |
 | `REBASE_SERVICE_KEY` | La clé de service avec laquelle ces commandes s'authentifient, lue depuis `.env` : la même variable que le serveur lit (voir ci-dessus). | — |
 | `SERVICE_KEY` | Un nom plus ancien pour cette clé. Lorsque `.env` la définit, `rebase api-keys` et `rebase storage` la lisent à la place de `REBASE_SERVICE_KEY`. | — |
@@ -375,7 +359,9 @@ Lu par `rebase`, pas par le serveur. Rien ici n'affecte un déploiement.
 | `REBASE_CLOUD_PASSWORD` | Son mot de passe, afin qu'un gestionnaire de secrets puisse le transmettre sans qu'il n'atteigne l'historique du shell. | — |
 | `REBASE_TOKEN` | Un jeton provenant de `rebase cloud tokens create`. S'il est défini, chaque commande `rebase cloud` s'authentifie avec lui au lieu de la session `rebase cloud login`, et ne lit ni n'écrit jamais la session stockée. Dans un répertoire lié par `rebase cloud init --claim`, il est mis de côté au profit du propre jeton de ce projet lorsqu'il ne détient aucune portée sur le projet. La méthode pour exécuter `rebase cloud` en CI — voir [CI et agents](/docs/deployment/cloud/#ci-and-agents). Le [serveur MCP](/docs/ai/mcp/) le transmet au CLI que ses outils cloud lancent, et ne l'envoie jamais à l'application : définissez `REBASE_API_TOKEN` pour cela. | — |
 | `REBASE_DEBUG` | `1` affiche l'erreur sous-jacente et le détail de la requête au lieu du message court. La première chose à définir lorsqu'une commande `rebase cloud` échoue sans explication claire. | — |
-| `REBASE_ATLAS_DEV_URL` | La base de données vide par rapport à laquelle `rebase db push`, `db generate` et `db migrate` planifient leurs actions, au lieu du `<db>_dev_diff` qu'ils créent à côté de `DATABASE_URL`. Rebase ne crée ni ne supprime aucune base de données nommée ici, et refuse une base égale à `DATABASE_URL`. Sur la base de données de développement gérée, le CLI la définit sur un PGlite en mémoire temporaire qui lui est propre. Définissez-la là où `CREATE DATABASE` n'est pas accordé. | `<db>_dev_diff` |
+| `REBASE_ATLAS_DEV_URL` | Base de développement vide pour `db push` et `db generate`. Le nom reste inchangé pour les projets existants. Rebase ne gère pas une base indiquée ici et refuse l’URL cible. PGlite géré reçoit une base éphémère en mémoire. Utilisez ce réglage sans droit `CREATE DATABASE` ; `db migrate` n’en a pas besoin. | `<db>_dev_diff` |
+| `PTAH_TRUST_REPLAY_SQL` | Avec PostgreSQL externe, y compris un service Docker Compose local, Ptah peut rejouer du SQL pour `db push`, `db push --dry-run` et `db generate`. Réservez `PTAH_DEV_SERVER_DISPOSABLE=1` à un serveur de développement entièrement jetable. Sur un serveur partagé, `PTAH_TRUST_REPLAY_SQL=1` autorise le rejeu avec les privilèges de la connexion de développement. Activez-le seulement si vous avez confiance dans ce SQL. Le PGlite géré est déjà jetable. | — |
+| `PTAH_DEV_SERVER_DISPOSABLE` | Définissez `1` uniquement si l'ensemble du serveur de développement peut être supprimé. Rebase le définit automatiquement pour son serveur de développement PGlite géré. | non défini |
 | `REBASE_DEV_NO_DB` | `rebase dev` ne démarre aucune base de données et ne provisionne rien — vous apportez la vôtre. Identique à `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Fixe le port du serveur de développement frontend, que `rebase dev` dérive autrement du chemin du projet. | — |
 | `REBASE_DEV_READY_TIMEOUT_MS` | Durée pendant laquelle `rebase dev` attend que le backend s'annonce avant d'indiquer qu'il n'a pas démarré. `0` désactive le rapport. | `30000` |

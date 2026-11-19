@@ -1,5 +1,5 @@
 ---
-sourceHash: ceff4ba3bdacfb06
+sourceHash: 15088538cf79c53c
 title: Búsqueda
 sidebar_label: Búsqueda
 description: Cómo se comporta .search() por defecto y cómo una tabla se habilita para la búsqueda de texto completo con clasificación sobre las columnas especificadas — incluyendo contenido JSONB y arrays.
@@ -97,40 +97,20 @@ Postgres recalcula la columna en cada escritura de un campo de origen y rechaza 
 intento de escribir en ella directamente, por lo que el índice no puede desincronizarse de la fila. La columna
 nunca es devuelta por la API.
 
-Se generan en `.rebase/sql/search.sql`, junto a `schema.sql` y
-`policies.sql`, y `rebase db push` los aplica por ti — nada adicional que
-ejecutar. Tienen su propio archivo porque una columna `tsvector` generada necesita que
-exista primero una función auxiliar `IMMUTABLE` (`unaccent` es solo `STABLE`, y
-aplanar un documento `jsonb` necesita una función que retorne conjuntos), y Atlas — el
-motor detrás de `db push` — no puede gestionar funciones en su plan gratuito.
-
-Una consecuencia que vale la pena conocer si despliegas mediante migraciones en lugar de push:
-añadir un bloque `search` por sí solo no produce ninguna migración, porque el esquema que
-Atlas compara no ha cambiado. `rebase db generate` lo indica cuando esto ocurre.
-El bloque todavía se aplica mediante `rebase db push` y por la verificación del esquema en
-el momento del arranque; para incluirlo explícitamente en una migración, añade `.rebase/sql/search.sql`,
-que `rebase db generate` acaba de escribir, al final de una de ellas.
+Ptah Compat recibe la función auxiliar, la columna y el índice juntos en
+`schema.sql`. `rebase db push` puede usar `search.sql` para recuperarse de un
+fallo.
 
 ### Modificar el bloque más adelante
 
-Una columna generada lleva su expresión consigo, y Postgres no puede alterar esa
-expresión in situ — por lo que añadir un campo, cambiar un peso, modificar el idioma
-o activar `unaccent` **no** es algo que `ADD COLUMN IF NOT EXISTS` pueda
-aplicar a una columna que ya existe.
+Desde PostgreSQL 17, Ptah Compat puede cambiar la expresión almacenada con `ALTER
+COLUMN ... SET EXPRESSION`. Revisa el plan con `rebase db push --dry-run` o genera
+una migración. El cambio reescribe la tabla y puede bloquear el acceso.
 
-Rebase registra una huella digital (fingerprint) de la expresión en la columna al crearla,
-y la compara en cada arranque y en cada `db push`. Un cambio es rechazado, explícitamente,
-mostrando las dos sentencias que lo aplican — un `DROP COLUMN` y un `ADD COLUMN`,
-las cuales reescriben la tabla y reconstruyen el índice GIN. Ejecútalas en el momento que
-elijas; nada reescribirá una tabla en producción por ti.
-
-Dos cambios están exentos. Activar `fuzzy` es aditivo —una segunda columna— y
-se aplica sin nada de esto. Configurar [`mode`](#mode) cambia la consulta en
-lugar de la columna, por lo que se aplica con un simple despliegue.
-
-El arranque rechaza iniciar en lugar de servir tráfico, porque la alternativa es lo que esta comprobación
-reemplazó: una columna que sigue indexando el conjunto de campos anterior, y una búsqueda que
-no devuelve nada para contenido que claramente está en la fila.
+En PostgreSQL 16 o anterior, usa una migración SQL revisada que reconstruya la
+columna generada y sus objetos dependientes. Comprueba luego la expresión y los
+índices. `fuzzy` añade una columna. [`mode`](#mode) solo cambia la consulta de
+búsqueda.
 
 ## Qué puedes especificar en `fields`
 

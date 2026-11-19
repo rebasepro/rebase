@@ -1,5 +1,5 @@
 ---
-sourceHash: 4040537e5cc9b4d3
+sourceHash: 95b02ddd03d482c6
 title: AI e agenti
 sidebar_label: Panoramica
 description: Cosa offre Rebase per assistenti di codifica AI e agenti autonomi — un server MCP, skill per agenti locali al progetto, file di istruzioni con scaffolding e il modello di credenziali che stabilisce a cosa un agente può effettivamente accedere.
@@ -80,11 +80,9 @@ metodo di query `.vectorSearch()` con distanze `cosine`, `l2` e `inner_product`.
 Tre aspetti fondamentali da sapere prima di iniziare a progettarne l'integrazione. **Rebase archivia ed effettua ricerche
 sugli embedding; non li calcola** — non è presente alcun provider di embedding, impostazione di modello
 o chiave API all'interno di Rebase, pertanto la generazione dei vettori è a tuo carico.
-**pgvector è un prerequisito e la sua installazione è facoltativa.**
-`database({ extensions: ["vector"] })` in `backend/resources.ts` consente a `rebase db
-push` e alla procedura di verifica dello schema all'avvio di eseguire `CREATE EXTENSION IF NOT EXISTS vector` al
-posto tuo; in caso contrario, creeranno la colonna lasciando l'installazione dell'estensione a tuo carico. In entrambi i casi,
-il server necessita di un'immagine che includa la libreria e di un ruolo autorizzato a installarla.
+Dichiara `database({ extensions: ["vector"] })` in `backend/resources.ts` affinché
+Ptah possa pianificare le colonne vettoriali, anche se l’estensione è già presente
+nel database di destinazione.
 Inoltre, **ogni colonna vettoriale riceve un indice HNSW per
 la distanza coseno**, poiché il coseno è ciò che `vectorSearch` misura a meno che
 non venga passato `distance` — un indice supporta esattamente un operatore. Configuralo o

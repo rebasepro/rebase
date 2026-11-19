@@ -1,5 +1,5 @@
 ---
-sourceHash: 535fb9801df93ad9
+sourceHash: 1823d98cb985e205
 title: Comandos de base de datos
 sidebar_label: Comandos de base de datos
 description: Los comandos de rebase db — push, generate y migrate, copias de seguridad y restauraciones, extracción de copias, la cadena de conexión, la base de datos de desarrollo administrada y ramas.
@@ -350,13 +350,13 @@ Escribe las filas que una rama insertó, actualizó y eliminó en la base de dat
 :::note[En la base de datos de desarrollo administrada]
 `push`, `generate` y `migrate` funcionan aquí como en cualquier otra base de
 datos.
-`push` y `generate` planifican su trabajo con Atlas, que necesita una segunda
+`push` y `generate` planifican su trabajo con Ptah Compat, que necesita una segunda
 base de datos vacía para comparar, y el PGlite administrado sirve exactamente
 una. Por lo tanto, en la base de datos administrada, cada uno de ellos inicia un
-segundo PGlite desechable en memoria para Atlas y lo detiene cuando finaliza el
+segundo PGlite desechable en memoria para Ptah Compat y lo detiene cuando finaliza el
 comando. Así es como se elimina, renombra o restringe una columna allí:
 `rebase dev` solo añade elementos. El control de operaciones destructivas es el
-mismo que en cualquier otro lugar. Para hacer que Atlas planifique contra una
+mismo que en cualquier otro lugar. Para hacer que Ptah Compat planifique contra una
 base de datos vacía propia en su lugar, configure `REBASE_ATLAS_DEV_URL`
 apuntando a ella; Rebase no crea ni elimina una base de datos nombrada de esa
 manera.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 379dcac78cfd8ebf
+sourceHash: 0d1d9bb421937cfe
 title: Rebase auf Fly.io bereitstellen
 description: Erfahren Sie, wie Sie Rebase mit Fly.io weltweit bereitstellen oder auf europäische Rechenzentren beschränken.
 sidebar_label: Fly.io
@@ -26,6 +26,9 @@ fly launch --no-deploy
 `--no-deploy`, da Secrets und das Bundle zuerst vorhanden sein müssen.
 
 Wenn Ihre Tabellen eine `col.vector()`-Spalte deklarieren, aktivieren Sie die Extension einmalig in dieser Datenbank: `CREATE EXTENSION vector;`.
+Deklarieren Sie `database({ extensions: ["vector"] })` in `backend/resources.ts`,
+damit Ptah Vektorspalten planen kann. Das gilt auch, wenn die Erweiterung im Ziel
+bereits vorhanden ist.
 
 ## 2. Bundle erstellen und fly.toml auf das Runtime-Image verweisen
 

@@ -44,7 +44,15 @@ From the database's **Connection** panel, copy the connection string (the `psql`
 postgresql://<user>:<password>@<host>:5432/<database>?sslmode=no-verify
 ```
 
-**Use `no-verify`, not `require`.** Both encrypt the connection. To `psql`, `require` also means "do not check the certificate against a public authority", but the Postgres driver Rebase runs on reads it as "check it", and a database certificate that is not publicly signed then fails the first connection with `self-signed certificate`. `no-verify` is the driver's spelling of what `require` means everywhere else. Out Plane's own Node.js guide turns the check off for the same reason. The same URL works for `rebase db push` from your machine: the CLI passes it to the Atlas schema engine as `sslmode=require`.
+**Use `no-verify`, not `require`.** Both encrypt the connection. To `psql`,
+`require` also means "do not check the certificate against a public
+authority", but the Postgres driver Rebase runs on reads it as "check it".
+A database certificate that is not publicly signed then fails the first
+connection with `self-signed certificate`. `no-verify` is the driver's
+spelling of what `require` means everywhere else. Out Plane's Node.js guide
+turns the check off for the same reason. The same URL works for
+`rebase db push` from your machine: the CLI passes it to Ptah Compat as
+`sslmode=require`.
 
 ### The role Rebase switches to
 
@@ -53,6 +61,8 @@ Rebase enforces row-level security by switching each signed-in request to a rest
 If the first start stops with an `AppRoleSetupError` naming `rebase_user`, the role in your connection string is not allowed to create roles or to grant itself the switch. The error prints the SQL to run instead: run it once, as a role on the database that may create roles, then redeploy.
 
 If your tables declare a `col.vector()` column, the database needs the pgvector extension. The scaffold declares none.
+Declare `database({ extensions: ["vector"] })` in `backend/resources.ts`
+so Ptah can plan the column, even if the extension is already installed.
 
 ## 3. Create a bucket
 
@@ -85,11 +95,13 @@ FROM rebasepro/server:0.34.1
 COPY --from=build --chown=node:node /app/dist-bundle /bundle
 ```
 
-Three details matter here:
+In this Dockerfile:
 
-- **`node:22`, not `node:22-slim`.** Installing the CLI downloads the Atlas schema engine, which needs `curl` and CA certificates. The slim image has neither, and the install fails.
-- **`--chown=node:node`.** The runtime runs as `node` and links its own packages into the bundle at start. A root-owned bundle still serves, but logs a warning for every package it could not link.
-- **No source in the final image.** It holds the runtime and your compiled bundle, and `dist-bundle/` stays gitignored.
+- **`--chown=node:node`.** The runtime runs as `node` and links its own
+  packages into the bundle at start. A root-owned bundle still serves, but
+  logs a warning for every package it could not link.
+- **No source in the final image.** It holds the runtime and your compiled
+  bundle, and `dist-bundle/` stays gitignored.
 
 The runtime image listens on port **8080** and declares it with `EXPOSE`, so Out Plane prefills the port when it reads the Dockerfile.
 

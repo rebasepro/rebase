@@ -1,5 +1,5 @@
 ---
-sourceHash: 379dcac78cfd8ebf
+sourceHash: 0d1d9bb421937cfe
 title: Distribuire Rebase su Fly.io
 description: Scopri come distribuire Rebase a livello globale o limitarlo ai data center europei utilizzando Fly.io.
 sidebar_label: Fly.io
@@ -26,6 +26,9 @@ fly launch --no-deploy
 `--no-deploy` perché i secret e il bundle devono essere configurati prima.
 
 Se le tue tabelle dichiarano una colonna `col.vector()`, abilita l'estensione una volta sul database: `CREATE EXTENSION vector;`.
+Dichiara `database({ extensions: ["vector"] })` in `backend/resources.ts` affinché
+Ptah possa pianificare le colonne vettoriali, anche se l’estensione è già presente
+nel database di destinazione.
 
 ## 2. Compilare il bundle e puntare fly.toml all'immagine di runtime
 

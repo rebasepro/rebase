@@ -139,6 +139,15 @@ flagged as a downgrade. A `--dry-run` of an upgrade the real run would refuse
 shows what would move and exits 0, and under `--json` its document carries the
 refusal as `wouldRefuse` (`{ code, message, hint }`).
 
+#### Upgrade a PostgreSQL project to Rebase 0.35
+
+```bash
+pnpm dlx @rebasepro/cli@0.35.0 upgrade --to 0.35.0 # version-pin: ignore
+```
+
+Run from the project root. The 0.35 CLI replaces `@ariga/atlas` with
+`@stokaro/ptah-compat` and keeps your SQL migrations, `atlas.sum`, and revisions.
+
 ### `rebase start`
 
 Run the built bundle the way a deployment runs it:

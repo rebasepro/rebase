@@ -215,7 +215,7 @@ navigation, so the descriptors are fetched after sign-in, and what opening a
 collection needs (the table, the record views, the form) loads only then. A
 large schema slows `rebase db push` more than the panel: at 400 or more tables a
 push takes tens of seconds; see
-[how long a push takes](/docs/cli/schema#rebase-db-push).
+[what a push plans](/docs/cli/schema#rebase-db-push).
 
 ## Next steps
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1aa92066ee4f7422
+sourceHash: 2685a77f978aeef3
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -27,29 +27,13 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 | `DATABASE_URL` | PostgreSQL-Verbindungszeichenfolge. **In der Entwicklung optional** – wenn nicht gesetzt, führt `rebase dev` eine verwaltete PostgreSQL-Instanz für das Projekt aus, deren Daten unter `.rebase/` liegen. Überall sonst erforderlich. | `postgresql://user:pass@localhost:5432/mydb` |
 | `JWT_SECRET` | Geheimer Schlüssel zum Signieren von JWT-Tokens. Verwenden Sie eine starke Zufallszeichenfolge (mind. 32 Zeichen). **In der Produktion erforderlich** (in der Entwicklung automatisch generiert). | `a1b2c3d4e5...` |
 
-> **Bei einer Managed Database bedeutet `sslmode=require` möglicherweise nicht das, wonach es aussieht.**
->
-> Für `psql` und jedes libpq-Tool bedeutet `require` „verschlüsselt, Zertifikat nicht
-> überprüft“. Der Node-Treiber, auf dem Rebase läuft, interpretiert dies als `verify-full`.
-> Eine Datenbank, deren Zertifikat nicht von einer öffentlichen Zertifizierungsstelle signiert
-> wurde – häufig bei Managed Postgres –, verweigert der Laufzeitumgebung den Zugriff mit
-> `self-signed certificate`, während `psql` sich mit derselben URL verbindet. Die
-> Laufzeitumgebung und `rebase db`-Befehle brechen mit einer entsprechenden Meldung ab.
->
-> Wählen Sie eine der Optionen:
->
-> - **`sslmode=no-verify`** – verschlüsselt, nicht überprüft: was `require` für
->   libpq bedeutet. Dies ist eine Schreibweise von node-postgres, die libpq fehlt,
->   weshalb `psql`, `pg_dump` und Atlas sie mit `invalid sslmode value: "no-verify"`
->   ablehnen. Die Rebase-eigenen Befehle (`rebase db push`, `rebase db backup`, `rebase db restore`)
->   übergeben diesen Wert an sie als `sslmode=require`, sodass sie mit der konfigurierten URL
->   funktionieren; für manuelle `psql`-Aufrufe ersetzen Sie ihn durch `sslmode=require`.
-> - **`sslmode=verify-full&sslrootcert=/path/to/ca.pem`** – anhand des CA-Zertifikats
->   des Anbieters überprüft. Einheitlich für jedes Tool.
->
-> `uselibpqcompat=true&sslmode=require`, was die Warnung des Node-Treibers selbst
-> vorschlägt, funktioniert ebenfalls für die Laufzeitumgebung; Rebase-Befehle entfernen
-> `uselibpqcompat`, bevor sie die URL an libpq-Tools übergeben, die dies ablehnen würden.
+> Standardmäßig prüft node-postgres bei `sslmode=require` das Zertifikat. Libpq-Tools
+> wie `psql` unterstützen `require` mit schwächerer Prüfung und weisen `no-verify`
+> zurück. Verwenden Sie `sslmode=verify-full&sslrootcert=/path/to/ca.pem` zur Prüfung
+> der CA und des Hostnamens. Soll nur verschlüsselt werden, geben Sie Rebase
+> `sslmode=no-verify`. Rebase reicht `sslmode=require` an Ptah Compat sowie die
+> PostgreSQL-Werkzeuge für Sicherung und Wiederherstellung weiter. Verwenden Sie für
+> direkte libpq-Aufrufe `sslmode=require`.
 
 ### Frontend
 
@@ -409,7 +393,9 @@ Wird von `rebase` gelesen, nicht vom Server. Nichts hiervon wirkt sich auf ein D
 | `REBASE_CLOUD_PASSWORD` | Dessen Passwort, sodass ein Secret-Store es übergeben kann, ohne dass es in den Shell-Verlauf gelangt. | — |
 | `REBASE_TOKEN` | Ein Token aus `rebase cloud tokens create`. Wenn gesetzt, authentifiziert sich jeder `rebase cloud`-Befehl damit anstelle der Sitzung aus `rebase cloud login` und liest oder schreibt die gespeicherte Sitzung niemals. In einem Verzeichnis, das durch `rebase cloud init --claim` verknüpft wurde, wird es für das eigene Token dieses Projekts beiseite gelegt, wenn es keinen Scope für das Projekt besitzt. Die Methode zur Ausführung von `rebase cloud` in CI – siehe [CI und Agenten](/docs/deployment/cloud/#ci-and-agents). Der [MCP-Server](/docs/ai/mcp/) übergibt es an die CLI, die seine Cloud-Tools starten, und sendet es niemals an die App: Setzen Sie dafür `REBASE_API_TOKEN`. | — |
 | `REBASE_DEBUG` | `1` gibt den zugrunde liegenden Fehler und Anfragedetails anstelle der Kurznachricht aus. Die erste Maßnahme, wenn ein `rebase cloud`-Befehl ohne hilfreiche Meldung fehlschlägt. | — |
-| `REBASE_ATLAS_DEV_URL` | Die leere Datenbank, gegen die `rebase db push`, `db generate` und `db migrate` planen, anstelle von `<db>_dev_diff`, das sie neben `DATABASE_URL` erstellen. Rebase erstellt oder löscht keine hier angegebene Datenbank und lehnt eine ab, die mit `DATABASE_URL` identisch ist. Bei der verwalteten Entwicklungsdatenbank setzt die CLI dies auf ein eigenes, flüchtiges In-Memory-PGlite. Setzen Sie dies dort, wo `CREATE DATABASE` nicht gewährt wird. | `<db>_dev_diff` |
+| `REBASE_ATLAS_DEV_URL` | Leere Dev-Datenbank für `db push` und `db generate`. Der Name bleibt für bestehende Projekte erhalten. Rebase verwaltet eine hier angegebene Datenbank nicht und verweigert die Ziel-URL. Verwaltetes PGlite erhält eine flüchtige In-Memory-Datenbank. Verwenden Sie dies ohne `CREATE DATABASE`; `db migrate` braucht sie nicht. | `<db>_dev_diff` |
+| `PTAH_TRUST_REPLAY_SQL` | Bei externem PostgreSQL, auch einem lokalen Docker-Compose-Dienst, kann Ptah für `db push`, `db push --dry-run` und `db generate` SQL wiedergeben. Setzen Sie `PTAH_DEV_SERVER_DISPOSABLE=1` nur für einen vollständig verwerfbaren Dev-Server. Auf einem gemeinsam genutzten Server erlaubt `PTAH_TRUST_REPLAY_SQL=1` die Wiedergabe mit den Rechten der Dev-Verbindung. Setzen Sie es nur für SQL, dem Sie vertrauen. Verwaltetes PGlite ist bereits verwerfbar. | — |
+| `PTAH_DEV_SERVER_DISPOSABLE` | Nur auf `1` setzen, wenn der gesamte Entwicklungsserver verworfen werden kann. Rebase setzt dies für seinen verwalteten PGlite-Entwicklungsserver automatisch. | nicht gesetzt |
 | `REBASE_DEV_NO_DB` | `rebase dev` startet keine Datenbank und stellt nichts bereit – Sie bringen Ihre eigene mit. Identisch mit `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Legt den Port des Frontend-Dev-Servers fest, den `rebase dev` andernfalls aus dem Projektpfad ableitet. | — |
 | `REBASE_DEV_READY_TIMEOUT_MS` | Wie lange `rebase dev` darauf wartet, dass sich das Backend meldet, bevor gemeldet wird, dass es nicht gestartet ist. `0` deaktiviert die Meldung. | `30000` |

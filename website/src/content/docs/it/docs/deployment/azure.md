@@ -1,5 +1,5 @@
 ---
-sourceHash: 9b95a797b2d9f086
+sourceHash: e0918e89fb72aab0
 title: Distribuzione di Rebase su Microsoft Azure
 description: Distribuisci la tua istanza Rebase in modo sicuro su Azure utilizzando Azure Database for PostgreSQL e Azure Container Apps.
 sidebar_label: Azure
@@ -23,6 +23,9 @@ Nulla in questa pagina riguarda nello specifico Azure per quanto concerne il tuo
    `postgresql://your_admin:YOUR_PASSWORD@your-server-name.postgres.database.azure.com:5432/postgres`
 
 Se le tue tabelle dichiarano una colonna `col.vector()`, abilita l'estensione una sola volta: Azure la vincola al parametro del server `azure.extensions`, quindi esegui `CREATE EXTENSION vector;`.
+Dichiara `database({ extensions: ["vector"] })` in `backend/resources.ts` affinché
+Ptah possa pianificare le colonne vettoriali, anche se l’estensione è già presente
+nel database di destinazione.
 
 ## 2. Crea il bundle e integralo in un'immagine
 

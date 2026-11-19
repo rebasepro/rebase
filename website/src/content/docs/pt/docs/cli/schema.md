@@ -1,5 +1,5 @@
 ---
-sourceHash: 79d8123106a0fa90
+sourceHash: 26de566694c2cb42
 title: Geração de Schema
 sidebar_label: Geração de Schema
 description: Gere schemas do Drizzle ORM a partir das tabelas em backend/schema, crie migrações SQL, faça introspecção de um banco de dados existente para arquivos defineTable e mantenha seu banco de dados em sincronia com o Rebase CLI.
@@ -36,9 +36,15 @@ flag anterior à 0.31, é recusada com uma mensagem indicando o codemod
 ([`rebase migrate collections-to-tables`](#rebase-migrate)), assim como um
 projeto que ainda possui `config/collections`.
 
-### 2. Drizzle Schema → Migrations
+### 2. Esquema declarado → Migrações
 
-A partir do schema gerado do Drizzle, o `db generate` compara as diferenças (diff) em relação às migrações já existentes em `backend/drizzle/migrations/`, reproduzidas em um banco de dados temporário (scratch database), e produz arquivos de migração SQL com carimbo de data/hora (timestamped). Ele nunca lê o seu banco de dados: uma coluna que a inicialização ou o `db push` já adicionou ainda é gerada como `ADD COLUMN`.
+`db generate` gera o SQL desejado para Ptah a partir das tabelas, políticas,
+funções, índices, gatilhos e vistas declarados. Ptah compara esse SQL com as
+migrações em `backend/drizzle/migrations/`, reproduzidas em um banco
+temporário, e escreve uma nova migração. Rebase também consulta o banco de
+destino para proteger objetos que não gerencia. Uma coluna já adicionada
+na inicialização ou por `db push` continua na migração porque o diff começa
+pelo histórico de migrações.
 
 ### 3. Migrations → PostgreSQL
 
@@ -173,159 +179,83 @@ Saindo do Supabase? Consulte [Migrando do Supabase](/docs/recipes/migrate-from-s
 
 ### `rebase db push`
 
-Envia alterações de schema diretamente para o banco de dados sem arquivos de migração:
+Aplica o esquema declarado diretamente ao banco de dados:
 
 ```bash
 rebase db push
+rebase db push --dry-run
 ```
 
-**O que ele faz:**
-- Lê o schema gerado do Drizzle
-- Aplica alterações diretamente ao banco de dados (CREATE, ALTER, DROP)
-- Executa um dry-run do plano primeiro e para antes de qualquer ação que destrua dados: uma
-  tabela, coluna, schema, view ou tipo removido, um `TRUNCATE`, ou uma alteração de tipo de coluna
-  que possa perder valores (`timestamptz` → `date`, `numeric` → `integer`),
-  ou uma alteração de chave primária — `(id)` → `(id, locale)` atribui a cada linha um novo id, de modo que
-  links, chaves estrangeiras e ids armazenados em outros lugares deixam de encontrar sua linha.
-  Ele também para
-  antes da remoção de uma restrição CHECK ou EXCLUDE que o banco de dados contenha: nenhuma linha
-  é perdida, mas a partir de então o banco aceita as linhas que antes recusava.
-  Ele solicita confirmação no terminal, onde Ctrl-C ou Ctrl-D responde não, e recusa
-  caso contrário; `--allow-destructive` aplica mesmo assim. `--yes` ainda faz isso nesta
-  versão, com um aviso de depreciação; a partir da próxima versão, ele aprovará
-  apenas pushes que não destroem nada. Um push que
-  é interrompido nesse ponto descarta seu banco de dados temporário `<db>_dev_diff` ao sair
-- Ativa a segurança a nível de linha (row-level security) para cada tabela declarada, incluindo junções, logo após a
-  alteração do schema e antes de qualquer etapa que possa falhar, de modo que um push interrompido no meio do caminho deixe uma nova tabela
-  negando todas as solicitações em vez de deixá-la aberta
-- Aplica as políticas de RLS para as quais o `rls` das suas tabelas compila, e **remove políticas que um push anterior substituiu**
-- Mantém inalterada
-  cada restrição CHECK e EXCLUDE em uma tabela declarada. Uma tabela
-  não pode declarar nenhuma delas, portanto, são regras do próprio banco de dados, escritas manualmente
-  ou herdadas de um banco adotado via `schema introspect`; para remover uma, remova manualmente
-  (`ALTER TABLE … DROP CONSTRAINT …`). Triggers e funções que você escreveu
-  também não são tocados
-- Faz a correspondência exata do
-  nome de tudo o que mantém intacto, incluindo `.`, `[`, `]` ou `*`
-- Constrói qualquer
-  [índice de chave estrangeira que o Rebase deriva](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
-  que uma tabela existente não tenha **antes** do planejamento, com
-  `CREATE INDEX CONCURRENTLY`, para que as gravações na tabela continuem durante a criação;
-  o Atlas então o encontra no local. `--dry-run` lista esses índices e não constrói nada
-- Registra uma marca (stamp) nas
-  políticas que aplica da mesma forma que o boot do servidor faz, para que a
-  primeira inicialização após um push não mexa nelas em vez de recriar cada uma
-- O `--dry-run`
-  lista o row-level security que o push alteraria, sob "Planned
-  row-level security changes": as tabelas para as quais ele ativa o RLS, e cada
-  política que ele cria, substitui ou descarta, calculadas da forma como as próprias
-  etapas do push decidem. Ele exibe "No changes" apenas quando nem o schema nem o
-  row-level security sofreriam alterações. Onde a marca de uma política não corresponde à sua
-  regra, ou não há marca (uma criada por `db migrate`, ou escrita à mão), o dry
-  run a recria a partir de sua regra sob outro nome, em uma transação revertida
-  (rollback), e compara o que o Postgres armazenou: uma que resulta idêntica é
-  considerada sem alteração. Portanto, uma regra lida pelo `schema introspect` como SQL não planeja nada, e
-  o mesmo vale para políticas aplicadas por `db migrate`. Apenas aquelas que ele não pôde comparar (por exemplo,
-  lock da tabela não concedido em dois segundos) são listadas à parte. O push
-  em si imprime uma única linha contabilizando as alterações
-- Exibe cada
-  instrução que o Atlas aplica uma vez. O Atlas conecta-se sem SSL a um banco de dados nesta
-  máquina (`localhost`, `127.x`, `::1`) cuja URL não define `sslmode`, como o app
-  faz, em vez de falhar com `SSL is not enabled on the server`; uma URL que
-  define `sslmode`, ou outro host, é transmitida exatamente como escrita. Uma execução do Atlas
-  que falha antes de planejar não deixa nenhum banco `<db>_dev_diff` para trás
-- O `--dry-run`
-  não grava nada do projeto: `src/schema.generated.ts` é mantido como está,
-  e as cópias em `drizzle/*.sql` commitadas por versões anteriores são listadas, não
-  excluídas. Apenas a entrada do plano vai para `.rebase/sql/`, que não é commitado
-- **Não** cria arquivos de migração
+Rebase gera um único SQL desejado com tabelas, políticas, funções, índices
+de busca e vetoriais, gatilhos e vistas. Ptah Compat planeja e aplica esses
+objetos em conjunto. O plano fica restrito às declarações de Rebase. Tabelas,
+vistas, extensões e funções externas permanecem intactas. Políticas,
+gatilhos, índices e restrições CHECK e EXCLUDE personalizados em uma tabela
+declarada também são protegidos.
 
-**Quanto tempo leva.** Quase todo o tempo de um push é gasto pelo Atlas
-calculando o plano: ele constrói o schema desejado em um banco de dados temporário e compara as
-diferenças em relação ao banco real, e esse custo cresce mais rápido do que o número de tabelas — em
-um laptop ocioso, cerca de 0,25 s por plano para 11 tabelas, 0,9 s para 111 e 5,5 s para 411. Um push que
-não altera nada planeja uma vez; um que altera algo planeja duas vezes (o dry-run
-lido pelo gate de alterações destrutivas, e depois a aplicação). Portanto, um push em um schema de
-400 ou mais tabelas leva dezenas de segundos, e mais em uma máquina ocupada ou lenta.
-Esse tempo é do Atlas, não do seu banco de dados: as etapas complementares — gerar o
-SQL, o lock de RLS, busca, triggers, políticas, a role — levam poucos segundos
-nessa escala, usando uma única conexão ao seu banco de dados.
+O comando mostra o plano antes de aplicá-lo. Uma alteração destrutiva,
+incluindo `DROP EXTENSION`, exige confirmação ou `--allow-destructive`.
+`--dry-run` mostra o plano sem modificar o banco nem escrever uma migração.
+Depois que o Ptah aplica o plano, o Rebase ativa RLS, prepara as tabelas de autenticação e os papéis de
+requisição, e registra a versão do esquema. Os índices derivados de chaves
+estrangeiras que faltarem são criados antes do plano.
 
-**Os arquivos gerados no caminho**, todos sob `.rebase/sql/` no diretório
-do backend. `db push` e `db generate` gravam todos os cinco a partir de suas tabelas
-a cada execução, antes de ler qualquer um deles, de modo que uma cópia commitada não seria
-lida por nada. O diretório possui seu próprio `.gitignore` e nunca é commitado.
+Com PostgreSQL externo, inclusive um serviço Docker Compose local, o Ptah pode
+reexecutar SQL para `db push`, `db push --dry-run` e `db generate`. Use
+`PTAH_DEV_SERVER_DISPOSABLE=1` apenas quando puder descartar todo o servidor de
+desenvolvimento. Em um servidor compartilhado, `PTAH_TRUST_REPLAY_SQL=1` permite a
+execução com os privilégios da conexão de desenvolvimento. Ative a opção somente se
+confiar no SQL. O PGlite gerenciado já é descartável. Consulte a
+[configuração](/docs/getting-started/configuration/).
 
-| Arquivo | Conteúdo |
-|---------|----------|
-| `schema.sql` | Tabelas, colunas, restrições e índices — o estado desejado do Atlas e o único no qual ele faz diff |
-| `policies.sql` | As políticas de RLS para as quais o `rls` das suas tabelas compila |
-| `search.sql` | Funções de busca full-text e colunas geradas, para tabelas com um bloco `search` |
-| `vector.sql` | Extensões pgvector e índices ANN |
-| `triggers.sql` | `rebase.set_updated_at()` e as triggers `BEFORE UPDATE` por trás de `.onUpdateNow()` |
+`db push` e `db generate` atualizam `.rebase/sql/` com o esquema atual.
+O Git ignora esse diretório.
 
-O Atlas gerencia o primeiro e nada mais, de modo que o `db push` e o schema em tempo
-de boot garantem a aplicação dos outros quatro por conta própria. Um deploy **migration-only**
-(somente migrações) — que executa `db migrate` e nunca `db push` — precisa incorporar esses quatro a uma
-migração manualmente; o `db generate` avisa quando uma alteração for invisível para o Atlas.
+| Arquivo | Finalidade |
+|---------|------------|
+| `schema.sql` | Estado desejado dos objetos declarados |
+| `search.sql` | Restaura colunas de busca geradas após uma falha |
+| `policies.sql`, `vector.sql`, `triggers.sql`, `views.sql` | Trechos do SQL gerado |
 
-Um projeto que commitou esses arquivos em `drizzle/` sob uma versão anterior terá
-essas cópias excluídas em sua primeira execução, e o comando nomeia cada uma para que você possa
-commitar a exclusão. Ele exclui apenas arquivos que abrem com o cabeçalho do gerador.
-Um arquivo escrito por você é mantido, assim como `drizzle/migrations/`.
+A CLI remove cópias antigas de SQL gerado de `drizzle/` e preserva `drizzle/migrations/`.
 
-:::note[Editar uma regra de segurança renomeia sua política]
-Uma regra sem um `name` explícito compila para `<table>_<op>_<hash>`, onde o hash cobre a semântica da regra — portanto, *editar* uma regra (em vez de adicionar uma) produz uma política sob um novo nome e deixa a antiga para trás.
+Inclua `backend/drizzle/ptah-managed.json` no Git junto com as migrações. O Rebase
+usa os nomes gravados para planejar a remoção de declarações retiradas.
 
-Isso costumava ter um impacto enorme: o Postgres combina políticas `PERMISSIVE` com operadores OR, de modo que uma regra substituída com `USING (rebase.uid() IS NOT NULL)` continuava concedendo tudo, não importando o quão restritiva fosse a sua substituta. Tornar uma regra mais restrita não tinha efeito, e o push informava sucesso.
-
-O `db push` agora reconcilia isso: ele remove políticas geradas que não correspondem mais a nenhuma regra e relata — sem remover — qualquer política com nome customizado que suas tabelas não descrevam, já que elas são indistinguíveis de SQL escrito deliberadamente por alguém.
-
-Para auditar um banco de dados que recebeu push antes dessa mudança, execute `rebase doctor --policies`. Ele funciona como uma barreira de CI (gate): encerra com código diferente de zero em caso de divergência (drift) e também quando não consegue executar a verificação — sem `DATABASE_URL`, um caminho `--schema-dir` que não resolve, leitura de `pg_policies` não concedida à role do CI. Uma barreira que não pôde verificar é considerada reprovada.
-
-O `doctor` e o `db push` diferenciam os dois tipos de regras órfãs. Uma política com nome gerado foi substituída e o próximo push a removerá. Qualquer outro nome foi escrito manualmente ou por outra ferramenta e permanece em vigor: descreva-a no `rls` de sua tabela para mantê-la (a visualização de RLS do Studio a importa) ou remova-a manualmente se estiver obsoleta.
-:::
+Uma política cujo nome foi gerado pelo Rebase é removida quando outra regra
+a substitui. Uma política com nome personalizado continua em vigor. Use
+`rebase doctor --policies` para verificar divergências. Para que Rebase
+gerencie uma política personalizada, declare-a no `rls` da tabela.
 
 :::caution
-O `db push` modifica o banco de dados diretamente. Use-o apenas em desenvolvimento. Para produção, use `db generate` + `db migrate` para criar arquivos de migração revisáveis.
+`db push` modifica o banco diretamente. Use-o no desenvolvimento.
+Na produção, crie uma migração revisável com `db generate` e aplique-a
+com `db migrate`.
 :::
 
 ### `rebase db generate`
 
-Gera arquivos de migração SQL a partir de alterações no schema:
+Cria uma migração SQL com data e hora:
 
 ```bash
 rebase db generate
 ```
 
-**O que ele faz:**
-- Compara o schema do Drizzle com o estado que as migrações em `drizzle/migrations/` constroem, não contra o seu banco de dados
-- Produz arquivos de migração SQL com carimbo de data/hora em `backend/drizzle/migrations/`
-- Os arquivos podem ser revisados, editados e commitados no controle de versão
-- Lista cada
-  instrução na nova migração que destrói dados, usando a mesma verificação que o `db push`
-  executa antes de aplicar: uma tabela, coluna, schema, view ou tipo removido, um
-  `TRUNCATE`, uma alteração de tipo de coluna que possa perder valores, uma alteração de chave primária,
-  ou a remoção de uma restrição CHECK ou EXCLUDE que o banco de dados possua. Ele
-  ainda grava o arquivo e encerra com código 0, portanto apenas avisa e não recusa a operação.
-- Conclui orientando sobre o que
-  fazer a seguir: `rebase db migrate`, e para a primeira migração de um projeto, a
-  linha `--baseline <version>` que um banco já configurado pela inicialização precisa. Uma
-  migração posterior não recebe a instrução de baseline, já que uma migração destrutiva que recebesse baseline
-  ignoraria seu `DROP`, e uma execução que não grava migrações informa apenas isso.
+Ptah compara o SQL desejado com o estado reconstruído das migrações em
+`backend/drizzle/migrations/`. O diff começa por esse histórico, não pelo
+banco ativo. Rebase ainda consulta o banco ativo para identificar objetos
+externos. Uma coluna já adicionada na inicialização ou por `db push` também
+aparece na migração gerada.
 
-**Um CHECK adicionado por uma migração sua é removido pela próxima.** O `db generate`
-faz a comparação de diferenças (diff) nos seus arquivos de migração, não no banco de dados, e o Atlas não tem como deixar um
-objeto de fora desse diff. Portanto, uma restrição CHECK ou EXCLUDE que você escreveu manualmente em uma
-migração, e que nenhuma tabela pode declarar, retorna como
-`ALTER TABLE … DROP CONSTRAINT …` na próxima migração gravada, mesclada na
-mesma instrução da alteração real. O relatório acima aponta essa remoção quando
-o banco de dados já possui a restrição; ele não a retira do
-arquivo. Exclua a cláusula antes de executar `rebase db migrate`, ou deixe o
-`rebase db migrate --refuse-destructive` interromper o processo. O `db push` lê o
-banco de dados e mantém a restrição.
+O comando grava a migração em `backend/drizzle/migrations/` e avisa sobre operações
+destrutivas. Um plano vazio não gera uma migração.
 
-As migrações geradas são arquivos SQL simples — você pode inspecioná-los e modificá-los antes de aplicar.
+Para a primeira migração, o comando mostra um exemplo com `--baseline <version>`.
+Verifique antes que o banco de dados corresponde à versão.
+
+Revise cada migração em busca de `DROP CONSTRAINT`. Restrições CHECK e EXCLUDE
+manuais que só existem no histórico reexecutado podem aparecer no plano como
+exclusões.
 
 ### `rebase db migrate`
 
@@ -338,15 +268,15 @@ rebase db migrate
 **O que ele faz:**
 - Lê `drizzle/migrations/` em busca de migrações não aplicadas
 - Aplica-as em ordem ao banco de dados
-- Registra quais migrações foram aplicadas
-- Marca (stamp) as
-  políticas de row-level security da mesma forma que o `db push` e a inicialização do servidor fazem, para
-  que a primeira inicialização após a migração não mexa nelas em vez de recriar cada
-  uma. Uma migração foi escrita a partir das tabelas da sua época, portanto, uma política só é
-  marcada quando corresponde exatamente ao que sua regra atual produz: o migrate a recria
-  a partir de sua regra sob outro nome, em uma transação revertida (rollback), e
-  compara o que o Postgres armazenou, assim como o `db push --dry-run` faz. Uma política que
-  diverge não recebe a marca, e a próxima inicialização reaplica sua tabela
+- Rastreia quais migrações foram aplicadas
+- Aplica marcas (stamps) nas
+  políticas de segurança em nível de linha da mesma forma que o `db push` e a inicialização do servidor fazem, para
+  que o primeiro boot após uma migração não precise recriar cada uma
+  delas. Como uma migração foi escrita a partir das tabelas da sua época, uma política só
+  recebe a marca se corresponder exatamente ao que sua regra produz agora: o migrate a recria
+  a partir de sua regra com outro nome, em uma transação revertida (rollback), e
+  compara com o que o Postgres armazenou. Uma política
+  diferente não recebe marca, e o próximo boot reaplica a tabela correspondente
 
 O `--refuse-destructive`
 faz com que ele recuse a execução. Ele executa um dry-run das migrações pendentes primeiro. Se alguma
@@ -365,7 +295,7 @@ sem a flag para aplicá-la.
 
 #### Criando uma baseline para um banco de dados que o Rebase já inicializou
 
-Toda inicialização do Rebase assegura o schema, e o `rebase db push` o aplica diretamente. Assim, um banco de dados que já executou qualquer um dos dois já possui as tabelas e tipos que a primeira migração criaria, e o `rebase db migrate` para com o erro `pq: type "posts_status" already exists (42710)`.
+Toda inicialização do Rebase valida o schema, e o `rebase db push` o aplica diretamente. Portanto, um banco de dados que já executou qualquer um dos dois já possui as tabelas e tipos que a primeira migração criaria, e o `rebase db migrate` para com `type "posts_status" already exists (42710)`.
 
 Não há nada de errado com a migração — o banco de dados foi provisionado de outra forma. Registre o ponto em que ele já está e depois faça a migração normalmente:
 
@@ -376,7 +306,9 @@ rebase db migrate
 
 A versão é o prefixo numérico do arquivo de migração que descreve o que está no banco de dados *agora*. Essa migração e tudo o que veio antes dela são registrados como aplicados; tudo o que vier depois é executado. Em um banco de dados contra o qual nada jamais foi inicializado, nenhuma baseline é necessária — migre diretamente.
 
-O mesmo acontece posteriormente no fluxo de trabalho comum: edite uma tabela enquanto o `rebase dev` está em execução, e o boot adicionará a coluna antes que o `rebase db generate` grave a migração correspondente, de modo que `rebase db migrate` para com `column … already exists (42701)`. Defina a baseline dessa migração da mesma maneira. `--baseline` funciona em um banco de dados que já registra migrações: ele marca tudo até essa versão como aplicado usando `atlas migrate set` e informa isso, ou diz que não há nada a registrar caso o histórico já a alcance. Uma versão que nenhum arquivo em `drizzle/migrations` possui é recusada antes que qualquer comando seja executado, informando quais versões existem.
+Para uma migração posterior, use o baseline somente depois de aplicar e verificar
+todas as mudanças pendentes até a versão, inclusive exclusões e atualizações de
+dados. Uma coluna existente comprova apenas uma mudança.
 
 ### `rebase db branch`
 
@@ -519,11 +451,11 @@ não tipados, data slots, test doubles) e **"Left unchanged — check each"**
 A verificação de SQL comprova que a conversão foi fiel, mas não que uma regra continua significando o que
 significava antes. A última seção da saída, **"Review before deploying: these rules
 change meaning"**, lista cada regra cuja política agora concede algo diferente
-— um simples `access: "authenticated"` não concedia nada e agora admite qualquer chamador autenticado
-([os quatro formatos](/docs/upgrading/0-30-to-0-31/#review-before-deploying-these-rules-change-meaning)).
-Em seguida, verifique contra seu banco de dados: `rebase db push --dry-run` deve imprimir "No
-changes: the database already matches these tables." e
-`rebase doctor --policies` não deve apontar divergências.
+— um simples `access: "authenticated"` não concedia nada e agora permite qualquer chamador
+autenticado ([os quatro formatos](/docs/upgrading/0-30-to-0-31/#review-before-deploying-these-rules-change-meaning)).
+Em seguida, verifique contra seu banco de dados: `rebase db push --dry-run` deve exibir "No
+changes: the database already matches the declared schema.", e
+`rebase doctor --policies` nenhuma divergência (no drift).
 
 ## Fluxo de Trabalho de Desenvolvimento
 
@@ -552,7 +484,7 @@ rebase db generate
 
 # 4. Review the generated SQL in backend/drizzle/migrations/
 # 5. Commit the migration to version control
-git add backend/drizzle/migrations/
+git add backend/drizzle/migrations/ backend/drizzle/ptah-managed.json
 
 # 6. Apply in production
 #    A database Rebase has already booted needs a baseline the first time —
@@ -565,13 +497,12 @@ rebase db migrate
 | Sintoma | Solução |
 |---------|---------|
 | `Could not detect an active database plugin` | Instale `@rebasepro/server-postgres` em `backend/package.json` |
-| Schema file not updating | Verifique se o caminho de `--schema-dir` (ou a chave `tables` em `rebase.json`) aponta para o diretório correto |
-| Migration shows unexpected changes | Execute `rebase doctor` para identificar divergências (drift) |
-| `db push` fails on production | Use `db generate` + `db migrate` em vez disso |
-| A migration must not drop data in CI or production | `rebase db migrate --refuse-destructive` encerra com código 1 e não aplica nada se uma instrução pendente destruir dados |
-| `db migrate` fails with `already exists (42710)` | A inicialização ou o `db push` já provisionaram o schema — registre-o com `rebase db migrate --baseline <version>` |
-| `db migrate` fails with `column … already exists (42701)` | O `rebase dev` adicionou a coluna na inicialização — crie a baseline dessa migração da mesma forma |
-| `db push` on the managed database fails with `Error: EOF` | O Atlas perdeu uma conexão mantida pelo `rebase dev` em execução. Execute novamente; se continuar falhando, pare o `rebase dev` primeiro |
+| Arquivo de schema não atualiza | Verifique se o caminho `--schema-dir` (ou a chave `tables` em `rebase.json`) aponta para o diretório correto |
+| Migração mostra alterações inesperadas | Execute `rebase doctor` para identificar divergências |
+| `db push` falha em produção | Use `db generate` + `db migrate` em vez disso |
+| Uma migração não pode remover dados no CI ou produção | `rebase db migrate --refuse-destructive` sai com código 1 e não aplica nada quando uma instrução pendente destrói dados |
+| `db migrate` falha com `already exists (42710)` | Verifique todas as mudanças até essa versão, inclusive exclusões e atualizações de dados, antes de definir um baseline. |
+| `db migrate` falha com `column … already exists (42701)` | Verifique todas as mudanças até essa versão, inclusive exclusões e atualizações de dados, antes de definir um baseline. |
 
 ## Próximos Passos
 

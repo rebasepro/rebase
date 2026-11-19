@@ -1,5 +1,5 @@
 ---
-sourceHash: 65f05732c36bd742
+sourceHash: 74016480ba989bec
 title: Schema as Code
 sidebar_label: Schema as Code
 description: Como o Rebase usa as tabelas TypeScript em backend/schema como a única fonte da verdade para o esquema do seu banco de dados, API, SDK e painel administrativo.
@@ -40,11 +40,10 @@ Essa abordagem de "UI como Gerador de Código" significa que as edições visuai
 
 ## Pipeline de Geração de Esquema
 
-Suas tabelas são lidas uma vez e emitidas em dois formatos — como um esquema Drizzle através do qual
-o servidor em execução faz consultas, e como SQL que descreve o banco de dados que você pretendia
-ter. É com esse SQL que o banco de dados é alinhado, por meio do
-[Atlas](https://atlasgo.io), que calcula o diff entre o esquema desejado e o esquema ativo
-e planeja a alteração:
+As tabelas são lidas uma vez e emitidas em dois formatos: um schema Drizzle para o
+servidor e SQL que descreve o banco de dados desejado. O Ptah Compat planeja alterações
+a partir desse SQL. `db push` o compara com o banco ativo, enquanto `db generate` o
+compara com o histórico de migrations:
 
 ```
                       Tables (backend/schema)
@@ -56,15 +55,16 @@ e planeja a alteração:
             ▼                               .rebase/sql/, which is not committed)
   backend/src/schema.generated.ts                       │
   the Drizzle schema the runtime                        ▼
-  reads and writes rows through             schema.sql              ← Atlas's desired state
-                                            policies.sql            ← RLS, applied separately
-                                            search.sql, vector.sql, ← Atlas cannot manage these
-                                            triggers.sql
+  reads and writes rows through             schema.sql              ← full desired state
+                                            ptah-managed.json       ← owned objects
+                                            policies.sql, search.sql,
+                                            vector.sql, triggers.sql,
+                                            views.sql               ← boot and recovery
                                                         │
                                           ┌─────────────┴─────────────┐
                                           ▼                           ▼
                                    rebase db push              rebase db generate
-                                   Atlas plans the diff        Atlas writes the diff
+                                   Ptah plans the diff         Ptah writes the diff
                                    and applies it now          to drizzle/migrations/
                                           │                           │
                                           │                           ▼
@@ -143,7 +143,7 @@ carrega o `.default(true)` definido por você como um valor padrão de **coluna*
 literal compila para um `DEFAULT` real, de modo que uma linha inserida pela API REST, por um script de seed
 ou pelo `psql` também o recebe, não apenas as inseridas pelo painel administrativo.
 
-E este SQL, que é o que é entregue ao Atlas como o estado desejado:
+Um trecho do SQL que o Ptah recebe como estado desejado:
 
 <!-- schema-sample: sql -->
 ```sql
@@ -160,19 +160,34 @@ CREATE TABLE "public"."products" (
 );
 ```
 
-Políticas, colunas de busca, índices vetoriais e triggers de `updated_at` são gravados em
-arquivos próprios e aplicados pela CLI por conta própria — o Atlas não gerencia
-nenhum desses quatro.
+O arquivo completo do estado desejado também contém políticas, funções, índices de busca
+e vetoriais, triggers `updated_at` e views declarados. Os arquivos SQL separados
+permanecem para inicialização e recuperação. `db push` e `db generate` planejam esses
+objetos juntos.
 
 ## Segurança e Objetos de Banco de Dados Não Mapeados
 
-Quando o Rebase atualiza o esquema do banco de dados, ele mapeia as tabelas declaradas para tabelas no banco de dados. Para garantir que **objetos de banco de dados não mapeados (ex.: tabelas, views, enums) nunca sejam excluídos ou modificados**, o Rebase implementa várias camadas de segurança:
+O Rebase limita o plano do Ptah aos objetos declarados. Seus nomes ficam em
+`drizzle/ptah-managed.json`, inclusive após a remoção de uma declaração. Por isso,
+remover uma declaração pode produzir um `DROP`. Tabelas, views, funções e extensões
+externas ficam fora do plano.
 
-1. **Exclusão de Tabelas Não Mapeadas**: Antes de cada push, a CLI lista todas as tabelas e views do banco de dados e passa para o Atlas um `--exclude` para cada uma que não seja mapeada por nenhuma tabela declarada (ou tabela de junção de uma tabela declarada), garantindo que o Atlas nunca planeje alterações para elas. Se o banco de dados não puder ser lido, o push é abortado em vez de ser executado com uma lista parcial.
-2. **Esquemas de Propriedade do Rebase**: O esquema `rebase` (tabelas de autenticação, funções auxiliares de RLS, tabela de revisões do Atlas) e qualquer esquema `auth` são excluídos por completo, de modo que um push nunca planeje um `DROP SCHEMA … CASCADE`.
-3. **Objetos que o Atlas Não Modela**: Colunas de busca, índices vetoriais e triggers também são excluídos do Atlas e aplicados a partir de seus próprios arquivos gerados.
-4. **Barreira para Alterações Destrutivas**: O comando `rebase db push` executa primeiro um dry-run do plano. Qualquer instrução que destrua dados — uma coluna ou tabela excluída, uma alteração de tipo com perda de dados — interrompe o push: em um terminal, ele solicita que você digite `yes`, e sem um terminal (CI, scripts, agentes), ele recusa a execução a menos que você passe `--allow-destructive`.
-5. **Propriedade de Índices por Nome**: Os índices são o único objeto que reside *em* uma tabela mapeada, portanto a filtragem de tabelas não pode protegê-los — e antigamente um push planejava `DROP INDEX` para qualquer índice ausente no estado desejado, o que incluía todos os índices criados manualmente. Agora, o Rebase nomeia os índices gerados como `<table>_<columns>_ix_<7 hex>` (`_ux_` quando único), um formato que nenhum outro gerador de nomes utiliza, e exclui todo o restante do diff por nome. Um índice escrito manualmente ou importado via introspecção nunca é tocado; uma declaração que você remover ainda será excluída, o que é o comportamento esperado. Veja **[Índices](/docs/backend/indexes)**.
+Inclua `backend/drizzle/ptah-managed.json` no Git junto com as migrações. O Rebase
+usa os nomes gravados para planejar a remoção de declarações retiradas.
+
+O provisionamento de autenticação e as revisões de migrations são excluídos. As funções
+auxiliares que o Rebase declara no schema `rebase` são incluídas. Nas tabelas
+selecionadas, a CLI também protege por nome políticas, triggers, índices e restrições
+CHECK e EXCLUDE personalizados.
+
+O Rebase lê as restrições CHECK e EXCLUDE no catálogo do banco ativo. Para
+políticas, gatilhos e índices, também lê os arquivos de migração. Uma falha de
+leitura do catálogo interrompe o planejamento.
+
+Antes de aplicar uma alteração, `db push` mostra o plano e verifica instruções
+destrutivas, incluindo `DROP EXTENSION`. Use `--dry-run` para inspecionar o plano sem
+aplicá-lo. Veja [Índices](/docs/backend/indexes) para saber como o Rebase distingue
+índices declarados dos personalizados.
 
 ## Próximos Passos
 

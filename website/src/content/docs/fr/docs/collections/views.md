@@ -1,5 +1,5 @@
 ---
-sourceHash: d3c645c7930945a3
+sourceHash: 12d04c868d80e974
 title: Vues
 sidebar_label: Vues
 description: "Servez une vue SQL ou une vue matérialisée en lecture seule avec defineView : des vues security_invoker régies par les tables qu'elles lisent, des vues matérialisées filtrées par rôles, rafraîchies à la demande, créées par db push."
@@ -24,7 +24,9 @@ export const artistStats = defineView("artist_stats", {
 
 Exportez-la depuis `backend/schema/index.ts` comme une table. Elle se lit comme n'importe quelle table — `find`, `findById`, `count`, [`aggregate`](/docs/sdk/aggregates-and-search/), `listen`, les routes REST, MCP et le CMS — et elle n'est jamais modifiée : chaque écriture renvoie une erreur `405 TABLE_READ_ONLY`. Écrivez dans les tables que la vue lit.
 
-`rebase db push` crée la vue après les tables, `rebase db generate` l'ajoute à la migration, et un démarrage géré (managed boot) la crée lors de son étape de schéma. Une vue dont la requête n'a pas changé est laissée intacte ; celle dont la requête a changé est supprimée puis recréée, en même temps que toutes vos vues qui la lisent. Rebase refuse de remplacer une table, ou une vue qu'il n'a pas créée, portant déjà ce nom.
+Ptah Compat planifie la vue déclarée et ses dépendances avec `rebase db push` et
+`rebase db generate`. Le démarrage géré peut aussi créer des vues. Examinez les
+changements avec `rebase db push --dry-run`.
 
 ## Options
 

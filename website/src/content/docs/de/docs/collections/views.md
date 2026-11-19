@@ -1,5 +1,5 @@
 ---
-sourceHash: d3c645c7930945a3
+sourceHash: 12d04c868d80e974
 title: Views
 sidebar_label: Views
 description: "Einen SQL-View oder einen Materialized View mit defineView schreibgeschützt bereitstellen: security_invoker-Views, gesteuert durch die gelesenen Tabellen, Materialized Views rollenabhängig beschränkt, bei Bedarf aktualisiert, erstellt via db push."
@@ -24,7 +24,9 @@ export const artistStats = defineView("artist_stats", {
 
 Exportieren Sie ihn wie eine Tabelle aus `backend/schema/index.ts`. Er lässt sich wie jede Tabelle lesen – `find`, `findById`, `count`, [`aggregate`](/docs/sdk/aggregates-and-search/), `listen`, die REST-Routen, MCP und das CMS – und wird niemals beschrieben: Jeder Schreibvorgang führt zu einem `405 TABLE_READ_ONLY`. Schreiben Sie in die Tabellen, die der View liest.
 
-`rebase db push` erstellt den View nach den Tabellen, `rebase db generate` hängt ihn an die Migration an, und ein verwalteter Start erstellt ihn in seinem Schema-Schritt. Ein View, dessen Abfrage sich nicht geändert hat, bleibt unberührt; einer, dessen Abfrage geändert wurde, wird gelöscht und neu erstellt, zusammen mit allen Ihren Views, die ihn lesen. Rebase weigert sich, eine Tabelle oder einen nicht von Rebase erstellten View zu ersetzen, der bereits diesen Namen trägt.
+Ptah Compat plant die deklarierte View und ihre Abhängigkeiten mit `rebase db push`
+und `rebase db generate`. Beim verwalteten Start können Views ebenfalls erstellt
+werden. Prüfen Sie Änderungen mit `rebase db push --dry-run`.
 
 ## Optionen
 

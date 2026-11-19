@@ -1,5 +1,5 @@
 ---
-sourceHash: f9ad18cf03580c13
+sourceHash: cc7b9aa6ef9d67c5
 title: Branching de base de données
 sidebar_label: Branching
 description: Créez des branches de base de données isolées pour le développement, le staging et les tests à l'aide de CREATE DATABASE ... TEMPLATE de PostgreSQL — des copies instantanées et fidèles à 100 % sans interruption de service.
@@ -417,7 +417,7 @@ plan et demandant confirmation avant de supprimer quoi que ce soit, sauf si vous
 Prune détecte également les deux cas de désynchronisation des branches par rapport à leurs métadonnées — une entrée dont
 la base de données a été supprimée avec du SQL brut (que `list` continuerait de signaler indéfiniment),
 et une base de données de branche dont l'entrée n'a jamais été enregistrée (un crash entre les deux
-instructions exécutées par `create`). Les bases de travail temporaires `<db>_dev_diff` d'Atlas sont signalées
+instructions exécutées par `create`). Les bases de travail temporaires `<db>_dev_diff` sont signalées
 en parallèle, mais supprimées uniquement avec `--include-dev-diff` : ce ne sont pas des branches, et
 l'une d'elles peut être liée à un `db push` en cours d'exécution.
 

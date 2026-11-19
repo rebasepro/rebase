@@ -39,9 +39,9 @@ Spawn the Rebase CLI in the active project directory.
 
 ## Schema planning (1)
 
-Asks the backend what a change would do, over `POST /api/admin/schema/plan`. No
-CLI, and nothing written to disk — it works on the managed development database,
-which the Atlas-backed commands cannot.
+Asks the backend what a change would do over `POST /api/admin/schema/plan`.
+It needs no CLI process and writes nothing to disk. It also works on the
+managed development database.
 
 | Tool | Required | Description |
 |---|---|---|

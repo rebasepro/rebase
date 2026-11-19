@@ -37,7 +37,12 @@ project that still has `config/collections`.
 
 ### 2. Drizzle Schema → Migrations
 
-From the generated Drizzle schema, `db generate` diffs against the migrations already in `backend/drizzle/migrations/`, replayed on a scratch database, and produces timestamped SQL migration files. It never reads your database: a column boot or `db push` already added still comes out as `ADD COLUMN`.
+`db generate` renders the declared tables, policies, functions, indexes,
+triggers and views into Ptah's desired SQL. Ptah compares that SQL with the
+migrations in `backend/drizzle/migrations/`, replayed on a scratch database,
+and writes a timestamped migration. Rebase also reads the target database to
+protect objects it does not own. A column already added by boot or `db push`
+still appears in the migration because the diff starts from migration history.
 
 ### 3. Migrations → PostgreSQL
 
@@ -174,160 +179,84 @@ Leaving Supabase? See [Migrating from Supabase](/docs/recipes/migrate-from-supab
 
 ### `rebase db push`
 
-Push schema changes directly to the database without migration files:
+Apply the declared schema directly to the database:
 
 ```bash
 rebase db push
+rebase db push --dry-run
 ```
 
-**What it does:**
-- Reads the generated Drizzle schema
-- Applies changes directly to the database (CREATE, ALTER, DROP)
-- Dry-runs the plan first and stops before anything that destroys data: a
-  dropped table, column, schema, view or type, a `TRUNCATE`, or a column type
-  change that can lose values (`timestamptz` → `date`, `numeric` → `integer`),
-  or a primary key change — `(id)` → `(id, locale)` gives every row a new id, so
-  links, foreign keys and ids stored elsewhere stop finding their row.
-  It also stops
-  before the drop of a CHECK or EXCLUDE constraint the database holds: no row
-  is lost, but from then on the database accepts the rows it refused.
-  It asks on a terminal, where Ctrl-C or Ctrl-D answers no, and refuses
-  otherwise; `--allow-destructive` applies it anyway. `--yes` still does too in
-  this release, with a deprecation warning; from the next release it approves
-  only pushes that destroy nothing. A push that
-  stops there drops its scratch `<db>_dev_diff` database on the way out
-- Switches row-level security on for every declared table, junctions included, right after the
-  schema change and before any step that can fail, so a push that stops part-way leaves a new table
-  denying every request rather than open to it
-- Applies the RLS policies your tables' `rls` compiles to, and **removes policies an earlier push superseded**
-- Leaves every
-  CHECK and EXCLUDE constraint on a declared table as it is. A table
-  cannot declare either, so they are the database's own rules, written by hand
-  or carried by a database `schema introspect` adopted; to remove one, drop it
-  by hand (`ALTER TABLE … DROP CONSTRAINT …`). Triggers and functions you wrote
-  are not touched either
-- Matches the
-  name of everything it leaves alone exactly, a `.`, `[`, `]` or `*` in it
-  included
-- Builds any
-  [foreign-key index Rebase derives](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
-  that an existing table is missing **before** planning, with
-  `CREATE INDEX CONCURRENTLY`, so writes to the table go on during the build;
-  Atlas then finds it in place. `--dry-run` names these and builds nothing
-- Stamps the
-  policies it applies the way the server's boot does, so the first boot after a
-  push leaves them alone instead of re-creating every one
-- `--dry-run`
-  lists the row-level security the push would change, under "Planned
-  row-level security changes": the tables it switches RLS on for, and each
-  policy it creates, replaces or drops, worked out the way the push's own
-  steps decide. It says "No changes" only when neither the schema nor
-  row-level security would change. Where a policy's stamp does not match its
-  rule, or it has none (one `db migrate` created, one written by hand), the dry
-  run makes it again from its rule under another name, in a transaction it
-  rolls back, and compares what Postgres stored: one that comes out the same is
-  no change. So a rule `schema introspect` read back as SQL plans nothing, and
-  neither do policies `db migrate` applied. Only one it could not compare (its
-  table's lock not granted within two seconds, say) is listed apart. The push
-  itself prints one line counting the changes
-- Shows each
-  statement Atlas applies once. Atlas connects without SSL to a database on this
-  machine (`localhost`, `127.x`, `::1`) whose URL names no `sslmode`, as the app
-  does, instead of failing on `SSL is not enabled on the server`; a URL that
-  names `sslmode`, or another host, is handed over as written. An Atlas run
-  that fails before it plans leaves no `<db>_dev_diff` database behind
-- `--dry-run`
-  writes nothing of the project's: `src/schema.generated.ts` is left as it is,
-  and the `drizzle/*.sql` copies an older release committed are named, not
-  deleted. Only the plan's input goes to `.rebase/sql/`, which is not committed
-- Does **not** create migration files
+Rebase renders the declared tables, policies, functions, search and vector
+indexes, triggers, and views into one desired SQL file. Ptah Compat plans and
+applies those objects together. The plan is limited to Rebase's declarations.
+Unrelated tables, views, extensions, and functions stay outside it. Custom
+policies, triggers, indexes, CHECK constraints, and EXCLUDE constraints on a
+declared table are protected too.
 
-**How long it takes.** Almost all of a push is Atlas computing the plan: it
-builds your desired schema in a scratch database and diffs it against the real
-one, and that cost grows faster than the number of tables — on a quiet laptop
-about 0.25 s per plan at 11 tables, 0.9 s at 111 and 5.5 s at 411. A push that
-changes nothing plans once; one that changes something plans twice (the dry-run
-the destructive-change gate reads, then the apply). So a push on a schema of
-400 or more tables takes tens of seconds, and longer on a busy or slow machine.
-That time is Atlas's, not your database's: the steps around it — generating the
-SQL, the RLS lock, search, triggers, policies, the role — take a few seconds at
-that size, over one connection to your database.
+The command shows the plan before applying it. A destructive change, including
+`DROP EXTENSION`, requires confirmation or `--allow-destructive`. `--dry-run`
+shows the plan without changing the database or writing a migration. After
+Ptah applies the plan, Rebase enables row-level security, provisions its auth
+tables and request roles, and records the schema version. Missing derived
+foreign-key indexes are built concurrently before the apply.
 
-**The files it generates on the way**, all under `.rebase/sql/` in the backend
-directory. `db push` and `db generate` write all five from your tables on
-every run, before reading any of them, so a committed copy would be read by
-nothing. The directory carries its own `.gitignore` and is never committed.
+Ptah may replay SQL for `db push`, including `--dry-run`, and `db generate` on
+external PostgreSQL, including local Docker Compose. On a shared dev server,
+set `PTAH_TRUST_REPLAY_SQL=1` only if you trust that SQL to run with the dev
+connection's privileges. For a disposable dev server, set
+`PTAH_DEV_SERVER_DISPOSABLE=1`. Rebase sets it for managed PGlite.
+See [configuration](/docs/getting-started/configuration/).
 
-| File | Holds |
-|------|-------|
-| `schema.sql` | Tables, columns, constraints and indexes — Atlas's desired state, and the only one it diffs |
-| `policies.sql` | The RLS policies your tables' `rls` compiles to |
-| `search.sql` | The full-text search functions and generated columns, for tables with a `search` block |
-| `vector.sql` | pgvector extensions and ANN indexes |
-| `triggers.sql` | `rebase.set_updated_at()` and the `BEFORE UPDATE` triggers behind `.onUpdateNow()` |
+Both `db push` and `db generate` refresh `.rebase/sql/` from the current
+schema. The directory is ignored by Git.
 
-Atlas manages the first and nothing else, so `db push` and the boot-time schema
-ensure apply the other four themselves. A **migration-only** deployment — one
-that runs `db migrate` and never `db push` — has to fold those four into a
-migration by hand; `db generate` says so when a change is invisible to Atlas.
+| File | Purpose |
+|------|---------|
+| `schema.sql` | Ptah's desired state for declared application objects |
+| `search.sql` | Search SQL used to restore generated columns after a failed apply |
+| `policies.sql`, `vector.sql`, `triggers.sql`, `views.sql` | Separate excerpts of the generated DDL |
 
-A project that committed these files to `drizzle/` under an earlier release has
-those copies deleted on its first run, and the command names each one so you can
-commit the deletion. It deletes only files that open with the generator's
-header. A file you wrote yourself stays, and so does `drizzle/migrations/`.
+Ptah plans the declared objects through `schema.sql`. The CLI removes old
+generated SQL copies from `drizzle/` and keeps `drizzle/migrations/` intact.
 
-:::note[Editing a security rule renames its policy]
-A rule without an explicit `name` compiles to `<table>_<op>_<hash>`, where the hash covers the rule's semantics — so *editing* a rule (rather than adding one) produces a policy under a new name and leaves the old one behind.
+Commit `backend/drizzle/ptah-managed.json` with the migrations. Rebase uses
+the saved object names to plan the removal of declarations that are gone in
+the current checkout.
 
-That used to matter a great deal: Postgres ORs `PERMISSIVE` policies together, so a superseded `USING (rebase.uid() IS NOT NULL)` kept granting everything no matter how tight its replacement was. Tightening a rule had no effect, and push reported success.
-
-`db push` now reconciles this: it drops generated policies that no longer match any rule, and reports — without dropping — any custom-named policy your tables don't describe, since those are indistinguishable from SQL someone wrote deliberately.
-
-To audit a database that was pushed before this landed, run `rebase doctor --policies`. It works as a CI gate: it exits non-zero on drift, and also when it could not run the check at all — no `DATABASE_URL`, a `--schema-dir` path that does not resolve, a `pg_policies` read the CI role is not granted. A gate that could not look has not passed.
-
-`doctor` and `db push` tell the two kinds of orphan apart. A policy with a generated name was superseded, and the next push drops it. Any other name was written by hand or by another tool and is still in force: describe it in its table's `rls` to keep it (Studio's RLS view imports it), or drop it by hand if it is stale.
-:::
+A policy whose name Rebase generated is removed when its rule is superseded.
+A custom-named policy stays in force. Use `rebase doctor --policies` to audit
+policy drift. If a custom policy should belong to Rebase, declare it in the
+table's `rls`.
 
 :::caution
-`db push` modifies the database directly. Use it only in development. For production, use `db generate` + `db migrate` to create reviewable migration files.
+`db push` modifies the database directly. Use it in development. For
+production, create a reviewable migration with `db generate` and apply it with
+`db migrate`.
 :::
 
 ### `rebase db generate`
 
-Generate SQL migration files from schema changes:
+Create a timestamped SQL migration from the declared schema:
 
 ```bash
 rebase db generate
 ```
 
-**What it does:**
-- Compares the Drizzle schema against the state the migrations in `drizzle/migrations/` build, not against your database
-- Produces timestamped SQL migration files in `backend/drizzle/migrations/`
-- Files can be reviewed, edited, and committed to version control
-- Names every
-  statement in the new migration that destroys data, using the check `db push`
-  runs before it applies: a dropped table, column, schema, view or type, a
-  `TRUNCATE`, a column type change that can lose values, a primary key
-  change, or the drop of a CHECK or EXCLUDE constraint the database holds. It
-  still writes the file and exits 0, so it warns and does not refuse.
-- Ends on what to
-  do next: `rebase db migrate`, and for a project's first migration, the
-  `--baseline <version>` a database boot has already set up needs instead. A
-  later migration gets no baseline line, since a destructive one baselined would
-  skip its `DROP`, and a run that writes no migration says only that.
+Ptah compares the desired SQL with the state built by replaying
+`backend/drizzle/migrations/`. The diff starts from that history, not from the
+live database. Rebase still reads the live database to identify objects it
+does not own. A column already added by boot or `db push` therefore still
+appears in the generated migration.
 
-**A CHECK a migration of yours added is dropped by the next one.** `db generate`
-diffs your migration files, not the database, and Atlas has no way to leave an
-object out of that diff. So a CHECK or EXCLUDE constraint that you wrote into a
-migration by hand, and that no table can declare, comes back as
-`ALTER TABLE … DROP CONSTRAINT …` in the next migration it writes, folded into
-the same statement as the real change. The report above names that drop when
-the database already holds the constraint; it does not take it out of the
-file. Delete the clause before `rebase db migrate`, or let
-`rebase db migrate --refuse-destructive` stop on it. `db push` reads the
-database and keeps the constraint.
+The command writes the migration to `backend/drizzle/migrations/`, warns about
+destructive statements, and names the next `db migrate` command. For the first migration, it prints a
+`--baseline <version>` example for an already provisioned database. Verify
+that the database matches that version before using it. A run with no diff writes no migration.
 
-The generated migrations are plain SQL files — you can inspect and modify them before applying.
+Review each generated file before applying it. In particular, compare any
+`DROP CONSTRAINT` with hand-written CHECK and EXCLUDE constraints in the
+migration history. The protection list comes from the live database, so a
+constraint that exists only in replayed history can appear as a drop.
 
 ### `rebase db migrate`
 
@@ -347,7 +276,7 @@ rebase db migrate
   one. A migration was written from the tables of its day, so a policy is
   stamped only when it is exactly what its rule makes now: migrate makes it
   again from its rule under another name, in a transaction it rolls back, and
-  compares what Postgres stored, as `db push --dry-run` does. A policy that
+  compares what Postgres stored. A policy that
   differs gets no stamp, and the next boot re-applies its table
 
 `--refuse-destructive`
@@ -367,7 +296,7 @@ without the flag to apply it.
 
 #### Baselining a database Rebase has already booted
 
-Every Rebase boot ensures the schema, and `rebase db push` applies it directly. So a database that has ever run either one already has the tables and types the first migration would create, and `rebase db migrate` stops on `pq: type "posts_status" already exists (42710)`.
+Every Rebase boot ensures the schema, and `rebase db push` applies it directly. So a database that has ever run either one already has the tables and types the first migration would create, and `rebase db migrate` can report that the database already contains objects from the migration.
 
 Nothing is wrong with the migration — the database was provisioned another way. Record where it already is, then migrate normally:
 
@@ -378,7 +307,12 @@ rebase db migrate
 
 The version is the numeric prefix of the migration file that describes what is in the database *now*. That migration and everything before it are recorded as applied; everything after it runs. On a database nothing has ever booted against, no baseline is needed — migrate straight away.
 
-The same happens later in the ordinary loop: edit a table while `rebase dev` runs, and boot adds the column before `rebase db generate` writes the migration that adds it, so `rebase db migrate` stops on `column … already exists (42701)`. Baseline that migration the same way. `--baseline` works on a database that already records migrations: it marks everything up to the version as applied with `atlas migrate set`, and says so, or says there is nothing to record when the history already reaches it. A version no file in `drizzle/migrations` has is refused before anything runs, naming the versions there are.
+For a later migration, baseline only after every pending change through that
+version has been applied and verified, including drops and data updates. An
+existing column proves only that one change is present. Baselining records
+the entire migration as applied and skips every statement it contains.
+On a database with revision history, Rebase records the baseline with
+`ptah-compat migrate set`.
 
 ### `rebase db branch`
 
@@ -524,7 +458,7 @@ change meaning"**, lists every rule whose policy now grants something different
 — a bare `access: "authenticated"` granted nothing and admits every signed-in
 caller now ([the four shapes](/docs/upgrading/0-30-to-0-31/#review-before-deploying-these-rules-change-meaning)).
 Then check against your database: `rebase db push --dry-run` should print "No
-changes: the database already matches these tables.", and
+changes: the database already matches the declared schema.", and
 `rebase doctor --policies` no drift.
 
 ## Development Workflow
@@ -553,8 +487,8 @@ rebase schema generate
 rebase db generate
 
 # 4. Review the generated SQL in backend/drizzle/migrations/
-# 5. Commit the migration to version control
-git add backend/drizzle/migrations/
+# 5. Commit the migration and the record of managed objects
+git add backend/drizzle/migrations/ backend/drizzle/ptah-managed.json
 
 # 6. Apply in production
 #    A database Rebase has already booted needs a baseline the first time —
@@ -571,9 +505,8 @@ rebase db migrate
 | Migration shows unexpected changes | Run `rebase doctor` to identify drift |
 | `db push` fails on production | Use `db generate` + `db migrate` instead |
 | A migration must not drop data in CI or production | `rebase db migrate --refuse-destructive` exits 1 and applies nothing when a pending statement destroys data |
-| `db migrate` fails with `already exists (42710)` | Boot or `db push` already provisioned the schema — record it with `rebase db migrate --baseline <version>` |
-| `db migrate` fails with `column … already exists (42701)` | `rebase dev` added the column at boot — baseline that migration the same way |
-| `db push` on the managed database fails with `Error: EOF` | Atlas lost a connection the running `rebase dev` holds. Run it again; if it keeps failing, stop `rebase dev` first |
+| `db migrate` fails with `already exists (42710)` | Verify all changes through that version before running `rebase db migrate --baseline <version>` |
+| `db migrate` fails with `column … already exists (42701)` | Compare the rest of the migration with the database, including drops and data updates, before recording a baseline |
 
 ## Next Steps
 

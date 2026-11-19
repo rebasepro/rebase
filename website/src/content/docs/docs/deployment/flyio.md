@@ -25,6 +25,8 @@ fly launch --no-deploy
 `--no-deploy` because the secrets and the bundle have to be in place first.
 
 If your tables declare a `col.vector()` column, enable the extension once against that database: `CREATE EXTENSION vector;`.
+Declare `database({ extensions: ["vector"] })` in `backend/resources.ts`
+so Ptah can plan the column, even if the extension is already installed.
 
 ## 2. Build the bundle and point fly.toml at the runtime image
 

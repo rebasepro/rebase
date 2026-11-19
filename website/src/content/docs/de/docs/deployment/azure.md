@@ -1,5 +1,5 @@
 ---
-sourceHash: 9b95a797b2d9f086
+sourceHash: e0918e89fb72aab0
 title: Rebase auf Microsoft Azure bereitstellen
 description: Stellen Sie Ihre Rebase-Instanz sicher auf Azure mithilfe von Azure Database for PostgreSQL und Azure Container Apps bereit.
 sidebar_label: Azure
@@ -23,6 +23,9 @@ Nichts auf dieser Seite bezüglich Ihres Projekts ist Azure-spezifisch. Ein Reba
    `postgresql://your_admin:YOUR_PASSWORD@your-server-name.postgres.database.azure.com:5432/postgres`
 
 Wenn Ihre Tabellen eine `col.vector()`-Spalte deklarieren, aktivieren Sie die Extension einmalig: Azure schützt dies hinter dem Serverparameter `azure.extensions`, gefolgt von `CREATE EXTENSION vector;`.
+Deklarieren Sie `database({ extensions: ["vector"] })` in `backend/resources.ts`,
+damit Ptah Vektorspalten planen kann. Das gilt auch, wenn die Erweiterung im Ziel
+bereits vorhanden ist.
 
 ## 2. Das Bundle bauen und in ein Image einbinden
 

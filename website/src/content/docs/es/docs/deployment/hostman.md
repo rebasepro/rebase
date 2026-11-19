@@ -1,5 +1,5 @@
 ---
-sourceHash: 8eaa572a1e8a1c54
+sourceHash: bf26f869d74e543f
 title: Desplegar Rebase en Hostman
 description: Despliega un proyecto rebase init en Hostman — App Platform con PostgreSQL administrado y almacenamiento S3, o un servidor en la nube con el propio archivo Compose de tu proyecto.
 sidebar_label: Hostman
@@ -68,11 +68,10 @@ FROM rebasepro/server:0.34.1
 COPY --from=build --chown=node:node /app/dist-bundle /bundle
 ```
 
-Aquí importan tres detalles:
+Aquí importan dos detalles:
 
-- **`node:22`, no `node:22-slim`.** Al instalar la CLI se descarga el motor de esquemas Atlas, que necesita `curl` y certificados de CA. La imagen slim no tiene ninguno de los dos y la instalación falla.
-- **`--chown=node:node`.** El runtime se ejecuta como `node` y vincula sus propios paquetes en el bundle al iniciar. Un bundle propiedad de root sigue funcionando, pero registra una advertencia por cada paquete que no pudo vincular.
-- **Sin código fuente en la imagen final.** Contiene el runtime y tu bundle compilado. Actualizar Rebase más adelante es simplemente cambiar la segunda línea `FROM`.
+- **`--chown=node:node`.** El runtime se ejecuta como `node` y vincula sus propios paquetes en el bundle al iniciar. Un bundle cuyo propietario sea root seguirá funcionando, pero registrará una advertencia (warning) por cada paquete que no pudo vincular.
+- **Sin código fuente en la imagen final.** Contiene el runtime y tu bundle compilado. Actualizar Rebase más adelante consiste únicamente en cambiar la segunda línea `FROM`.
 
 La imagen del runtime escucha en el puerto 8080 y lo declara con `EXPOSE`, que es el puerto al que enruta App Platform.
 

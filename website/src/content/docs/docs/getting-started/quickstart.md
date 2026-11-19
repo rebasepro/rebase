@@ -23,7 +23,7 @@ This scaffolds a project with two packages. If any of *table*, *collection*,
 
 - **Node.js** 22.22+ — every scaffold, headless included, declares `"node": ">=22.22.0"`
 - **pnpm** (recommended) or npm
-- **On Windows**, read [Windows](/docs/getting-started/windows/) first: one tool, Atlas, needs its own Windows binary
+- **Windows:** See the [Windows guide](/docs/getting-started/windows/).
 
 No database to install, and no Docker. `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. See [Variant: use your own PostgreSQL](#variant-use-your-own-postgresql) if you would rather supply one — a local install, Neon, Supabase, or the container this scaffold ships.
 
@@ -84,16 +84,21 @@ Then start the dev servers as above. A `DATABASE_URL` that is set is never
 touched, and one pointing anywhere other than this machine is left alone
 entirely.
 
-The migration commands plan changes with [Atlas](https://atlasgo.io/), the
-schema-migration engine Rebase plans with, which needs a second empty database to
-compare against. On your own database Rebase makes one beside it; on the managed
-one, which serves exactly one database, it starts a throwaway PGlite for the
-length of the command.
-Either way:
+The migration commands use Ptah Compat to plan the declared schema. Planning
+needs a second, empty database. Rebase creates one beside your PostgreSQL
+database; for the managed database it starts a throwaway PGlite. You can
+push the schema on either database:
 
 ```bash
 pnpm run db:push
 ```
+
+With external PostgreSQL, including a local Docker Compose service, Ptah may
+replay SQL during `db push`, `db push --dry-run`, and `db generate`. Set
+`PTAH_DEV_SERVER_DISPOSABLE=1` only for a dev server you can discard entirely.
+For a shared dev server, set `PTAH_TRUST_REPLAY_SQL=1` only if you trust that SQL
+to run with the dev connection's privileges. Managed PGlite is already disposable.
+See [database configuration](/docs/getting-started/configuration/).
 
 Boot already creates missing tables — and their
 [RLS](/docs/collections/security-rules/) policies, PostgreSQL's row-level

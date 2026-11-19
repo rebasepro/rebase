@@ -418,7 +418,7 @@ plan and asks before removing anything unless you pass `--yes`.
 Prune also finds the two ways branches drift from their metadata — an entry whose
 database was dropped with plain SQL (which `list` would keep reporting forever),
 and a branch database whose entry was never written (a crash between the two
-statements `create` runs). Atlas's `<db>_dev_diff` scratch databases are reported
+statements `create` runs). The `<db>_dev_diff` scratch databases are reported
 alongside but removed only with `--include-dev-diff`: they are not branches, and
 one may belong to a `db push` running right now.
 
