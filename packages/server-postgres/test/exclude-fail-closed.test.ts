@@ -49,6 +49,7 @@ describe("getTableExcludes fail-closed behaviour", () => {
         });
 
         // Always-present system excludes (framework-owned schemas).
+        expect(excludes).toContain("atlas_schema_revisions");
         expect(excludes).toContain("atlas_schema_revisions.*");
         expect(excludes).toContain("auth.*");
         expect(excludes).toContain("rebase");
@@ -66,6 +67,6 @@ describe("getTableExcludes fail-closed behaviour", () => {
             getIncludes,
             queryExistingTables: async () => []
         });
-        expect(excludes).toEqual(["atlas_schema_revisions.*", "auth", "auth.*", "rebase", "rebase.*"]);
+        expect(excludes).toEqual(["atlas_schema_revisions", "atlas_schema_revisions.*", "auth", "auth.*", "rebase", "rebase.*"]);
     });
 });

@@ -3,26 +3,9 @@
  *
  * `databaseDefault: true` declares a DEFAULT somebody else wrote: a DBA's
  * `now()`, a migration's `'X-' || gen_random_uuid()`. The planner writes no
- * DEFAULT for it, since it has no expression to write, so `schema.sql` holds
- * the column without one. Atlas reads that file as the whole desired state and
- * planned `ALTER COLUMN … DROP DEFAULT`. The API kept letting creates through
- * without the field, and the database then refused them on NOT NULL.
- *
- * Atlas has no way to leave one column's DEFAULT alone: `--exclude` names
- * objects, and a DEFAULT is not one. So the desired state is made to agree with
- * the database instead. Before Atlas plans, the live DEFAULT of each such
- * column is read and appended to `schema.sql` as `ALTER TABLE … SET DEFAULT`,
- * and Atlas finds nothing to change.
- *
- * Two kinds are left out, because Atlas already does something else with them:
- *
- * - a DEFAULT reading a sequence (`nextval(…)`). Atlas does not manage
- *   sequences and leaves those DEFAULTs alone, and the sequence does not exist
- *   in the scratch database Atlas loads `schema.sql` into.
- * - a DEFAULT calling a function or operator the database defines (an
- *   extension's `uuid_generate_v4()`, a project's own function). The scratch
- *   database has none of them, and Atlas refuses such a column whether or not
- *   it is in `schema.sql`; adding it would only change the error.
+ * DEFAULT for it, since it has no expression to write. Copy the live DEFAULT
+ * into the push input so Ptah keeps it, including defaults that reference a
+ * sequence or a function the database already holds.
  */
 import { declaredDatabaseExtensions, type CompiledTable } from "@rebasepro/types";
 import { databaseOwnsDefault } from "@rebasepro/common";
@@ -67,8 +50,7 @@ export function databaseOwnedDefaultColumns(tables: readonly CompiledTable[]): D
 }
 
 /**
- * Every column DEFAULT outside the system schemas, and whether Atlas can carry
- * it (see the module comment for the two it cannot).
+ * Every column DEFAULT outside the system schemas.
  *
  * Rendered with only `pg_catalog` on the search path, so anything outside it
  * comes back schema-qualified and reads the same in whichever database
@@ -78,19 +60,7 @@ const LIVE_DEFAULTS_SQL = `
     SELECT n.nspname AS "schema",
            c.relname AS "table",
            a.attname AS "column",
-           pg_get_expr(d.adbin, d.adrelid) AS "expression",
-           EXISTS (
-               SELECT 1
-               FROM pg_depend dep
-               WHERE dep.classid = 'pg_attrdef'::regclass
-                 AND dep.objid = d.oid
-                 AND (
-                     (dep.refclassid = 'pg_class'::regclass
-                         AND EXISTS (SELECT 1 FROM pg_class s WHERE s.oid = dep.refobjid AND s.relkind = 'S'))
-                     OR (dep.refclassid IN ('pg_proc'::regclass, 'pg_operator'::regclass)
-                         AND dep.refobjid >= 16384)
-                 )
-           ) AS "uncarried"
+           pg_get_expr(d.adbin, d.adrelid) AS "expression"
     FROM pg_attrdef d
     JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
     JOIN pg_class c ON c.oid = d.adrelid
@@ -101,14 +71,9 @@ const LIVE_DEFAULTS_SQL = `
       AND n.nspname NOT LIKE 'pg\\_%'
 `;
 
-interface LiveDefaultRow extends KeptDefault {
-    uncarried: boolean;
-}
-
 /**
- * The live DEFAULTs of `columns` that the desired state must carry so Atlas
- * plans no `DROP DEFAULT`. A column with no DEFAULT, or one Atlas cannot carry,
- * is not listed.
+ * The live DEFAULTs of `columns` that the desired state must carry so Ptah
+ * plans no `DROP DEFAULT`.
  *
  * Read in a transaction of its own, so the search path it narrows goes back
  * when it ends.
@@ -116,17 +81,16 @@ interface LiveDefaultRow extends KeptDefault {
 export async function readKeptDefaults(client: Queryable, columns: DatabaseOwnedDefaultColumn[]): Promise<KeptDefault[]> {
     if (columns.length === 0) return [];
     const wanted = new Set(columns.map(keyOf));
-    let rows: LiveDefaultRow[];
+    let rows: KeptDefault[];
     await client.query("BEGIN READ ONLY");
     try {
         await client.query("SET LOCAL search_path TO pg_catalog");
-        rows = (await client.query<LiveDefaultRow>(LIVE_DEFAULTS_SQL)).rows;
+        rows = (await client.query<KeptDefault>(LIVE_DEFAULTS_SQL)).rows;
     } finally {
         await client.query("ROLLBACK");
     }
     return rows
-        .filter(row => wanted.has(keyOf(row)) && !row.uncarried && row.expression)
-        .map(({ schema, table, column, expression }) => ({ schema, table, column, expression }))
+        .filter(row => wanted.has(keyOf(row)) && row.expression)
         .sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
 }
 

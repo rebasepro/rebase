@@ -9,6 +9,7 @@ import type { GeneratedColumnDependency } from "./schema/generated-column-confli
 import { COLUMN_TYPES_SQL, type ExistingColumnType } from "./schema/destructive-sql";
 import { UNDECLARABLE_CONSTRAINTS_SQL, undeclaredConstraintExcludes, type ExistingConstraint } from "./schema/undeclarable-constraints";
 import { atlasExcludePattern, excludePatternParts } from "./schema/atlas-exclude";
+import { historicalChildren, unmanagedChildExcludes, type ExistingChild } from "./schema/unmanaged-child-excludes";
 import { out, outWarn } from "./cli-output";
 import type { CompiledTable, TableDescriptor } from "@rebasepro/types";
 import { resolveTableJunctions } from "@rebasepro/common";
@@ -206,43 +207,6 @@ export function describeDevAddCommand(
     }
 }
 
-/**
- * The Atlas release Windows readers are sent: the floor of the scaffold's
- * `@ariga/atlas` range. The npm package's version is the Atlas version — its
- * `install.js` passes it to atlasgo.sh as `ATLAS_VERSION` — so Linux and macOS
- * get the newest 1.x the range resolves to (1.3.10 on 2026-11-16) and this is
- * the oldest release that range accepts. A pinned URL keeps the advice
- * reproducible; `tooling/scripts/check-templates.mjs` holds it to the range.
- */
-export const ATLAS_WINDOWS_VERSION = "1.2.3";
-
-/**
- * How to install Atlas on Windows, as lines for the terminal.
- *
- * `@ariga/atlas` ships Linux and macOS builds only — on Windows its
- * `preinstall` exits "Unsupported platform", so nothing an install command can
- * do will put Atlas in `node_modules/.bin`, and the npm advice below it is a
- * loop. Atlas does publish a Windows binary; `resolveLocalBin` finds it through
- * `where atlas` once it is on PATH. Only x64 is built: Windows on Arm runs it
- * under emulation.
- */
-export function describeAtlasWindowsInstall(version: string = ATLAS_WINDOWS_VERSION): string[] {
-    const url = `https://release.ariga.io/atlas/atlas-windows-amd64-v${version}.exe`;
-    return [
-        "  The @ariga/atlas npm package has no Windows build, so it cannot install here.",
-        "  Install Atlas's own Windows binary instead. In PowerShell:",
-        "",
-        "    $dir = \"$env:LOCALAPPDATA\\Programs\\atlas\"",
-        "    New-Item -ItemType Directory -Force $dir | Out-Null",
-        `    Invoke-WebRequest ${url} -OutFile "$dir\\atlas.exe"`,
-        "    [Environment]::SetEnvironmentVariable(\"Path\", [Environment]::GetEnvironmentVariable(\"Path\", \"User\") + \";$dir\", \"User\")",
-        "",
-        "  Then open a new terminal, check it with `atlas version`, and run the command again.",
-        "  Only `db push`, `db generate` and `db migrate` need Atlas; `rebase dev` does not.",
-        "  Guide: https://rebase.pro/docs/getting-started/windows/"
-    ];
-}
-
 /** A path as one shell word: as it is when it needs no quoting, single-quoted otherwise. */
 const shellWord = (value: string): string =>
     /^[\w./-]+$/.test(value) ? value : `'${value.replace(/'/g, "'\\''")}'`;
@@ -280,6 +244,25 @@ function resolvePackageManifest(packageName: string): string | null {
         }
     }
     return null;
+}
+
+/** Resolve a package's own bin entry, so an unrelated executable cannot take its place. */
+export function resolvePackageBin(packageName: string, binName: string): string | null {
+    const manifestPath = resolvePackageManifest(packageName);
+    if (!manifestPath) return null;
+    try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+            bin?: string | Record<string, string>;
+        };
+        const target = typeof manifest.bin === "string"
+            ? packageName.split("/").at(-1) === binName ? manifest.bin : undefined
+            : manifest.bin?.[binName];
+        if (typeof target !== "string") return null;
+        const binary = path.resolve(path.dirname(manifestPath), target);
+        return fs.existsSync(binary) ? binary : null;
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -513,7 +496,7 @@ export function atlasDevDatabaseUrl(
         // Atlas would replay the schema into the database it is about to change.
         throw new Error(
             `${ATLAS_DEV_URL_ENV} names the same database as DATABASE_URL. It must be a separate, empty ` +
-            "database that Atlas may fill and clear."
+            "database that Ptah may fill and clear."
         );
     }
     return { url: named, named: true };
@@ -587,17 +570,17 @@ export function describeDevDatabaseFailure(err: unknown, devDbName: string): str
     const message = err instanceof Error ? err.message : String(err);
 
     const lines = [
-        chalk.yellow(`  ⚠  Could not create the Atlas scratch database "${devDbName}": ${message}`)
+        chalk.yellow(`  ⚠  Could not create the migration scratch database "${devDbName}": ${message}`)
     ];
     if (code === "42501") {
         lines.push(chalk.gray(
-            "     Atlas plans every change in a throwaway copy of the schema, and CREATE DATABASE\n" +
+            "     Ptah plans every change in a throwaway copy of the schema, and CREATE DATABASE\n" +
             "     is a privilege most managed providers withhold. Two ways forward:\n" +
             `       • GRANT the role CREATEDB:  ALTER ROLE "<role>" CREATEDB;\n` +
             `       • or create it once by hand:  CREATE DATABASE "${devDbName}";`
         ));
     } else {
-        lines.push(chalk.gray("     Atlas will fail next with `database \"" + devDbName + "\" does not exist (3D000)`, which is this."));
+        lines.push(chalk.gray("     Ptah will fail next with `database \"" + devDbName + "\" does not exist (3D000)`, which is this."));
     }
 
     return lines.join("\n");
@@ -634,7 +617,7 @@ export async function dropDevDatabase(databaseUrl: string, devDatabaseUrl: strin
         // Not fatal, and not silent: the push has already succeeded, so the
         // worst case is one database left where `prune` can find it.
         outWarn(chalk.gray(
-            `  ⚠  Could not remove the Atlas scratch database: ${err instanceof Error ? err.message : String(err)}\n` +
+            `  ⚠  Could not remove the migration scratch database: ${err instanceof Error ? err.message : String(err)}\n` +
             "     `rebase db branch prune --include-dev-diff` clears them."
         ));
     }
@@ -884,6 +867,64 @@ export async function getTriggerExcludes(schemaDir: string): Promise<string[]> {
     return triggerExcludePatterns(await tablesIn(schemaDir));
 }
 
+/** Foreign policies and triggers on selected tables remain outside Ptah's plan. */
+export async function getUnmanagedChildExcludes(
+    databaseUrl: string,
+    schemaDir: string,
+    includes: readonly string[],
+    historyDir?: string
+): Promise<string[]> {
+    let children: { policies: ExistingChild[]; triggers: ExistingChild[] };
+    try {
+        children = await withAppClient(databaseUrl, async client => {
+            const policies = await client.query<ExistingChild>(`
+                SELECT schemaname AS "schema", tablename AS "table", policyname AS "name"
+                FROM pg_policies
+                WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+            `);
+            const triggers = await client.query<ExistingChild>(`
+                SELECT n.nspname AS "schema", c.relname AS "table", t.tgname AS "name"
+                FROM pg_trigger t
+                JOIN pg_class c ON c.oid = t.tgrelid
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE NOT t.tgisinternal
+                  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+            `);
+            return { policies: policies.rows, triggers: triggers.rows };
+        });
+    } catch (err) {
+        throw new ExcludeIntrospectionError(
+            `Failed to introspect the database for unmanaged policies and triggers: ${err instanceof Error ? err.message : String(err)}`,
+            err
+        );
+    }
+
+    if (historyDir && fs.existsSync(historyDir)) {
+        try {
+            for (const file of fs.readdirSync(historyDir).filter(name => name.endsWith(".sql"))) {
+                const previous = historicalChildren(fs.readFileSync(path.join(historyDir, file), "utf8"));
+                children.policies.push(...previous.policies);
+                children.triggers.push(...previous.triggers);
+            }
+        } catch (err) {
+            throw new ExcludeIntrospectionError(
+                `Failed to read migration history for unmanaged policies and triggers: ${err instanceof Error ? err.message : String(err)}`,
+                err
+            );
+        }
+    }
+
+    const tables = await tablesIn(schemaDir);
+    const { planTablePolicies, triggerExcludePatterns } = await import("./schema/generate-postgres-ddl-logic");
+    const policyNames = new Set(planTablePolicies(tables).flatMap(plan =>
+        plan.policies.map(policy => JSON.stringify([plan.schema, plan.table, policy.name]))));
+    const triggerNames = new Set(triggerExcludePatterns(tables)
+        .map(excludePatternParts)
+        .filter((parts): parts is string[] => parts !== undefined && parts.length === 3)
+        .map(parts => JSON.stringify(parts)));
+    return unmanagedChildExcludes(children.policies, children.triggers, includes, policyNames, triggerNames);
+}
+
 /**
  * Query the live database for every user table/view outside the system
  * catalogs. Separated from {@link getTableExcludes} so its failure mode can
@@ -940,6 +981,8 @@ export async function queryExistingIndexes(databaseUrl: string): Promise<Existin
  * {@link isRebaseIndexName} is the test, the same arrangement
  * `isGeneratedPolicyName` uses to let policy reconciliation drop only what it
  * generated.
+ * For migration authoring, the replayed history is also inspected: an index
+ * in an unapplied migration does not appear in the live catalog yet.
  *
  * The named-in-the-desired-state check comes first and is what makes removal
  * work: a declared index that the author has just deleted still matches the
@@ -958,6 +1001,7 @@ export async function getForeignIndexExcludes(
     deps: {
         queryExistingIndexes?: (databaseUrl: string) => Promise<ExistingIndex[]>;
         getManagedIndexNames?: (schemaDir: string) => Promise<Set<string>>;
+        historyDir?: string;
     } = {}
 ): Promise<string[]> {
     const queryIndexes = deps.queryExistingIndexes ?? queryExistingIndexes;
@@ -978,12 +1022,29 @@ export async function getForeignIndexExcludes(
         );
     }
 
-    return existing
+    // A pending migration can contain a hand-written index that has not
+    // reached the live target yet. Ptah replays that history for migrate diff.
+    if (deps.historyDir && fs.existsSync(deps.historyDir)) {
+        try {
+            for (const file of fs.readdirSync(deps.historyDir).filter(name => name.endsWith(".sql"))) {
+                const previous = historicalChildren(fs.readFileSync(path.join(deps.historyDir, file), "utf8"));
+                existing.push(...previous.indexes.map(({ schema, table, name }) => ({ schema, table, index: name })));
+            }
+        } catch (err) {
+            throw new ExcludeIntrospectionError(
+                `Failed to read migration history for unmanaged indexes: ${err instanceof Error ? err.message : String(err)}`,
+                err
+            );
+        }
+    }
+
+    const patterns = existing
         .filter(({ index }) => {
             if (managed.has(index)) return false;   // ours, and still declared
             return !isRebaseIndexName(index);       // ours, but no longer declared -> let it drop
         })
         .map(({ schema, table, index }) => atlasExcludePattern(schema, table, index));
+    return [...new Set(patterns)];
 }
 
 /**
@@ -1106,9 +1167,9 @@ export async function getTableExcludes(
     // own revision table. Excluding both the schema object AND its contents
     // keeps Atlas from planning a `DROP SCHEMA … CASCADE` — which on a live
     // database would take the user/auth tables with it.
-    // `atlas_schema_revisions.*` covers a revision table living outside the
-    // `rebase` schema — an externally managed Atlas setup — which the apply
-    // must not plan changes against either.
+    // An external Atlas setup can also leave a schema or table named
+    // `atlas_schema_revisions`. Exclude the object itself and its contents:
+    // excluding only the contents still permits DROP SCHEMA or DROP TABLE.
     //
     // `auth` stays on this list even though Rebase no longer creates it, and
     // that is the point: on a database still holding the pre-1.0 schema it must
@@ -1116,7 +1177,7 @@ export async function getTableExcludes(
     // it is somebody else's and must never be in scope at all. Removing it here
     // would let a `db push` plan `DROP SCHEMA auth CASCADE` against a live
     // Supabase installation.
-    const excludes: string[] = ["atlas_schema_revisions.*", "auth", "auth.*", "rebase", "rebase.*"];
+    const excludes: string[] = ["atlas_schema_revisions", "atlas_schema_revisions.*", "auth", "auth.*", "rebase", "rebase.*"];
 
     let existingTables: ExistingTable[];
     try {

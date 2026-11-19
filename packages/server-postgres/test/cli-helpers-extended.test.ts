@@ -197,8 +197,9 @@ describe("CLI Helpers — Extended", () => {
             queryExistingTables: async () => ["public.users", "public.sessions", "public.migrations"].map(asTable),
         });
 
-        it("should always include atlas_schema_revisions.* in excludes", async () => {
+        it("should protect the revision object and its contents", async () => {
             const excludes = await runExcludes();
+            expect(excludes).toContain("atlas_schema_revisions");
             expect(excludes).toContain("atlas_schema_revisions.*");
             // The framework-owned schemas go in whole *and* by contents —
             // excluding only the contents still lets Atlas plan a DROP SCHEMA.

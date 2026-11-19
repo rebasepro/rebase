@@ -103,10 +103,12 @@ describe("db push and databaseDefault: true", () => {
     }, 30_000);
 
     function runPush(extra: string[] = []) {
+        const env = cleanEnv(connectionString);
+        if (container) env.PTAH_DEV_SERVER_DISPOSABLE = "1";
         return execa(
             path.join(monorepoRoot, "node_modules", ".bin", "tsx"),
             [path.join(pkgRoot, "src", "cli.ts"), "db", "push", "--schema-dir", schemaDir, ...extra],
-            { cwd: workDir, env: cleanEnv(connectionString), reject: false, stdin: "ignore", all: true }
+            { cwd: workDir, env, reject: false, stdin: "ignore", all: true }
         );
     }
 

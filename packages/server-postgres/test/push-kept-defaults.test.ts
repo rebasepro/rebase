@@ -77,13 +77,15 @@ describe("the DEFAULTs db push keeps for databaseDefault: true", () => {
         expect(databaseOwnedDefaultColumns(compileSet([plain]))).toEqual([]);
     });
 
-    it("reads the live DEFAULT of those columns, leaving out sequences, the database's own functions and undeclared columns", async () => {
+    it("reads the live defaults of declared columns, including sequence and function references", async () => {
         const db = await liveDatabase();
         try {
             const kept = await readKeptDefaults(clientOf(db), databaseOwnedDefaultColumns(compileSet([items])));
             expect(kept).toEqual([
                 { schema: "public", table: "items", column: "code", expression: "('X-'::text || (gen_random_uuid())::text)" },
-                { schema: "public", table: "items", column: "ref_code_x", expression: "upper('r'::text)" }
+                { schema: "public", table: "items", column: "owner", expression: "public.my_owner()" },
+                { schema: "public", table: "items", column: "ref_code_x", expression: "upper('r'::text)" },
+                { schema: "public", table: "items", column: "seqno", expression: "nextval('public.items_seqno_seq'::regclass)" }
             ]);
             // The read narrowed the search path inside its own transaction only.
             expect((await db.query<{ search_path: string }>("SHOW search_path")).rows[0].search_path)
@@ -93,7 +95,7 @@ describe("the DEFAULTs db push keeps for databaseDefault: true", () => {
         }
     });
 
-    it("leaves a desired state that loads into an empty database with exactly the DEFAULTs the live one has", async () => {
+    it("preserves the declared database defaults when their dependencies are present", async () => {
         const live = await liveDatabase();
         const scratch = new PGlite();
         try {
@@ -101,13 +103,17 @@ describe("the DEFAULTs db push keeps for databaseDefault: true", () => {
             const desired = withKeptDefaults(generatePostgresDdl(compileSet([items]), { includePolicies: false }), kept);
             expect(desired).toContain('ALTER TABLE "public"."items" ALTER COLUMN "code" SET DEFAULT');
 
-            // What Atlas does with `schema.sql`: run it in a scratch database
-            // and compare that to the target.
+            await scratch.exec(`
+                CREATE SEQUENCE items_seqno_seq;
+                CREATE FUNCTION my_owner() RETURNS text LANGUAGE sql AS $$ SELECT 'me' $$;
+            `);
             await scratch.exec(desired);
             const want = await defaultsOf(live);
             const got = await defaultsOf(scratch);
             expect(got.code).toBe(want.code);
             expect(got.ref_code_x).toBe(want.ref_code_x);
+            expect(got.owner).toBe(want.owner);
+            expect(got.seqno).toBe(want.seqno);
             // The expression form is the planner's own and is in `schema.sql` already.
             expect(got.stamped).toBe(want.stamped);
         } finally {
