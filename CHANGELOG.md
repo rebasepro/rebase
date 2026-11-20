@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`rebase cloud projects transfer <slug> --to-org <id|slug>` moves a project to another organization.** The project stays as it is: same id, address, custom domains, database, storage, environment variables and deployments. What changes is who owns it, who can see it and who pays for it. You have to be owner or admin of both organizations and signed in with `rebase cloud login`. An access token cannot move a project. The destination is billed from then on, so a destination with no card on file, unless it is billed internally, refuses the move and nothing changes. The command asks for confirmation unless you pass `--yes`, and off a terminal it refuses rather than assuming. It needs a control plane with the `project-transfer` function. An older one says that moving a project is not available there.
+
 ## [0.34.2] - 2026-11-20
 
 ### Added
