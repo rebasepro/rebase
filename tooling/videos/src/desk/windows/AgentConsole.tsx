@@ -7,10 +7,11 @@ import { CHROMA, FONT, INK } from "../../theme";
 /**
  * THE AGENT — an MCP session against the same backend, under a scoped key.
  *
- * The tool names are the server's own (`packages/mcp`: list_documents,
- * delete_document) and the refusal is the one the API actually returns for
- * a key used outside its scope (`api-generator.ts`: 403 SCOPE_MISSING, with
- * the first sentence of its message). An invented error message in the one beat
+ * The tool names are the server's own (`packages/mcp`: query_table,
+ * delete_row), the key's scopes are spelled as keys hold them
+ * (`data:<read|write|delete>:<table>`), and the refusal is the one the API
+ * actually returns for a key used outside its scope (`api-generator.ts`: 403
+ * SCOPE_MISSING, with the first sentence of its message). An invented error message in the one beat
  * about what an agent cannot do would be the film's own way around it.
  */
 
@@ -25,12 +26,12 @@ interface Line {
 }
 
 const LINES: Line[] = [
-    { kind: "key", text: "api key   acme-support · customers: read, write", at: 6 },
-    { kind: "call", text: "list_documents   customers · where status = active", at: 22 },
-    { kind: "ok", text: "← 48 documents", at: 44 },
-    { kind: "call", text: "delete_document  customers · 3f9a2c7e-…", at: 0, refusal: true },
+    { kind: "key", text: "api key   acme-support · data:read:customers, data:write:customers", at: 6 },
+    { kind: "call", text: "query_table  customers · limit 50", at: 22 },
+    { kind: "ok", text: "← 48 rows", at: 44 },
+    { kind: "call", text: "delete_row   customers · 3f9a2c7e-…", at: 0, refusal: true },
     { kind: "err", text: "← 403 SCOPE_MISSING", at: 22, refusal: true },
-    { kind: "note", text: 'This credential does not hold "data:delete" for collection "customers".', at: 30, refusal: true },
+    { kind: "note", text: 'This credential does not hold "data:delete" for table "customers".', at: 30, refusal: true },
 ];
 
 const COLOUR: Record<Line["kind"], string> = {

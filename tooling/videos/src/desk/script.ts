@@ -57,7 +57,7 @@ export const DESK_NARRATION: { id: LineId; at: number; words: string[] }[] = [
     // the evidence: the agent's summary, then the scan's tally
     { id: "evidence", at: 167, words: ["A", "coding", "agent", "wrote", "this", "backend.", "It", "says", "it's", "done:", "auth,", "CRUD", "for", "nine", "tables,", "a", "REST", "API,", "deployed.", "And", "a", "ten-second", "scan", "of", "its", "database", "finds", "nine", "critical", "issues.", "Every", "table", "is", "open."] },
     // what Rebase does with that database
-    { id: "init", at: 526, words: ["Rebase", "starts", "from", "that", "database.", "One", "command", "reads", "all", "nine", "tables", "and", "writes", "a", "typed", "collection", "file", "for", "each.", "Your", "schema", "becomes", "code,", "in", "seconds."] },
+    { id: "init", at: 526, words: ["Rebase", "starts", "from", "that", "database.", "One", "command", "reads", "all", "nine", "tables", "and", "writes", "a", "typed", "table", "definition", "for", "each.", "Your", "schema", "becomes", "code,", "in", "seconds."] },
     // the rule
     { id: "rule", at: 796, words: ["Access", "rules", "live", "in", "that", "file,", "right", "next", "to", "the", "table", "they", "protect.", "In", "this", "example,", "customers", "only", "see", "their", "own", "orders.", "Rebase", "compiles", "the", "rule", "into", "a", "Postgres", "policy,", "which", "the", "database", "checks", "on", "every", "query,", "from", "any", "client."] },
     // push + the same scan
@@ -69,16 +69,16 @@ export const DESK_NARRATION: { id: LineId; at: number; words: string[] }[] = [
     // the panel
     { id: "panel", at: 1896, words: ["And", "your", "team", "has", "an", "admin", "panel", "on", "day", "one,", "generated", "from", "those", "files,", "with", "access", "control", "already", "in", "place.", "Nobody", "had", "to", "build", "it."] },
     // views
-    { id: "views", at: 2168, words: ["Each", "collection", "comes", "with", "the", "views", "that", "fit", "it:", "boards,", "tables,", "cards", "and", "forms."] },
+    { id: "views", at: 2168, words: ["Each", "table", "comes", "with", "the", "views", "that", "fit", "it:", "boards,", "grids,", "cards", "and", "forms."] },
     // schema
-    // The visualizer builds its graph from the collection registry
-    // (useSchemaGraph(collections, liveRls)); only the RLS state is read from
-    // pg_tables. "Read live from your database" was not true.
-    { id: "schema", at: 2348, words: ["The", "schema", "view", "shows", "all", "the", "tables", "and", "relations,", "as", "your", "collections", "declare", "them."] },
+    // The visualizer draws the tables the server serves (useTableDescriptors →
+    // useSchemaGraph), which are the ones backend/schema declares; only the RLS
+    // state is read from pg_tables. "Read live from your database" was not true.
+    { id: "schema", at: 2348, words: ["The", "schema", "view", "shows", "every", "table", "and", "relation,", "exactly", "as", "your", "code", "declares", "them."] },
     // studio
     { id: "studio", at: 2513, words: ["You", "can", "also", "work", "on", "the", "database", "directly,", "without", "leaving", "the", "app:", "SQL,", "schema,", "policies", "and", "logs."] },
     // the wall: what the film leaves out, six of twenty-four named
-    { id: "wall", at: 2703, words: ["And", "that's", "the", "short", "version.", "There's", "more:", "realtime", "sync,", "one", "isomorphic", "SDK", "for", "the", "server,", "the", "browser", "and", "agents,", "a", "visual", "collection", "editor", "that", "writes", "your", "TypeScript,", "storage,", "functions,", "jobs,", "search", "and", "cron."] },
+    { id: "wall", at: 2703, words: ["And", "that's", "the", "short", "version.", "There's", "more:", "realtime", "sync,", "one", "isomorphic", "SDK", "for", "the", "server,", "the", "browser", "and", "agents,", "database", "branches,", "storage,", "functions,", "jobs,", "search", "and", "cron."] },
     // close — on the product, and what you get
     { id: "close", at: 3083, words: ["Rebase", "is", "open", "source,", "and", "runs", "on", "your", "laptop,", "your", "own", "servers", "or", "any", "cloud.", "You", "point", "it", "at", "the", "Postgres", "you", "already", "have,", "and", "you", "get", "the", "whole", "backend:", "a", "typed", "API,", "an", "admin", "panel,", "and", "rules", "the", "database", "enforces."] },
 ];

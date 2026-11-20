@@ -7,14 +7,19 @@ import type { OutputLine, Step } from "../../components/Terminal";
 /**
  * OUR terminal, under the agent's — the spine of the story, and PROOF, NOT
  * PROCEDURE. Three commands, each with the few lines of its output that
- * carry the point: `init --introspect` finds nine tables and writes nine
- * files; `db push` applies the policies; `dev` puts the admin app and the
- * API up. A version that showed the whole session — pnpm's banners, `cd`,
+ * carry the point: `init --introspect` finds nine tables and writes, for
+ * each, its table in `backend/schema` and its panel layout in
+ * `frontend/src/cms` (the two halves since 0.31); `db push` applies the
+ * policies; `dev` puts the admin app and the API up. A version that showed the whole session — pnpm's banners, `cd`,
  * "Next steps:" — was a tutorial, and the film is not one.
  *
- * Every line is one the tools print (init.ts, introspect-db.ts,
- * server-postgres/cli.ts, dev.ts), and the file list is the real one for
- * these nine tables. Lines are left out, never made up. The project lives at
+ * The terminal draws its own ✓ before an "ok" line, so the tool's own ✓
+ * and indent are not repeated in the text.
+ *
+ * Every line is one the tools print, captured 2026-11-20 by running this
+ * CLI's `schema introspect` (what `init --introspect --install` runs) and
+ * `db push` against a Postgres 18 database with these nine tables; `dev`'s
+ * lines are dev.ts's. The file list is the real one for these nine tables. Lines are left out, never made up. The project lives at
  * {@link ROOT}: introspection prints each file's absolute path, and `dev`
  * derives both ports from that path (getProjectPort, getProjectFrontendPort),
  * so the paths and the ports below are what that directory gets.
@@ -34,13 +39,17 @@ const ROOT = "/Users/you/work/acme";
    `init` chains from the window's own start; push and dev are pinned to
    the narration (timeline.ts) and do not exist until their moment. */
 const INIT: Step = {
-    command: "rebase init acme --database-url $DATABASE_URL --introspect",
+    command: "rebase init acme --database-url $DATABASE_URL --introspect --install",
     output: [
         { text: "Introspecting schema 'public'...", tone: "muted", at: 4 },
         { text: "Found 9 tables.", tone: "accent", at: 10 },
-        ...FILES.map((f, i): OutputLine => ({ text: `${ROOT}/config/collections/${f}.ts`, tone: "ok", at: 16 + i * 3 })),
+        /* Each table, then its panel layout: the order the tool prints. */
+        ...FILES.flatMap((f, i): OutputLine[] => [
+            { text: `${ROOT}/backend/schema/${f}.ts`, tone: "ok", at: 16 + i * 3 },
+            { text: `${ROOT}/frontend/src/cms/${f}.tsx`, tone: "ok", at: 17.5 + i * 3 },
+        ]),
         blank(44),
-        { text: "Introspected 9 tables — generated 9 collection(s).", tone: "ok", at: 48 },
+        { text: "Introspected 9 tables — generated 9 table(s).", tone: "ok", at: 48 },
     ],
 };
 

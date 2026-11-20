@@ -17,19 +17,19 @@ import { FONT, INK } from "../../theme";
  * The grid stops at x 1520: the presenter's corner stays clear.
  */
 const ITEMS: [string, string][] = [
-    ["Realtime subscriptions", "every collection, over the wire you choose"],
+    ["Realtime subscriptions", "every table, over the wire you choose"],
     ["One isomorphic SDK", "the same shape on the server, in the browser, in an agent"],
-    ["Live schema editing", "a visual collection editor that writes your TypeScript"],
+    ["Migrations", "SQL files generated from your tables"],
     ["Offline & local-first sync", "reads and writes that survive the connection"],
     ["File storage", "local or any S3, uploads on any field"],
     ["Custom functions", "your code, in the same process or split out"],
-    ["Cron jobs", "declared next to the collections they touch"],
+    ["Cron jobs", "declared next to the tables they touch"],
     ["Background jobs", "queued work with retries and a log"],
     ["Full-text search", "and aggregates, from the SDK"],
     ["Entity history", "who changed what, on every record"],
     ["Database branching", "a branch of the data for every branch of the code"],
     ["Hooks", "before and after every write"],
-    ["Indexes", "declared with the collection, owned by name"],
+    ["Indexes", "declared with the table, owned by name"],
     ["Multiple databases", "several Postgres databases, one backend"],
     ["Auth adapters & API keys", "email, OAuth, keys with permissions on them"],
     ["REST API & OpenAPI", "generated, documented, with Swagger"],
