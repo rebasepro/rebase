@@ -388,6 +388,43 @@ describe("db push destructive-change gate E2E", () => {
         fs.writeFileSync(path.join(schemaDir, "notes.ts"), notesTableTs("text"));
     }, 150_000);
 
+    /**
+     * A default that calls one of Rebase's own functions. Atlas builds the
+     * desired state in an empty scratch database with no `rebase` schema, and
+     * refuses both ways of giving it one (a scratch database that is not
+     * empty, and CREATE FUNCTION on its free tier), so the push died inside
+     * Atlas with "function rebase.uid() does not exist" (reported from a
+     * Supabase migration, 2026-11-18). The push now stops before Atlas, names
+     * the column and says what to write; `.onCreateUser()` then pushes.
+     */
+    it("refuses a default that calls rebase.uid() with the column and the remedy, and .onCreateUser() pushes", async () => {
+        await dropScratchDatabases();
+        for (const file of fs.readdirSync(schemaDir)) fs.rmSync(path.join(schemaDir, file));
+        fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex("memos"));
+        const memos = (author: string) => `import { col, defineTable, sql } from "@rebasepro/types";
+
+export const memos = defineTable("memos", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        author: ${author},
+        body: col.text()
+    },
+    rls: "admin-only"
+});
+`;
+        fs.writeFileSync(path.join(schemaDir, "memos.ts"), memos("col.text().default(sql\`rebase.uid()\`)"));
+        const refused = await runPush();
+        expect(refused.exitCode).not.toBe(0);
+        expect(refused.all ?? "").toMatch(/public\.memos\.author\s+DEFAULT rebase\.uid\(\)/);
+        expect(refused.all ?? "").toMatch(/onCreateUser/);
+        expect(refused.all ?? "").not.toMatch(/does not exist/);
+        expect(await scratchDatabases()).toEqual([]);
+
+        fs.writeFileSync(path.join(schemaDir, "memos.ts"), memos("col.text().onCreateUser()"));
+        const pushed = await runPush();
+        expect(pushed.exitCode, pushed.all).toBe(0);
+    }, 150_000);
+
     it("refuses to re-key a table non-interactively, then re-keys it with --allow-destructive", async () => {
         const translationsTs = (localeIsKey: boolean) => `import { col, defineTable } from "@rebasepro/types";
 

@@ -113,6 +113,55 @@ async function loadDeclaredResources(backendDir: string): Promise<void> {
     await import(pathToFileURL(entry).href);
 }
 
+/** A column whose DEFAULT calls one of Rebase's own `rebase.*` functions. */
+export interface RebaseFunctionDefault {
+    table: string;
+    column: string;
+    expression: string;
+}
+
+/**
+ * The columns in `schema.sql` whose DEFAULT calls a `rebase.*` function, such
+ * as `DEFAULT rebase.uid()`.
+ *
+ * Atlas cannot build them. It runs `schema.sql` in an empty scratch database,
+ * where there is no `rebase` schema, and it refuses both ways of providing
+ * one: a scratch database that is not empty ("connected database is not
+ * clean"), and `CREATE FUNCTION` in the desired state on its free tier. So
+ * `db push` died inside Atlas with "function rebase.uid() does not exist",
+ * though the real database had the function (reported from a Supabase
+ * migration, 2026-11-18). It is refused here instead, naming the column and
+ * what to write.
+ */
+export function rebaseFunctionDefaults(ddl: string): RebaseFunctionDefault[] {
+    const found: RebaseFunctionDefault[] = [];
+    const tableRe = /CREATE TABLE(?: IF NOT EXISTS)?\s+((?:"[^"]+"\.)?"[^"]+")\s*\(([\s\S]*?)\n\);/g;
+    let table: RegExpExecArray | null;
+    while ((table = tableRe.exec(ddl)) !== null) {
+        for (const line of table[2].split("\n")) {
+            const column = /^\s*"([^"]+)"\s.*?\bDEFAULT\s+(.*?),?\s*$/.exec(line);
+            // String literals out first: a default that only mentions the
+            // function in text calls nothing.
+            if (column && /\brebase\.\w+\s*\(/.test(column[2].replace(/'(?:[^']|'')*'/g, "''"))) {
+                found.push({ table: table[1].replace(/"/g, ""), column: column[1], expression: column[2] });
+            }
+        }
+    }
+    return found;
+}
+
+/** The refusal for {@link rebaseFunctionDefaults}, or undefined when there is none. */
+export function rebaseFunctionDefaultsProblem(ddl: string): string | undefined {
+    const found = rebaseFunctionDefaults(ddl);
+    if (found.length === 0) return undefined;
+    return [
+        `${found.length === 1 ? "A column's DEFAULT calls" : `${found.length} columns' DEFAULTs call`} a Rebase function, which the schema planner (Atlas) cannot build:`,
+        ...found.map((f) => `  - ${f.table}.${f.column}  DEFAULT ${f.expression}`),
+        "For the caller's id, declare the column `.onCreateUser()` (or `.onUpdateUser()`) instead of `.default(sql`rebase.uid()`)`: the server writes it.",
+        "For anything else, set the value in the table's `hooks: { beforeSave }`."
+    ].join("\n");
+}
+
 /**
  * `schema.sql` (Atlas's desired state) and, beside it, `policies.sql`,
  * `search.sql`, `vector.sql`, `triggers.sql` and `views.sql` — the parts Atlas
@@ -138,6 +187,8 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
             includeSearch: false,
             includeVector: false
         });
+        const functionDefaults = rebaseFunctionDefaultsProblem(ddlContent);
+        if (functionDefaults) throw new Error(functionDefaults);
         const policiesContent = generatePostgresPoliciesDdl(tables);
         const searchContent = generatePostgresSearchDdl(tables);
         const vectorContent = generatePostgresVectorDdl(tables, {
