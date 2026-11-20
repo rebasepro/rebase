@@ -1046,9 +1046,12 @@ export const App: React.FC = () => {
            chapter being talked about, the camera in it. */
         if (talking) return { timing: null, live: { stream } };
         if (recording) return { timing: liveTiming, live: { stream } };
-        if (assembled) return { timing: assembled.timing, clips: assembled.clips };
-        return { timing: null };
-    }, [recording, liveTiming, stream, assembled, talking]);
+        /* Between takes the window shows you, live, to frame the shot;
+           only a playback shows the recorded takes. */
+        const live = review.playing ? null : { stream };
+        if (assembled) return { timing: assembled.timing, clips: assembled.clips, live };
+        return { timing: null, live };
+    }, [recording, liveTiming, stream, assembled, talking, review.playing]);
 
     useEffect(() => {
         if (talkChapter === null) return;
@@ -1186,6 +1189,11 @@ export const App: React.FC = () => {
                           : `lines ${range.from + 1}–${range.to + 1} of ${SCRIPT.length}`}
                 </span>
                 <Meter level={status.level} threshold={status.threshold} speaking={status.speaking} />
+                {!SIMULATE && (
+                    <span title="The camera the page has open — change it with Camera below" style={{ color: stream?.getVideoTracks()[0] ? "rgba(255,255,255,0.6)" : "#FFC600", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {stream?.getVideoTracks()[0] ? `camera: ${stream.getVideoTracks()[0].label || "on"}` : camera === PHONE ? "waiting for the phone" : "no camera open"}
+                    </span>
+                )}
                 {phoneLink && phone && phoneTrack && <PhoneBadge link={phoneLink} state={phone} onSync={recording ? null : () => setSyncing(true)} />}
                 <span style={{ color: "rgba(255,255,255,0.45)" }}>{canRecognize() || SIMULATE ? status.recognition : "no speech recognition — use Chrome"}</span>
                 <span style={{ flex: 1, fontFamily: "JetBrains Mono, monospace", fontSize: 13, color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "right" }}>
