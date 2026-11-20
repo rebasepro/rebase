@@ -1,5 +1,5 @@
 /**
- * `rebase cloud projects` — list / create / info / delete.
+ * `rebase cloud projects` — list / create / info / delete / transfer.
  */
 import chalk from "chalk";
 import inquirer from "inquirer";
@@ -31,6 +31,7 @@ import {
 } from "./context";
 import { buildDialPatch } from "./resources";
 import { attachDatabaseRow } from "./databases";
+import { reportCallError, type Unserved } from "./not-served";
 
 interface ProjectRow {
     id: string | number;
@@ -539,9 +540,9 @@ error: message }
  *
  * Exported so its tests drive the real parser rather than a copy of it.
  */
-export function resolveProjectArg(rawArgs: string[], action: "info" | "delete"): string {
+export function resolveProjectArg(rawArgs: string[], action: "info" | "delete" | "transfer"): string {
     const { positionals } = parseCloudArgs({
-        spec: {},
+        spec: action === "transfer" ? TRANSFER_PROJECT_FLAGS : {},
         rawArgs,
         commandWords: 3, // cloud projects <action>
         command: `cloud projects ${action}`,
@@ -573,7 +574,8 @@ async function fetchCapacity(client: CloudClient, projectId: string): Promise<Da
         const res = await client.functions.invoke<{ database?: DatabaseCapacity | null }>(
             "capacity",
             undefined,
-            { method: "GET", path: projectId }
+            { method: "GET",
+path: projectId }
         );
         return res?.database ?? null;
     } catch {
@@ -701,6 +703,115 @@ export async function deleteProject(rawArgs: string[], projectRef: string): Prom
     } catch (e) {
         reportError(e, "Failed to delete project");
     }
+}
+
+/* ─── transfer ─────────────────────────────────────────────────── */
+
+/** The flags `rebase cloud projects transfer` takes. */
+export const TRANSFER_PROJECT_FLAGS = {
+    "--to-org": String
+} as const;
+
+/** What `transfer` says on a control plane that has no `project-transfer` function yet. */
+const TRANSFER_UNSERVED: Unserved = {
+    what: "moving a project to another organization",
+    hint: "Update the control plane, or ask its operator to move the project."
+};
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Move a project into another organization, unchanged: same id, address,
+ * custom domains, database, storage, variables and deployments. Only who owns
+ * it, who sees it and who pays for it change.
+ *
+ * The control plane decides who may (owner or admin of both organizations,
+ * signed in rather than holding an access token) and puts the destination
+ * through the billing gate a deploy goes through; a destination that cannot
+ * pay refuses the move and nothing changes.
+ */
+export async function transferProject(rawArgs: string[], projectRef: string): Promise<void> {
+    const { flags: args } = parseCloudArgs({
+        spec: TRANSFER_PROJECT_FLAGS,
+        rawArgs,
+        commandWords: 3, // cloud projects transfer
+        command: "cloud projects transfer",
+        maxPositionals: 1 // [id]
+    });
+    const toOrgRef = args["--to-org"]?.trim();
+    if (!toOrgRef) {
+        fail(
+            "Say which organization to move the project to.",
+            `Pass ${chalk.bold("--to-org <id|slug>")}; ${chalk.bold("rebase cloud orgs list")} shows yours.`,
+            "missing_param"
+        );
+    }
+    const { client } = await requireClient(rawArgs);
+    const projectId = await resolveProjectRef(projectRef, client);
+
+    const p = (await client.data.table("projects").findById(projectId).catch(() => undefined)) as
+        | ProjectRow
+        | undefined;
+    if (!p) fail(`Project ${projectRef} not found.`, undefined, "project_not_found");
+
+    const toOrg = await resolveOrgRef(client, toOrgRef);
+    const rawOrg: unknown = p.organization;
+    const fromOrg = rawOrg && typeof rawOrg === "object" && "id" in rawOrg ? String(rawOrg.id)
+        : rawOrg !== undefined && rawOrg !== null ? String(rawOrg) : undefined;
+    if (fromOrg && toOrg.id === fromOrg) {
+        fail(`Project ${p.subdomain ?? projectRef} already belongs to ${toOrg.name}.`, undefined, "conflict");
+    }
+
+    await confirmDestructive({
+        yes: Boolean(args["--yes"]),
+        prompt: `Move project "${p.name ?? projectRef}" (${p.subdomain ?? projectRef}) into organization "${toOrg.name}"? `
+            + "Its members get access to it, this organization's lose it, and it is billed there from now on."
+    });
+
+    let res: { projectId?: string; slug?: string; fromOrganizationId?: string; toOrganizationId?: string; cancelledSubscriptions?: number; movedIncidents?: number };
+    try {
+        res = await client.functions.invoke<typeof res>(
+            "project-transfer",
+            { organizationId: toOrg.id },
+            { path: encodeURIComponent(projectId) }
+        );
+    } catch (e) {
+        reportCallError(e, "Failed to transfer project", TRANSFER_UNSERVED);
+    }
+    success(`Moved ${chalk.bold(p.name ?? projectId)} into ${chalk.bold(toOrg.name)}`);
+    emit(
+        () => {
+            note(chalk.gray("  Its address, domains, database, variables and deployments are unchanged."));
+            note(chalk.gray(`  Select that organization to keep working on it:  ${chalk.bold(`rebase cloud use ${toOrg.id}`)}`));
+        },
+        {
+            success: true,
+            id: projectId,
+            name: p.name ?? null,
+            slug: p.subdomain ?? null,
+            fromOrg: res.fromOrganizationId ?? fromOrg ?? null,
+            toOrg: toOrg.id,
+            toOrgName: toOrg.name
+        }
+    );
+}
+
+/** An organization the caller belongs to, by id or slug. */
+async function resolveOrgRef(client: CloudClient, ref: string): Promise<{ id: string; name: string }> {
+    const table = client.data.table("organizations");
+    const row = UUID.test(ref)
+        ? await table.findById(ref).catch(() => undefined)
+        : (await table.find({ where: { slug: ["==", ref] },
+limit: 1 }).catch(() => ({ data: [] }))).data[0];
+    if (!row) {
+        fail(
+            `No organization ${ref} that you belong to.`,
+            `${chalk.bold("rebase cloud orgs list")} shows yours; create one with ${chalk.bold("rebase cloud orgs create <name>")}.`,
+            "org_not_found"
+        );
+    }
+    return { id: String(row.id),
+name: String(row.name ?? row.id) };
 }
 
 /* ─── shared helpers (used by other subcommands too) ───────────── */
