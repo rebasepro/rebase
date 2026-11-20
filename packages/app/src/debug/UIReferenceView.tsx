@@ -874,7 +874,9 @@ selected: true }, { name: "Tags" }].map(c => (
                         A field is a filled box with no edge. <code className="font-mono text-xs">TextField</code>,{" "}
                         <code className="font-mono text-xs">DateTimeField</code> and a labelled switch carry their label{" "}
                         <em>inside</em> — the floating <code className="font-mono text-xs">label</code> prop, shrunk into the top edge
-                        once there is a value; a standalone <code className="font-mono text-xs">Select</code> labels above. A record
+                        once there is a value. A <code className="font-mono text-xs">Select</code> does the same at the TextField&apos;s
+                        height, except at <code className="font-mono text-xs">smallest</code>, where it labels above
+                        (<code className="font-mono text-xs">labelPlacement=&quot;above&quot;</code> asks for that at any size). A record
                         form sets every one-line field at <code className="font-mono text-xs">large</code> with the label inside,
                         single selects included: 64px and a 16px value. A multi-select, whose chips wrap, keeps its label{" "}
                         <em>above</em> (<code className="font-mono text-xs">FieldBlock</code>: 13px, primary ink, muted type icon)

@@ -2,7 +2,7 @@
 "use client";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import { iconSize } from "../icons/Icon";
-import React, { ChangeEvent, Children, forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { ChangeEvent, Children, forwardRef, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import {
     defaultBorderMixin,
@@ -15,6 +15,7 @@ import {
 
 import { cls } from "../util";
 import { SelectInputLabel } from "./common/SelectInputLabel";
+import { InputLabel } from "./InputLabel";
 import { usePortalContainer } from "../hooks/PortalContainerContext";
 
 export type SelectValue = string | number | boolean;
@@ -118,6 +119,18 @@ export type SelectProps<T extends SelectValue = string> = {
     renderValue?: (value: T) => React.ReactNode,
     size?: "smallest" | "small" | "medium" | "large",
     label?: React.ReactNode | string,
+    /**
+     * Where `label` is drawn. `"inside"` puts it in the box's top edge, the
+     * way a TextField draws its label: resting in the middle while nothing is
+     * selected, shrunk into the top edge once something is or the select has
+     * focus. The box grows to a labelled TextField's height at the same size,
+     * so the two line up on a row. `"above"` puts it
+     * over the box, as every Select did before.
+     *
+     * Defaults to `"inside"`, except at `smallest`, whose 28px box has no room
+     * for a label in its top edge.
+     */
+    labelPlacement?: "inside" | "above",
     disabled?: boolean,
     error?: boolean,
     position?: "item-aligned" | "popper",
@@ -167,6 +180,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
     placeholder,
     renderValue,
     label,
+    labelPlacement,
     size = "large",
     error,
     disabled,
@@ -292,12 +306,47 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
     // a pixel taller than the chip. A block of its own takes it off the line.
     const bareContent = bare ? <div className={"flex w-full"}>{triggerContent}</div> : undefined;
 
-    const controlHeight = {
-        "min-h-[28px]": size === "smallest",
-        "min-h-[32px]": size === "small",
-        "min-h-[40px]": size === "medium",
-        "min-h-[48px]": size === "large"
-    };
+    // A select that draws something else in its trigger (a table cell's
+    // preview) frames itself, and has no box to put a label in.
+    const labelInside = label !== undefined && label !== null && label !== false && !bare
+        && (labelPlacement ?? (size === "smallest" ? "above" : "inside")) === "inside";
+
+    const autoId = useId();
+    const triggerId = id ?? autoId;
+    const labelId = `${triggerId}-label`;
+
+    // Focus colours the label, as a TextField's does. Opening the list moves
+    // focus into it, so an open select counts as focused too.
+    const [focused, setFocused] = useState(false);
+    const active = focused || openInternal;
+    // An option whose value is "" is still something shown in the box.
+    const showsValue = hasValue || emptyItemDisplay !== null;
+    // The label rests in the middle of an empty box and moves up into its top
+    // edge once there is a value to make room for, or the select is in use.
+    const labelShrunk = showsValue || active;
+
+    const controlHeight = labelInside
+        // A labelled TextField's height at the same size: its padding plus the
+        // 20px its one-line input comes out at — 40 / 44 / 52 / 60px inside
+        // the border, measured side by side. The value sits on the line a
+        // TextField's value sits on beside it.
+        ? {
+            "min-h-[40px]": size === "smallest",
+            "min-h-[44px]": size === "small",
+            "min-h-[52px]": size === "medium",
+            "min-h-[60px]": size === "large"
+        }
+        : {
+            "min-h-[28px]": size === "smallest",
+            "min-h-[32px]": size === "small",
+            "min-h-[40px]": size === "medium",
+            "min-h-[48px]": size === "large"
+        };
+    // TextField's labelled padding, so the value lands under the label. Put
+    // on the value, not on the trigger: the chevron stays centred in the box.
+    const valuePadding = labelInside
+        ? { smallest: "pt-4 pb-1", small: "pt-5 pb-1", medium: "pt-6 pb-2", large: "pt-8 pb-2" }[size]
+        : undefined;
 
     return (
         <SelectPrimitive.Root
@@ -312,7 +361,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                 setOpenInternal(open);
             }}
             {...props}>
-            {typeof label === "string" ? <SelectInputLabel error={error}>{label}</SelectInputLabel> : label}
+            {!labelInside && (typeof label === "string" ? <SelectInputLabel error={error}>{label}</SelectInputLabel> : label)}
             <div className={cls(
                 "select-none",
                 !bare && "rounded-lg text-sm",
@@ -329,10 +378,12 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
             )}>
                 <SelectPrimitive.Trigger
                     ref={inputRef}
-                    id={id}
+                    id={triggerId}
                     asChild={false}
                     type="button"
                     onKeyDown={onTriggerKeyDown}
+                    onFocus={() => setFocused(true)}
+                    onBlur={() => setFocused(false)}
                     // A `label` that is an element — which every entity form
                     // passes, because the label carries the property's type
                     // icon — fell through to a hard-coded English literal, so
@@ -340,11 +391,21 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                     // "Select an option". Callers pass `aria-label` now; the
                     // literal stays as the last resort, and is unreachable for
                     // anything that names itself.
-                    aria-label={ariaLabel ?? (typeof label === "string" ? label : (typeof renderValue === "string" ? renderValue : "Select an option"))}
+                    // A label drawn inside the box is a `<label>` of its own
+                    // that names the trigger, whatever it holds.
+                    aria-label={ariaLabel ?? (labelInside ? undefined : (typeof label === "string" ? label : (typeof renderValue === "string" ? renderValue : "Select an option")))}
+                    aria-labelledby={!ariaLabel && labelInside ? labelId : undefined}
                     aria-invalid={error || undefined}
                     className={cls(
                         "h-full",
-                        padding && !bare ? {
+                        // With the label inside, the value starts where the
+                        // shrunk label does, 12px in, as in a TextField.
+                        padding && !bare && labelInside ? {
+                            "pl-3": true,
+                            "pr-4": size === "large",
+                            "pr-3": size === "medium",
+                            "pr-2": size === "small" || size === "smallest"
+                        } : padding && !bare ? {
                             "px-4": size === "large",
                             "px-3": size === "medium",
                             "px-2": size === "small" || size === "smallest"
@@ -372,14 +433,18 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                         className={cls(
                             "flex-grow max-w-full flex flex-row gap-2 items-center",
                             "overflow-visible",
-                            !bare && controlHeight
+                            !bare && controlHeight,
+                            labelInside && ["leading-5", valuePadding]
                         )}>
                         <SelectPrimitive.Value
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
                             }}
-                            placeholder={bareContent ?? emptyItemDisplay ?? placeholder}
+                            // A resting label fills the empty box, so the
+                            // placeholder waits until the label moves up, as a
+                            // TextField's does.
+                            placeholder={bareContent ?? emptyItemDisplay ?? (!labelInside || labelShrunk ? placeholder : null)}
                             className={"w-full"}>
 
                             {bareContent ?? (hasValue && value !== undefined && renderValue
@@ -401,6 +466,27 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                             })}/>
                     </SelectPrimitive.Icon>}
                 </SelectPrimitive.Trigger>
+
+                {/* Placed and coloured as a TextField's label, in the same box. */}
+                {labelInside && (
+                    <InputLabel
+                        id={labelId}
+                        htmlFor={triggerId}
+                        shrink={labelShrunk}
+                        className={cls(
+                            "pointer-events-none absolute left-0",
+                            size === "large" ? "top-1" : "top-[-1px]",
+                            disabled
+                                ? "text-text-disabled dark:text-text-disabled-dark"
+                                : error
+                                    ? "text-red-500 dark:text-red-600"
+                                    : active
+                                        ? "text-primary dark:text-primary"
+                                        : "text-text-secondary dark:text-text-secondary-dark"
+                        )}>
+                        {label}
+                    </InputLabel>
+                )}
 
                 {endAdornment && (
                     <div

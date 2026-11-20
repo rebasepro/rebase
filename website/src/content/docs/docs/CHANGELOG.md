@@ -7,6 +7,10 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Changed
+
+- **A select draws its label inside the box, as a text field does.** It drew the label above the box, so a form that put a select beside text fields showed two kinds of label on one row. The label now rests in the middle of an empty select and moves into the top edge once there is a value or the select has focus, and the box is a labelled `TextField`'s height at the same size, so the two line up. At `smallest` the label stays above, since a 28px box has no room for it. Pass `labelPlacement="above"` to keep it above at any size. The record form's single selects already looked like this; their binding now uses the kit's label instead of drawing its own over the box. `MultiSelect` is unchanged.
+
 ## [0.34.2] - 2026-11-20
 
 ### Added
