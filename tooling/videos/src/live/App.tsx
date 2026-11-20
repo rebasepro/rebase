@@ -998,7 +998,8 @@ export const App: React.FC = () => {
                 audio.pause();
                 URL.revokeObjectURL(url);
                 testing.current = null;
-                setMicTest((m) => m && { ...m, state: "done" });
+                /* Played back: the box has said what it needed to — gone. */
+                setMicTest(null);
             };
             audio.onended = done;
             current.stopPlayback = done;
@@ -1380,7 +1381,7 @@ export const App: React.FC = () => {
                 </div>
             )}
             {micTest && !recording && (
-                <div style={panel}>
+                <div style={{ ...panel, cursor: "pointer" }} title="Click to close" onClick={() => (testing.current ? undefined : setMicTest(null))}>
                     <div style={{ fontWeight: 600, marginBottom: 8 }}>
                         {micTest.state === "listening"
                             ? "Mic test: say a line of the script, then press M (it stops by itself after 15 s)"
