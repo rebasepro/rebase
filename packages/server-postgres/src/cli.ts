@@ -38,6 +38,8 @@ import {
     queryUndeclarableConstraints,
     ExcludeIntrospectionError,
     queryGeneratedColumnDependencies,
+    queryPolicyColumnDependencies,
+    retypeAroundPolicies,
     queryColumnTypes,
     dropGeneratedColumns,
     withAppClient,
@@ -68,6 +70,7 @@ import {
     migrationDropPreamble,
     describeConflict
 } from "./schema/generated-column-conflicts";
+import { describeBlocked, findPolicyBlockedStatements } from "./schema/policy-column-conflicts";
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import type { ExistingConstraint } from "./schema/undeclarable-constraints";
 import { finishNewMigration } from "./schema/migration-post-process";
@@ -837,6 +840,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 schemaDir ? await getSearchExcludes(schemaDir) : []
             );
 
+            // A policy makes every column it reads immutable to Atlas the same
+            // way, and Atlas has no model of a policy to see it coming. Those
+            // statements run before Atlas, each in one transaction with the
+            // policies in its way dropped and recreated around it — see
+            // `schema/policy-column-conflicts.ts`.
+            const policyBlocked = databaseUrl
+                ? findPolicyBlockedStatements(plan, await queryPolicyColumnDependencies(databaseUrl))
+                : [];
+
             // A removed enum option plans nothing (no ALTER TYPE … DROP VALUE
             // exists), so the push would succeed and the database go on
             // accepting the value. Not a refusal — boot does the same — but said.
@@ -903,6 +915,13 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     for (const conflict of rebuildable) {
                         out(chalk.gray(`       ${describeConflict(conflict)}`));
                     }
+                    out("");
+                }
+                if (policyBlocked.length > 0) {
+                    out(chalk.gray(`  ${policyBlocked.length} retype(s) would run first, each in one transaction with the`));
+                    out(chalk.gray("  policies that read the column dropped and recreated around it — Postgres"));
+                    out(chalk.gray("  cannot retype a column a policy reads:"));
+                    for (const blocked of policyBlocked) out(chalk.gray(`       ${describeBlocked(blocked)}`));
                     out("");
                 }
                 if (unowned.length > 0) {
@@ -985,6 +1004,12 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 // rebuild below entirely, so a failed apply left the search
                 // columns it had just dropped dropped.
                 atlasApply: async () => {
+                    if (databaseUrl && policyBlocked.length > 0) {
+                        for (const blocked of policyBlocked) {
+                            out(chalk.gray(`  Retyping ${describeBlocked(blocked)} — with those policies dropped and recreated around it.`));
+                        }
+                        await retypeAroundPolicies(databaseUrl, policyBlocked);
+                    }
                     await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], schemaDir, { throwOnFailure: true, omitPlanEcho: true });
                 },
                 reportSynced: () => out("Schema is synced, no changes to be made"),

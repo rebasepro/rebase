@@ -68,6 +68,34 @@ export const prices = defineTable("prices", {
 `;
 }
 
+/**
+ * A table whose policy reads `owner_id`, so retyping `owner_id` is refused by
+ * Postgres ("cannot alter type of a column used in a policy definition")
+ * unless the policy is out of the way for the length of the ALTER.
+ */
+function notesTableTs(ownerType: "varchar" | "text" | "integer"): string {
+    const owner = ownerType === "varchar" ? "col.varchar({ length: 64 })" : ownerType === "text" ? "col.text()" : "col.integer()";
+    return `import { col, defineTable } from "@rebasepro/types";
+
+export const notes = defineTable("notes", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        owner_id: ${owner}.notNull(),
+        body: col.text()
+    },
+    rls: [
+        {
+            name: "notes_owner",
+            operation: "all",
+            mode: "permissive",
+            using: "(owner_id::text = current_setting('app.uid', true))",
+            withCheck: "(owner_id::text = current_setting('app.uid', true))"
+        }
+    ]
+});
+`;
+}
+
 function cleanEnv(connectionString: string): Record<string, string> {
     const env = { ...process.env } as Record<string, string>;
     for (const key of Object.keys(env)) {
@@ -297,6 +325,69 @@ describe("db push destructive-change gate E2E", () => {
      * PRIMARY KEY ("id", "locale")` — no DROP of data in sight — and push
      * applied it unasked, off a TTY, changing the id of every row.
      */
+    /**
+     * Postgres refuses `ALTER COLUMN … TYPE` on a column a policy reads, and
+     * Atlas, which has no model of a policy, plans it anyway. The plan runs in
+     * one transaction, so one widened `owner_id` rolled the whole push back:
+     * "cannot alter type of a column used in a policy definition", on every
+     * push after (reported from a Supabase migration, 2026-11-18). The push
+     * now runs that ALTER itself, with the policies dropped and recreated
+     * around it in one transaction, and the row-level security is the same
+     * after as before.
+     */
+    it("widens a column a policy reads, keeping the policy", async () => {
+        // The index is the table set: the earlier tables are left alone as unmanaged.
+        for (const file of fs.readdirSync(schemaDir)) fs.rmSync(path.join(schemaDir, file));
+        fs.writeFileSync(path.join(schemaDir, "notes.ts"), notesTableTs("varchar"));
+        fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex("notes"));
+        const first = await runPush();
+        expect(first.exitCode, first.all).toBe(0);
+        const policyBefore = await dbClient.query(
+            `SELECT policyname, cmd, permissive, roles::text, qual, with_check FROM pg_policies WHERE tablename = 'notes' ORDER BY policyname`
+        );
+        expect(policyBefore.rows.length).toBeGreaterThan(0);
+
+        fs.writeFileSync(path.join(schemaDir, "notes.ts"), notesTableTs("text"));
+        const widened = await runPush();
+        expect(widened.all ?? "").not.toMatch(/used in a policy definition/);
+        expect(widened.exitCode, widened.all).toBe(0);
+
+        const type = await dbClient.query(
+            `SELECT format_type(atttypid, atttypmod) AS type FROM pg_attribute WHERE attrelid = 'notes'::regclass AND attname = 'owner_id'`
+        );
+        expect(type.rows[0].type).toBe("text");
+        const policyAfter = await dbClient.query(
+            `SELECT policyname, cmd, permissive, roles::text, qual, with_check FROM pg_policies WHERE tablename = 'notes' ORDER BY policyname`
+        );
+        // The same policies, with the same command, mode and roles. The
+        // expressions may print differently: `(owner_id)::text = …` loses its
+        // cast once the column is text.
+        const shape = (rows: { policyname: string; cmd: string; permissive: string; roles: string }[]) =>
+            rows.map(({ policyname, cmd, permissive, roles }) => ({ policyname, cmd, permissive, roles }));
+        expect(shape(policyAfter.rows)).toEqual(shape(policyBefore.rows));
+    }, 150_000);
+
+    /**
+     * The policies are dropped only inside the transaction that runs the
+     * retype. When the retype fails, the policies are still there afterwards:
+     * dropping them before Atlas and recreating them after would have left the
+     * table without them.
+     */
+    it("keeps a policy when the retype it made room for fails", async () => {
+        await dbClient.query(`INSERT INTO notes (owner_id, body) VALUES ('not-a-number', 'x')`);
+        const before = await dbClient.query(`SELECT policyname FROM pg_policies WHERE tablename = 'notes' ORDER BY policyname`);
+        fs.writeFileSync(path.join(schemaDir, "notes.ts"), notesTableTs("integer"));
+        const failed = await runPush(["--allow-destructive"]);
+        expect(failed.exitCode).not.toBe(0);
+        const type = await dbClient.query(
+            `SELECT format_type(atttypid, atttypmod) AS type FROM pg_attribute WHERE attrelid = 'notes'::regclass AND attname = 'owner_id'`
+        );
+        expect(type.rows[0].type).toBe("text");
+        const after = await dbClient.query(`SELECT policyname FROM pg_policies WHERE tablename = 'notes' ORDER BY policyname`);
+        expect(after.rows).toEqual(before.rows);
+        fs.writeFileSync(path.join(schemaDir, "notes.ts"), notesTableTs("text"));
+    }, 150_000);
+
     it("refuses to re-key a table non-interactively, then re-keys it with --allow-destructive", async () => {
         const translationsTs = (localeIsKey: boolean) => `import { col, defineTable } from "@rebasepro/types";
 
