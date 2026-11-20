@@ -39,6 +39,7 @@ import {
     ExcludeIntrospectionError,
     queryGeneratedColumnDependencies,
     queryPolicyColumnDependencies,
+    applySqlFiles,
     retypeAroundPolicies,
     queryColumnTypes,
     dropGeneratedColumns,
@@ -71,6 +72,7 @@ import {
     describeConflict
 } from "./schema/generated-column-conflicts";
 import { describeBlocked, findPolicyBlockedStatements } from "./schema/policy-column-conflicts";
+import { draftSqlFiles, sqlFilesDir, type SqlFilesPlan } from "./schema/sql-files";
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import type { ExistingConstraint } from "./schema/undeclarable-constraints";
 import { finishNewMigration } from "./schema/migration-post-process";
@@ -935,6 +937,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     outWarn(chalk.gray("  (`--yes` still approves them in this release, with a deprecation warning; from the next it will not.)"));
                     outWarn("");
                 }
+                if (databaseUrl) reportSqlFiles(await applySqlFiles(databaseUrl, sqlFilesDir(schemaDir), { dryRun: true }), true, draftSqlFiles(sqlFilesDir(schemaDir)));
                 out(chalk.gray("  The auth schema step was skipped, because it writes. A real push runs it first."));
                 out("");
                 return;
@@ -1037,6 +1040,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     await applyTriggersDdl(databaseUrl);
                     // After every table a view could read.
                     await applyViewsDdl(databaseUrl);
+                    // The project's own SQL (functions, triggers, checks), after
+                    // the tables and views it acts on and before the policies,
+                    // which may call a function one of the files defines.
+                    reportSqlFiles(await applySqlFiles(databaseUrl, sqlFilesDir(schemaDir)), false, draftSqlFiles(sqlFilesDir(schemaDir)));
                     // Before the policies: where the server-or-admin policies go
                     // (TO rebase_admin or TO public) follows from whether the admin
                     // switch is live, which this sets up as a boot would. After
@@ -1181,6 +1188,24 @@ async function keepDatabaseOwnedDefaults(databaseUrl: string, schemaDir: string)
         out(chalk.gray(`       ${each.table}.${each.column}  DEFAULT ${each.expression}`));
     }
     out("");
+}
+
+/** What `applySqlFiles` did, or with `dryRun` would do, with `backend/sql`. */
+function reportSqlFiles(plan: SqlFilesPlan, dryRun: boolean, drafts: string[] = []): void {
+    if (drafts.length > 0) {
+        out(chalk.gray(`  Not applied, drafts in backend/sql (rename without the leading \`_\` once reviewed): ${drafts.join(", ")}`));
+        out("");
+    }
+    if (plan.apply.length > 0) {
+        out(chalk.gray(`  ${dryRun ? "Would apply" : "Applied"} ${plan.apply.length} file(s) from backend/sql:`));
+        for (const file of plan.apply) out(chalk.gray(`       ${file.name}${file.changed ? " (changed)" : ""}`));
+        out("");
+    }
+    if (plan.removed.length > 0) {
+        outWarn(chalk.yellow(`  ⚠️  ${plan.removed.length} file(s) applied earlier are gone from backend/sql: ${plan.removed.join(", ")}.`));
+        outWarn(chalk.gray("     Removing a file undoes nothing it did. Drop what it created by hand, in a new file if you like."));
+        outWarn("");
+    }
 }
 
 /** Renames relation columns that carry their pre-0.13 derived name, as boot does; a dry-run only names them. */

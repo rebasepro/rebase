@@ -6,6 +6,7 @@ import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { isRebaseIndexName } from "./schema/table-index";
 import type { GeneratedColumnDependency } from "./schema/generated-column-conflicts";
+import { planSqlFiles, readSqlFiles, RECORD_SQL_FILE_SQL, SQL_FILES_LEDGER_SQL, type SqlFilesPlan } from "./schema/sql-files";
 import { dropPolicySql, recreatePolicySql, type PolicyBlockedStatement, type PolicyColumnDependency, type PolicyDefinition } from "./schema/policy-column-conflicts";
 import { COLUMN_TYPES_SQL, type ExistingColumnType } from "./schema/destructive-sql";
 import { UNDECLARABLE_CONSTRAINTS_SQL, undeclaredConstraintExcludes, type ExistingConstraint } from "./schema/undeclarable-constraints";
@@ -789,6 +790,41 @@ export async function retypeAroundPolicies(databaseUrl: string, blocked: PolicyB
             }
         }
         await client.query("COMMIT");
+    });
+}
+
+/**
+ * Apply `backend/sql/*.sql` (see `schema/sql-files.ts`): each new or changed
+ * file in its own transaction, recorded in `rebase.sql_files`. A failure rolls
+ * back that file alone and is rethrown naming it. With `dryRun`, nothing is
+ * written and the plan is only returned (an absent ledger reads as empty).
+ */
+export async function applySqlFiles(databaseUrl: string, dir: string, options: { dryRun?: boolean } = {}): Promise<SqlFilesPlan> {
+    const files = readSqlFiles(dir);
+    return withAppClient(databaseUrl, async client => {
+        const exists = (await client.query("SELECT to_regclass('rebase.sql_files') IS NOT NULL AS present")).rows[0]?.present === true;
+        if (files.length === 0 && !exists) return { apply: [], unchanged: [], removed: [] };
+        const applied = new Map<string, string>();
+        if (exists) {
+            for (const row of (await client.query("SELECT name, hash FROM rebase.sql_files")).rows as { name: string; hash: string }[]) {
+                applied.set(row.name, row.hash);
+            }
+        }
+        const plan = planSqlFiles(files, applied);
+        if (options.dryRun || plan.apply.length === 0) return plan;
+        if (!exists) for (const statement of SQL_FILES_LEDGER_SQL) await client.query(statement);
+        for (const file of plan.apply) {
+            await client.query("BEGIN");
+            try {
+                await client.query(file.sql);
+                await client.query(RECORD_SQL_FILE_SQL, [file.name, file.hash]);
+                await client.query("COMMIT");
+            } catch (err) {
+                await client.query("ROLLBACK").catch(() => undefined);
+                throw new Error(`backend/sql/${file.name} failed, and was rolled back: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+            }
+        }
+        return plan;
     });
 }
 

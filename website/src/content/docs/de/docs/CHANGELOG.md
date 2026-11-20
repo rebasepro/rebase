@@ -11,6 +11,10 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Added
+
+- **`rebase db push` applies the SQL in `backend/sql`.** Functions, triggers, CHECK constraints and grants that a table declaration cannot express go in `backend/sql/*.sql`. The push applies the files in name order, after the tables and views and before the policies. It records each by hash in `rebase.sql_files` and runs it again only when it changes, each in its own transaction: a failing file is rolled back and stops the push, which names it. Before this nothing applied these files, so a project had to remember to run its SQL by hand after every push. A file whose name starts with `_` is a draft and is skipped. `rebase schema introspect` now writes what it could not carry to `backend/sql/_introspected-left-behind.sql`, which you review and rename to have it applied. A deploy to Rebase Cloud does not apply these files yet.
+
 ### Fixed
 
 - **`rebase db push` and `rebase db generate` refuse a column default that calls a Rebase function, and say what to use instead.** A default such as `.default(sql`rebase.uid()`)` failed inside the schema planner with "function rebase.uid() does not exist", even though the database had the function: the planner builds the schema in an empty scratch database, which has no `rebase` functions and cannot be given them. The command now stops before planning, names each such column, and points to `.onCreateUser()` (the server writes the caller's id) or `hooks.beforeSave`.

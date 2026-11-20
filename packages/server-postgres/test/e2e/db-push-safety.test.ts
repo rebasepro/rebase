@@ -425,6 +425,68 @@ export const memos = defineTable("memos", {
         expect(pushed.exitCode, pushed.all).toBe(0);
     }, 150_000);
 
+    /**
+     * `backend/sql/*.sql` is applied by the push, in name order, recorded by
+     * hash in `rebase.sql_files`, and run again only when it changes. Before
+     * this, nothing applied it: a migrated project kept a note to run its
+     * functions and triggers by hand after every push (2026-11-18).
+     */
+    it("applies backend/sql once, again when a file changes, and stops on a failing file with only it rolled back", async () => {
+        await dropScratchDatabases();
+        for (const file of fs.readdirSync(schemaDir)) fs.rmSync(path.join(schemaDir, file));
+        fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex("memos"));
+        fs.writeFileSync(path.join(schemaDir, "memos.ts"), `import { col, defineTable } from "@rebasepro/types";
+
+export const memos = defineTable("memos", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        author: col.text(),
+        body: col.text()
+    },
+    rls: "admin-only"
+});
+`);
+        const sqlDir = path.join(workDir, "sql");
+        fs.mkdirSync(sqlDir, { recursive: true });
+        const fn = (suffix: string) => `CREATE OR REPLACE FUNCTION public.shout(t text) RETURNS text AS $$ SELECT upper(t) || '${suffix}' $$ LANGUAGE sql IMMUTABLE;\n`;
+        fs.writeFileSync(path.join(sqlDir, "010-functions.sql"), fn("!"));
+        fs.writeFileSync(path.join(sqlDir, "020-trigger.sql"), `CREATE OR REPLACE FUNCTION public.memos_shout() RETURNS trigger AS $$ BEGIN NEW.body := public.shout(NEW.body); RETURN NEW; END $$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS memos_shout ON public.memos;
+CREATE TRIGGER memos_shout BEFORE INSERT ON public.memos FOR EACH ROW EXECUTE FUNCTION public.memos_shout();
+`);
+        const dry = await runPush(["--dry-run"]);
+        expect(dry.exitCode, dry.all).toBe(0);
+        expect(dry.all ?? "").toMatch(/Would apply 2 file\(s\) from backend\/sql/);
+
+        const first = await runPush();
+        expect(first.exitCode, first.all).toBe(0);
+        expect(first.all ?? "").toMatch(/Applied 2 file\(s\) from backend\/sql/);
+        await dbClient.query(`INSERT INTO memos (body) VALUES ('hi')`);
+        expect((await dbClient.query(`SELECT body FROM memos`)).rows[0].body).toBe("HI!");
+        const ledger = async () => (await dbClient.query(`SELECT name, hash FROM rebase.sql_files ORDER BY name`)).rows as { name: string; hash: string }[];
+        const recorded = await ledger();
+        expect(recorded.map((r) => r.name)).toEqual(["010-functions.sql", "020-trigger.sql"]);
+
+        const again = await runPush();
+        expect(again.exitCode, again.all).toBe(0);
+        expect(again.all ?? "").not.toMatch(/from backend\/sql/);
+
+        fs.writeFileSync(path.join(sqlDir, "010-functions.sql"), fn("?"));
+        const changed = await runPush();
+        expect(changed.all ?? "").toMatch(/010-functions\.sql \(changed\)/);
+        expect((await ledger())[0].hash).not.toBe(recorded[0].hash);
+        await dbClient.query(`INSERT INTO memos (body) VALUES ('yo')`);
+        expect((await dbClient.query(`SELECT body FROM memos WHERE body LIKE 'YO%'`)).rows[0].body).toBe("YO?");
+
+        fs.writeFileSync(path.join(sqlDir, "030-broken.sql"), "CREATE TABLE public.half_made (id int);\nSELECT no_such_function();\n");
+        const failed = await runPush();
+        expect(failed.exitCode).not.toBe(0);
+        expect(failed.all ?? "").toMatch(/backend\/sql\/030-broken\.sql failed, and was rolled back/);
+        expect((await dbClient.query(`SELECT to_regclass('public.half_made') AS t`)).rows[0].t).toBeNull();
+        expect((await ledger()).map((r) => r.name)).toEqual(["010-functions.sql", "020-trigger.sql"]);
+        fs.rmSync(sqlDir, { recursive: true, force: true });
+    }, 200_000);
+
     it("refuses to re-key a table non-interactively, then re-keys it with --allow-destructive", async () => {
         const translationsTs = (localeIsKey: boolean) => `import { col, defineTable } from "@rebasepro/types";
 

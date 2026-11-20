@@ -43,7 +43,8 @@ text: a `uuid` column compared with `rebase.uid()` in a policy fails.
 
 The run ends with a list of what it did **not** carry over (functions,
 triggers, extensions, CHECK constraints, other indexes, composite foreign keys)
-and writes the SQL for each to `backend/sql/introspected-left-behind.sql`.
+and writes the SQL for each to `backend/sql/_introspected-left-behind.sql`, a
+draft that `rebase db push` does not apply until you rename it.
 
 ## 2. Point the project at the new database
 
@@ -56,17 +57,23 @@ rebase db push
 ```
 
 ## 3. Apply the SQL objects
+<span class="since-badge" data-since="0.35">Since 0.35</span>
 
-Edit `backend/sql/introspected-left-behind.sql` the way the tables were
+Edit `backend/sql/_introspected-left-behind.sql` the way the tables were
 edited: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, no
 `GRANT … TO anon, authenticated`. Functions that called `pg_net` are better as a
-[custom function](/docs/backend/custom-functions/). Then apply it:
+[custom function](/docs/backend/custom-functions/). Make every statement safe to
+run again (`DROP TRIGGER IF EXISTS` before each `CREATE TRIGGER`), then rename
+the file without the leading `_` and push:
 
 ```bash
-psql "$DATABASE_URL" -f backend/sql/introspected-left-behind.sql
-# on Rebase Cloud, with no local psql:
-rebase cloud db query --file backend/sql/introspected-left-behind.sql
+mv backend/sql/_introspected-left-behind.sql backend/sql/introspected.sql
+rebase db push
 ```
+
+`rebase db push` applies every `.sql` file in `backend/sql` in name order, after
+the tables and before the policies, and records each by hash in
+`rebase.sql_files`, so a file runs again only when it changes.
 
 A function the browser called with `supabase.rpc('fn')` is reached through a
 custom function that validates its input and calls it, as the caller under
@@ -136,9 +143,13 @@ on Cloud). Without them the route answers 503, and `rebase cloud status`
 reports `blockedOn: email_not_configured`.
 
 ## 8. Deploy
+<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 ```bash
 rebase cloud projects create --name Triptelier --link
 rebase cloud deploy
-rebase cloud db query --file backend/sql/introspected-left-behind.sql
+rebase cloud db query --file backend/sql/introspected.sql
 ```
+
+A deploy does not apply `backend/sql` yet; run the file once on the Cloud
+database as above, and again after you change it.

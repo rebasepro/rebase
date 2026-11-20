@@ -102,6 +102,7 @@ the ID you got. Read the response header.
 | `EMAIL_EXISTS` | 409 | An account with that address already exists — on registration, on an address change, and on following an address-change link when another account took the address while it waited. | Sign in, or start a password reset; for an address change, pick another address. |
 | `EMAIL_NOT_CONFIGURED` | 503 | Magic links or OTP were requested and the server has no mail transport. | Configure SMTP, or use another sign-in method. |
 | `EMAIL_NOT_VERIFIED` | 403 | An OAuth sign-in found an account with the same address, and the provider did not verify that address, so it is not linked. | Sign in with the existing method, then `POST /auth/link/<provider>`. |
+| `CSRF_REFUSED` | 403 | CSRF protection is on (`csrf: { origin }`) and a request with no `Authorization` header came from an origin not on the list: a cookie-authenticated form post from another site, or a request with no body and no `Origin`. | Send it from an allowed origin, with a JSON body, or with an `Authorization` header. |
 | `FACTOR_NOT_VERIFIED` | 400 | The MFA factor was enrolled but never confirmed. | Confirm the factor. |
 | `IDENTITY_ALREADY_LINKED` | 409 | That OAuth identity belongs to another account. | Sign in with it, or unlink it there first. |
 | `IMPERSONATION_FORBIDDEN` | 403 | A request sent `x-rebase-impersonate` and its caller may not run a request as another user. Only a signed-in administrator's own session may, never an API key or the service key. | Send it with an administrator's session, or leave the header out. |
