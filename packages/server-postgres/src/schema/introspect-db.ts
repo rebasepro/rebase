@@ -1,3 +1,4 @@
+import { INTROSPECTED_LEFT_BEHIND_FILE } from "./sql-files";
 import chalk from "chalk";
 import fs from "fs";
 import path from "path";
@@ -306,12 +307,13 @@ async function main() {
             }
             const withSql = generation.leftBehind.filter((item) => item.sql);
             if (withSql.length > 0) {
-                const sqlPath = path.join(path.dirname(outDir), "sql", "introspected-left-behind.sql");
+                const sqlPath = path.join(path.dirname(outDir), "sql", INTROSPECTED_LEFT_BEHIND_FILE);
                 fs.mkdirSync(path.dirname(sqlPath), { recursive: true });
                 if (!fs.existsSync(sqlPath) || force) {
                     fs.writeFileSync(sqlPath, renderLeftBehindSql(pgSchema, withSql), "utf-8");
-                    outWarn(chalk.gray(`  The SQL for ${withSql.length} of them is in ${sqlPath}: review it, then apply it after \`rebase db push\``));
-                    outWarn(chalk.gray("  (`psql \"$DATABASE_URL\" -f …`, or `rebase cloud db query --file …` on Rebase Cloud)."));
+                    outWarn(chalk.gray(`  The SQL for ${withSql.length} of them is in ${sqlPath}, a draft \`rebase db push\` does not apply.`));
+                    outWarn(chalk.gray("  Review it, make it safe to run again (DROP TRIGGER IF EXISTS before CREATE TRIGGER), and rename it"));
+                    outWarn(chalk.gray("  without the leading `_`: every push then applies it, again whenever it changes."));
                 } else {
                     outWarn(chalk.gray(`  ${sqlPath} exists; pass --force to rewrite it.`));
                 }

@@ -6,6 +6,8 @@ import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { isRebaseIndexName } from "./schema/table-index";
 import type { GeneratedColumnDependency } from "./schema/generated-column-conflicts";
+import { planSqlFiles, readSqlFiles, RECORD_SQL_FILE_SQL, SQL_FILES_LEDGER_SQL, type SqlFilesPlan } from "./schema/sql-files";
+import { dropPolicySql, recreatePolicySql, type PolicyBlockedStatement, type PolicyColumnDependency, type PolicyDefinition } from "./schema/policy-column-conflicts";
 import { COLUMN_TYPES_SQL, type ExistingColumnType } from "./schema/destructive-sql";
 import { UNDECLARABLE_CONSTRAINTS_SQL, undeclaredConstraintExcludes, type ExistingConstraint } from "./schema/undeclarable-constraints";
 import { atlasExcludePattern, excludePatternParts } from "./schema/atlas-exclude";
@@ -723,6 +725,106 @@ export async function queryGeneratedColumnDependencies(
               AND NOT dep.attisdropped;
         `);
         return res.rows as GeneratedColumnDependency[];
+    });
+}
+
+/**
+ * Every `policy → column it reads` edge, for `findPolicyBlockedStatements`:
+ * the columns PostgreSQL will not retype while the policy exists.
+ */
+export async function queryPolicyColumnDependencies(databaseUrl: string): Promise<PolicyColumnDependency[]> {
+    return withAppClient(databaseUrl, async client => {
+        const res = await client.query(`
+            SELECT n.nspname     AS "schema",
+                   c.relname     AS "table",
+                   a.attname     AS "column",
+                   p.oid::int    AS "policyOid",
+                   p.polname     AS "policy"
+            FROM pg_depend d
+            JOIN pg_policy p     ON d.classid = 'pg_policy'::regclass AND d.objid = p.oid
+            JOIN pg_class c      ON c.oid = d.refobjid
+            JOIN pg_namespace n  ON n.oid = c.relnamespace
+            JOIN pg_attribute a  ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+            WHERE d.refclassid = 'pg_class'::regclass
+              AND d.refobjsubid > 0
+              AND NOT a.attisdropped;
+        `);
+        return res.rows as PolicyColumnDependency[];
+    });
+}
+
+/**
+ * Run each blocked plan statement with the policies in its way dropped and
+ * recreated around it, all in one transaction: see `policy-column-conflicts.ts`
+ * for why never in two. A failure rolls everything back, policies included,
+ * and is rethrown naming the statement.
+ */
+export async function retypeAroundPolicies(databaseUrl: string, blocked: PolicyBlockedStatement[]): Promise<void> {
+    if (blocked.length === 0) return;
+    await withAppClient(databaseUrl, async client => {
+        await client.query("BEGIN");
+        for (const item of blocked) {
+            const res = await client.query(`
+                SELECT p.polname AS name, n.nspname AS schema, c.relname AS "table",
+                       p.polcmd::text AS command, p.polpermissive AS permissive,
+                       ARRAY(SELECT CASE WHEN r = 0 THEN 'public' ELSE pg_get_userbyid(r)::text END
+                             FROM unnest(p.polroles) AS r) AS roles,
+                       pg_get_expr(p.polqual, p.polrelid) AS using,
+                       pg_get_expr(p.polwithcheck, p.polrelid) AS "withCheck",
+                       obj_description(p.oid, 'pg_policy') AS comment
+                FROM pg_policy p
+                JOIN pg_class c ON c.oid = p.polrelid
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE p.oid = ANY($1::oid[])
+                ORDER BY p.polname
+            `, [item.policies.map(policy => policy.oid)]);
+            const definitions = res.rows as PolicyDefinition[];
+            for (const definition of definitions) await client.query(dropPolicySql(definition));
+            try {
+                await client.query(item.statement);
+            } catch (err) {
+                throw new Error(`${item.statement}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+            }
+            for (const definition of definitions) {
+                for (const statement of recreatePolicySql(definition)) await client.query(statement);
+            }
+        }
+        await client.query("COMMIT");
+    });
+}
+
+/**
+ * Apply `backend/sql/*.sql` (see `schema/sql-files.ts`): each new or changed
+ * file in its own transaction, recorded in `rebase.sql_files`. A failure rolls
+ * back that file alone and is rethrown naming it. With `dryRun`, nothing is
+ * written and the plan is only returned (an absent ledger reads as empty).
+ */
+export async function applySqlFiles(databaseUrl: string, dir: string, options: { dryRun?: boolean } = {}): Promise<SqlFilesPlan> {
+    const files = readSqlFiles(dir);
+    return withAppClient(databaseUrl, async client => {
+        const exists = (await client.query("SELECT to_regclass('rebase.sql_files') IS NOT NULL AS present")).rows[0]?.present === true;
+        if (files.length === 0 && !exists) return { apply: [], unchanged: [], removed: [] };
+        const applied = new Map<string, string>();
+        if (exists) {
+            for (const row of (await client.query("SELECT name, hash FROM rebase.sql_files")).rows as { name: string; hash: string }[]) {
+                applied.set(row.name, row.hash);
+            }
+        }
+        const plan = planSqlFiles(files, applied);
+        if (options.dryRun || plan.apply.length === 0) return plan;
+        if (!exists) for (const statement of SQL_FILES_LEDGER_SQL) await client.query(statement);
+        for (const file of plan.apply) {
+            await client.query("BEGIN");
+            try {
+                await client.query(file.sql);
+                await client.query(RECORD_SQL_FILE_SQL, [file.name, file.hash]);
+                await client.query("COMMIT");
+            } catch (err) {
+                await client.query("ROLLBACK").catch(() => undefined);
+                throw new Error(`backend/sql/${file.name} failed, and was rolled back: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+            }
+        }
+        return plan;
     });
 }
 

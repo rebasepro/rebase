@@ -749,6 +749,25 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         } satisfies ErrorResponse, 400);
     }
 
+    // Hono's own refusals (`hono/csrf`, a middleware's `throw new HTTPException(403)`)
+    // spell their status `status`, and this handler read only `statusCode`, so
+    // each went out as a 500 — a refusal reported as a server fault. Matched by
+    // shape: hono sets no `name` on it, and two copies of hono can be
+    // resolved in one graph, where `instanceof` is false.
+    const httpStatus = honoHttpExceptionStatus(err);
+    if (httpStatus !== undefined && httpStatus >= 400 && httpStatus < 500) {
+        const httpCode = HTTP_EXCEPTION_CODES[httpStatus] ?? `HTTP_${httpStatus}`;
+        const httpMessage = err.message || httpCode;
+        handOffToRequestLog(c, httpCode, httpMessage);
+        return c.json({
+            error: {
+                message: httpMessage,
+                code: httpCode,
+                ...(reqId && { requestId: reqId })
+            }
+        } satisfies ErrorResponse, httpStatus as ContentfulStatusCode);
+    }
+
     let statusCode = error.statusCode || codeToStatus(error.code) || 500;
     let code = error.code || "INTERNAL_ERROR";
 
@@ -1032,6 +1051,23 @@ function missingGrant(message: string | undefined): { kind: string; name: string
     const match = message?.match(/^permission denied for (schema|table|relation|view|materialized view|sequence|function|procedure|routine|type|column|database|foreign table|large object|tablespace|language) (.+)$/i);
     return match ? { kind: match[1].toLowerCase(), name: match[2].replace(/^"|"$/g, "") } : undefined;
 }
+
+/** The status of a Hono `HTTPException` (a numeric `status` and a `getResponse()`), or undefined. */
+export function honoHttpExceptionStatus(error: unknown): number | undefined {
+    if (!(error instanceof Error) || !("status" in error) || !("getResponse" in error)) return undefined;
+    return typeof error.status === "number" && typeof error.getResponse === "function" ? error.status : undefined;
+}
+
+/** The API's code for a Hono `HTTPException`'s status; anything else is `HTTP_<status>`. */
+const HTTP_EXCEPTION_CODES: Record<number, string> = {
+    400: "BAD_REQUEST",
+    401: "UNAUTHORIZED",
+    403: "FORBIDDEN",
+    404: "NOT_FOUND",
+    405: "METHOD_NOT_ALLOWED",
+    413: "PAYLOAD_TOO_LARGE",
+    429: "RATE_LIMITED"
+};
 
 /**
  * Map known error codes to HTTP status codes.

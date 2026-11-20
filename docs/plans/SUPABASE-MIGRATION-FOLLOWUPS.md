@@ -155,6 +155,43 @@ Not reproduced: one sighting, after a fast stop/start, when the old process may
 still have held the port. `rebase dev` already prints the move
 (`portMovedNotice`), and `rebase dev --port` pins it. No change.
 
+## Item 19 (2026-11-20). A refused deploy was reported as exiting 0
+
+Reported: `pnpm exec rebase cloud deploy --project <slug> --yes -m "…"` on CLI
+0.33.2 printed the control plane's `FRAMEWORK_DOWNGRADE` refusal (a platform
+upgrade had rebuilt the project on 0.34.2), deployed nothing, and exited 0.
+
+**Not reproduced.** I installed `@rebasepro/cli@0.33.2` from npm and ran it with
+`pnpm exec` against a local stand-in control plane that sends the real 400
+envelope (`saas/backend/functions/deploy.ts`, `intakeCode: FRAMEWORK_DOWNGRADE`).
+It exits 1, and with `--json` prints `{"error":{"code":"FRAMEWORK_DOWNGRADE",…}}`.
+Every refusal in `cloud deploy` (intake, 402, 409, upload, timeout, failed build)
+ends in `fail()` or `process.exit(1)`, on 0.33.2 and on main. The CLI also prints
+a remedy line of its own under the server's hint (`Run \`rebase upgrade\` to move
+this project's…`), and that line is missing from the reported output, so the
+output had been cut. Most likely the exit status read was that of a pipe's last
+command (`… | tail`). A test now sends the real envelope through the SDK
+transport and pins exit 1 and the JSON code (`deploy-source.test.ts`). Nothing
+else to do unless it is seen again with the command exactly as run.
+
+## Item 20 (2026-11-20). Cloud tenants run without `rebase_admin`
+
+The boot logged `admin requests keep running as the request role, because
+"rebase_user_admin": Failed query: [redacted …]`. The cause: a tenant cluster is
+created with only `rebase_user` pre-made (`postInitApplicationSQL` in
+`saas/backend/src/k8s/orchestrator.ts`), and `app` has no CREATEROLE, so
+`rebase_admin` cannot be created. The backend then writes the server-or-admin
+policies `TO public`. They still check the admin role, so **admins see every
+row**, and a test checks that. What is lost is the owner-index speedup for
+signed-in users' owner-scoped reads. The log line now gives the reason and says
+this in plain words (fixed in this repo).
+
+**Next (saas).** Add `rebase_admin` and `rebase_user_admin`, with their grants
+(see `docs/deployment/existing-database`), to `postInitApplicationSQL`. Run the
+same statements once as superuser on the tenant clusters that already exist,
+since `postInitApplicationSQL` only runs at initdb. Decide whether that runs as
+a rollout step or a one-off.
+
 ## `rebase migrate supabase`
 
 The pieces now exist separately: Supabase-aware `schema introspect` with the

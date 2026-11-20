@@ -1,15 +1,38 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
+import { HTTPException } from "hono/http-exception";
 import { HonoEnv } from "../api/types";
 import { responseCompression } from "../utils/compression";
 import { requestId } from "../utils/request-id";
 import { requestLogger } from "../utils/request-logger";
 import { logger } from "../utils/logger";
 import { logMiddleware } from "../api/logs-routes";
-import { ApiError, errorHandler } from "../api/errors";
+import { ApiError, errorHandler, honoHttpExceptionStatus } from "../api/errors";
 import { RUNTIME_DEFAULT_MAX_BODY_SIZE } from "../deploy/pod-contract";
 import { formatByteSize } from "../utils/byte-size";
+
+/**
+ * Whether a request is outside what CSRF protects: one that carries its own
+ * credential in `Authorization`.
+ *
+ * CSRF is an attack on ambient credentials, the cookie a browser attaches to a
+ * request another site makes it send. A page on another origin cannot set
+ * `Authorization` on a request without a CORS preflight this server answers,
+ * and could not know the token to put there anyway. Such a request was
+ * refused anyway whenever it had no body and no `Origin` (a CLI's `DELETE`, a
+ * script's bare `POST`), because `hono/csrf` reads a missing content type as a
+ * form post. That broke `rebase users delete` through the Rebase Cloud
+ * control plane.
+ */
+export function csrfDoesNotApply(authorization: string | undefined): boolean {
+    return typeof authorization === "string" && authorization.trim() !== "";
+}
+
+/** A Hono `HTTPException` with this status, matched by shape too: two copies of hono can be resolved. */
+function isHttpException(error: unknown, status: number): boolean {
+    return (error instanceof HTTPException && error.status === status) || honoHttpExceptionStatus(error) === status;
+}
 
 interface MiddlewareConfig {
     maxBodySize?: number;
@@ -111,7 +134,29 @@ export function configureMiddlewares(
         // backend with CSRF on could ever finish connecting.
         const oauthBackChannel = new Set([`${basePath}/oauth/token`, `${basePath}/oauth/revoke`]);
         const checkOrigin = csrf({ origin: config.csrf.origin });
-        app.use(`${basePath}/*`, (c, next) => oauthBackChannel.has(c.req.path) ? next() : checkOrigin(c, next));
+        app.use(`${basePath}/*`, async (c, next) => {
+            if (oauthBackChannel.has(c.req.path) || csrfDoesNotApply(c.req.header("authorization"))) return next();
+            // The check alone, with a `next` that only records that it passed,
+            // so an exception from the route itself is never read as a refusal.
+            // `hono/csrf` refuses by throwing an `HTTPException(403)`, and the
+            // error handler read only `statusCode`, so every refusal went out
+            // as a 500 (a body-less `DELETE` from a script, 2026-11-18).
+            let passed = false;
+            try {
+                await checkOrigin(c, async () => { passed = true; });
+            } catch (error: unknown) {
+                if (!isHttpException(error, 403)) throw error;
+            }
+            if (!passed) {
+                return errorHandler(new ApiError(
+                    403,
+                    "CSRF_REFUSED",
+                    "This request was refused: it did not come from an allowed origin. " +
+                        "Send an Origin header naming one, a JSON body, or an Authorization header."
+                ), c) as Response;
+            }
+            return next();
+        });
         logger.debug("CSRF protection enabled");
     }
 
