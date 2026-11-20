@@ -432,9 +432,9 @@ the one before it:
 1. **The derived collection**: what the panel reads off the table the server
    serves.
 2. **Code**: the `customizeTable` results you pass as `tableCustomizations`.
-3. **`frontend/src/cms/ui-config.json`**: the workspace's presentation as the
-   collection editor saved it in development, passed as `uiConfig`. It is a
-   file in the frontend, so it is reviewed and deployed with it.
+3. **`frontend/src/cms/ui-config.json`**: the workspace's presentation,
+   passed as `uiConfig`. It is a file in the frontend, edited by hand (or by
+   your agent), so it is reviewed and deployed with it.
 4. **Workspace preferences**: what an admin saves on a deployment, in the
    `rebase.ui_preferences` table through
    [`/api/admin/ui-config`](/docs/backend/endpoints/). Writing them needs
@@ -454,8 +454,7 @@ export const Admin = () => <RebaseCMS tableCustomizations={tableCustomizations} 
 
 Preferences hold presentation only: labels, icon, view modes, column order,
 hidden columns, enum labels and colours, kanban and query defaults. A schema
-fact never lands there; the [collection editor](/docs/studio/) writes those to
-`backend/schema` instead.
+fact never lands there; those live in `backend/schema`.
 
 `rebase build` carries `frontend/src/cms/ui-config.json` into the bundle
 (`entry.uiConfig`), so a deployed backend knows it too: `GET /api/admin/ui-config`

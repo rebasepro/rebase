@@ -41,7 +41,7 @@ export { SchemaChangeCancelled, isSchemaChangeCancelled } from "./liveSchemaClie
  * a dialog most sessions never open. The bundle budget caught it.
  */
 const SchemaChangeDialog = lazyChunk(() =>
-    import("./ui/collection_editor/SchemaChangeDialog")
+    import("./SchemaChangeDialog")
         .then(m => ({ default: m.SchemaChangeDialog }))
 );
 

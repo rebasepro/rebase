@@ -39,7 +39,7 @@ import {
 } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
 
-import type { LiveSchemaPlan, LiveSchemaResult, WithheldConstraint } from "../../liveSchemaClient";
+import type { LiveSchemaPlan, LiveSchemaResult, WithheldConstraint } from "./liveSchemaClient";
 
 export interface SchemaChangeDialogProps {
     open: boolean;

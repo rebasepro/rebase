@@ -19,10 +19,6 @@ import { collectionFromTable } from "../../src/tables";
 import { splitEdit, SplitEditError, sameValue } from "../../src/collection_editor/split_edit";
 import { wireColumnOfDescriptor } from "../../src/collection_editor/property_column";
 import { column, posts, rules, table, tags, users, uuidId } from "../tables/fixtures";
-import { productsCollectionTemplate } from "../../src/collection_editor/ui/collection_editor/templates/products_template";
-import { blogCollectionTemplate } from "../../src/collection_editor/ui/collection_editor/templates/blog_template";
-import { usersCollectionTemplate } from "../../src/collection_editor/ui/collection_editor/templates/users_template";
-import { pagesCollectionTemplate } from "../../src/collection_editor/ui/collection_editor/templates/pages_template";
 
 const all = [posts, users, tags];
 const project = (t: TableDescriptor): AdminPostgresCollection => collectionFromTable(t, { tables: [...all, t] });
@@ -376,18 +372,6 @@ describe("a new table", () => {
         const notKey = fresh();
         notKey.properties.id = { type: "string", name: "Id" };
         expect(() => splitEdit({ after: notKey })).toThrow(expect.objectContaining({ code: "NO_PRIMARY_KEY", key: "id" }));
-    });
-
-    it.each([
-        ["products", productsCollectionTemplate],
-        ["blog", blogCollectionTemplate],
-        ["users", usersCollectionTemplate],
-        ["pages", pagesCollectionTemplate]
-    ])("the %s template is a createTable the server accepts, and a presentation that validates", (_name, template) => {
-        const result = splitEdit({ after: template });
-        expect(ops(result.schema)).toEqual(["createTable"]);
-        expect(tablePatchProblems(result.schema)).toEqual([]);
-        expect(uiTablePreferencesProblems(result.presentation)).toEqual([]);
     });
 });
 

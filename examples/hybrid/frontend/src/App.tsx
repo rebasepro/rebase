@@ -6,7 +6,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { firebaseApp } from "./firebase";
 import { firestoreEvents } from "./cms/events";
 import { ordersCms } from "./cms/orders";
-// How the collection editor laid out the tables in development (labels, columns, views).
+// The admin panel's shared layout for each table (labels, columns, views).
 import uiConfig from "./cms/ui-config.json";
 
 // One client for the page: the default data source, the Postgres tables the

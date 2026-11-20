@@ -151,8 +151,7 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 });
 ```
 
-Or register the component once and name it by key, which is also what makes it
-selectable from the collection editor:
+Or register the component once and name it by key:
 
 ```tsx
 <RebaseCMS

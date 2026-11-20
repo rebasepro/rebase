@@ -22,7 +22,7 @@ import { insightSlots } from "./InsightSlots";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { tableCustomizations } from "./cms";
-// How the collection editor laid out the tables in development (labels, columns, views).
+// The admin panel's shared layout for each table (labels, columns, views).
 import uiConfig from "./cms/ui-config.json";
 import { BlogEntryPreview } from "./BlogEntryPreview";
 import { ProductPriceMapView } from "./ProductPriceMapView";

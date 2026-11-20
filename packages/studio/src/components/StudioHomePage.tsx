@@ -1,8 +1,7 @@
 import type { AppView, HomePageSection, PluginGenericProps } from "@rebasepro/cms-types";
-import { studioSchemaToolEnabled } from "@rebasepro/cms-types";
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, cls, Container, ExpandablePanel, Typography } from "@rebasepro/ui";
-import { IconForView, useApiConfig, useNavigationGroupLabel, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot, useTranslation } from "@rebasepro/app";
+import { IconForView, useApiConfig, useNavigationGroupLabel, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot } from "@rebasepro/app";
 import { useNavigate } from "react-router";
 import { useStudioBreadcrumbs, SchemaDriftBanner } from "@rebasepro/app";
 
@@ -112,7 +111,6 @@ export function StudioHomePage({
     const breadcrumbs = useStudioBreadcrumbs();
     const navigate = useNavigate();
     const registry = useRebaseRegistry();
-    const { t } = useTranslation();
     const apiConfig = useApiConfig();
     const apiUrl = absoluteApiUrl(apiConfig?.apiUrl);
 
@@ -126,25 +124,10 @@ export function StudioHomePage({
 
     const pluginActions = useSlot("home.actions", sectionProps);
 
-    // The collection editor ("schema") is not part of `devViews` — RebaseNavigation
-    // injects it when the admin enables a collection editor and the Studio's
-    // tools include it. The same predicate, so the card tracks the route.
-    const schemaEnabled = studioSchemaToolEnabled(registry);
-
-    const filteredSections = useMemo(() => {
-        const views: StudioViewMeta[] = [];
-        if (schemaEnabled) {
-            views.push({
-                slug: "schema",
-                name: t("studio_tool_schema"),
-                group: "Database",
-                icon: "LayoutList",
-                description: t("studio_tool_schema_description")
-            });
-        }
-        views.push(...(registry.studioConfig?.devViews ?? []));
-        return buildSections(views).filter(s => !hiddenGroups?.includes(s.label));
-    }, [registry.studioConfig?.devViews, schemaEnabled, hiddenGroups, t]);
+    const filteredSections = useMemo(
+        () => buildSections([...(registry.studioConfig?.devViews ?? [])]).filter(s => !hiddenGroups?.includes(s.label)),
+        [registry.studioConfig?.devViews, hiddenGroups]
+    );
 
     const groupNames = useMemo(
         () => filteredSections.map(s => s.label),

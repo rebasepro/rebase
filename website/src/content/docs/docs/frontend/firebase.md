@@ -146,15 +146,11 @@ options are the same, so it can sit inline in `dataSources`. Its options:
 It also registers what Firestore can do, so its collections are never offered
 relation tabs or filters Firestore cannot run.
 
-## Editing it in the collection editor
+## Editing it
 
-In development the [collection editor](/docs/studio/#collection-editor) edits
-Firestore collections too: a save rewrites the collection's
-`defineFirestoreCollection({...})` call in `frontend/src/cms` in place,
-changing only what you edited. Functions, custom components, comments and
-imports stay as written; fields defined in code show as read-only. In
-production Firestore collections are read-only in the editor. To delete one,
-remove its file and its `externalCollections` entry.
+A Firestore collection is its `defineFirestoreCollection({...})` call in
+`frontend/src/cms`: edit it there. To delete one, remove its file and its
+`externalCollections` entry.
 
 ## From Firestore to a table
 

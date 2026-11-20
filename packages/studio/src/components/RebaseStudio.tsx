@@ -22,13 +22,6 @@ import { StudioHomePage } from "./StudioHomePage";
 /**
  * Declarative component to configure the Studio in Rebase.
  * Renders nothing — purely registers config into the RebaseRegistry.
- *
- * The "schema" tool (collection editor view) is a Studio tool, but it is not
- * registered here: it ships from the panel package because it needs the project's
- * collection source to write back to. When `<RebaseCMS collectionEditor={...}>`
- * is used, the schema view is automatically injected into Studio — no manual
- * wiring needed. Where it is mounted from is an implementation detail; it is a
- * schema-editing tool and belongs beside SQL and RLS.
  */
 const DEFAULT_HOME_PAGE = <StudioHomePage/>;
 
@@ -158,7 +151,6 @@ icon: "KeyRound",
 description: t("studio_tool_api_keys_description"),
 view: suspense(<ApiKeysView/>) });
         }
-        // Note: "schema" tool is auto-injected by RebaseShell when collectionEditor is enabled.
         // It is NOT registered here anymore.
         return views;
         // Keyed by the tool list's *contents*; see `toolsKey`. `tools` itself is

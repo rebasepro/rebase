@@ -26,8 +26,8 @@
  *
  * Read from source: a single static import puts the whole stack back, and it
  * is one line. This walks modules, not bindings, so it cannot see through a
- * barrel that is imported for one light export (`_cms_internals.ts`, the
- * `preview` index) — the bundle check in tooling/scripts/check-bundle-budget.mjs
+ * barrel that is imported for one light export (the `preview` index) — the
+ * bundle check in tooling/scripts/check-bundle-budget.mjs
  * covers what a build actually keeps.
  */
 import fs from "node:fs";

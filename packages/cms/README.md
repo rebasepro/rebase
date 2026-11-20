@@ -84,15 +84,15 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 All exports from `./data_import` and `./data_export` — utilities for importing CSV/JSON/Excel data with field mapping, and exporting collection data in multiple formats.
 
-### Collection Editor (Visual Schema Editor)
+### Schema editing
 
-All exports from `./collection_editor` — the visual editor for a table and how the panel shows it. A save is split into `TablePatch` edits, which the server's schema editor writes into `backend/schema`, and UI preferences (labels, view modes, column order), which go to `/api/admin/ui-config`.
-
-Also available as a separate entry point:
+All exports from `./collection_editor` — the controller the Studio's RLS editor saves through: an edit is split into `TablePatch` edits, which the server's schema editor writes into `backend/schema` after a plan → confirm → apply step, and UI preferences, which go to `/api/admin/ui-config`. The plan/apply dialog is its own entry point, so it stays out of the eager bundle:
 
 ```ts
-import { CollectionEditorDialog, PropertyForm } from "@rebasepro/cms/collection_editor_ui";
+import { SchemaChangeDialog } from "@rebasepro/cms/collection_editor_ui";
 ```
+
+The visual collection editor (the Studio's "Collections" tool) was removed: a table's schema lives in `backend/schema`.
 
 ### Rich Text Editor (`RichTextEditor`)
 

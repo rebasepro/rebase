@@ -1,18 +1,16 @@
 ---
 title: Studio Tools
 sidebar_label: Studio
-description: Rebase Studio provides developer tools for visual schema editing, SQL queries, JavaScript scripting, RLS policy management, and storage browsing.
+description: Rebase Studio provides developer tools for SQL queries, JavaScript scripting, RLS policy management, a schema diagram, and storage browsing.
 ---
 
 ## Overview
 
 Studio is the developer half of the admin panel. The same application your
-content team uses to edit rows also carries a schema editor, a SQL console, a
-JavaScript scratchpad, an RLS policy browser and a storage browser — and Studio
-is the mode that unlocks them. Nothing to install and nothing to deploy: it is
-already in the panel, behind the toggle in the drawer.
-
-![The collection editor, the flagship Studio tool: a visual schema editor that writes your TypeScript back](/img/collection_editor.png)
+content team uses to edit rows also carries a SQL console, a JavaScript
+scratchpad, an RLS policy editor, a schema diagram and a storage browser — and
+Studio is the mode that unlocks them. Nothing to install and nothing to deploy:
+it is already in the panel, behind the toggle in the drawer.
 
 It exists because the alternative is a second set of credentials. Editing a
 table, checking what a policy really allows, or running one query against
@@ -34,87 +32,14 @@ migrated to `"cms"` on read.
 
 ## Built-in Studio Tools
 
-### Collection Editor
-
-A visual editor for a table and how the panel shows it. A save is split in two:
-
-- **Schema facts** — a column's type, nullability, default, validation, enum
-  values, storage, relations, rules, description, history — become `TablePatch`
-  edits that the server's schema editor writes into `backend/schema/<table>.ts`
-  with [ts-morph](https://ts-morph.com/), changing only the code an edit names
-  and leaving the rest of the file as it was: imports, comments, formatting,
-  hooks, shared columns. An edit that reaches into code — a column built by a
-  helper, rules held in a variable — is refused with the place to make it. A
-  rule left untouched is sent back exactly as served, so its policy name never
-  changes. See [Live schema editing](/docs/backend/live-schema-editing/#the-edits-tablepatch).
-- **Presentation** — labels, icon, view modes, column order, hidden columns,
-  widths, enum labels and colours, kanban, query defaults — is a UI preference,
-  never a schema edit. An admin's are the workspace's: where the server may
-  write the project's source they go to `frontend/src/cms/ui-config.json`, and
-  on a deployment to the `rebase.ui_preferences` table, through
-  `/api/admin/ui-config`. A user's own resizes and view switches are theirs.
-
-A slug, SQL table or database change is refused as a migration. A table whose
-rules come from `defaultRls` asks before taking rules of its own. A caller
-served redacted rules gets a read-only editor. A save the server cannot
-compile lists each problem against the field it names, and nothing is written.
-A file changed on disk since the editor read it offers a reload instead of
-overwriting the change (`SCHEMA_EDIT_STALE_FILE`). A field whose definition is built in code — a helper,
-a shared variable — is shown read-only, with the reason. Column order is
-presentation only: reordering never moves a column in the table. It is the
-screenshot at the top of this page.
-
-**Import an existing table.** A table the database has and `backend/schema`
-does not declare is listed under "Import an existing table"; picking one writes
-its `defineTable` file exactly as the database describes it — columns, keys,
-indexes, row-level security — through the `adoptTable` edit. Adoption changes
-nothing in the database: it plans no DDL, and the first policy step re-creates
-an identical policy once to stamp it. The row-level security posture is never
-lowered: a table with RLS off, or with no policies, is adopted as
-`rls: "admin-only"`, and the dialog says so. A table with no primary key cannot
-be adopted. The routes are `GET /api/admin/schema-editor/unmapped-tables` and
-`GET /api/admin/schema-editor/unmapped-tables/:schema/:table`.
-
-**Firestore collections.** In development the collection editor also edits
-Firestore collections: a save rewrites the collection's
-`defineFirestoreCollection({...})` call in `frontend/src/cms` in place, changing
-only what you edited. Functions, custom components, comments and imports stay
-as written; fields defined in code show as read-only. In production Firestore
-collections are read-only in the editor. Creating one, or changing its slug,
-is done in code; to delete one, remove its file and its `externalCollections`
-entry.
-
-The editor is on wherever Studio is mounted — a scaffold's `<RebaseStudio/>` is
-enough, and there is no prop to add. `collectionEditor` tunes it rather than
-turning it on:
-
-```tsx
-import { RebaseCMS } from "@rebasepro/cms";
-import { RebaseStudio } from "@rebasepro/studio";
-
-// Studio is mounted, so the Collection Editor is available. Nothing else
-// is needed for it.
-<Rebase>
-    <RebaseCMS tableCustomizations={tableCustomizations}/>
-    <RebaseStudio/>
-</Rebase>
-
-// `collectionEditor` is for fine-tuning — a read-only editor, a different
-// token — not for opting in.
-<RebaseCMS
-    tableCustomizations={tableCustomizations}
-    collectionEditor={{
-        getAuthToken: authController.getAuthToken
-    }}
-/>
-```
-
-Whether a *save* lands is the server's decision, not the panel's: the editor
-rewrites `backend/schema`, so it is off under `NODE_ENV=production` (unless
-[live schema editing](/docs/backend/live-schema-editing/) names a repository),
-in `baas` mode, and on a server with no `schemaDir`. The panel asks
-`GET /api/admin/schema-editor/status` and shows the reason it gets back beside the
-disabled button.
+A table's schema is code: `defineTable` in `backend/schema`, or — for a
+project that declares none — whatever the database holds, changed with SQL or a
+migration. Studio has no visual table editor; the Collections tool that was one
+was removed, because a table's columns and its panel presentation had
+been decoupled and one form editing both no longer matched either. The RLS
+editor still saves policies into `backend/schema` in development, through the
+same plan → confirm → apply step as
+[live schema editing](/docs/backend/live-schema-editing/).
 
 ### Built-in tools
 
@@ -178,13 +103,6 @@ pod name on Kubernetes, the container id under Docker) or else `pid-<n>`. There
 is no view across replicas, nor of the `functions` and `worker` processes of a
 [split deployment](/docs/deployment/split-processes/). A reconnect that lands on
 another instance replaces the window instead of mixing the two logs.
-
-The **Collection Editor** is a Studio tool too, but it is not in this list because
-it is registered differently: `RebaseStudio` does not lazy-load it. The panel mounts
-it wherever Studio and the CMS are registered, because unlike the tools above it
-edits the presentation the CMS draws as well as the schema. That is a difference in how it
-is mounted, not in what it is — it edits schema, and it belongs beside the SQL and
-RLS editors.
 
 ## Turning Studio on
 
@@ -251,8 +169,7 @@ a hosted console that has its own storage browser, say, can leave that one out:
 <RebaseStudio tools={["sql", "rls", "schema-visualizer", "api"]} />
 ```
 
-The Collection Editor's Studio view is the `"schema"` tool. Omit `tools` and it
-is there; pass a list without `"schema"`, as above, and it is left out.
+`"schema"`, the Collections tool, is no longer accepted: the tool was removed.
 
 The list is read by *contents*, not identity, so writing it inline is safe: a
 re-render of the host does not tear down and remount whichever tool is on screen.

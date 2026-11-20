@@ -154,17 +154,14 @@ export * from "./selection";
 export * from "./data_import";
 export * from "./data_export";
 
-// Collection editor — moved from @rebasepro/studio (admin-dependent visual schema editor)
+// Schema editing: the collections config controller, the live schema client
+// and the plan/apply flow the Studio's RLS editor saves through. The visual
+// collection editor is gone. `SchemaChangeDialog` stays out of this barrel (it
+// would join the eager bundle and undo the `lazyChunk` in
+// `useLiveSchemaEditing`); it is `@rebasepro/cms/collection_editor_ui`.
 export * from "./collection_editor";
 export * from "./collection_editor/liveSchemaClient";
 export * from "./collection_editor/useLiveSchemaEditing";
-// `SchemaChangeDialog` is deliberately absent, like `CollectionEditorDialog`
-// and `PropertyFormDialog` beside it: re-exporting it from the barrel puts it
-// back in the eager bundle and undoes the `lazyChunk` in `useLiveSchemaEditing`.
-// It is reachable from `@rebasepro/cms/collection_editor_ui`, with the other
-// two — this used to say "import it by path", which named no path and had none
-// to name.
-
 
 export { CreationResultDialog } from "./components/admin/CreationResultDialog";
 
@@ -211,7 +208,6 @@ export type { CollectionAddButtonProps } from "./components/CollectionViewBindin
 // layout — its own width, not the window's. A copy of `Collection.Table`
 // freezes its id column by it.
 export { useCollectionLargeLayout } from "./components/CollectionViewBinding/useCollectionLargeLayout";
-export { EditorCollectionAction } from "./collection_editor/ui/EditorCollectionAction";
 
 // The table's cells and columns, for a copy of `Collection.Table`: the frame
 // every cell sits in, a property's cell, an `additionalFields` value, and the

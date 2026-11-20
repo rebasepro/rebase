@@ -364,8 +364,8 @@ change.
 
 An edit is prepared against the files as they are. If one of them changes on
 disk before the edit is applied — an IDE save, another process — the apply
-writes nothing and answers 409 `SCHEMA_EDIT_STALE_FILE`. The collection editor
-offers Reload; make the edit again against the file as it is now.
+writes nothing and answers 409 `SCHEMA_EDIT_STALE_FILE`. Make the edit again
+against the file as it is now.
 
 ## Where this works
 

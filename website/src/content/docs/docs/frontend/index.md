@@ -54,7 +54,7 @@ matter, and adding a feature means adding a component, not rewiring a tree.
 | Component | Package | Registers |
 |---|---|---|
 | `<RebaseAuth>` | `@rebasepro/app` | the sign-in screen (`loginView`) |
-| `<RebaseCMS>` | `@rebasepro/cms` | the served tables with their customizations, external collections, custom views, the home page, the collection editor |
+| `<RebaseCMS>` | `@rebasepro/cms` | the served tables with their customizations, external collections, custom views, the home page |
 | `<RebaseStudio>` | `@rebasepro/studio` | the developer tools (SQL, RLS, logs, backups…) |
 | `<RebaseShell>` | `@rebasepro/cms` | nothing — it renders the admin from everything above |
 
@@ -98,7 +98,7 @@ browser. The backend imports nothing from the frontend.
 | `entityViews` | Record tabs any table can name by `key` in its `entityViews` |
 | `collectionViews` | View modes any table can name by `key` in its `customViews` |
 | `entityActions` | Record actions any table can name by `key` in its `entityActions` |
-| `collectionEditor` | `true` or options for the visual schema editor |
+| `collectionEditor` | Options for the schema controller the Studio's RLS editor saves through (`readOnly`, `getAuthToken`) |
 | `navigationGroupMappings` | Named groups and the collections and views in each, in order |
 | `basePath` | The URL prefix the admin is mounted under, when the router has no `basename` |
 <!-- rebase-cms-props:end -->

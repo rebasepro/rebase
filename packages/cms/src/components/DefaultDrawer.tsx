@@ -8,7 +8,7 @@ import { useNavigationStateController } from "../hooks/navigation/contexts/Navig
 
 
 import { Link, useNavigate } from "react-router";
-import { AnalyticsEvent, studioSchemaToolEnabled } from "@rebasepro/cms-types";
+import { AnalyticsEvent } from "@rebasepro/cms-types";
 import {
     Avatar,
     ChevronsLeftIcon,
@@ -189,8 +189,6 @@ function AdminNavigationContent() {
     const studioViewSlugs = useMemo(() => {
         const slugs = new Set<string>();
         (registry.studioConfig?.devViews ?? []).forEach(v => slugs.add(v.slug));
-        // The schema view is also a Studio dev view (auto-injected when collectionEditor is enabled)
-        if (studioSchemaToolEnabled(registry)) slugs.add("schema");
         return slugs;
     }, [registry]);
 

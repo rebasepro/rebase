@@ -657,35 +657,17 @@ totalPolicies };
                                             </div>
                                         ) : (
                                             <>
-                                            {/* ── Schema Tables ── */}
-                                            {categorizedTables.collection.length > 0 && (
+                                            {/* ── Served tables: what the API serves, and the junction
+                                                tables its relations read through. Declared or read
+                                                from the database, the server's answer is the same. ── */}
+                                            {(categorizedTables.collection.length > 0 || categorizedTables.junction.length > 0) && (
                                                 <SidebarSection
-                                                    title="Schema Tables"
+                                                    title="Served tables"
                                                     icon={<DatabaseIcon size={12} className="text-primary dark:text-primary-light"/>}
                                                     expanded={expandedSections.collection ?? true}
                                                     onToggle={() => setExpandedSections(prev => ({ ...prev, collection: !(prev.collection ?? true) }))}
                                                 >
                                                     {categorizedTables.collection.map(table => (
-                                                        <SidebarTableRow
-                                                            key={`${table.schemaName}.${table.tableName}`}
-                                                            table={table}
-                                                            isSelected={selectedTable === `${table.schemaName}.${table.tableName}`}
-                                                            onSelect={() => setSelectedTable(`${table.schemaName}.${table.tableName}`)}
-                                                            t={t}
-                                                        />
-                                                    ))}
-                                                </SidebarSection>
-                                            )}
-
-                                            {/* ── Other Tables (unmapped + junction) ── */}
-                                            {(categorizedTables.other.length > 0 || categorizedTables.junction.length > 0) && (
-                                                <SidebarSection
-                                                    title="Other Tables"
-                                                    icon={<AlertTriangleIcon size={12} className="text-yellow-500 dark:text-yellow-400"/>}
-                                                    expanded={expandedSections.other ?? true}
-                                                    onToggle={() => setExpandedSections(prev => ({ ...prev, other: !(prev.other ?? true) }))}
-                                                >
-                                                    {categorizedTables.other.map(table => (
                                                         <SidebarTableRow
                                                             key={`${table.schemaName}.${table.tableName}`}
                                                             table={table}
@@ -702,6 +684,28 @@ totalPolicies };
                                                             onSelect={() => setSelectedTable(`${table.schemaName}.${table.tableName}`)}
                                                             badge="Junction"
                                                             dimmed
+                                                            t={t}
+                                                        />
+                                                    ))}
+                                                </SidebarSection>
+                                            )}
+
+                                            {/* ── Not served: in the database, but the API does not serve
+                                                them (no row-level security, or not declared). The one
+                                                section that warrants the warning. ── */}
+                                            {categorizedTables.other.length > 0 && (
+                                                <SidebarSection
+                                                    title="Not served"
+                                                    icon={<AlertTriangleIcon size={12} className="text-yellow-500 dark:text-yellow-400"/>}
+                                                    expanded={expandedSections.other ?? true}
+                                                    onToggle={() => setExpandedSections(prev => ({ ...prev, other: !(prev.other ?? true) }))}
+                                                >
+                                                    {categorizedTables.other.map(table => (
+                                                        <SidebarTableRow
+                                                            key={`${table.schemaName}.${table.tableName}`}
+                                                            table={table}
+                                                            isSelected={selectedTable === `${table.schemaName}.${table.tableName}`}
+                                                            onSelect={() => setSelectedTable(`${table.schemaName}.${table.tableName}`)}
                                                             t={t}
                                                         />
                                                     ))}

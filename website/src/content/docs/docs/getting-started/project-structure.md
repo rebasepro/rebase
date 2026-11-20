@@ -147,7 +147,7 @@ import { postsCms } from "./cms/posts";
 import { authorsCms } from "./cms/authors";
 import { tagsCms } from "./cms/tags";
 import { usersCms } from "./cms/users";
-// How the collection editor laid out the tables in development (labels, columns, views).
+// The admin panel's shared layout for each table (labels, columns, views).
 import uiConfig from "./cms/ui-config.json";
 
 // `rebase dev` injects VITE_API_URL with the port it actually bound, and that
@@ -203,7 +203,7 @@ one value without it being written down three times.
 ### Key Concepts
 
 - **`createRebaseClient`** — Creates the SDK client that handles HTTP requests, WebSocket connections, and auth token management. Call it once, at module scope: inside a component, even in a `useMemo`, `<React.StrictMode>` builds a second client in development
-- **`<RebaseCMS tableCustomizations>`** — the panel renders every table the backend serves at `GET /api/schema/tables`; the `customizeTable` objects from `frontend/src/cms/` change how some of them look, and `uiConfig` carries what the collection editor saved in development. See [Customizing a table](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
+- **`<RebaseCMS tableCustomizations>`** — the panel renders every table the backend serves at `GET /api/schema/tables`; the `customizeTable` objects from `frontend/src/cms/` change how some of them look, and `uiConfig` carries the shared layout from `frontend/src/cms/ui-config.json`. See [Customizing a table](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
 - **`useRebaseAuthController`** — Holds the signed-in user and the token lifecycle, and is what `<Rebase>` distributes to everything below it
 
 ## Backend (`backend/`)

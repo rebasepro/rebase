@@ -1733,7 +1733,7 @@ isFavorite: !s.isFavorite } : s));
                                                 )}
                                                 {availableRoles.map(role => (
                                                     <MenuItem key={role} dense disabled={connectionOwner !== null} onClick={() => handleRoleChange(role)} className={cls("text-xs", selectedRole === role && "text-primary dark:text-primary-dark")}>
-                                                        {role}{role === "postgres" ? " " + t("studio_sql_collections_label") : ""}
+                                                        {role}
                                                     </MenuItem>
                                                 ))}
                                             </>

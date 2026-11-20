@@ -1,85 +1,43 @@
-import { useUrlController } from "./_cms_internals";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { UnmappedTable, User } from "@rebasepro/types";
-import { Property, Entity } from "@rebasepro/cms-types";
+import React, { useMemo } from "react";
 import { deepEqual as equal } from "fast-equals";
 
-import { CollectionsConfigController, ImportedTable } from "./types/config_controller";
-import { useCustomizationController, useAuthController, useSnackbarController, useBridgeRegistration } from "@rebasepro/app";
+import { CollectionsConfigController } from "./types/config_controller";
+import { useBridgeRegistration } from "@rebasepro/app";
 import type { StudioSchemaEditing } from "@rebasepro/app";
-import { useNavigate } from "react-router";
-import { CollectionEditorController } from "./types/collection_editor_controller";
-import { CollectionInference } from "./types/collection_inference";
-import { CollectionGenerationCallback } from "./api/generateCollectionApi";
-import { CollectionEditorDialogsContext, CollectionEditorDialogsState } from "./CollectionEditorDialogsContext";
-import type { AdminCollection } from "@rebasepro/cms-types";
 
 export const ConfigControllerContext = React.createContext<CollectionsConfigController>({} as CollectionsConfigController);
-export const CollectionEditorContext = React.createContext<CollectionEditorController>({} as CollectionEditorController);
 
 export interface ConfigControllerProviderProps {
     /**
-     * Controller for managing the collections' config.
+     * Controller for the project's schema source: what the Studio's writers
+     * (the RLS editor) save through, via plan → confirm → apply.
      */
     collectionConfigController: CollectionsConfigController;
-
-    /**
-     * Callback used to infer the schema from the data.
-     */
-    collectionInference?: CollectionInference;
-
-    extraView?: {
-        View: React.ComponentType<{
-            path: string
-        }>,
-        icon: React.ReactNode
-    };
-
-    pathSuggestions?: string[];
-
-    getUser?: (uid: string) => User | null;
-
-    getData?: (path: string, parentPaths: string[]) => Promise<object[]>;
-
-    onAnalyticsEvent?: (event: string, params?: object) => void;
-
-    /**
-     * Callback function for generating/modifying collections.
-     * The plugin is API-agnostic - the consumer provides the implementation.
-     */
-    generateCollection?: CollectionGenerationCallback;
-
 }
 
+/**
+ * Hands the schema controller to everything under it, and to the Studio.
+ *
+ * It used to host the visual collection editor too — its dialogs, their
+ * state, and the "Collections" Studio view's context. That editor is gone: a
+ * table's schema lives in `backend/schema`, and the admin panel renders what
+ * the server serves. What remains is the one writer the Studio still uses.
+ */
 export const ConfigControllerProvider = React.memo(
     function ConfigControllerProvider({
         children,
-        collectionConfigController,
-        collectionInference,
-        extraView,
-        getUser,
-        getData,
-        onAnalyticsEvent,
-        pathSuggestions,
-        generateCollection
+        collectionConfigController
     }: ConfigControllerProviderProps & { children?: React.ReactNode }) {
 
-        const authController = useAuthController();
-        /** The database's tables no declared table maps, as the schema editor lists them. */
-        const [unmapped, setUnmapped] = useState<UnmappedTable[]>([]);
-        const unmappedTables = useMemo(() => unmapped.filter(table => !table.unimportable).map(table => table.table), [unmapped]);
-
         /**
-         * Studio's writers, routed through the same plan/apply dialog the
-         * collection editor uses.
+         * Studio's writers, routed through the plan/apply dialog.
          *
          * The RLS editor used to POST a mapped table's rules straight to
          * `/schema-editor/collection/save`: no plan, no confirmation, no sight
-         * of the SQL — while the identical edit two tabs away showed all three.
-         * Studio cannot import this controller (`@rebasepro/cms` is a *peer*
-         * of `@rebasepro/studio`, and Studio has to run without it), so it
-         * arrives over the bridge, and `available` is what a caller checks
-         * before reaching for it.
+         * of the SQL. Studio cannot import this controller (`@rebasepro/cms`
+         * is a *peer* of `@rebasepro/studio`, and Studio has to run without
+         * it), so it arrives over the bridge, and `available` is what a caller
+         * checks before reaching for it.
          */
         const schemaEditing = useMemo<StudioSchemaEditing>(() => {
             const apply = collectionConfigController.applyTablePatches;
@@ -87,347 +45,17 @@ export const ConfigControllerProvider = React.memo(
                 available: !collectionConfigController.readOnly && apply !== undefined,
                 applyTablePatches: (table, patches) => apply
                     ? apply(table, patches)
-                    : Promise.reject(new Error("This collection editor does not write backend/schema."))
+                    : Promise.reject(new Error("This project's schema controller does not write backend/schema."))
             };
         }, [collectionConfigController]);
         useBridgeRegistration("schemaEditing", schemaEditing);
 
-        /** One unmapped table as introspection describes it: what "Import an existing table" adopts. */
-        const onDescribeUnmappedTable = useCallback(async (tableName: string): Promise<ImportedTable | undefined> => {
-            const describe = collectionConfigController.describeUnmappedTable;
-            const listed = unmapped.find(table => table.table === tableName);
-            if (!describe || !listed) return undefined;
-            return describe(listed.schema, listed.table);
-        }, [collectionConfigController, unmapped]);
-
-        const urlController = useUrlController();
-        const navigate = useNavigate();
-        const snackbarController = useSnackbarController();
-        const { propertyConfigs } = useCustomizationController();
-
-        const [currentDialog, setCurrentDialog] = React.useState<{
-            isNewCollection: boolean,
-            parentCollection?: AdminCollection,
-            editedCollectionId?: string,
-            path?: string,
-            parentCollectionSlugs: string[], parentEntityIds: string[],
-            initialValues?: {
-                path?: string,
-                name?: string
-            },
-            copyFrom?: AdminCollection,
-            redirect: boolean,
-            existingEntities?: Entity[],
-            pathSuggestions?: string[];
-            initialView?: "general" | "display" | "properties";
-            expandKanban?: boolean;
-        }>();
-
-        /**
-         * The tables no collection maps, which the "new collection" dialog
-         * offers to import — asked for when that dialog opens, and only then.
-         * They were asked for on every admin page load, and again whenever
-         * the collections or the user changed: `information_schema.tables`
-         * and the junction-table query, ~50–70 ms of catalogue at 2,000
-         * tables, for a list most sessions never see.
-         */
-        const newCollectionDialogOpen = Boolean(currentDialog?.isNewCollection);
-        const listUnmappedTables = collectionConfigController.listUnmappedTables;
-        useEffect(() => {
-            if (!newCollectionDialogOpen) return;
-            if (!listUnmappedTables || authController.initialLoading || !authController.user) return;
-            listUnmappedTables()
-                .then(tables => setUnmapped(tables))
-                .catch((e: unknown) => console.warn("Could not fetch unmapped tables:", e));
-        }, [newCollectionDialogOpen, listUnmappedTables, authController.initialLoading, authController.user]);
-
-        const [currentPropertyDialog, setCurrentPropertyDialog] = React.useState<{
-            propertyKey?: string,
-            property?: Property,
-            namespace?: string,
-            parentCollection?: AdminCollection,
-            currentPropertiesOrder?: string[],
-            editedCollectionId: string,
-            path?: string,
-            parentCollectionSlugs: string[], parentEntityIds: string[],
-
-            existingEntities?: Entity[];
-            collection?: AdminCollection;
-        }>();
-
-        const editCollection = useCallback(({
-            id,
-            path,
-            parentCollectionSlugs, parentEntityIds,
-            parentCollection,
-            existingEntities,
-            initialView,
-            expandKanban
-        }: {
-            id?: string,
-            path?: string,
-            parentCollectionSlugs: string[], parentEntityIds: string[],
-            parentCollection?: AdminCollection,
-            existingEntities?: Entity[],
-            initialView?: "general" | "display" | "properties",
-            expandKanban?: boolean
-        }) => {
-            console.debug("Edit collection", id, path, parentCollectionSlugs, parentEntityIds, parentCollection);
-            onAnalyticsEvent?.("edit_collection", {
-                id,
-                path
-            });
-            setCurrentDialog({
-                editedCollectionId: id,
-                path,
-                parentCollectionSlugs,
-parentEntityIds,
-                isNewCollection: false,
-                parentCollection,
-                redirect: false,
-                existingEntities,
-                pathSuggestions,
-                initialView,
-                expandKanban
-            });
-        }, [onAnalyticsEvent, pathSuggestions]);
-
-        const editProperty = useCallback(({
-            propertyKey,
-            property,
-            editedCollectionId,
-            currentPropertiesOrder,
-            parentCollectionSlugs, parentEntityIds,
-            collection,
-            existingEntities
-        }: {
-            propertyKey?: string,
-            property?: Property,
-            currentPropertiesOrder?: string[],
-            editedCollectionId: string,
-            parentCollectionSlugs: string[], parentEntityIds: string[],
-            collection: AdminCollection,
-            existingEntities?: Entity[]
-        }) => {
-            console.debug("Edit property", propertyKey, property, editedCollectionId, currentPropertiesOrder, parentCollectionSlugs, parentEntityIds, collection);
-            onAnalyticsEvent?.("edit_property", {
-                propertyKey,
-                editedCollectionId
-            });
-            // namespace is all the path until the last dot
-            const namespace = propertyKey && propertyKey.includes(".")
-                ? propertyKey.substring(0, propertyKey.lastIndexOf("."))
-                : undefined;
-            const propertyKeyWithoutNamespace = propertyKey && propertyKey.includes(".")
-                ? propertyKey.substring(propertyKey.lastIndexOf(".") + 1)
-                : propertyKey;
-            setCurrentPropertyDialog({
-                propertyKey: propertyKeyWithoutNamespace,
-                property,
-                namespace,
-                currentPropertiesOrder,
-                editedCollectionId,
-                parentCollectionSlugs,
-parentEntityIds,
-
-                existingEntities,
-                collection
-            });
-        }, [onAnalyticsEvent]);
-
-        const createCollection = useCallback(({
-            parentCollectionSlugs, parentEntityIds,
-            parentCollection,
-            initialValues,
-            copyFrom,
-            redirect,
-            sourceClick
-        }: {
-            parentCollectionSlugs: string[], parentEntityIds: string[],
-            parentCollection?: AdminCollection
-            initialValues?: {
-                path?: string,
-                name?: string
-            },
-            copyFrom?: AdminCollection,
-            redirect: boolean,
-            sourceClick?: string
-        }) => {
-            console.debug("Create collection", {
-                parentCollectionSlugs,
-parentEntityIds,
-                parentCollection,
-                initialValues,
-                copyFrom,
-                redirect,
-                sourceClick
-            });
-            onAnalyticsEvent?.(copyFrom ? "duplicate_collection" : "create_collection", {
-                parentCollectionSlugs,
-parentEntityIds,
-                parentCollection,
-                initialValues,
-                redirect,
-                sourceClick
-            });
-            setCurrentDialog({
-                isNewCollection: true,
-                parentCollectionSlugs,
-parentEntityIds,
-                parentCollection,
-                initialValues,
-                copyFrom,
-                redirect,
-                pathSuggestions
-            });
-        }, [onAnalyticsEvent, pathSuggestions]);
-
-        // Build the dialog props objects that will be consumed by
-        // CollectionEditorDialogs (rendered inside RebaseShell where admin
-        // contexts are available).
-        const collectionDialogProps = useMemo(() => {
-            if (!currentDialog) return undefined;
-            return {
-                open: true,
-                configController: collectionConfigController,
-                collectionInference,
-                ...currentDialog,
-                getData,
-                extraView,
-                getUser,
-                generateCollection,
-                onAnalyticsEvent,
-                unmappedTables,
-                onDescribeUnmappedTable,
-                handleClose: (collection?: AdminCollection) => {
-                    if (currentDialog?.redirect) {
-                        if (collection && currentDialog?.isNewCollection && !currentDialog.parentCollectionSlugs.length) {
-                            const url = urlController.buildUrlCollectionPath(collection.slug);
-                            navigate(url);
-                        }
-                    }
-                    setCurrentDialog(undefined);
-                }
-            };
-        }, [
-            currentDialog, collectionConfigController, collectionInference,
-            getData, extraView, getUser, generateCollection,
-            onAnalyticsEvent, unmappedTables, onDescribeUnmappedTable,
-            urlController, navigate
-        ]);
-
-        const propertyDialogProps = useMemo(() => {
-            if (!currentPropertyDialog) return undefined;
-            return {
-                open: true,
-                includeIdAndName: true,
-                existingProperty: Boolean(currentPropertyDialog.propertyKey),
-                autoUpdateId: !currentPropertyDialog.propertyKey,
-                autoOpenTypeSelect: !currentPropertyDialog.propertyKey,
-                inArray: false,
-                getData: currentPropertyDialog.existingEntities || (getData && currentPropertyDialog.editedCollectionId)
-                    ? async () => {
-                        let data: object[] = [];
-                        if (currentPropertyDialog.existingEntities) {
-                            data = currentPropertyDialog.existingEntities.map(e => e.values);
-                        }
-                        if (getData && currentPropertyDialog.editedCollectionId) {
-                            console.debug("Get data for property, path:", currentPropertyDialog.editedCollectionId);
-                            const resolvedPath = urlController.resolveDatabasePathsFrom(currentPropertyDialog.editedCollectionId!);
-                            const fetchedData = await getData(resolvedPath, []);
-                            data.push(...fetchedData);
-                        }
-                        return data;
-                    }
-                    : undefined,
-                onPropertyChanged: ({
-                    id,
-                    property
-                }: { id?: string; property: Property }) => {
-                    if (!currentPropertyDialog) return;
-                    if (!id) return;
-                    const newProperty = !(currentPropertyDialog.propertyKey);
-                    return collectionConfigController.saveProperty({
-                        path: currentPropertyDialog.editedCollectionId,
-                        property,
-                        propertyKey: id,
-                        newPropertiesOrder: newProperty && currentPropertyDialog.currentPropertiesOrder ? [...currentPropertyDialog.currentPropertiesOrder, id] : undefined,
-                        namespace: currentPropertyDialog.namespace,
-                        parentCollectionSlugs: currentPropertyDialog.parentCollectionSlugs
-                    })
-                        .catch((e: any) => {
-                            console.error(e);
-                            snackbarController.open({
-                                type: "error",
-                                message: "Error persisting property: " + (e.message ?? "Details in the console")
-                            });
-                            return false;
-                        });
-                },
-                onPropertyChangedImmediate: false,
-                onDelete: () => {
-                    if (!currentPropertyDialog.propertyKey) return;
-                    const newPropertiesOrder = currentPropertyDialog.currentPropertiesOrder?.filter((p: string) => p !== currentPropertyDialog.propertyKey);
-                    return collectionConfigController.deleteProperty({
-                        path: currentPropertyDialog.editedCollectionId,
-                        propertyKey: currentPropertyDialog.propertyKey,
-                        namespace: currentPropertyDialog.namespace,
-                        newPropertiesOrder,
-                        parentCollectionSlugs: currentPropertyDialog.parentCollectionSlugs
-                    })
-                        .then(() => {
-                            setCurrentPropertyDialog(undefined);
-                        }).catch((e: any) => {
-                            console.error(e);
-                            snackbarController.open({
-                                type: "error",
-                                message: "Error deleting property: " + (e.message ?? "Details in the console")
-                            });
-                            return false;
-                        });
-                },
-                onError: () => { },
-                onOkClicked: () => {
-                    setCurrentPropertyDialog(undefined);
-                },
-                onCancel: () => {
-                    setCurrentPropertyDialog(undefined);
-                },
-                initialErrors: {},
-                forceShowErrors: false,
-                existingPropertyKeys: currentPropertyDialog.collection?.properties ? Object.keys(currentPropertyDialog.collection.properties) : [],
-                allowDataInference: true,
-                propertyConfigs,
-                property: currentPropertyDialog.property,
-                propertyKey: currentPropertyDialog.propertyKey
-            };
-        }, [currentPropertyDialog, getData, urlController, collectionConfigController, snackbarController, propertyConfigs]);
-
-        const dialogsState: CollectionEditorDialogsState = useMemo(() => ({
-            collectionDialogProps,
-            propertyDialogProps
-        }), [collectionDialogProps, propertyDialogProps]);
-
-        const collectionEditorContextValue = useMemo(() => ({
-            editCollection,
-            createCollection,
-            editProperty,
-            pathSuggestions,
-            configController: collectionConfigController
-        }), [editCollection, createCollection, editProperty, pathSuggestions, collectionConfigController]);
-
         return (
             <ConfigControllerContext.Provider value={collectionConfigController}>
-                <CollectionEditorContext.Provider value={collectionEditorContextValue}>
-                    <CollectionEditorDialogsContext.Provider value={dialogsState}>
-                        {children}
-                        {/* Rendered here rather than by each consumer: a
-                            controller that has to ask before it writes needs
-                            somewhere to ask, and this is the one component that
-                            wraps every editor surface. */}
-                        {collectionConfigController.dialog}
-                    </CollectionEditorDialogsContext.Provider>
-                </CollectionEditorContext.Provider>
+                {children}
+                {/* Rendered here rather than by each writer: a controller that
+                    has to ask before it writes needs somewhere to ask. */}
+                {collectionConfigController.dialog}
             </ConfigControllerContext.Provider>
         );
     }, equal);
