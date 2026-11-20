@@ -432,6 +432,17 @@ export const App: React.FC = () => {
     /* ── a take ──────────────────────────────────────────────────────── */
 
     const stopRef = useRef<(discard?: boolean) => Promise<void>>(async () => undefined);
+    /** The take being thrown away while it saves (its id). */
+    const throwing = useRef<string | null>(null);
+    /* A take that is saving — encoding can take a minute or two — can still
+       be thrown away: the server stops the encode and moves it aside. */
+    const throwAwaySaving = useCallback(() => {
+        const s = session.current;
+        if (!s || !s.stopping || throwing.current) return;
+        throwing.current = s.id;
+        setNotice("Throwing the take away…");
+        void post(`/api/takes/${s.id}/discard`, "").catch(() => undefined);
+    }, []);
 
     const loop = useCallback(() => {
         const s = session.current;
@@ -677,6 +688,14 @@ export const App: React.FC = () => {
             } catch (err) {
                 session.current = null;
                 setLiveTiming(null);
+                if (throwing.current === s.id) {
+                    /* Thrown away while it was saving: the server stopped the
+                       encode and moved it aside. Nothing went wrong. */
+                    throwing.current = null;
+                    setPhase("ready");
+                    setNotice("Take thrown away.");
+                    return;
+                }
                 setError(`Saving the take failed: ${String(err)}. What was recorded is in takes/${s.id}/.`);
                 /* Still ready to record: one take going wrong is no reason to
                    reload the page. */
@@ -1048,6 +1067,9 @@ export const App: React.FC = () => {
                 /* A presenter's clicker sends PageDown. */
                 e.preventDefault();
                 s.follower.advanceLine(((performance.now() - s.t0) * FPS) / 1000);
+            } else if (e.code === "KeyR" && s && s.stopping && phase === "saving") {
+                e.preventDefault();
+                throwAwaySaving();
             } else if (e.code === "KeyR" && s && !s.stopping) {
                 e.preventDefault();
                 void stop(true);
@@ -1085,7 +1107,7 @@ export const App: React.FC = () => {
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [start, stop, testMic, stopReview, playChapter, playCut, chapter, review.playing, review.cut, takes, mode, startTalk, stopTalk, nextTalkChapter]);
+    }, [start, stop, testMic, stopReview, playChapter, playCut, chapter, review.playing, review.cut, takes, mode, startTalk, stopTalk, nextTalkChapter, phase, throwAwaySaving]);
 
     /* ── the page ────────────────────────────────────────────────────── */
 
@@ -1370,6 +1392,13 @@ export const App: React.FC = () => {
                     <span>Talk about the chapter in your own words, as if to a colleague. → or a clicker: next chapter · Space or Esc: stop and save the transcript</span>
                 ) : phase === "recording" && session.current?.rehearse ? (
                     <span>Say each line the way you would say it — change words freely. If the prompter stops following, → moves to the next line · Esc: stop and compare</span>
+                ) : phase === "saving" && session.current && !session.current.rehearse ? (
+                    <>
+                        <span>Saving the take: encoding it for the film can take a minute or two.</span>
+                        <button style={ghost} onClick={throwAwaySaving}>
+                            Throw it away — R
+                        </button>
+                    </>
                 ) : phase === "recording" ? (
                     <span>Read at your own pace. → or a clicker: next line · Esc: stop and keep · R: throw this take away</span>
                 ) : null}

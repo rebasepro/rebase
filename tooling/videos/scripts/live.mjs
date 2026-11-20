@@ -32,12 +32,12 @@
 import { context } from "esbuild";
 import { spawn } from "node:child_process";
 import { createReadStream, existsSync } from "node:fs";
-import { appendFile, mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startPhone } from "./phone.mjs";
-import { processTake } from "./take.mjs";
+import { Discarded, processTake } from "./take.mjs";
 import { listTakes } from "./takes.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -141,6 +141,9 @@ function body(req) {
         req.on("error", reject);
     });
 }
+
+/** Takes being processed, so a discard can stop the encode. */
+const processing = new Map();
 
 const json = (res, status, value) => res.writeHead(status, { "Content-Type": "application/json" }).end(JSON.stringify(value));
 
@@ -266,14 +269,28 @@ const server = http.createServer(async (req, res) => {
                 return json(res, 200, { ok: true });
             }
             if (action === "discard") {
+                /* Thrown away while it is still being encoded: stop that
+                   first, and drop the half-written film copy. */
+                processing.get(id)?.abort();
+                processing.delete(id);
+                await rm(path.join(PUBLIC, "takes", `${id}.mp4`), { force: true });
                 await mkdir(path.join(TAKES, ".discarded"), { recursive: true });
                 await rename(dir, path.join(TAKES, ".discarded", id));
                 console.log(`${id}: discarded (moved to takes/.discarded/)`);
                 return json(res, 200, { ok: true });
             }
-            const out = await processTake(id, { log: (line) => console.log(line) });
-            console.log(`\n${out.summary}\n\nrender:\n  ${out.render}\n`);
-            return json(res, 200, { summary: out.summary, render: out.render });
+            const controller = new AbortController();
+            processing.set(id, controller);
+            try {
+                const out = await processTake(id, { log: (line) => console.log(line), signal: controller.signal });
+                console.log(`\n${out.summary}\n\nrender:\n  ${out.render}\n`);
+                return json(res, 200, { summary: out.summary, render: out.render });
+            } catch (err) {
+                if (err instanceof Discarded) return json(res, 409, { discarded: true });
+                throw err;
+            } finally {
+                if (processing.get(id) === controller) processing.delete(id);
+            }
         }
         const loose = /^\/api\/loose\/(loose-\d{8}-\d{6})\/(chunk|save)$/.exec(url.pathname);
         if (loose && req.method === "POST") {
