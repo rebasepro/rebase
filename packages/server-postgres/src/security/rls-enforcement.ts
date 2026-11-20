@@ -1221,7 +1221,12 @@ export async function settleAdminRequestRoles(
                 role, adminRole, provisionRole: options.provision ? settings.provisionRole : "never"
             });
         } catch (err) {
-            failures.push(`"${adminRole}": ${err instanceof Error ? err.message : String(err)}`);
+            // `failureReason`, not `.message`: a statement the runner refused
+            // arrives as Drizzle's `Failed query: …`, which the logger redacts
+            // to nothing, and the reason (on Rebase Cloud: `app` may not create
+            // `rebase_admin`) is in `.cause`. The line used to read `because
+            // "rebase_user_admin": Failed query: [redacted …]`.
+            failures.push(`"${adminRole}": ${failureReason(err).trim().replace(/\.$/, "")}`);
         }
     }
     if (failures.length > 0) {
@@ -1229,12 +1234,22 @@ export async function settleAdminRequestRoles(
         // (`settleAdminSwitch`), which the request role passes: as before, and
         // nothing refused. Louder when `rebase_admin` exists, since that is a
         // setup someone started and this server cannot finish.
+        //
+        // The line leads with what it means for admins, because that is what a
+        // reader of it wants to know and what the old wording left them to
+        // guess: "keep running as the request role" read as admins losing the
+        // admin baseline. They do not — the TO public policies still check the
+        // admin role — and what is lost is an index, which it says next.
         const [marker] = await run(`SELECT to_regrole('${REBASE_ADMIN_ROLE}') IS NOT NULL AS present`);
+        const requestRoles = [...settings.adminRoles.keys()].map((r) => `"${r}"`).join(", ");
         (marker?.present === true ? (m: string) => logger.warn(m) : (m: string) => logger.info(m))(
-            `${marker?.present === true ? "⚠️" : "🔐"} RLS enforcement: admin requests keep running as the request role, because ${failures.join("; ")}. ` +
-            `The server-or-admin policies are written TO public by this server until that is fixed, so signed-in ` +
-            `users' owner-scoped reads cannot use the owner index. Create ${REBASE_ADMIN_ROLE} and the admin request role ` +
-            "as above to change that, or declare adminPolicies \"public\" to say this on purpose."
+            `${marker?.present === true ? "⚠️" : "🔐"} RLS enforcement: admins still read and write every row, ` +
+            `but through the slower path, because the admin request role could not be set up (${failures.join("; ")}). ` +
+            `Admin requests run as the request role (${requestRoles}) and the server-or-admin policies are written ` +
+            "TO public, where they still check the admin role. The cost: a signed-in user's owner-scoped reads cannot " +
+            `use the owner index. To get it back, a database administrator creates ${REBASE_ADMIN_ROLE} and the admin ` +
+            "request role (https://rebase.pro/docs/deployment/existing-database/, `rebase doctor --database` shows " +
+            "what is missing); or declare adminPolicies \"public\" to keep this on purpose."
         );
         return settings.request;
     }

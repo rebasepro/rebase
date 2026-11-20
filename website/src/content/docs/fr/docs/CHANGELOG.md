@@ -11,6 +11,10 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The boot line about the admin request role says why it could not be set up, and that admins still see every row.** Where `rebase_admin` cannot be created (a Rebase Cloud tenant, whose connection role may not create roles), the backend logged `admin requests keep running as the request role, because "rebase_user_admin": Failed query: [redacted …]`. The reason was hidden by log redaction, and the wording read as admins losing their access to every row. The line now gives the database's reason and says what it means: admins still read and write every row, because the admin policies are written `TO public` and still check the admin role. What is lost is the owner index for signed-in users' owner-scoped reads. It also says how to get that back.
+
 ## [0.34.2] - 2026-11-20
 
 ### Added

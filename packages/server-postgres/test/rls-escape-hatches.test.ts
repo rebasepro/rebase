@@ -5,6 +5,7 @@
  * Postgres (PGlite).
  */
 import { PGlite } from "@electric-sql/pglite";
+import { logger } from "@rebasepro/server";
 import { revokeInternalTableSql, tableEffectiveRules } from "@rebasepro/common";
 import { compileRulePolicies, getEffectiveSecurityRules, liftedPolicyTable } from "./helpers/legacy-policies";
 import { resetDeclaredResources, database } from "@rebasepro/types";
@@ -564,6 +565,71 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
             expect(plan.replace).toEqual([]);
             expect(plan.create).toEqual([]);
         } finally {
+            await pg.close();
+        }
+    });
+
+    /**
+     * What the boot says on a Rebase Cloud tenant, and that it is true. The
+     * driver's runner is Drizzle, which throws `Failed query: <sql>` and keeps
+     * Postgres's sentence in `.cause`; the logger redacts the former, so the
+     * line read `because "rebase_user_admin": Failed query: [redacted …]` and
+     * "admin requests keep running as the request role", which a reader took
+     * for admins losing the admin baseline (reported from a migration,
+     * 2026-11-20). It must name the cause, and say that admins still see every
+     * row — which the counts below check rather than take on trust.
+     */
+    it("says why, and that admins still see every row, where rebase_admin cannot be made", async () => {
+        const pg = new PGlite();
+        const info = jest.spyOn(logger, "info").mockImplementation(() => undefined);
+        try {
+            await pg.exec(`
+                CREATE ROLE app NOLOGIN;
+                CREATE ROLE rebase_user NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+                GRANT rebase_user TO app;
+                ALTER SCHEMA public OWNER TO app;
+                DO $$ BEGIN EXECUTE format('GRANT CREATE ON DATABASE %I TO app', current_database()); END $$;
+                SET ROLE app;
+                CREATE SCHEMA rebase;
+                GRANT USAGE ON SCHEMA rebase TO rebase_user;
+                CREATE FUNCTION rebase.uid() RETURNS text AS $f$ SELECT NULLIF(current_setting('app.uid', true), '') $f$ LANGUAGE sql STABLE;
+                CREATE FUNCTION rebase.roles() RETURNS text AS $f$ SELECT COALESCE(current_setting('app.user_roles', true), '') $f$ LANGUAGE sql STABLE;
+                CREATE TABLE public.tasks (id serial PRIMARY KEY, owner_id text);
+                INSERT INTO public.tasks (owner_id) VALUES ('ada'), ('bob');
+                GRANT SELECT ON public.tasks TO rebase_user;
+            `);
+            // Drizzle's shape: the statement in the message, Postgres in `.cause`.
+            const drizzleLike = async (text: string) => {
+                try {
+                    return (await pg.query<Record<string, unknown>>(text)).rows;
+                } catch (cause) {
+                    throw new Error(`Failed query: ${text}\nparams: `, { cause });
+                }
+            };
+            const request = await settleAdminRequestRoles(drizzleLike, ["public"], resolveRlsSettings(undefined), { provision: true });
+            expect(request.adminRoleFor).toBeUndefined();
+
+            const said = info.mock.calls.map(([m]) => String(m)).join("\n");
+            expect(said).toContain("admins still read and write every row");
+            expect(said).toContain("which does not exist, and app may not create it");
+            expect(said).not.toContain("Failed query");
+
+            const outcome = await ensureTablePolicies({ query: <T,>(text: string) => pg.query<T>(text) }, compileSet([tasks]));
+            expect(outcome.failures).toEqual([]);
+            const count = async (auth: { uid: string; roles: string[] }) => {
+                const opening = authContextStatement(auth, request);
+                await pg.query("BEGIN");
+                try {
+                    await pg.query(opening.text, opening.values);
+                    return Number((await pg.query<{ n: number }>("SELECT count(*)::int AS n FROM public.tasks")).rows[0].n);
+                } finally {
+                    await pg.query("ROLLBACK");
+                }
+            };
+            expect(await count({ uid: "ada", roles: ["user"] })).toBe(1);
+            expect(await count({ uid: "staff", roles: ["admin"] })).toBe(2);
+        } finally {
+            info.mockRestore();
             await pg.close();
         }
     });

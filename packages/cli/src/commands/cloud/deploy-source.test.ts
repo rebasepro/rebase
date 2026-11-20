@@ -48,6 +48,7 @@ vi.mock("./bundle-deploy", async (importOriginal) => {
     return { ...actual, uploadBundle: vi.fn(actual.uploadBundle) };
 });
 
+import { createRebaseClient } from "@rebasepro/client";
 import * as context from "./context";
 import { fakeCloudClient, type InvokeAnswer } from "../../../test/helpers/cloud-client";
 import { deployCommand } from "./deploy";
@@ -345,6 +346,52 @@ describe("a bundle refused as a downgrade", () => {
         expect(text).toContain("Rebuild it on 0.21.0 or later.");
         expect(text).toContain("rebase upgrade");
         expect(text).toContain("--allow-downgrade");
+    });
+
+    /**
+     * The case above hands the deploy an error already shaped the way the CLI
+     * reads it. This one sends the control plane's actual 400 envelope through
+     * the real SDK transport, so a transport that stopped carrying `status` or
+     * `details` — and the refusal fell through to a path that does not exit —
+     * fails here. Reported from a migration (2026-11-20) as "refused, exit 0":
+     * the CLI exits 1 on that refusal, and this pins it, in JSON mode too, where
+     * a script reads the code rather than the prose.
+     */
+    it("exits 1 with a FRAMEWORK_DOWNGRADE error object when the real transport carries the refusal", async () => {
+        bundle("backend");
+        controlPlane();
+        const message = "This project runs @rebasepro 0.34.2: a platform upgrade rebuilt it from your last deploy's source. "
+            + "This bundle was built against 0.33.2, so deploying it would put the older admin panel and database driver back.";
+        const hint = "Run `rebase upgrade --to 0.34.2` and deploy again — or pass `--allow-downgrade` if going back is what you want.";
+        const wire = createRebaseClient({
+            baseUrl: "https://cp.example",
+            realtime: false,
+            fetch: async () => new Response(JSON.stringify({
+                error: { code: "invalid_param", message, details: { intakeCode: "FRAMEWORK_DOWNGRADE", hint } }
+            }), { status: 400, headers: { "Content-Type": "application/json" } })
+        });
+        const client = fakeCloudClient({
+            session: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }),
+            collection: () => ({ findById: async () => undefined, find: async () => ({ data: [] }) })
+        });
+        client.functions = wire.functions;
+        vi.mocked(context.requireClient).mockResolvedValue({ client, url: "https://cp.example" });
+
+        context.setJsonModeForTest(true);
+        const stdout: string[] = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+        try {
+            await expect(deploy("--no-source")).rejects.toMatchObject({ code: 1 });
+        } finally {
+            context.setJsonModeForTest(false);
+        }
+
+        expect(JSON.parse(stdout.join(""))).toMatchObject({
+            error: { code: "FRAMEWORK_DOWNGRADE", message, hint: expect.stringContaining("rebase upgrade --to 0.34.2") }
+        });
     });
 });
 
