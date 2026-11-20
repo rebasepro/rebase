@@ -998,8 +998,9 @@ export const App: React.FC = () => {
                 audio.pause();
                 URL.revokeObjectURL(url);
                 testing.current = null;
-                /* Played back: the box has said what it needed to — gone. */
-                setMicTest(null);
+                /* Played back: the box has said what it needed to — gone,
+                   unless recognition heard nothing, which is worth reading. */
+                setMicTest((m) => (m && !m.heard ? { ...m, state: "done" } : null));
             };
             audio.onended = done;
             current.stopPlayback = done;
