@@ -11,6 +11,8 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ## [Unreleased]
 
+## [0.34.2] - 2026-11-20
+
 ### Added
 
 - **Every socket's open and close is logged, and `/metrics` counts what sockets do.** A close left one debug line, and none in production, so a report of dropped connections had nothing to be read against. Each socket now logs `[WebSocket Server] Socket opened` (its `clientId`, `affinity` and opt-ins) and `[WebSocket Server] Socket closed` at info, with its `uid`, `closedBy` (`client`, `client_watchdog`, `network`, `no_pong`, `backlog`, `session`, `ceiling`, `shutdown`, `oversized_frame`, `server`), close `code` and `reason`, `ageMs`, channels, and frames and bytes in and out. `/metrics` gains `rebase_realtime_socket_opens_total`, `rebase_realtime_socket_closes_total{closed_by}`, `rebase_realtime_socket_close_codes_total{code}`, frames and bytes in and out, and `rebase_realtime_frames_refused_total{code}` (`RATE_LIMITED`, `CHANNEL_FORBIDDEN`, `CHANNEL_BUS_PAYLOAD_TOO_LARGE`, `FRAME_TOO_LARGE`, `AUTH_UNAVAILABLE`, `UNAUTHORIZED`). A channel frame refused because the auth store could not re-check its identity past the 60 s grace is now a warning.

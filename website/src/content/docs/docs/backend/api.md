@@ -458,7 +458,7 @@ GET /api/meta/contract
 ```
 
 ```json
-{ "schemaVersion": "v2:…", "runtime": { "version": "0.34.1", "contract": 2 }, "tables": [ … ] }
+{ "schemaVersion": "v2:…", "runtime": { "version": "0.34.2", "contract": 2 }, "tables": [ … ] }
 ```
 
 It needs the **`schema:read`** scope, which an admin holds, and on a deployment with no authentication configured it

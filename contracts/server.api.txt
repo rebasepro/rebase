@@ -1041,10 +1041,11 @@ interface RawSQLCheckOnlySecurityRule { access, check, condition, mode, name, op
 interface RawSQLSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface ReadQuery { fields, filter, limit, logical, offset, orderBy, relatedTo, searchString }
 interface RealtimeChannelsConfig { bus, cdc, channels, maxSocketsPerUser, maxSubscriptionsPerSocket, path, recountIntervalMs, recountMinRows, refetchMaxWaitMs }
-interface RealtimeCounts { busFramesPublished, busFramesSkipped, channels, sockets }
+interface RealtimeCounts { busFramesPublished, busFramesSkipped, channels, socketTotals, sockets }
 interface RealtimeListenerHealth { connected, downSince, name }
 interface RealtimeProvider { counts, destroy, health, notifyUpdate, onServerReady, setScopeRunner, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RealtimeSocketOptions { accessModel, dataRateLimit, heartbeatIntervalMs, identityRecheckIntervalMs, maxPayload, maxSocketsPerUser, path, resolveApiKey, runInScope, verifyAccessToken }
+interface RealtimeSocketTotals { bytesIn, bytesOut, closeCodes, closedBy, framesIn, framesOut, opened, refused }
 interface RebaseBackendAppConfig { context, crons, dockerfile, functions, port, registerDatabase, runtime, schema, tables, type }
 interface RebaseBundleEntrypoints { crons, functions, hooks, resources, schema, static, storage, tables, uiConfig }
 interface RebaseBundleFunction { file, name, portable, requires }
@@ -1474,6 +1475,7 @@ interface PushClient { getSubscription, isSupported, subscribe, unsubscribe }
 interface PushRegistrationOptions { registration }
 interface PushSubscribeOptions { lang, registration }
 interface RealtimeClientOptions { affinity }
+interface RealtimeDisconnectInfo { cause, code, openForMs, reason, silentForMs }
 interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, headers, impersonate, onUnauthorized, realtime, schemaVersion, storageUrlOrigin, token, websocketUrl }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RestoreOptions { field, idempotencyKey, ifMatch, returning }
@@ -1514,6 +1516,7 @@ type OrderBySpec
 type PaginationErrorCode
 type PresenceState
 type QueryComputedFields
+type RealtimeDisconnectCause
 type RebaseErrorCode
 type RowOf
 type SessionRestoreOutcome

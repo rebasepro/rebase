@@ -1,5 +1,5 @@
 ---
-sourceHash: 82c169ec5db30ba5
+sourceHash: 3036d8c7d3f98d60
 title: App e Repository
 sidebar_label: App e Repository
 description: Un progetto è composto da un backend più le app che comunicano con esso, ciascuna delle quali può risiedere nel proprio repository.
@@ -395,7 +395,7 @@ poiché un identificativo di versione non svela dettagli strutturali sullo schem
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.34.1","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.34.2","contract":1}}
 ```
 
 Confrontare questi due identificatori all'interno della pipeline di CI trasforma un potenziale disallineamento silente in un controllo fallito prima del rilascio. L'identificativo

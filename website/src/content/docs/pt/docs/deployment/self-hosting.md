@@ -1,5 +1,5 @@
 ---
-sourceHash: afff523ed2df1d76
+sourceHash: 24ca441ff345427c
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem de runtime oficial e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS comum.
@@ -125,7 +125,7 @@ Para um deploy real, prefira embutir ambos em uma imagem, o que também fixa exa
 o que é executado:
 
 ```dockerfile
-FROM rebasepro/server:0.34.1
+FROM rebasepro/server:0.34.2
 COPY dist-bundle /bundle
 ```
 
@@ -331,7 +331,7 @@ containers funciona. Dois pontos a garantir em qualquer lugar:
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.34.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.34.2 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -585,7 +585,7 @@ cooperantes. Veja [Processos divididos](/docs/deployment/split-processes/).
 ## Atualização
 
 ```yaml
-image: rebasepro/server:0.34.1
+image: rebasepro/server:0.34.2
 ```
 
 Reinicie. Seu bundle permanece inalterado. Dentro de uma mesma versão major do contrato de runtime, um bundle que

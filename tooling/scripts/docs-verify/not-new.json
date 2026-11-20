@@ -1,3 +1,1 @@
-{
-  "disconnect": "The SDK's `disconnect` event has shipped since the first realtime client; [Unreleased] only adds the details it carries ({ code, reason, cause, openForMs, silentForMs })."
-}
+{}
