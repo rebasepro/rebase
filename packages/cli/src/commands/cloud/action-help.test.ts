@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ACTION_HELP, printActionHelp } from "./action-help";
 import { GLOBAL_SPEC_KEYS } from "./context";
-import { CREATE_PROJECT_FLAGS, LIST_PROJECTS_FLAGS } from "./projects";
+import { CREATE_PROJECT_FLAGS, LIST_PROJECTS_FLAGS, TRANSFER_PROJECT_FLAGS } from "./projects";
 import { CREATE_DATABASE_FLAGS } from "./databases";
 import { DB_CONNECT_FLAGS } from "./db-connect";
 import { DB_QUERY_FLAGS } from "./db-query";
@@ -65,6 +65,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     clusters: null,
     "projects create": CREATE_PROJECT_FLAGS,
     "projects delete": {},
+    "projects transfer": TRANSFER_PROJECT_FLAGS,
     "resources prune": {},
     "db create": CREATE_DATABASE_FLAGS,
     "db connect": DB_CONNECT_FLAGS,
@@ -283,6 +284,7 @@ flag: flag[1] });
         ["deploy.ts", DEPLOY_FLAGS],
         ["projects.ts", CREATE_PROJECT_FLAGS],
         ["projects.ts", LIST_PROJECTS_FLAGS],
+        ["projects.ts", TRANSFER_PROJECT_FLAGS],
         ["env.ts", ENV_SET_FLAGS],
         ["tokens.ts", CREATE_TOKEN_FLAGS],
         ["init.ts", INIT_FLAGS],

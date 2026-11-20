@@ -11,6 +11,10 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Added
+
+- **`rebase cloud projects transfer <slug> --to-org <id|slug>` moves a project to another organization.** The project stays as it is: same id, address, custom domains, database, storage, environment variables and deployments. What changes is who owns it, who can see it and who pays for it. You have to be owner or admin of both organizations and signed in with `rebase cloud login`. An access token cannot move a project. The destination is billed from then on, so a destination with no card on file, unless it is billed internally, refuses the move and nothing changes. The command asks for confirmation unless you pass `--yes`, and off a terminal it refuses rather than assuming. It needs a control plane with the `project-transfer` function. An older one says that moving a project is not available there.
+
 ### Changed
 
 - **A select draws its label inside the box, as a text field does.** It drew the label above the box, so a form that put a select beside text fields showed two kinds of label on one row. The label now rests in the middle of an empty select and moves into the top edge once there is a value or the select has focus, and the box is a labelled `TextField`'s height at the same size, so the two line up. At `smallest` the label stays above, since a 28px box has no room for it. Pass `labelPlacement="above"` to keep it above at any size. The record form's single selects already looked like this; their binding now uses the kit's label instead of drawing its own over the box. `MultiSelect` is unchanged.

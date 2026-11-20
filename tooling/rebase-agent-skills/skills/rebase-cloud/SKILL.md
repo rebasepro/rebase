@@ -15,7 +15,7 @@ Everything here is driven by `rebase cloud <command>`. There is no bare
 namespace, and a mistyped one exits 1.
 
 > **⛔ AGENT RULE — read this first.** Never run `rebase cloud deploy`,
-> `rebase cloud projects create`, `rebase cloud projects delete`,
+> `rebase cloud projects create`, `rebase cloud projects delete`, `rebase cloud projects transfer`,
 > `rebase cloud rollback`, `rebase cloud stop` or any other command that changes
 > the hosted platform unless the user asked for it **in the current
 > conversation**. Everything in this skill is safe to *read*
@@ -741,7 +741,7 @@ and go through the console's Studio proxy (see the **`rebase-basics`** skill:
 
 **Never run a command that changes the hosted platform unless the user asked in
 the current conversation.** That includes `deploy`, `projects create`,
-`projects delete`, `db create`, `env set`, `domains add`, `rollback`, `stop`,
+`projects delete`, `projects transfer`, `db create`, `env set`, `domains add`, `rollback`, `stop`,
 `restart`, `compute set`, `extensions enable`, `tokens create` / `tokens revoke`
 and `connect` / `connect --remove`.
 
@@ -753,6 +753,7 @@ and `connect` / `connect --remove`.
 | `--force` on `env set` | Stores a build-time variable that will silently never reach the bundle |
 | `--yes` on `extensions enable/disable` | Restarts the project's database — a write outage while it comes back |
 | `--yes` on `projects delete` | Deletes the project |
+| `--yes` on `projects transfer` | Hands the project, and its bill, to another organization |
 
 **Never retry or "fix" a `platform_permission_denied`.** Report it.
 

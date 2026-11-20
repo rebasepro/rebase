@@ -12,7 +12,7 @@ import chalk from "chalk";
 import { accessTokenCommand, loginCommand, logoutCommand, whoamiCommand } from "./auth";
 import { tokensCommand } from "./tokens";
 import { linkCommand, unlinkCommand, selectOrgCommand, openCommand } from "./link";
-import { listProjects, createProject, projectInfo, deleteProject, resolveProjectArg } from "./projects";
+import { listProjects, createProject, projectInfo, deleteProject, transferProject, resolveProjectArg } from "./projects";
 import { cloudInitCommand } from "./init";
 import { claimCommand } from "./claim";
 import { deployCommand, logsCommand } from "./deploy";
@@ -159,6 +159,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--tables": String,
     "--target": String,
     "--timeout": String,
+    "--to-org": String,
     "--type": String,
     "--out": "--output",
     "-e": "--email",
@@ -533,6 +534,9 @@ async function projectsGroup(action: string | undefined, rawArgs: string[]): Pro
         case "delete":
             await deleteProject(rawArgs, resolveProjectArg(rawArgs, "delete"));
             break;
+        case "transfer":
+            await transferProject(rawArgs, resolveProjectArg(rawArgs, "transfer"));
+            break;
         case "--help":
             printCloudHelp();
             break;
@@ -585,7 +589,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
 
     { action: "init", section: "Projects", description: "With --claim: a live backend with no account, and a link to claim it within 72 hours" },
     { action: "claim", section: "Projects", description: "The claim link of the project `init --claim` made here, and the time left; --open opens it" },
-    { action: "projects", section: "Projects", description: "Create, list, inspect and delete projects" },
+    { action: "projects", section: "Projects", description: "Create, list, inspect, transfer and delete projects" },
 
     { action: "deploy", section: "Deploy & observe", args: "[app]", description: "Build, upload and ship an app, following it to a terminal state" },
     { action: "logs", section: "Deploy & observe", description: "Build logs, or the runtime's with --runtime" },
