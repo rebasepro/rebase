@@ -87,6 +87,16 @@ install against a lockfile no scaffold has yet, and belongs in the e2e lane.
 Seconds, no network, no database.`
     },
     {
+        run: "check:stock-bundle",
+        why: `The bundle every new Rebase Cloud project runs before its first deploy
+(\`infra/stock-bundle\`, built by \`tooling/scripts/build-stock-bundle.mts\`):
+the admin panel and an introspected backend, built with the real \`rebase
+build\` and read back with the runtime's own manifest reader. The control
+plane builds it into its image, so a stock bundle that stops building is a
+control-plane release that cannot ship — found here instead, on the change
+that broke it. \`--no-vendor\`: no npm install in CI; the image build vendors.`
+    },
+    {
         run: "check:config-paths",
         why: `Three aliases pointed at a \`packages/ui/index.css\` that has never
 existed, and one at \`packages/client-postgres/src\` after that package was

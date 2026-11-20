@@ -25,6 +25,8 @@
     "verify:docs": "node --max-old-space-size=8192 tooling/scripts/verify-docs.mjs",
     "verify:docs:strict": "node --max-old-space-size=8192 tooling/scripts/verify-docs.mjs --strict",
     "verify:selfhost": "node --import tsx tooling/scripts/verify-selfhost.mts",
+    "build:stock-bundle": "node --import tsx tooling/scripts/build-stock-bundle.mts",
+    "check:stock-bundle": "node --import tsx tooling/scripts/build-stock-bundle.mts --no-vendor",
     "verify:selfhost:docker": "node --import tsx tooling/scripts/verify-selfhost-docker.mts",
     "verify:corpus": "node --import tsx tooling/scripts/verify-bundle-corpus.mts",
     "rls:check": "node --import tsx tooling/scripts/rls-scan.mts",

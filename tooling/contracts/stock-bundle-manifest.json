@@ -1,0 +1,47 @@
+{
+  "bundleFormat": 3,
+  "runtime": {
+    "range": "^1",
+    "builtAgainst": "0.0.0-contract",
+    "contract": 2
+  },
+  "schemaVersion": "",
+  "app": "backend",
+  "kind": "backend",
+  "entry": {
+    "storage": "backend/storage.js",
+    "static": [
+      {
+        "path": "/",
+        "dir": "static/admin",
+        "spa": true,
+        "name": "admin",
+        "cms": "/"
+      }
+    ]
+  },
+  "tables": [],
+  "hooks": {
+    "native": false
+  },
+  "storage": {
+    "authorize": true
+  },
+  "resources": {
+    "version": 1,
+    "resources": []
+  },
+  "deps": {
+    "declared": {
+      "@rebasepro/server-postgres": "0.0.0-contract"
+    }
+  },
+  "build": {
+    "cli": "0.0.0-contract",
+    "node": "22",
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  },
+  "stock": {
+    "version": "0.0.0-contract"
+  }
+}

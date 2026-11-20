@@ -1,0 +1,16 @@
+{
+    "name": "rebase-stock-bundle-backend",
+    "version": "1.0.0",
+    "private": true,
+    "description": "No schema on purpose: the runtime introspects the project's database and serves every table with row-level security on.",
+    "type": "module",
+    "dependencies": {
+        "@rebasepro/server": "workspace:*",
+        "@rebasepro/server-postgres": "workspace:*",
+        "@rebasepro/types": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "^26.1.2",
+        "typescript": "^6.0.3"
+    }
+}

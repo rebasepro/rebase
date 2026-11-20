@@ -1,0 +1,16 @@
+{
+    "name": "rebase-stock-bundle",
+    "version": "1.0.0",
+    "private": true,
+    "description": "The bundle every new Rebase Cloud project runs until its first deploy: an introspected backend and the admin panel, with no project code.",
+    "type": "module",
+    "scripts": {
+        "build": "node --import tsx ../../tooling/scripts/build-stock-bundle.mts"
+    },
+    "devDependencies": {
+        "@rebasepro/cli": "workspace:*",
+        "@rebasepro/types": "workspace:*",
+        "tsx": "^4.23.1",
+        "typescript": "^6.0.3"
+    }
+}

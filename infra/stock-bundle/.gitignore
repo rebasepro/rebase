@@ -1,0 +1,5 @@
+# `pnpm build` here (tooling/scripts/build-stock-bundle.mts) writes the bundle
+# to dist-bundle/ and the shippable archive and its manifest to out/.
+dist-bundle/
+out/
+admin/dist/

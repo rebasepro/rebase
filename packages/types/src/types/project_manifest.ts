@@ -1560,6 +1560,20 @@ export interface RebaseBundleManifest {
         /** ISO-8601. */
         createdAt: string;
     };
+    /**
+     * Set only on the platform's stock bundle: what a new Rebase Cloud project
+     * runs before anybody deploys code to it — an introspected backend (no
+     * `entry.tables`) and the admin panel. `version` is the `@rebasepro`
+     * release it was built from.
+     *
+     * Written by `tooling/scripts/build-stock-bundle.mts` and by nothing a
+     * project builds, so a host can tell "this project serves no code of its
+     * own yet" from "this project's code declares no tables". The runtime does
+     * not read it: a stock bundle boots like any other.
+     */
+    stock?: {
+        version: string;
+    };
 }
 
 /** The contract a running backend serves at `GET /api/meta/contract`. */

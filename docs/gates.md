@@ -147,6 +147,7 @@ this list, in this order.
 | `check:llms-coverage` | Every English docs page is *in* those mirrors — the direction the regenerate-and-diff above cannot see. Runs inside `check:generated`. | — |
 | `check:package-contents` | What each published tarball actually contains — tests shipped by accident (a build's `.test.d.ts` included), sources shipped on purpose. Reads `dist`, so it runs after the build. | — |
 | `test:gates` | The gate scripts' own unit tests. | — |
+| `check:stock-bundle` | The stock bundle a new Rebase Cloud project runs before its first deploy (`infra/stock-bundle`): admin panel plus an introspected backend, built with the real `rebase build` and read back by the runtime's manifest reader. The control-plane image builds it, so this catches a stock bundle that no longer builds on the change that broke it. Without vendoring; the image build vendors. | `pnpm build:stock-bundle` |
 | `check:config-paths` | Every alias target in every loadable `vite.config.*` exists. Four pointed at nothing: three at a `packages/ui/index.css` that never existed, one at a package deleted from the repo. A dead alias resolves through nothing until a reorder makes it first, and then it is a dev server that will not start. `website/astro.config.mjs` is the known gap — Vite's loader cannot read it. After the build, not in the static job: it loads each config for real, and `app/frontend/vite.config.ts` imports `@rebasepro/app/dist/vitePlugin.js`. | Delete the entry; it is dead, not broken |
 
 ## Tests
