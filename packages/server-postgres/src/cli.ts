@@ -9,37 +9,19 @@ import { resolveTsxLoader } from "./tsx-loader";
 import { formatRelativeTime } from "@rebasepro/utils";
 import type { BranchDiff, BranchMergeResult, DatabaseAdmin } from "@rebasepro/types";
 import {
-    diagnoseMissingBin,
-    detectProjectPackageManager,
-    describeBuildScriptRemedy,
-    describeAtlasWindowsInstall,
-    describeDevAddCommand,
-    describeReinstallCommand,
-    workspaceMemberDir,
     resolveLocalBin,
-    getTableIncludes,
+    resolvePackageBin,
     atlasDevDatabaseUrl,
     ensureDevDatabaseExists,
     dropDevDatabase,
-    applySearchDdl,
     getSearchExcludes,
-    readSearchDdl,
-    applyVectorDdl,
-    getVectorExcludes,
-    readVectorDdl,
-    applyTriggersDdl,
-    applyViewsDdl,
-    readViewsDdl,
-    getTriggerExcludes,
-    readTriggersDdl,
-    getTableExcludes,
     getForeignIndexExcludes,
+    getUnmanagedChildExcludes,
     getUndeclaredConstraintExcludes,
     queryUndeclarableConstraints,
     ExcludeIntrospectionError,
     queryGeneratedColumnDependencies,
     queryColumnTypes,
-    dropGeneratedColumns,
     withAppClient,
     closeAppClients
 } from "./cli-helpers";
@@ -53,9 +35,9 @@ import {
     isSslNotEnabled,
     reportCommandFailure
 } from "./cli-errors";
-import { forAtlas, redactConnectionPasswords } from "./utils/connection-string";
-import { ADMIN_POLICY_ROLE_SQL, dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL, REQUEST_ROLE_FUNCTION_SQL } from "./schema/rls-bootstrap-sql";
-import { declaredRlsPolicyShape, REBASE_ADMIN_ROLE } from "@rebasepro/types";
+import { forAtlas, forManagedPGlitePtah, redactConnectionPasswords } from "./utils/connection-string";
+import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL, REQUEST_ROLE_FUNCTION_SQL } from "./schema/rls-bootstrap-sql";
+import { declaredRlsPolicyShape, parseEnvBoolean, REBASE_ADMIN_ROLE } from "@rebasepro/types";
 
 import { describeDestructiveFindings, detectDestructiveStatements, decidePushSafety, destructiveOptInFlag, extractPlanStatements, warnIfYesApprovedDestructive, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
 import type { LegacyRename } from "./schema/push-legacy-renames";
@@ -63,22 +45,20 @@ import { declaredIndexesIfNotExists, indexAdoptionStatement, type IndexAdoption 
 import {
     parseColumnMutations,
     findGeneratedColumnConflicts,
-    partitionByOwnership,
-    dropGeneratedColumnStatements,
-    migrationDropPreamble,
-    describeConflict
+    partitionByOwnership
 } from "./schema/generated-column-conflicts";
-import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import type { ExistingConstraint } from "./schema/undeclarable-constraints";
-import { finishNewMigration } from "./schema/migration-post-process";
-import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, readsRevisions, takesDevUrl } from "./schema/atlas-argv";
+import { finishNewMigration, preparePtahMigration, ptahManualMigrationWarning } from "./schema/migration-post-process";
+import { managedSelectorsForPlan, rememberManagedSelectors } from "./schema/managed-selectors";
+import { ptahApplyDesiredStateUrl } from "./schema/ptah-policy-comments";
+import { acceptsExcludes, buildAtlasArgs, migrateApplyArgs, migrateDiffExcludeValue, migrateDiffIncludeValue, readsRevisions, takesDevUrl } from "./schema/atlas-argv";
 import { ensureAtlasRevisionsTable } from "./schema/atlas-revisions";
 import { createApplyReportFilter } from "./schema/atlas-apply-report";
 import { nextStepAfterDbGenerate } from "./schema/generate-next-step";
 import { CommandStopped, ScratchDatabase } from "./cli-scratch-database";
 import { baselineVersionProblem, describeBaselinePlan, latestRecordedMigration, planBaseline } from "./schema/migrate-baseline";
 import { promptConfirm } from "./cli-prompt";
-import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
+import { applyPushPlan } from "./cli-push";
 import { branchNameIn, branchSourceIn, resolveBranchSwitches, unexpectedBranchArgs } from "./branch-argv";
 import { assertKnownFlags, parseDriverLine, resolveDriverSwitches, schemaDirIn } from "./cli-flags";
 import { assertNoCollectionsFlag, assertSchemaDirExists, DEFAULT_SCHEMA_DIR } from "./cli-schema-dir";
@@ -315,99 +295,6 @@ function latestMigrationVersion(): string | null {
 }
 
 /**
- * Take Atlas's carve-outs back out of the migration `migrate diff` just wrote.
- *
- * The apply path hands Atlas `--exclude` and it never sees the search or vector
- * columns. The diff path has no such flag — `atlas migrate diff` rejects
- * `--exclude` outright, and an `atlas.hcl` `env` block's `exclude` is accepted
- * and then ignored — so Atlas replays the migration directory (which builds
- * both columns, because that DDL is appended to migrations), does not find them
- * in `schema.sql`, and plans `DROP COLUMN`. Applied, that would take search and
- * the embeddings away from every database the migration reaches.
- *
- * Returns whether a migration Atlas just wrote is still there afterwards: a
- * file whose only content was the spurious drop is deleted, because an empty
- * migration is worse than none — it takes a slot in the revision history and
- * the caller would append the carved-out DDL and the policies to it.
- *
- * @returns true when a new migration survives and may be appended to.
- */
-async function stripCarvedOutFromNewestMigration(schemaDir: string): Promise<boolean> {
-    // Both carve-outs, for one reason: they are the same problem. Search is out
-    // of Atlas's sight because its free tier will not parse a function; vector
-    // is out because Atlas resolves the desired state in a dev database that
-    // can never have pgvector. What follows from that is identical — the diff
-    // replays a migration directory holding objects `schema.sql` omits, and
-    // plans a drop for every one.
-    const patterns = [
-        ...await getSearchExcludes(schemaDir),
-        ...await getVectorExcludes(schemaDir),
-        ...await getTriggerExcludes(schemaDir)
-    ];
-    if (patterns.length === 0) return true;
-
-    const newest = listMigrationFiles().at(-1);
-    if (!newest) return false;
-    const file = path.resolve(process.cwd(), "drizzle", "migrations", newest);
-
-    const result = stripCarvedOutStatements(fs.readFileSync(file, "utf-8"), patterns);
-
-    // Fail CLOSED, and loudly. A drop this could not rewrite stays in the file
-    // exactly as Atlas wrote it, and the file is one somebody applies next week
-    // — by which time the column is gone and nothing connects it to this run.
-    // The destructive gate does not cover it either: that reads the *push*
-    // plan. So `db generate` stops here rather than hand back a migration that
-    // destroys a column the developer never asked to lose.
-    if (result.unhandled.length > 0) {
-        outError(chalk.red(
-            `\n  ✗ ${newest} drops an object Rebase manages outside Atlas, in a form the CLI`
-        ));
-        outError(chalk.red("    could not remove:"));
-        for (const statement of result.unhandled) {
-            outError(chalk.gray(`       ${statement.replace(/\s+/g, " ")}`));
-        }
-        outError(chalk.gray(
-            "    Left as Atlas wrote it. Delete those statements by hand before running\n" +
-            "    `rebase db migrate` — and please report them: rewriting this is meant to\n" +
-            "    be automatic."
-        ));
-        process.exit(1);
-    }
-
-    if (result.removed.length === 0) return true;
-
-    if (result.empty) {
-        fs.rmSync(file);
-        out(chalk.gray(
-            `  ✓ Dropped ${newest} — it planned nothing but the removal of columns\n` +
-            "    Atlas cannot see and Rebase applies itself."
-        ));
-    } else {
-        fs.writeFileSync(file, result.sql, "utf-8");
-        out(chalk.gray(`  ✓ Kept Rebase's own columns out of ${newest} (${result.removed.length} statement(s))`));
-    }
-
-    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir);
-    return !result.empty;
-}
-
-/**
- * The newest migration's declared indexes as `CREATE INDEX IF NOT EXISTS`, so
- * `rebase db migrate` can adopt an identical existing index under the declared
- * name before applying it (`adoptIdenticalIndexes`) and the statement then
- * finds it there. Re-hashes the directory when it rewrote anything.
- */
-async function makeDeclaredIndexesAdoptable(schemaDir: string): Promise<void> {
-    const newest = listMigrationFiles().at(-1);
-    if (!newest) return;
-    const file = path.resolve(process.cwd(), "drizzle", "migrations", newest);
-    const result = declaredIndexesIfNotExists(fs.readFileSync(file, "utf-8"));
-    if (result.rewritten === 0) return;
-    fs.writeFileSync(file, result.sql, "utf-8");
-    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir);
-}
-
-/**
  * One line per destructive statement, as `db push` prints them — shared by
  * push, `db generate` and `db migrate --refuse-destructive`, so the three
  * describe the same statement the same way.
@@ -451,9 +338,8 @@ async function constraintsOrNone(databaseUrl: string | undefined): Promise<Exist
  *
  * `db push` stops before a destructive change; `db generate` wrote the same
  * `DROP COLUMN` into a file without a word, and `db migrate` applied it. Only
- * the part Atlas planned is read: what is appended after it (the search
- * rebuild, policies, triggers) is Rebase's own and puts back what it drops.
- * A report, not a refusal — the exit code is unchanged.
+ * Ptah's whole generated file is read, including policies and indexes.
+ * This reports destructive changes without changing the exit code.
  */
 async function reportDestructiveMigration(migrationSql: string, migrationFile: string, databaseUrl: string | undefined): Promise<void> {
     const destructive = detectDestructiveStatements(migrationSql, await columnTypesOrNone(databaseUrl), await constraintsOrNone(databaseUrl));
@@ -544,179 +430,58 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         await schemaCommand("generate", rawArgs, { nextStep: false });
         await generatePostgresDdlCommand(rawArgs);
         out("");
-        out(chalk.gray("  Step 2/2: Generating SQL migration files with Atlas..."));
+        out(chalk.gray("  Step 2/2: Generating SQL migration files with Ptah..."));
         out("");
         const migrationName = argsList._[0] || "migration";
         const migrationsBefore = listMigrationFiles();
         await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", DESIRED_STATE_URL], schemaDir);
-        // The diff cannot be told to ignore the carved-out objects the way the
-        // apply can, so the drop it plans for them is taken back out of the
-        // file it just wrote. A migration that was nothing else is deleted.
-        let wroteNewMigration = listMigrationFiles().length > migrationsBefore.length;
-        if (wroteNewMigration) {
-            wroteNewMigration = await stripCarvedOutFromNewestMigration(schemaDir);
-        }
-        if (wroteNewMigration) await makeDeclaredIndexesAdoptable(schemaDir);
-        const newestWritten = wroteNewMigration ? listMigrationFiles().at(-1) : undefined;
-        if (newestWritten) {
-            await reportDestructiveMigration(
-                fs.readFileSync(path.resolve(process.cwd(), "drizzle", "migrations", newestWritten), "utf-8"),
-                newestWritten,
-                process.env.DATABASE_URL
-            );
-        }
-        
-        // Post-process the migration Atlas just wrote.
-        //
-        // `wroteNewMigration` gates the whole block, and that gate is the point.
-        // "The newest migration file" is only Atlas's when Atlas wrote one;
-        // otherwise it is a migration that has already run in production, and
-        // appending to it changes a hash Atlas has recorded while the appended
-        // SQL never runs anywhere. The search half already said so and checked;
-        // the `CREATE SCHEMA` rewrite and the policy append did not, so every
-        // `db generate` that found nothing to diff still grew the last
-        // migration by another copy of the policies.
-        //
-        // A failure here takes the migration back out and stops: see
-        // `finishNewMigration`. Atlas's half creates the tables, the append
-        // locks them, and a migration with only the first half applies cleanly.
+        const migrationFiles = listMigrationFiles();
+        const newestWritten = migrationFiles.length > migrationsBefore.length ? migrationFiles.at(-1) : undefined;
+
+        // A role belongs to the PostgreSQL server, not the scratch database.
+        // Ptah can omit its CREATE when the role already exists on the dev
+        // server, so make every new migration self-contained before the
+        // policies that name it. Keep the idempotent schema rewrite used for
+        // the revisions schema and update atlas.sum after either change.
         const migrationsDir = path.resolve(process.cwd(), "drizzle", "migrations");
-        const newestSql = fs.existsSync(migrationsDir) && wroteNewMigration
-            ? fs.readdirSync(migrationsDir).filter(f => f.endsWith(".sql")).sort().at(-1)
-            : undefined;
-        if (newestSql) {
-            const newestMigrationFile = path.join(migrationsDir, newestSql);
+        if (newestWritten) {
+            const newestMigrationFile = path.join(migrationsDir, newestWritten);
             const finished = await finishNewMigration(newestMigrationFile, async () => {
-                // Make CREATE SCHEMA idempotent so it doesn't conflict with
-                // --revisions-schema (Atlas pre-creates the rebase schema
-                // for its revision table before running migrations).
-                let migrationContent = fs.readFileSync(newestMigrationFile, "utf-8");
-                migrationContent = migrationContent.replace(
-                    /CREATE SCHEMA (?!IF NOT EXISTS)("[^"]+");/g,
-                    "CREATE SCHEMA IF NOT EXISTS $1;"
+                const desiredSql = fs.readFileSync(path.join(generatedSqlDir(), "schema.sql"), "utf-8");
+                const migrationContent = preparePtahMigration(
+                    fs.readFileSync(newestMigrationFile, "utf-8"),
+                    desiredSql.includes("DO $rebase_admin_role$")
                 );
-                // Atlas never writes the search or vector objects into a
-                // migration — it is not shown them — so a migration
-                // replayed against a fresh database would build every table
-                // except the parts that make search and vector search work.
-                // Appending, because these are `ALTER TABLE ... ADD COLUMN`
-                // over the tables the migration just created.
-                //
-                // Vector first: `vector.sql` may open with
-                // `CREATE EXTENSION vector`, so prerequisites lead, which is
-                // the order a reader of the migration expects. Nothing in
-                // search depends on it either way.
-                const vectorContent = readVectorDdl();
-                if (vectorContent) {
-                    migrationContent = `${migrationContent}\n\n${vectorContent}`;
-                    out(chalk.gray("  ✓ Appended vector DDL to the migration"));
-                }
-
-                const searchContent = readSearchDdl();
-                if (searchContent) {
-                    // The same refusal `db push` works around, but decided
-                    // here and written into the file: this migration runs
-                    // later, somewhere else, against a database nobody can
-                    // inspect from this machine. A column retyped by the
-                    // statements above cannot be retyped while the search
-                    // column reads it, and the appended DDL below runs too
-                    // late to help — so the drop is prepended and the
-                    // rebuild is the append that was already happening.
-                    //
-                    // Derived from the tables rather than a catalogue:
-                    // `searchColumnDependencies` knows which columns each
-                    // block reads, which is all the decision needs.
-                    const { searchColumnDependencies } = await import("./schema/generate-postgres-ddl-logic");
-                    const { loadTables } = await import("./schema/load-tables");
-                    const migrationConflicts = findGeneratedColumnConflicts(
-                        parseColumnMutations(migrationContent),
-                        searchColumnDependencies(await loadTables(schemaDir))
-                    );
-                    const preamble = migrationDropPreamble(migrationConflicts);
-                    if (preamble) {
-                        migrationContent = `${preamble}\n${migrationContent}`;
-                        for (const conflict of migrationConflicts) {
-                            out(chalk.gray(`  ✓ ${describeConflict(conflict)} is dropped and rebuilt inside the migration`));
-                        }
-                    }
-                    migrationContent = `${migrationContent}\n\n${searchContent}`;
-                    out(chalk.gray("  ✓ Appended search DDL to the migration"));
-                }
-
-                // Last of the three: a trigger needs its table and its
-                // column, and both arrive above.
-                const triggersContent = readTriggersDdl();
-                if (triggersContent) {
-                    migrationContent = `${migrationContent}\n\n${triggersContent}`;
-                    out(chalk.gray("  ✓ Appended `updated_at` triggers to the migration"));
-                }
-
-                // The views read the tables everything above creates. The
-                // block creates a missing view and recreates a changed one,
-                // so it is safe in every migration that carries it.
-                const viewsContent = readViewsDdl();
-                if (viewsContent) {
-                    migrationContent = `${migrationContent}\n\n${viewsContent}`;
-                    out(chalk.gray("  ✓ Appended views to the migration"));
-                }
-
-                fs.writeFileSync(newestMigrationFile, migrationContent, "utf-8");
-
-                // Append RLS policies, preceded by the RLS bootstrap so the
-                // migration is self-contained: Atlas replays migrations
-                // against a clean dev database where `rebase.uid()` would
-                // not otherwise exist.
-                const policiesFile = path.join(generatedSqlDir(), "policies.sql");
-                if (fs.existsSync(policiesFile)) {
-                    const policiesContent = fs.readFileSync(policiesFile, "utf-8");
-                    fs.appendFileSync(newestMigrationFile, "\n\n" + rlsBootstrapSql() + "\n" + policiesContent);
-                    out(chalk.gray(`  ✓ Appended RLS policies to migration file: ${path.basename(newestMigrationFile)}`));
-
-                    // Re-hash the migration directory
-                    out(chalk.gray("  Re-hashing migration files..."));
-                    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir, { throwOnFailure: true });
-                    out(chalk.gray("  ✓ Migration directory checksum updated successfully."));
-                }
+                // migrate adopts an identical live index under the declared
+                // name before applying the SQL.
+                fs.writeFileSync(newestMigrationFile, declaredIndexesIfNotExists(migrationContent).sql, "utf-8");
+                await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir, { throwOnFailure: true });
             }, async () => {
                 await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir, { throwOnFailure: true });
             });
             if (!finished.ok) {
-                outError(chalk.red(`\n  ✗ Could not finish ${newestSql}: ${finished.error}`));
-                outError(chalk.gray(
-                    "    Atlas's half of a migration creates the tables; the part that failed adds their\n" +
-                    "    row-level security, policies, search, vector and trigger DDL. Applied alone, it\n" +
-                    "    would serve the new tables with no row filtering."
-                ));
+                outError(chalk.red(`\n  ✗ Could not finish ${newestWritten}: ${finished.error}`));
                 outError(chalk.gray(finished.removed
-                    ? `    ${newestSql} was removed. Fix the cause and run \`rebase db generate\` again.`
-                    : `    ${newestSql} could not be removed — delete it by hand before \`rebase db migrate\`.`));
+                    ? `    ${newestWritten} was removed. Fix the cause and run \`rebase db generate\` again.`
+                    : `    ${newestWritten} could not be removed — delete it before \`rebase db migrate\`.`));
                 if (finished.rehashError) {
-                    outError(chalk.gray(
-                        `    Re-hashing failed too (${finished.rehashError}); run \`atlas migrate hash\` or generate again.`
-                    ));
+                    outError(chalk.gray(`    Re-hashing failed too (${finished.rehashError}).`));
                 }
                 process.exit(1);
             }
+            await reportDestructiveMigration(
+                fs.readFileSync(newestMigrationFile, "utf-8"),
+                newestWritten,
+                process.env.DATABASE_URL
+            );
+        } else {
+            out(chalk.gray("  ℹ No migration written — the declared schema is unchanged."));
         }
-
-        if (!wroteNewMigration) {
-            // Reachable whenever the only thing that changed is something Atlas
-            // cannot see — a `search` block, a `vector` property, or a
-            // `securityRules` edit. There is no new file to carry it, and the
-            // previous migration must not be reopened: it has already run
-            // wherever this project is deployed.
-            out(chalk.gray(
-                "  ℹ No migration written — nothing in this change is visible to Atlas.\n" +
-                "    Search, vector, trigger and RLS DDL are applied by `rebase db push`, and at\n" +
-                "    boot by the schema ensure. For a migration-only deployment, add\n" +
-                `    ${GENERATED_SQL_DIR}/search.sql, vector.sql, triggers.sql and\n` +
-                "    policies.sql to a migration by hand."
-            ));
-        }
+        rememberManagedSelectors();
 
         const nextStep = nextStepAfterDbGenerate({
             newestVersion: latestMigrationVersion(),
-            wrote: wroteNewMigration,
+            wrote: newestWritten !== undefined,
             first: migrationsBefore.length === 0
         });
         out("");
@@ -747,7 +512,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             out("");
             out(chalk.gray(dryRun
                 ? "  Step 2/3: Planning the change against the database (nothing is applied)..."
-                : "  Step 2/3: Pushing schema to database with Atlas..."));
+                : "  Step 2/3: Pushing schema to database with Ptah..."));
             out("");
             const databaseUrl = process.env.DATABASE_URL;
             // Skipped under --dry-run: this creates the auth schema and its
@@ -780,6 +545,9 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // since Atlas cannot be told to leave one DEFAULT alone. See
             // `schema/push-kept-defaults.ts`.
             if (databaseUrl) await keepDatabaseOwnedDefaults(databaseUrl, schemaDir);
+            const applyDesiredStateUrl = databaseUrl
+                ? await ptahApplyDesiredStateUrl(databaseUrl, schemaDir)
+                : DESIRED_STATE_URL;
 
             // Preview the plan before touching data. `atlas schema apply` with
             // --auto-approve will silently DROP COLUMN on a field removal and
@@ -787,10 +555,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // SQL and gate anything destructive.
             const plan = await runAtlas(
                 "schema",
-                ["apply", "--to", DESIRED_STATE_URL, "--dry-run"],
+                ["apply", "--to", applyDesiredStateUrl, "--dry-run"],
                 schemaDir,
                 { captureStdout: true }
             );
+            const manualMigration = ptahManualMigrationWarning(plan);
+            if (manualMigration) {
+                outError(chalk.red(`  ✗ ${manualMigration}`));
+                throw new CommandStopped("The generated column needs a manual migration.");
+            }
             // The columns' current types, because an `ALTER COLUMN … TYPE`
             // loses data or does not depending on what the column is now.
             // Without them every type change is gated. And the CHECK and
@@ -811,28 +584,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 ? plan.trim()
                 : planStatements.map(statement => `${statement};`).join("\n");
 
-            // A generated column makes every column it reads immutable to
-            // Atlas: PostgreSQL refuses `ALTER COLUMN … TYPE` and `DROP COLUMN`
-            // while one depends on it, and `schema apply` runs its plan in a
-            // single transaction — so one refusal rolls back the whole push,
-            // including the statements that had nothing to do with it.
-            //
-            // Atlas cannot avoid planning it. The search column is hidden from
-            // its view on purpose (`searchExcludePatterns`), because a desired
-            // state that never mentions the column reads to Atlas as an
-            // instruction to drop it. So the dependant is invisible exactly
-            // where it would have to be visible.
-            //
-            // Rebase owns those columns, so it takes them out of the way and
-            // `applySearchDdl` puts them back below — the same drop-and-re-apply
-            // the search stamp guard already prescribes when a block changes.
+            // Ptah rebuilds managed generated columns inside its transaction.
+            // Keep changes to foreign generated columns outside this workflow.
             const generatedConflicts = databaseUrl
                 ? findGeneratedColumnConflicts(
                     parseColumnMutations(plan),
                     await queryGeneratedColumnDependencies(databaseUrl)
                 )
                 : [];
-            const { managed: rebuildable, foreign: unowned } = partitionByOwnership(
+            const { foreign: unowned } = partitionByOwnership(
                 generatedConflicts,
                 schemaDir ? await getSearchExcludes(schemaDir) : []
             );
@@ -841,13 +601,6 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // exists), so the push would succeed and the database go on
             // accepting the value. Not a refusal — boot does the same — but said.
             if (databaseUrl) await reportKeptEnumLabels(databaseUrl, schemaDir);
-
-            // What the push does to row-level security, which Atlas's plan
-            // cannot show: it has no model for a policy. Read once, here, for
-            // the dry run to list and the push to summarize — see
-            // `schema/push-policy-plan.ts`.
-            const policyPlan = databaseUrl ? await readPolicyPushPlan(databaseUrl, schemaDir) : undefined;
-            const policyLines = policyPlan ?? { changes: [], notes: [] };
 
             // `--dry-run` stops here, having printed the SQL and nothing else.
             //
@@ -867,24 +620,8 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     out(chalk.gray(planListing.split("\n").map((l) => `       ${l}`).join("\n")));
                     out("");
                 }
-                const [rlsHeading, ...rlsChanges] = policyLines.changes;
-                if (rlsHeading) {
-                    out(chalk.bold(rlsHeading));
-                    for (const line of rlsChanges) out(chalk.gray(line));
-                    out("");
-                }
-                if (!schemaChanges && !rlsHeading) {
-                    out(chalk.green(policyPlan
-                        ? "  ✓ No changes: the database already matches these tables."
-                        : "  ✓ No schema changes: the tables already match backend/schema."));
-                    out("");
-                }
-                if (databaseUrl && !policyPlan) {
-                    outWarn(chalk.yellow("  ⚠️  The row-level security the push would change could not be read, so none is listed."));
-                    outWarn("");
-                }
-                if (policyLines.notes.length > 0) {
-                    for (const line of policyLines.notes) out(chalk.gray(line));
+                if (!schemaChanges) {
+                    out(chalk.green("  ✓ No changes: the database already matches the declared schema."));
                     out("");
                 }
                 if (prebuilt.length > 0) {
@@ -893,15 +630,6 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     out(chalk.gray("  above lists them because they do not exist yet):"));
                     for (const name of prebuilt) {
                         out(chalk.gray(`       ${name}`));
-                    }
-                    out("");
-                }
-                if (rebuildable.length > 0) {
-                    out(chalk.gray(`  ${rebuildable.length} generated column(s) would be dropped before the apply and`));
-                    out(chalk.gray("  rebuilt from search.sql after it — Postgres cannot retype a column"));
-                    out(chalk.gray("  while one reads it:"));
-                    for (const conflict of rebuildable) {
-                        out(chalk.gray(`       ${describeConflict(conflict)}`));
                     }
                     out("");
                 }
@@ -965,67 +693,37 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 }
             }
 
-            if (policyPlan?.summary) {
-                out(chalk.gray(policyPlan.summary));
-                out("");
-            }
-
-            // Without a database URL there is nothing to drop or rebuild: runAtlas
-            // refuses to run without one anyway.
-            const rebuildCount = databaseUrl ? rebuildable.length : 0;
-            await applyPushPlan({ dryRun: plan, rebuildable: rebuildCount }, {
-                dropRebuildable: async () => {
-                    if (!databaseUrl) return;
-                    for (const conflict of rebuildable) {
-                        out(chalk.gray(`  Dropping ${describeConflict(conflict)} — it reads a column this push retypes.`));
-                    }
-                    await dropGeneratedColumns(databaseUrl, dropGeneratedColumnStatements(rebuildable));
-                },
-                // Thrown, not exited: an exit from inside runAtlas skipped the
-                // rebuild below entirely, so a failed apply left the search
-                // columns it had just dropped dropped.
+            await applyPushPlan(plan, {
                 atlasApply: async () => {
-                    await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], schemaDir, { throwOnFailure: true, omitPlanEcho: true });
+                    await runAtlas("schema", ["apply", "--to", applyDesiredStateUrl, "--auto-approve"], schemaDir, { throwOnFailure: true, omitPlanEcho: true });
                 },
                 reportSynced: () => out("Schema is synced, no changes to be made"),
-                rebuildAfterFailure: async () => {
-                    if (!databaseUrl) return;
-                    out(chalk.gray("  The apply failed — rebuilding the generated columns it needed out of the way."));
-                    await applySearchDdl(databaseUrl);
-                },
                 afterApply: async () => {
                     out("");
                     if (!databaseUrl) {
                         outWarn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
                         return;
                     }
-                    // First, before anything below can fail. Atlas has just
-                    // committed any new table with RLS off and the user role
-                    // already holding DML on it; every later step may refuse.
+                    // Check RLS before post-apply role provisioning grants
+                    // request access to managed tables.
                     await lockManagedTables(databaseUrl, schemaDir);
                     await ensureAuthTables(databaseUrl, schemaDir);
-                    // After the tables exist and before the policies: the vector and
-                    // search columns are `ALTER TABLE ... ADD COLUMN`, and a policy
-                    // may reference the table they are added to.
-                    await applyVectorDdl(databaseUrl);
-                    await applySearchDdl(databaseUrl);
-                    await applyTriggersDdl(databaseUrl);
-                    // After every table a view could read.
-                    await applyViewsDdl(databaseUrl);
-                    // Before the policies: where the server-or-admin policies go
-                    // (TO rebase_admin or TO public) follows from whether the admin
-                    // switch is live, which this sets up as a boot would. After
-                    // them, a fresh database got them TO public and its first boot
-                    // moved every one.
+                    // Ptah applied declared functions, columns, indexes, views,
+                    // triggers and policies in one plan. Runtime provisioning
+                    // still grants the request role and records the schema version.
                     await ensureRlsUserRole(databaseUrl);
-                    await applyPolicies(databaseUrl, schemaDir);
-                    await reconcilePolicies(databaseUrl, schemaDir);
                     await retireLegacyAuthSchema(databaseUrl);
+                    const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
+                    if (!adminRoleAvailable) await moveAdminPoliciesToPublic(databaseUrl, schemaDir);
+                    await dropStaleCompanions(databaseUrl, schemaDir, adminRoleAvailable);
+                    const { stampMigratedPolicies } = await import("./schema/migrate-policy-stamps");
+                    await stampMigratedPolicies(databaseUrl, schemaDir, adminRoleAvailable);
                     // Last: the push has applied the whole schema, tables and
                     // policies, so it records the version a boot would.
                     await stampSchemaVersion(databaseUrl, schemaDir);
                 }
             });
+            rememberManagedSelectors();
         } else if (subcommand === "migrate") {
             const databaseUrl = process.env.DATABASE_URL;
             // `--baseline <version>` records the version as already applied and
@@ -1308,22 +1006,9 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
 }
 
 /**
- * Switch row-level security on for every table backend/schema declares, right
- * after Atlas has applied the schema.
- *
- * Atlas cannot carry `ENABLE ROW LEVEL SECURITY` in `schema.sql`: its free tier
- * neither plans it nor reads it back, so a table it creates is born with RLS
- * off — and `rebase_user`, the role every authenticated request runs as, holds
- * DML on it from that moment through the schema's default privileges. RLS used
- * to arrive with the policies, the last step of the push; a refusal from the
- * vector, search or trigger step in between left the new table readable and
- * writable by every caller, with no policy, until a later push or boot fixed
- * it — and a deployment with `REBASE_MIGRATE_ON_BOOT=none` never did. Locked
- * first, a failure later leaves a table that denies, not one that is open.
- *
- * Fatal when a table cannot be locked, and before the steps that follow: the
- * role provisioning at the end re-grants on every table in the schema, which
- * would undo the revoke that is the fallback here.
+ * Verify RLS remains enabled after the Ptah plan and before granting the
+ * request role access to managed tables. A failure is fatal; the fallback
+ * revokes access so a partially provisioned table stays closed.
  */
 async function lockManagedTables(databaseUrl: string, schemaDir: string): Promise<void> {
     let unsecured: TableLockResult["unsecured"];
@@ -1514,48 +1199,6 @@ async function retireLegacyAuthSchema(databaseUrl: string): Promise<void> {
     }
 }
 
-async function applyPolicies(databaseUrl: string, schemaDir: string): Promise<void> {
-    try {
-        const policiesPath = path.join(generatedSqlDir(), "policies.sql");
-        if (!fs.existsSync(policiesPath)) return;
-        
-        out(chalk.gray("  Step 3/3: Applying RLS policies to database..."));
-        out("");
-        
-        let policiesContent = fs.readFileSync(policiesPath, "utf-8");
-        // The server-or-admin policies are `TO rebase_admin` only where the
-        // admin switch is set up for this database's request roles, as the
-        // boot decides: written there while admin requests still run as the
-        // request role, they refuse every admin caller. Otherwise the ones the
-        // compiler put there go `TO public`, as they were before.
-        const adminRoleAvailable = policiesContent.includes(`"${REBASE_ADMIN_ROLE}"`)
-            ? await readAdminPoliciesLive(databaseUrl)
-            : true;
-        if (!adminRoleAvailable) {
-            out(chalk.gray(
-                `  The server-or-admin policies are written TO public: the admin request roles are not set up for this ` +
-                `database (\`rebase doctor --database\` says what is missing). A server boot that sets them up moves them TO ${REBASE_ADMIN_ROLE}.`
-            ));
-            // Its own preamble would refuse the whole file where the role cannot be made.
-            policiesContent = (await policiesToPublic(schemaDir, policiesContent)).split(`${ADMIN_POLICY_ROLE_SQL};`).join("");
-        }
-        const stamping = await policyStamping(databaseUrl, schemaDir, policiesContent, adminRoleAvailable);
-        const { stampError } = await withAppClient(databaseUrl, client => applyPoliciesFile(client, policiesContent, stamping));
-        out(chalk.green("  ✓ RLS policies applied successfully."));
-        if (stampError) {
-            // The policies are in; only the boot's shortcut is not. See applyPoliciesFile.
-            outWarn(chalk.yellow(`  ⚠️  The policies could not be stamped (${stampError}); the next boot applies them again.`));
-        }
-    } catch (err) {
-        const hint = diagnoseDbError(err, databaseUrl);
-        if (hint) {
-            outError(hint);
-        } else {
-            outError(chalk.red(`  ✗ Failed to apply RLS policies: ${err instanceof Error ? err.message : String(err)}`));
-        }
-        process.exit(1);
-    }
-}
 
 /**
  * Whether the server-or-admin policies belong `TO rebase_admin` on this
@@ -1627,137 +1270,6 @@ async function moveAdminPoliciesToPublic(databaseUrl: string, schemaDir: string)
     }
 }
 
-/**
- * The stamps a boot looks for, for the policies `policies.sql` is about to
- * create — see `applyPoliciesFile`. None when the tables cannot be read
- * here, which costs only the shortcut: the next boot re-applies, as before.
- */
-/**
- * `policies.sql` with each policy the compiler wrote `TO rebase_admin`
- * rewritten `TO public` — statement for statement, from the two plans, so a
- * rule that names `rebase_admin` itself is left exactly as written.
- */
-async function policiesToPublic(schemaDir: string, policiesSql: string): Promise<string> {
-    const { loadTables } = await import("./schema/load-tables");
-    const { planTablePolicies } = await import("./schema/generate-postgres-ddl-logic");
-    const tables = await loadTables(schemaDir);
-    const fallback = new Map(planTablePolicies(tables, { adminRoleAvailable: false })
-        .flatMap(plan => plan.policies.map(policy => [`${plan.qualified}.${policy.name}`, policy.statements] as const)));
-    let sql = policiesSql;
-    for (const plan of planTablePolicies(tables)) {
-        for (const policy of plan.policies) {
-            if (!policy.adminTarget) continue;
-            const replacement = fallback.get(`${plan.qualified}.${policy.name}`) ?? [];
-            policy.statements.forEach((statement, i) => {
-                if (replacement[i]) sql = sql.split(statement).join(replacement[i]);
-            });
-        }
-    }
-    return sql;
-}
-
-async function policyStamping(databaseUrl: string, schemaDir: string, policiesSql: string, adminRoleAvailable = true): Promise<PolicyStamping> {
-    try {
-        const { loadTables } = await import("./schema/load-tables");
-        const { planTablePolicies } = await import("./schema/generate-postgres-ddl-logic");
-        const { policyStampSql } = await import("./schema/ensure-policies");
-        // The rule the boot's connections follow: `search_path=public` unless
-        // the URL pins one of its own, in which case this connection has it too.
-        const { pinSearchPath } = await import("./connection");
-        const tables = await loadTables(schemaDir);
-        const statements = stampableTables(planTablePolicies(tables, { adminRoleAvailable }), policiesSql)
-            .map(plan => policyStampSql(plan))
-            .filter((statement): statement is string => statement !== undefined);
-        return { statements, searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public" };
-    } catch {
-        return { statements: [] };
-    }
-}
-
-/**
- * `planPolicyPush` for this database and these tables, read under the
- * `search_path` the push stamps policies under, as the lines the dry run
- * prints and the one the push does; `undefined`, having said why, when it
- * cannot be read.
- */
-async function readPolicyPushPlan(databaseUrl: string, schemaDir: string): Promise<{
-    changes: string[];
-    notes: string[];
-    summary: string | null;
-} | undefined> {
-    try {
-        const { formatPolicyPushPlan, planPolicyPush, summarizePolicyPushPlan } = await import("./schema/push-policy-plan");
-        const { loadTables } = await import("./schema/load-tables");
-        const { pinSearchPath } = await import("./connection");
-        const tables = await loadTables(schemaDir);
-        const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
-        const plan = await withAppClient(databaseUrl, client => planPolicyPush(
-            { query: async (text, values) => ({ rows: (await client.query(text, values)).rows }) },
-            tables,
-            { searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public", adminRoleAvailable }
-        ));
-        return { ...formatPolicyPushPlan(plan), summary: summarizePolicyPushPlan(plan) };
-    } catch (err) {
-        outWarn(chalk.yellow(`  ⚠️  Could not read the database's row-level security: ${err instanceof Error ? err.message : String(err)}`));
-        return undefined;
-    }
-}
-
-/**
- * Remove the policies an earlier push superseded but never dropped.
- *
- * `policies.sql` only DROPs the names it is about to CREATE, and a rule's
- * generated name contains a hash of its own semantics — so editing a rule
- * writes a *new* policy and abandons the old one. Postgres ORs PERMISSIVE
- * policies together, which makes an abandoned grant outrank every tightening
- * that replaced it, and push reported success the whole time.
- *
- * Runs after `applyPolicies` so the current policies are already in place: the
- * drift check then sees exactly the set that should survive, and anything else
- * on a managed table is by definition left over.
- */
-async function reconcilePolicies(databaseUrl: string, schemaDir: string): Promise<void> {
-    try {
-        const { checkPolicyDrift, dropOrphanedPolicies, formatPolicyDrift, hasDrift } =
-            await import("./security/policy-drift");
-        const { loadTables } = await import("./schema/load-tables");
-
-        const tables = await loadTables(schemaDir);
-        const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
-        await withAppClient(databaseUrl, async client => {
-            const drift = await checkPolicyDrift(client, tables, { adminRoleAvailable });
-            const { dropped, kept } = await dropOrphanedPolicies(client, drift, tables);
-
-            for (const p of dropped) {
-                out(chalk.gray(`  ✓ Dropped superseded policy "${p.name}" on ${p.schema}.${p.table}`));
-            }
-            if (dropped.length > 0) {
-                out(chalk.green(`  ✓ Removed ${dropped.length} superseded RLS ${dropped.length === 1 ? "policy" : "policies"}.`));
-            }
-
-            // Custom-named orphans are indistinguishable from policies someone
-            // wrote in SQL deliberately, so they are reported, never dropped.
-            if (kept.length > 0) {
-                outWarn(chalk.yellow("  ⚠️  Policies in the database that no table describes:"));
-                for (const p of kept) {
-                    outWarn(chalk.yellow(`       • ${p.schema}.${p.table} → "${p.name}" (${p.command} TO ${p.roles.join(", ")})`));
-                }
-                outWarn(chalk.yellow("       Each is still in force. To keep one, describe it in its table's `rls` (backend/schema)"));
-                outWarn(chalk.yellow("       (Studio's RLS view imports it); if it is stale, drop it by hand."));
-            }
-
-            // Missing/diverged are not push's to fix, but staying silent about
-            // them is how a database ends up not matching its config.
-            const remaining = { ...drift, orphaned: kept };
-            if (hasDrift(remaining) && (remaining.missing.length > 0 || remaining.diverged.length > 0)) {
-                outWarn(chalk.yellow("  ⚠️  RLS policies do not match your tables:"));
-                outWarn(formatPolicyDrift({ ...remaining, orphaned: [] }));
-            }
-        });
-    } catch (err) {
-        outWarn(chalk.yellow(`  ⚠️  Could not reconcile RLS policies: ${err instanceof Error ? err.message : String(err)}`));
-    }
-}
 
 /**
  * Flags the `branch` subcommands take.
@@ -2128,7 +1640,7 @@ max: 3 });
                         out(chalk.gray(`  ${rows.length} branch(es) are healthy — --older-than 14 also removes old ones.`));
                     }
                     if (!includeDevDiff && plan.devDiff.length > 0) {
-                        out(chalk.gray(`  ${plan.devDiff.length} Atlas scratch database(s) left over from db push;`));
+                        out(chalk.gray(`  ${plan.devDiff.length} migration scratch database(s) left over from db push;`));
                         out(chalk.gray("  --include-dev-diff removes those too."));
                     }
                     out("");
@@ -2149,10 +1661,10 @@ max: 3 });
                 keptActive();
                 if (includeDevDiff) {
                     for (const dbName of plan.devDiff) {
-                        out(`  ${chalk.red("●")} ${chalk.bold(dbName)} ${chalk.gray("— Atlas scratch database; will be dropped")}`);
+                        out(`  ${chalk.red("●")} ${chalk.bold(dbName)} ${chalk.gray("— migration scratch database; will be dropped")}`);
                     }
                 } else if (plan.devDiff.length > 0) {
-                    out(chalk.gray(`  (${plan.devDiff.length} Atlas scratch database(s) not listed — --include-dev-diff)`));
+                    out(chalk.gray(`  (${plan.devDiff.length} migration scratch database(s) not listed — --include-dev-diff)`));
                 }
                 out("");
 
@@ -2242,7 +1754,7 @@ ${chalk.green.bold("Options")}
                                     own \`rebase dev\`.
   ${chalk.blue.bold("--json")}                            diff: print the whole diff as JSON, with up
                                     to --sample-limit rows a table (default 100).
-  ${chalk.blue.bold("--include-dev-diff")}                Also prune the Atlas scratch databases
+  ${chalk.blue.bold("--include-dev-diff")}                Also prune the migration scratch databases
                                     \`db push\` leaves behind.
   ${chalk.blue.bold("--on-conflict")} <abort|branch|target> merge: a row both sides changed — write nothing
                                     (abort, the default), take the branch's, or keep the parent's.
@@ -2322,74 +1834,15 @@ async function runAtlas(
         omitPlanEcho?: boolean;
     } = {}
 ): Promise<string> {
-    const atlasBin = resolveLocalBin("atlas");
-    if (!atlasBin) {
-        // Two very different causes, and the advice for one is a loop for the
-        // other — see `diagnoseMissingBin`. This used to say "Install it with:
-        // pnpm add -D @ariga/atlas" unconditionally, which is the exact command
-        // that produces the far more common of the two states.
-        outError(chalk.red("\n✗ The atlas binary is missing, so the schema cannot be applied.\n"));
-
-        // On Windows every remedy below is a loop: the npm package has no
-        // Windows build, so no install or allowlist ever produces the binary.
-        if (process.platform === "win32") {
-            for (const line of describeAtlasWindowsInstall()) outError(line);
-            outError("");
-            process.exit(1);
-        }
-
-        // Every remedy below is package-manager specific, and this used to print
-        // pnpm's unconditionally. npm 12 blocks a dependency's install scripts
-        // the same way pnpm 10 does, so an npm reader was handed `pnpm
-        // approve-builds` and a `"pnpm"` package.json key — correct advice, for
-        // somebody else. Read the lockfile and answer the reader in front of us.
-        const manager = detectProjectPackageManager();
-
-        const diagnosis = diagnoseMissingBin("@ariga/atlas");
-
-        if (diagnosis === "bin-link-missing") {
-            // The binary IS on disk; only the `node_modules/.bin` shim that
-            // points at it is not. pnpm produces this when it writes the link
-            // before the script that creates the target ("Failed to create bin
-            // … ENOENT"), and so does a tree copied without its symlinks.
-            // Sending this reader to `approve-builds` does nothing: nothing is
-            // blocked.
-            outError(chalk.yellow("  @ariga/atlas and its binary are both on disk — only the\n"
-                + "  node_modules/.bin/atlas link that puts it on PATH is missing.\n"));
-            outError(chalk.gray(
-                "  Usually a half-written install: the link is created before the script that\n"
-                + "  downloads the target, so an interrupted or copied tree keeps the binary and\n"
-                + "  loses the shim.\n"
-            ));
-            outError("  Fix it with:\n");
-            outError(chalk.bold(`    ${describeReinstallCommand(manager)}\n`));
-        } else if (diagnosis === "build-script-blocked") {
-            outError(chalk.yellow("  @ariga/atlas IS installed — only its binary is missing.\n"));
-            outError(chalk.gray(
-                "  It downloads that binary in a `preinstall` script, and pnpm 10+ and npm 12+\n" +
-                "  do not run a dependency's scripts unless you allow it. The install still\n" +
-                "  exits 0, so the only sign is a line several screens up: pnpm's\n" +
-                "  `Ignored build scripts: @ariga/atlas`, or npm's `install scripts blocked`.\n"
-            ));
-            outError("  Fix it with either:\n");
-            for (const line of describeBuildScriptRemedy("@ariga/atlas", manager)) {
-                outError(line ? chalk.bold(line) : "");
-            }
-            outError("");
-        } else {
-            outError(chalk.gray("  It is not installed in this project.\n"));
-            const member = workspaceMemberDir();
-            outError(member === null ? "  Install it with:\n" : "  Install it with (from the project root):\n");
-            outError(chalk.bold(`    ${describeDevAddCommand("@ariga/atlas", manager, member)}\n`));
-            outError(chalk.gray(
-                "  If the install then reports blocked or ignored build scripts, allow them too —\n" +
-                "  the package carries a `preinstall` script that fetches the binary.\n"
-            ));
-        }
+    const compatBin = resolvePackageBin("@stokaro/ptah-compat", "ptah-compat");
+    if (!compatBin) {
+        outError(chalk.red("\n✗ The Ptah Compat executable is missing, so the schema cannot be applied.\n"));
+        outError(chalk.gray("  Install @stokaro/ptah-compat in this project."));
         process.exit(1);
     }
 
     const env = { ...process.env as Record<string, string> };
+    env.PTAH_ATLAS_ALLOW_UNMATCHED_EXCLUDE = "1";
     try {
         const dotenv = await import("dotenv");
         const envPaths = [
@@ -2446,55 +1899,56 @@ async function runAtlas(
     // everything above still connects with the URL as configured.
     const atlasUrl = forAtlas(databaseUrl);
     const atlasDevUrl = forAtlas(devDatabaseUrl);
+    const ptahUrl = managedDatabase() ? forManagedPGlitePtah(atlasUrl) : atlasUrl;
+    const ptahDevUrl = managedDatabase() && parseEnvBoolean(env.REBASE_PTAH_DEV_PGLITE) === true
+        ? forManagedPGlitePtah(atlasDevUrl)
+        : atlasDevUrl;
 
-    // Everything Atlas must keep its hands off, in one list.
-    //
-    // Gathered only for the invocations that accept the flag — which is
-    // `schema apply` and nothing else. `atlas migrate diff` and `migrate apply`
-    // both reject `--exclude` outright with `unknown flag`, and passing it there
-    // took `rebase db generate` and `rebase db migrate` down for every project
-    // declaring a `search` block; the diff keeps the same objects out of the
-    // migration afterwards instead, with `stripCarvedOutStatements`. See
-    // `acceptsExcludeFlag`.
-    const excludes: string[] = [];
-    if (schemaDir && acceptsExcludeFlag(domain, args)) {
-        // Search and vector objects are Rebase's, not Atlas's: the desired state
-        // does not carry them, so an apply left to itself would drop them.
-        excludes.push(...await getSearchExcludes(schemaDir));
-        excludes.push(...await getVectorExcludes(schemaDir));
-        excludes.push(...await getTriggerExcludes(schemaDir));
+    if (acceptsExcludes(domain, args) && !schemaDir) {
+        throw new Error("Schema planning requires a schema directory for its managed-resource scope.");
+    }
 
-        // Fail CLOSED: the exclude list is the only thing shielding
-        // non-collection tables from the auto-approved apply. If we can't
-        // introspect the database to build it, abort rather than proceed with
-        // a partial list that would let Atlas drop unmanaged tables.
-        try {
-            excludes.push(...await getTableExcludes(databaseUrl, schemaDir));
-        } catch (err) {
-            if (err instanceof ExcludeIntrospectionError) {
-                outError(chalk.red("\n✗ Aborting push: could not determine which tables to protect."));
-                outError(chalk.gray(`  ${err.message}`));
-                outError(chalk.gray("  Refusing to apply — a partial exclude list could drop tables Rebase does not manage."));
-                const hint = diagnoseDbError(err.cause ?? err, databaseUrl);
-                if (hint) outError(hint);
-                throw new CommandStopped("Could not determine which tables to protect.");
-            }
-            throw err;
-        }
+    // Auth and migration bookkeeping are outside Rebase's declared schema.
+    // The other generated objects are in schema.sql and belong in Ptah's plan.
+    const excludes: string[] = acceptsExcludes(domain, args)
+        ? ["atlas_schema_revisions", "atlas_schema_revisions.*", "auth", "auth.*"]
+        : [];
+    let includes: string[] = [];
+    if (schemaDir && acceptsExcludes(domain, args)) {
+        const historyDir = domain === "migrate" ? path.resolve(process.cwd(), "drizzle", "migrations") : undefined;
+        // Positive scope protects every unmanaged table, view, function and
+        // extension in both push and migration authoring. Ptah keeps a
+        // selected table's policies, triggers and indexes with that table.
+        // Committed ownership keeps a removed declaration in scope for DROP.
+        includes = managedSelectorsForPlan();
 
         // And the indexes on those tables that Rebase did not create. Same
         // fail-closed contract as the table list above, for the same reason: a
         // partial answer here silently drops somebody's index.
         try {
-            excludes.push(...await getForeignIndexExcludes(databaseUrl, schemaDir));
+            excludes.push(...await getForeignIndexExcludes(databaseUrl, schemaDir, { historyDir }));
         } catch (err) {
             if (err instanceof ExcludeIntrospectionError) {
-                outError(chalk.red("\n✗ Aborting push: could not determine which indexes to protect."));
+                outError(chalk.red("\n✗ Aborting database plan: could not determine which indexes to protect."));
                 outError(chalk.gray(`  ${err.message}`));
-                outError(chalk.gray("  Refusing to apply — a partial exclude list could drop an index Rebase does not manage."));
+                outError(chalk.gray("  Refusing to plan — a partial exclude list could drop an index Rebase does not manage."));
                 const hint = diagnoseDbError(err.cause ?? err, databaseUrl);
                 if (hint) outError(hint);
                 throw new CommandStopped("Could not determine which indexes to protect.");
+            }
+            throw err;
+        }
+
+        try {
+            excludes.push(...await getUnmanagedChildExcludes(
+                databaseUrl, schemaDir, includes,
+                historyDir
+            ));
+        } catch (err) {
+            if (err instanceof ExcludeIntrospectionError) {
+                outError(chalk.red("\n✗ Aborting database plan: could not determine which policies and triggers to protect."));
+                outError(chalk.gray(`  ${err.message}`));
+                throw new CommandStopped("Could not determine which policies and triggers to protect.");
             }
             throw err;
         }
@@ -2508,9 +1962,9 @@ async function runAtlas(
             excludes.push(...await getUndeclaredConstraintExcludes(databaseUrl, desiredSql));
         } catch (err) {
             if (err instanceof ExcludeIntrospectionError) {
-                outError(chalk.red("\n✗ Aborting push: could not determine which constraints to protect."));
+                outError(chalk.red("\n✗ Aborting database plan: could not determine which constraints to protect."));
                 outError(chalk.gray(`  ${err.message}`));
-                outError(chalk.gray("  Refusing to apply — a partial exclude list could drop a CHECK or EXCLUDE constraint the database enforces."));
+                outError(chalk.gray("  Refusing to plan — a partial exclude list could drop a CHECK or EXCLUDE constraint the database enforces."));
                 const hint = diagnoseDbError(err.cause ?? err, databaseUrl);
                 if (hint) outError(hint);
                 throw new CommandStopped("Could not determine which constraints to protect.");
@@ -2519,8 +1973,18 @@ async function runAtlas(
         }
     }
 
+    // PGlite's connection is bound to public. Ptah expects table.child there,
+    // while the same selector on a regular PostgreSQL database is
+    // schema.table.child.
+    const scopedExcludes = managedDatabase()
+        ? excludes.map(pattern => pattern.startsWith("public.") ? pattern.slice("public.".length) : pattern)
+        : excludes;
+    const migrateDiffExcludes = migrateDiffExcludeValue(domain, args, scopedExcludes);
+    if (migrateDiffExcludes !== undefined) env.PTAH_ATLAS_MIGRATE_DIFF_EXCLUDE = migrateDiffExcludes;
+    const migrateDiffIncludes = migrateDiffIncludeValue(domain, args, includes);
+    if (migrateDiffIncludes !== undefined) env.PTAH_ATLAS_MIGRATE_DIFF_INCLUDE = migrateDiffIncludes;
     const atlasArgs = buildAtlasArgs({
-        domain, args, url: atlasUrl, devUrl: atlasDevUrl, excludes, singleSession: managedDatabase()
+        domain, args, url: ptahUrl, devUrl: ptahDevUrl, excludes: scopedExcludes, includes, singleSession: managedDatabase()
     });
 
     // The managed database is one session every connection shares, so the
@@ -2543,7 +2007,7 @@ async function runAtlas(
     // for known, actionable failure modes (e.g. a dependency-drop that leaves
     // the schema half-applied) after the process exits. When capturing (used
     // for the destructive-change dry-run), pipe stdout and collect it instead.
-    const subprocess = execa(atlasBin, atlasArgs, {
+    const subprocess = execa(process.execPath, [compatBin, ...atlasArgs], {
         cwd: process.cwd(),
         stdout: opts.captureStdout || opts.omitPlanEcho ? "pipe" : "inherit",
         stderr: "pipe",
@@ -2574,7 +2038,7 @@ async function runAtlas(
         // its own failure, so the scratch database outlives this command —
         // unless Atlas never got as far as planning, when it holds nothing.
         await scratchDatabase.afterAtlasFailure(stderrText);
-        outError(chalk.red(`\n✗ atlas ${domain} ${args.join(" ")} failed.\n`));
+        outError(chalk.red(`\n✗ ptah-compat ${domain} ${args.join(" ")} failed.\n`));
         // Surface actionable recovery guidance for recognized failures. The
         // Atlas-shaped ones first: they read the invocation as well as the
         // text, so they can tell `migrate apply` hitting an already-provisioned
@@ -2594,7 +2058,7 @@ async function runAtlas(
             outError(hint);
         }
         if (opts.throwOnFailure) {
-            throw Object.assign(new Error(`atlas ${domain} ${args.join(" ")} failed`), { alreadyReported: true });
+            throw Object.assign(new Error(`ptah-compat ${domain} ${args.join(" ")} failed`), { alreadyReported: true });
         }
         process.exit(1);
     }

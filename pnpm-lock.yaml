@@ -92,9 +92,6 @@ importers:
 
   app/backend:
     dependencies:
-      '@ariga/atlas':
-        specifier: ^1.2.3
-        version: 1.2.3
       '@aws-sdk/client-s3':
         specifier: ^3.1096.0
         version: 3.1096.0
@@ -107,6 +104,9 @@ importers:
       '@rebasepro/server-postgres':
         specifier: workspace:*
         version: link:../../packages/server-postgres
+      '@stokaro/ptah-compat':
+        specifier: ^0.33.1
+        version: 0.33.1
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -1627,9 +1627,6 @@ importers:
 
   packages/server-postgres:
     dependencies:
-      '@ariga/atlas':
-        specifier: ^1.2.3
-        version: 1.2.3
       '@rebasepro/codegen':
         specifier: workspace:*
         version: link:../codegen
@@ -1645,6 +1642,9 @@ importers:
       '@rebasepro/utils':
         specifier: workspace:*
         version: link:../utils
+      '@stokaro/ptah-compat':
+        specifier: ^0.33.1
+        version: 0.33.1
       arg:
         specifier: ^5.0.2
         version: 5.0.2
@@ -2387,11 +2387,6 @@ packages:
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
-
-  '@ariga/atlas@1.2.3':
-    resolution: {integrity: sha512-16VpZbQ7nW19DzEzEJhkRzI9OUZRDyL8HWVrFIUxusE6K3F6XoIbDZ91koD/FJ/in1ebFULSghq/yvl32nuv0g==}
-    engines: {node: '>=18.0.0'}
-    hasBin: true
 
   '@asamuzakjp/css-color@3.2.0':
     resolution: {integrity: sha512-K1A6z8tS3XsmCMM86xoWdn7Fkdn9m6RSVtocUrJYIwZnFVkng/PvkEoWtOWmP+Scc6saYWHWZYbndEEXxl24jw==}
@@ -5547,6 +5542,46 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@stokaro/ptah-compat@0.33.1':
+    resolution: {integrity: sha512-PQXyYpV6YzAa9GR80mXgBYmAusFhpAMlVmdPZ37f/QmNVt2rh9wPaF5uEJVwknQt/16o5rUQFiCWok5i5PUdRw==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  '@stokaro/ptah-darwin-arm64@0.33.1':
+    resolution: {integrity: sha512-RsRvIocfL8brwEGcUSak2iF2b01cuOpdrErkZUVnyxrn3efZn1pvt5tIAJTHMgg3+v2gyT5wIGdP6YTtm1UKZw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@stokaro/ptah-darwin-x64@0.33.1':
+    resolution: {integrity: sha512-64kgcvQIAExCkK/JBVhLFitZftGV8w7Q41vGIbLW82Vw6f+W/K65at1a7XkXnYKc9D5v2jFPM8Q8g+ufX7Y/9A==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@stokaro/ptah-linux-arm64@0.33.1':
+    resolution: {integrity: sha512-TK65q9BNQ/d4CXCDD4WK7UvewQ7b8j4UOZ4qbhLiVIygtkNBwmYfMoM2kg+cogq0O4rk0OT9iaFpHxqcPBmIew==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@stokaro/ptah-linux-x64@0.33.1':
+    resolution: {integrity: sha512-qMumrb4GHphBp7mhY8fBQ8F8vrL71Hf1UIlQBZ/QHrrm3ihYdfZo5bQZ9Y+Zg1rA8BDrGRgs/JCATgxMmMKGJQ==}
+    cpu: [x64]
+    os: [linux]
+
+  '@stokaro/ptah-win32-arm64@0.33.1':
+    resolution: {integrity: sha512-GZuFDaMZE5tVG2T/8OGiEv98EC50FGMgZUcWnRhu2XXnUZJXvsaI2SI7/lbVvxuVPQkiz4XWa4b3+vvxhuM5Ig==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@stokaro/ptah-win32-x64@0.33.1':
+    resolution: {integrity: sha512-j6GGyQy0JXzfODb8+E3wtx6SFmwEKmiHHqh85ILturLKFzdhRD4hvV6sUaaiSPUB2OXC01oo7AP6jIfN9yTeVw==}
+    cpu: [x64]
+    os: [win32]
+
+  '@stokaro/ptah@0.33.1':
+    resolution: {integrity: sha512-Qzdvk2Hd546LQWjbMYqkf8upfHBSmtoyWPowO55bBdaegimdAauI/KLdXPebDymvo3g+ODE9yDRR/VhTJgLtIA==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   '@svgr/babel-plugin-add-jsx-attribute@8.0.0':
     resolution: {integrity: sha512-b9MIk7yhdS1pMCZM8VeNfUlSKVRhsHZNMl5O9SfaX0l0t5wjdgu4IDzGB8bpnGBBOjGST3rRFVsaaEtI4W6f7g==}
@@ -12032,8 +12067,6 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@ariga/atlas@1.2.3': {}
-
   '@asamuzakjp/css-color@3.2.0':
     dependencies:
       '@csstools/css-calc': 2.1.4(@csstools/css-parser-algorithms@3.0.5(@csstools/css-tokenizer@3.0.4))(@csstools/css-tokenizer@3.0.4)
@@ -15678,6 +15711,37 @@ snapshots:
       tslib: 2.8.1
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@stokaro/ptah-compat@0.33.1':
+    dependencies:
+      '@stokaro/ptah': 0.33.1
+
+  '@stokaro/ptah-darwin-arm64@0.33.1':
+    optional: true
+
+  '@stokaro/ptah-darwin-x64@0.33.1':
+    optional: true
+
+  '@stokaro/ptah-linux-arm64@0.33.1':
+    optional: true
+
+  '@stokaro/ptah-linux-x64@0.33.1':
+    optional: true
+
+  '@stokaro/ptah-win32-arm64@0.33.1':
+    optional: true
+
+  '@stokaro/ptah-win32-x64@0.33.1':
+    optional: true
+
+  '@stokaro/ptah@0.33.1':
+    optionalDependencies:
+      '@stokaro/ptah-darwin-arm64': 0.33.1
+      '@stokaro/ptah-darwin-x64': 0.33.1
+      '@stokaro/ptah-linux-arm64': 0.33.1
+      '@stokaro/ptah-linux-x64': 0.33.1
+      '@stokaro/ptah-win32-arm64': 0.33.1
+      '@stokaro/ptah-win32-x64': 0.33.1
 
   '@svgr/babel-plugin-add-jsx-attribute@8.0.0(@babel/core@7.29.7)':
     dependencies:

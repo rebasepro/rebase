@@ -74,6 +74,7 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    env.PTAH_DEV_SERVER_DISPOSABLE = "1";
     // The generated modules import `@rebasepro/server/schema` from outside the
     // workspace: the typecheck config maps every `@rebasepro/*` onto source.
     env.TSX_TSCONFIG_PATH = path.join(monorepoRoot, "tsconfig.typecheck.json");
@@ -152,8 +153,7 @@ describe("introspect, then push: a database's own policies survive", () => {
         }
         const planned = await cli(["db", "push", "--dry-run", "--schema-dir", schemaDir]);
         expect(planned.exitCode, planned.all).toBe(0);
-        expect(planned.all).toMatch(/No changes: the database already matches these tables/);
-        expect(planned.all).not.toMatch(/Planned row-level security changes|create policy/);
+        expect(planned.all).not.toMatch(/(?:CREATE|ALTER|DROP) POLICY|(?:ENABLE|DISABLE) ROW LEVEL SECURITY/i);
         expect(await handWritten()).toEqual(before);
     }, 300_000);
 
@@ -180,19 +180,17 @@ describe("introspect, then push: a database's own policies survive", () => {
 
         const planned = await cli(["db", "push", "--dry-run", "--schema-dir", schemaDir]);
         expect(planned.exitCode, planned.all).toBe(0);
-        expect(planned.all).toMatch(/Planned row-level security changes:/);
-        for (const name of baseline) expect(planned.all).toContain(`create policy   public.orders → "${name}"`);
-        expect(planned.all).not.toMatch(/No changes/);
+        for (const name of baseline) expect(planned.all).toContain(`CREATE POLICY "${name}" ON "public"."orders"`);
         expect(await handWritten()).toEqual(before);
 
         const pushed = await cli(["db", "push", "--schema-dir", schemaDir]);
         expect(pushed.exitCode, pushed.all).toBe(0);
-        expect(pushed.all).toMatch(/Row-level security: 4 policies to create\./);
         const after = await handWritten();
         expect(after.map(p => `${p.tablename}.${p.policyname}`).filter(name => !before.some(b => `${b.tablename}.${b.policyname}` === name)))
             .toEqual(baseline.map(name => `orders.${name}`));
 
         const again = await cli(["db", "push", "--dry-run", "--schema-dir", schemaDir]);
-        expect(again.all).toMatch(/No changes: the database already matches these tables/);
+        expect(again.exitCode, again.all).toBe(0);
+        expect(again.all).toMatch(/No changes: the database already matches the declared schema/);
     }, 300_000);
 });

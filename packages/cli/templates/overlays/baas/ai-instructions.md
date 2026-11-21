@@ -10,7 +10,7 @@ This is a **headless** Rebase project: a REST API, auth, storage and realtime ov
 |---|---|
 | `pnpm dev` | The backend and the managed development database, together |
 | `rebase db url` | Print the connection string in use — it pipes straight into `psql` |
-| `pnpm db:migrate` | Apply the migration files in `backend/drizzle/migrations`, on the managed development database or your own PostgreSQL. A headless project declares no tables, so nothing writes those files for it — `rebase db generate` has no schema to generate from — and until you add one there is nothing to apply. A file you write by hand needs `pnpm exec atlas migrate hash --dir file://drizzle/migrations`, run in `backend/`, before it applies |
+| `pnpm db:migrate` | Apply files in `backend/drizzle/migrations` to the managed database or your PostgreSQL server |
 | `pnpm schema:introspect` | Existing tables → `defineTable(...)` files in `backend/schema/`. That directory makes the code the schema; see rule 1 |
 | `pnpm generate:sdk` | Regenerate the typed client from `backend/schema/` — so in a headless project it has nothing to read until you introspect. Once there are tables there, `pnpm dev` does this on start and on every save; the script is for CI and for when `pnpm dev` is not running |
 | `pnpm build` then `pnpm start` | Build the deployable bundle, then run it |
@@ -19,6 +19,11 @@ This is a **headless** Rebase project: a REST API, auth, storage and realtime ov
 | `rebase doctor` | Checks the environment and the database connection — run this before guessing |
 | `rebase resources --write` | After declaring a database, bucket or topic in `backend/resources.ts`: regenerate `rebase.resources.json` and commit it (`pnpm build` does this too) |
 | `pnpm deploy` | Deploys this project. Never run it; see below |
+
+A headless project declares no tables, so `rebase db generate` has nothing to
+write until you add a schema. For a migration you write by hand, run
+`pnpm exec ptah-compat migrate hash --dir file://drizzle/migrations` from
+`backend/` before applying it.
 
 ## Never
 

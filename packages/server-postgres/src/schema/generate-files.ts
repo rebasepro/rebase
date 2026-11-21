@@ -6,7 +6,8 @@ import { declaredDatabaseExtensions } from "@rebasepro/types";
 import { loadTables } from "./load-tables";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
-    generatePostgresDdl,
+    generatePtahDdl,
+    generatePtahManagedSelectors,
     generatePostgresPoliciesDdl,
     generatePostgresSearchDdl,
     generatePostgresTriggersDdl,
@@ -114,9 +115,8 @@ async function loadDeclaredResources(backendDir: string): Promise<void> {
 }
 
 /**
- * `schema.sql` (Atlas's desired state) and, beside it, `policies.sql`,
- * `search.sql`, `vector.sql`, `triggers.sql` and `views.sql` — the parts Atlas
- * does not own.
+ * Write the complete Ptah desired state and the legacy SQL files that boot
+ * and recovery paths still consume.
  */
 export async function writePostgresDdl(options: GenerateFileOptions): Promise<void> {
     try {
@@ -129,14 +129,11 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
 
         const tables = await loadTables(resolvedPath);
 
-        // `schema.sql` is Atlas's desired state, and it carries neither the RLS
-        // policies, nor the search apparatus, nor the vector columns: Atlas
-        // manages none of them, and in the search and vector cases cannot. All
-        // three are written beside it and applied by the CLI in their own right.
-        const ddlContent = generatePostgresDdl(tables, {
-            includePolicies: false,
-            includeSearch: false,
-            includeVector: false
+        const ddlContent = generatePtahDdl(tables, {
+            extensions: declaredDatabaseExtensions()
+        });
+        const managedSelectors = generatePtahManagedSelectors(tables, {
+            extensions: declaredDatabaseExtensions()
         });
         const policiesContent = generatePostgresPoliciesDdl(tables);
         const searchContent = generatePostgresSearchDdl(tables);
@@ -151,15 +148,15 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
             const outputDir = path.dirname(outputPath);
             await fsPromises.mkdir(outputDir, { recursive: true });
             await fsPromises.writeFile(outputPath, ddlContent);
+            await fsPromises.writeFile(path.join(outputDir, "ptah-managed.json"), JSON.stringify(managedSelectors, null, 2) + "\n");
             out(`✅ PostgreSQL DDL generated successfully at ${outputPath}`);
 
             const policiesPath = path.join(outputDir, "policies.sql");
             await fsPromises.writeFile(policiesPath, policiesContent);
             out(`✅ PostgreSQL Policies DDL generated successfully at ${policiesPath}`);
 
-            // Removed when the last `search` block goes: the CLI applies this
-            // file whenever it exists, and a stale one would keep re-creating
-            // functions for tables that no longer want them.
+            // Boot and recovery still read this file. Remove a stale copy when
+            // the last search block goes so those paths use the current schema.
             const searchPath = path.join(outputDir, "search.sql");
             if (searchContent) {
                 await fsPromises.writeFile(searchPath, searchContent);
@@ -169,10 +166,8 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
             }
 
             // Removed when the last vector column goes, for the same reason
-            // `search.sql` is: the CLI applies whichever of these files exists,
-            // and a stale one would keep re-adding a column the tables no
-            // longer declare — which Atlas, no longer told to exclude it, would
-            // then plan a DROP for on the very next push.
+            // `search.sql` is: boot and recovery must not restore a vector
+            // column that the tables no longer declare.
             const vectorPath = path.join(outputDir, "vector.sql");
             if (vectorContent) {
                 await fsPromises.writeFile(vectorPath, vectorContent);
@@ -181,10 +176,8 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
                 await fsPromises.rm(vectorPath);
             }
 
-            // `.onUpdateNow()` (`autoValue: "on_update"`), on the same terms as the two above: a
-            // trigger is a function plus a binding, which Atlas's free tier
-            // will not parse, and a stale file would keep re-installing a
-            // trigger for a column nothing declares any more.
+            // `.onUpdateNow()` (`autoValue: "on_update"`) also feeds boot and
+            // recovery. Remove its file when no trigger remains.
             const triggersPath = path.join(outputDir, "triggers.sql");
             if (triggersContent) {
                 await fsPromises.writeFile(triggersPath, triggersContent);
@@ -193,9 +186,8 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
                 await fsPromises.rm(triggersPath);
             }
 
-            // The schema's views (`defineView`), which Atlas's free tier does not manage.
-            // Removed with the last view, as the others are: the CLI applies
-            // the file whenever it exists.
+            // Boot and recovery still use the schema's view file. Remove it
+            // when the last declared view goes.
             const viewsPath = path.join(outputDir, "views.sql");
             if (viewsContent) {
                 await fsPromises.writeFile(viewsPath, viewsContent);

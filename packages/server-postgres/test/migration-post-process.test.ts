@@ -1,16 +1,36 @@
-/**
- * `db generate` finishing the migration Atlas wrote.
- *
- * Atlas's file creates tables without RLS; the policies arrive in an append.
- * When the append failed, the CLI warned and said "You can now run rebase db
- * migrate" — and a migration that failed before it was rewritten still matched
- * its checksum, so it applied and served every new table with RLS off.
- */
+/** `db generate` finishing the migration Ptah wrote. */
 import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { finishNewMigration } from "../src/schema/migration-post-process";
+import { finishNewMigration, preparePtahMigration, ptahManualMigrationWarning } from "../src/schema/migration-post-process";
+
+const GENERATED_COLUMN_WARNING = "WARNING: Generated column public.tasks.search_vector changed, but ALTER COLUMN SET EXPRESSION requires target capability alter_generated_column_expression, unavailable on this target (PostgreSQL added it in 17); manual migration required.";
+const INCOMPLETE_SEARCH_PLAN = `-- ${GENERATED_COLUMN_WARNING}\nCOMMENT ON COLUMN "public"."tasks"."search_vector" IS 'new fingerprint';\n`;
+
+describe("ptahManualMigrationWarning", () => {
+    it("finds the warning even when Ptah plans a valid fingerprint comment", () => {
+        expect(ptahManualMigrationWarning(`Planned schema changes:\n${INCOMPLETE_SEARCH_PLAN}`)).toBe(GENERATED_COLUMN_WARNING);
+        expect(ptahManualMigrationWarning('ALTER TABLE "tasks" ALTER COLUMN "search_vector" SET EXPRESSION AS (new_expression);')).toBeUndefined();
+    });
+});
+
+describe("preparePtahMigration", () => {
+    it("makes generated functions and schemas replayable after auth bootstrap", () => {
+        const sql = 'CREATE SCHEMA "rebase";\nCREATE FUNCTION "rebase"."uid"() RETURNS text AS $$ SELECT 1 $$ LANGUAGE sql;\nCREATE FUNCTION "public"."other"() RETURNS text AS $$ SELECT 2 $$ LANGUAGE sql;\n';
+        expect(preparePtahMigration(sql, false)).toBe(
+            'CREATE SCHEMA IF NOT EXISTS "rebase";\nCREATE OR REPLACE FUNCTION "rebase"."uid"() RETURNS text AS $$ SELECT 1 $$ LANGUAGE sql;\nCREATE FUNCTION "public"."other"() RETURNS text AS $$ SELECT 2 $$ LANGUAGE sql;\n'
+        );
+    });
+
+    it("uses one conditional role creation when Ptah emits an unconditional one", () => {
+        const sql = 'CREATE ROLE "rebase_admin" WITH NOLOGIN NOINHERIT;\nCREATE TABLE "public"."notes" ("id" bigint);\n';
+        const prepared = preparePtahMigration(sql, true);
+        expect(prepared).toContain("DO $rebase_admin_role$");
+        expect(prepared).toContain('CREATE TABLE "public"."notes"');
+        expect(prepared).not.toContain('CREATE ROLE "rebase_admin" WITH');
+    });
+});
 
 describe("finishNewMigration", () => {
     let dir: string;
@@ -44,6 +64,18 @@ describe("finishNewMigration", () => {
         }, rehash);
 
         expect(outcome).toEqual({ ok: false, error: "search.sql could not be read", removed: true });
+        expect(fs.existsSync(file)).toBe(false);
+        expect(rehash).toHaveBeenCalledTimes(1);
+    });
+
+    it("removes an incomplete migration before its fingerprint comment can be applied", async () => {
+        fs.writeFileSync(file, INCOMPLETE_SEARCH_PLAN);
+        const rehash = jest.fn(async () => undefined);
+        const outcome = await finishNewMigration(file, async () => {
+            preparePtahMigration(fs.readFileSync(file, "utf8"), false);
+        }, rehash);
+
+        expect(outcome).toEqual({ ok: false, error: GENERATED_COLUMN_WARNING, removed: true });
         expect(fs.existsSync(file)).toBe(false);
         expect(rehash).toHaveBeenCalledTimes(1);
     });

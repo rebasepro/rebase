@@ -16,6 +16,7 @@
  * limit, the proxy in front.
  */
 import net from "net";
+import { once } from "node:events";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { MANAGED_SERVER_MAX_CONNECTIONS } from "./constraints";
@@ -121,4 +122,68 @@ describe("the proxy in front of the managed database", () => {
         expect(served).toEqual(served.map(() => true));
         expect(server.getStats().activeConnections).toBe(0);
     });
+});
+
+
+it("waits for a terminating connection while keeping the connection limit", async () => {
+    const host = "127.0.0.1";
+    const upstreamPort = await findFreePort();
+    const port = await findFreePort();
+    const upstream = net.createServer();
+    const clients: net.Socket[] = [];
+    const backends: net.Socket[] = [];
+    upstream.on("connection", socket => backends.push(socket));
+    const proxy = new NotificationProxy({ listenPort: port, upstreamPort, maxConnections: 1 });
+
+    async function connect() {
+        const socket = net.connect(port, host);
+        clients.push(socket);
+        await once(socket, "connect");
+        return socket;
+    }
+
+    try {
+        const listening = once(upstream, "listening");
+        upstream.listen(upstreamPort, host);
+        await listening;
+        await proxy.start();
+
+        const firstUpstream = once(upstream, "connection");
+        const first = await connect();
+        const [oldSocket] = await firstUpstream;
+        const started = once(oldSocket, "data");
+        first.write(startupMessage());
+        await started;
+        const terminate = Buffer.from([0x58, 0, 0, 0, 4]);
+        const finishing = once(oldSocket, "data");
+        first.write(terminate);
+        expect((await finishing)[0]).toEqual(terminate);
+
+        const replacement = await connect();
+        const response = once(replacement, "data");
+        replacement.write(startupMessage());
+
+        // The replacement has reserved the single slot. An additional
+        // client still receives SQLSTATE 53300 without opening upstream.
+        const excess = await connect();
+        const refusal = once(excess, "data");
+        excess.write(startupMessage());
+        expect((await refusal)[0].toString()).toContain("53300");
+        expect(backends).toHaveLength(1);
+
+        const ready = Buffer.from([0x5a, 0, 0, 0, 5, 0x49]);
+        const admitted = once(upstream, "connection").then(async ([socket]) => {
+            const [startup] = await once(socket, "data");
+            socket.write(ready);
+            return startup;
+        });
+        oldSocket.end();
+        expect((await response)[0]).toEqual(ready);
+        expect(await admitted).toEqual(startupMessage());
+        expect(backends).toHaveLength(2);
+    } finally {
+        for (const socket of [...clients, ...backends]) socket.destroy();
+        await proxy.stop();
+        await new Promise<void>(resolve => upstream.close(() => resolve()));
+    }
 });

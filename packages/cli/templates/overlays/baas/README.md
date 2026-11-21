@@ -57,6 +57,11 @@ managed PostgreSQL for this project, with its data under `.rebase/`. Set
 `DATABASE_URL` in `.env` to point at a database of your own — it always wins.
 `rebase db url` prints whichever one is in use, so it pipes straight into psql.
 
+On a shared external PostgreSQL server, `db generate` needs
+`PTAH_TRUST_REPLAY_SQL=1` to replay migration SQL with the dev connection's
+privileges. Set it only when you trust that SQL. The managed database does
+not need this setting.
+
 ## Use it from an app
 
 ```ts

@@ -84,12 +84,11 @@ export class ScratchDatabase {
 }
 
 /**
- * Whether Atlas failed before it planned anything: on connecting, which it
- * reports as `querying system variables: …` — SSL the server does not offer, a
- * login refused, a socket that closed or never opened.
+ * Whether the tool refused before running its plan. The connection error is
+ * Atlas's wording. Ptah refuses replay it cannot confine to the scratch database.
  */
 export function atlasFailedBeforePlanning(stderr: string): boolean {
-    return /querying system variables:/.test(stderr);
+    return /querying system variables:|postgres migration replay rejects /.test(stderr);
 }
 
 /**

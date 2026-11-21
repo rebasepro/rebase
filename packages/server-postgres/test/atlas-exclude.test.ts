@@ -1,3 +1,6 @@
+import fs from "fs";
+import os from "os";
+import path from "path";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { atlasExcludePattern, atlasExcludeSegment, excludePatternParts } from "../src/schema/atlas-exclude";
 import { getForeignIndexExcludes, getTableExcludes } from "../src/cli-helpers";
@@ -97,6 +100,22 @@ describe("each exclude list, for a name that is not a glob as it stands", () => 
         });
         expect(excludes.some(p => atlasMatches(p, ["public", "orders", ODD]))).toBe(true);
         expect(excludes.some(p => atlasMatches(p, ["public", "orders", "orders_idx[v1]"]))).toBe(true);
+    });
+
+    it("protects a hand-written index in unapplied migration history", async () => {
+        const historyDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-index-history-"));
+        try {
+            fs.writeFileSync(path.join(historyDir, "20261116000000_init.sql"),
+                'CREATE UNIQUE INDEX "custom.title[1]" ON "public"."orders" ("title");\n');
+            const excludes = await getForeignIndexExcludes("postgres://x/db", "/collections", {
+                queryExistingIndexes: async () => [],
+                getManagedIndexNames: async () => new Set<string>(),
+                historyDir
+            });
+            expect(excludes.some(pattern => atlasMatches(pattern, ["public", "orders", "custom.title[1]"]))).toBe(true);
+        } finally {
+            fs.rmSync(historyDir, { recursive: true, force: true });
+        }
     });
 
     it("an index of ours that is still declared is left to Atlas, whatever its name", async () => {

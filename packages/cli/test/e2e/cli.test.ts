@@ -68,6 +68,8 @@ force: true });
     it("should scaffold project, install workspace dependencies, run database operations, and perform auth password reset", async () => {
         const cliBin = path.join(cliRoot, "bin", "rebase.js");
         const cleanEnv = getCleanEnv();
+        // The PostgreSQL container belongs to this suite and is removed afterward.
+        cleanEnv.PTAH_DEV_SERVER_DISPOSABLE = "1";
 
         console.log("1. Scaffolding project via rebase init...");
         // Do NOT pass --install so we can link local workspace packages first

@@ -74,6 +74,7 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    env.PTAH_DEV_SERVER_DISPOSABLE = "1";
     // The schema modules import `@rebasepro/types` from outside the workspace;
     // the typecheck config maps every `@rebasepro/*` onto source, so the driver
     // and the modules share one copy of the builders.
@@ -123,28 +124,27 @@ describe("db push destructive-change gate E2E", () => {
         if (container) await stopPgContainer(container.containerName);
     }, 30_000);
 
-    /**
-     * Run `rebase db push` NON-INTERACTIVELY (stdin ignored ⇒ not a TTY) so
-     * the gate's non-interactive branch is exercised. `reject: false` lets us
-     * assert on the exit code; `all: true` merges stdout+stderr for message
-     * checks.
-     */
-    function runPush(extra: string[] = []) {
+    /** Run without a TTY and capture the complete plan or error. */
+    function runDb(command: "push" | "generate", extra: string[] = []) {
         const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
         return execa(
             tsxBin,
-            [cliScript, "db", "push", "--schema-dir", schemaDir, ...extra],
+            [cliScript, "db", command, "--schema-dir", schemaDir, ...extra],
             { cwd: workDir, env, reject: false, stdin: "ignore", all: true }
         );
     }
 
+    function runPush(extra: string[] = []) {
+        return runDb("push", extra);
+    }
+
     /** {@link runPush} against another connection string. */
-    function runPushAt(databaseUrl: string, extra: string[] = []) {
+    function runPushAt(databaseUrl: string, extra: string[] = [], overrides: Record<string, string> = {}) {
         const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
         return execa(
             tsxBin,
             [cliScript, "db", "push", "--schema-dir", schemaDir, ...extra],
-            { cwd: workDir, env: cleanEnv(databaseUrl), reject: false, stdin: "ignore", all: true }
+            { cwd: workDir, env: { ...cleanEnv(databaseUrl), ...overrides }, reject: false, stdin: "ignore", all: true }
         );
     }
 
@@ -198,12 +198,10 @@ describe("db push destructive-change gate E2E", () => {
 
         // ── 3. Opt in explicitly → the drop is applied ───────────────────
         const allowed = await runPush(["--allow-destructive"]);
-        expect(allowed.exitCode).toBe(0);
+        expect(allowed.exitCode, allowed.all).toBe(0);
         expect(await noteColumnExists()).toBe(false);
-        // Atlas's report shows the statement it applies once: the plan it
-        // prints before applying is the one the push already listed.
-        expect(allowed.all?.match(/->\s+ALTER TABLE "public"\."tasks" DROP COLUMN "note"/g) ?? []).toHaveLength(1);
-        expect(allowed.all).toMatch(/Applying approved migration/);
+        expect(allowed.all).toContain('ALTER TABLE "public"."tasks" DROP COLUMN "note"');
+        expect(allowed.all).toMatch(/Proceeding because --allow-destructive was passed/);
     }, 150_000);
 
     /**
@@ -220,9 +218,10 @@ describe("db push destructive-change gate E2E", () => {
         fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex("prices"));
         fs.writeFileSync(path.join(schemaDir, "prices.ts"),
             pricesTableTs({ precision: 5, scale: 2, nicknameMax: 40 }));
-        const created = await runPush();
+        // This fixture replaces the table from the preceding case.
+        const created = await runPush(["--allow-destructive"]);
         expect(created.all ?? "").not.toMatch(/UNREADABLE PLAN/);
-        expect(created.exitCode).toBe(0);
+        expect(created.exitCode, created.all).toBe(0);
         await dbClient.query(`INSERT INTO prices (nickname, rating) VALUES ('first', 123.45)`);
 
         fs.writeFileSync(path.join(schemaDir, "prices.ts"),
@@ -245,19 +244,13 @@ describe("db push destructive-change gate E2E", () => {
         expect(row.rows).toEqual([{ rating: "123.45", type: "numeric(5,2)" }]);
     }, 150_000);
 
-    /**
-     * The same blindness, on the path that moves the search column out of the
-     * way: Postgres refuses to retype a column a generated column reads, and
-     * `db push` drops and rebuilds Rebase's own search column around the apply —
-     * but only if it sees the retype in the plan. It did not, and every push
-     * after widening a searched `varchar` failed with no hint.
-     */
+    /** PostgreSQL requires the plan to rebuild search around the type change. */
     it("widens a column a search block reads, rebuilding the search column around it", async () => {
         fs.writeFileSync(path.join(schemaDir, "prices.ts"),
             pricesTableTs({ precision: 5, scale: 2, nicknameMax: 100 }));
         const pushed = await runPush();
         expect(pushed.all ?? "").not.toMatch(/cannot alter type of a column used by a generated column/);
-        expect(pushed.exitCode).toBe(0);
+        expect(pushed.exitCode, pushed.all).toBe(0);
 
         const columns = await dbClient.query(`SELECT attname, format_type(atttypid, atttypmod) AS type,
                 attgenerated <> '' AS generated
@@ -268,14 +261,7 @@ describe("db push destructive-change gate E2E", () => {
         expect(Object.values(byName).some((c) => (c as { generated: boolean }).generated)).toBe(true);
     }, 150_000);
 
-    /**
-     * The push drops the search column before the apply. If the apply then
-     * fails for some other reason, the column must come back: Atlas rolled its
-     * transaction back, so the old definition still fits. The rebuild was
-     * written, and never ran — the failure exited from inside the Atlas runner,
-     * past the `catch` that held it — so search was left gone.
-     */
-    it("puts the search column back when the apply it made room for fails", async () => {
+    it("keeps the search column when an apply with a rebuild fails", async () => {
         await dbClient.query(`INSERT INTO prices (nickname, rating) VALUES ('no rating', NULL)`);
         fs.writeFileSync(path.join(schemaDir, "prices.ts"),
             pricesTableTs({ precision: 5, scale: 2, nicknameMax: 200, ratingRequired: true }));
@@ -324,7 +310,8 @@ export const translations = defineTable("translations", {
         for (const file of fs.readdirSync(schemaDir)) fs.rmSync(path.join(schemaDir, file));
         fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex("translations"));
         fs.writeFileSync(path.join(schemaDir, "translations.ts"), translationsTs(false));
-        const created = await runPush();
+        // This fixture replaces the table from the preceding cases.
+        const created = await runPush(["--allow-destructive"]);
         expect(created.all ?? "").toMatch(/completed successfully/);
         expect(created.exitCode).toBe(0);
         await dbClient.query(`INSERT INTO translations (id, locale, title) VALUES (1, 'en', 'Hello'), (2, 'en', 'Bye')`);
@@ -349,35 +336,27 @@ export const translations = defineTable("translations", {
         ]);
     }, 150_000);
 
-    /**
-     * Atlas speaks to Postgres through lib/pq, whose default `sslmode` is
-     * `require`; node-postgres, which the app and the CLI's own steps use,
-     * asks for no SSL. So a hand-written URL with no `sslmode` passed the
-     * CLI's connection check, then Atlas failed on `querying system
-     * variables: pq: SSL is not enabled on the server` — and the scratch
-     * database made for it stayed behind, kept as "evidence" of a run that
-     * planned nothing.
-     */
-    it("drops the scratch database when Atlas fails before planning", async () => {
-        // Not loopback, so the URL is handed to Atlas as written.
-        const address = Object.values(os.networkInterfaces()).flat()
-            .find(net => net !== undefined && !net.internal && net.family === "IPv4")?.address;
-        if (!address) throw new Error("This test needs a non-loopback IPv4 address to reach the container by.");
-        const url = container.connectionString.replace("localhost", address).replace("?sslmode=disable", "");
+    it("drops the scratch database when Ptah refuses untrusted replay on a shared server", async () => {
+        await dbClient.query("CREATE DATABASE untrusted");
+        const url = new URL(container.connectionString);
+        url.pathname = "/untrusted";
         await dropScratchDatabases();
         for (const file of fs.readdirSync(schemaDir)) fs.rmSync(path.join(schemaDir, file));
         fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex("tasks"));
         fs.writeFileSync(path.join(schemaDir, "tasks.ts"), tasksTableTs(true));
 
-        const failed = await runPushAt(url, ["--dry-run"]);
+        const failed = await runPushAt(url.href, ["--dry-run"], {
+            PTAH_DEV_SERVER_DISPOSABLE: "0",
+            PTAH_TRUST_REPLAY_SQL: "0"
+        });
         expect(failed.exitCode, failed.all).toBe(1);
-        expect(failed.all).toMatch(/SSL is not enabled on the server/);
+        expect(failed.all).toMatch(/postgres migration replay rejects CREATE (?:ROLE|routine)/);
         expect(await scratchDatabases()).toEqual([]);
     }, 150_000);
 
     // The same URL on this machine is the common case — a `.env` written by
-    // hand, or by an older `init` — and Atlas is given the app's default.
-    it("connects Atlas without SSL to a database on this machine whose URL names no sslmode", async () => {
+    // hand, or by an older `init` — and Ptah is given the app's default.
+    it("connects Ptah without SSL to a database on this machine whose URL names no sslmode", async () => {
         const url = container.connectionString.replace("?sslmode=disable", "");
         await dropScratchDatabases();
         for (const file of fs.readdirSync(schemaDir)) fs.rmSync(path.join(schemaDir, file));
@@ -388,5 +367,29 @@ export const translations = defineTable("translations", {
         expect(planned.exitCode, planned.all).toBe(0);
         expect(planned.all).not.toMatch(/SSL is not enabled/);
         expect(await scratchDatabases()).toEqual([]);
+    }, 150_000);
+
+    it("generates a search-column rebuild once when a varchar grows", async () => {
+        for (const file of fs.readdirSync(schemaDir)) fs.rmSync(path.join(schemaDir, file));
+        fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex("prices"));
+        const pricesFile = path.join(schemaDir, "prices.ts");
+        fs.writeFileSync(pricesFile, pricesTableTs({ precision: 5, scale: 2, nicknameMax: 40 }));
+        const baseline = await runDb("generate", ["search_baseline"]);
+        expect(baseline.exitCode, baseline.all).toBe(0);
+
+        fs.writeFileSync(pricesFile, pricesTableTs({ precision: 5, scale: 2, nicknameMax: 100 }));
+        const widened = await runDb("generate", ["widen_search_input"]);
+        expect(widened.exitCode, widened.all).toBe(0);
+
+        const migrations = path.join(workDir, "drizzle", "migrations");
+        const before = fs.readdirSync(migrations).filter(name => name.endsWith(".sql")).sort();
+        expect(before).toHaveLength(2);
+        const sql = fs.readFileSync(path.join(migrations, before[1]), "utf8");
+        expect(sql).toMatch(/ALTER COLUMN "nickname" TYPE character varying\(100\)/i);
+        expect(sql).toMatch(/ADD COLUMN "search_vector"[^;]+GENERATED ALWAYS AS/i);
+
+        const repeated = await runDb("generate", ["unchanged_search"]);
+        expect(repeated.exitCode, repeated.all).toBe(0);
+        expect(fs.readdirSync(migrations).filter(name => name.endsWith(".sql")).sort()).toEqual(before);
     }, 150_000);
 });

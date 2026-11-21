@@ -219,7 +219,7 @@ describe("a NOT NULL refusal: only remedies that work for this column", () => {
         expect(hint).not.toContain("defaultValue");
         expect(hint).toContain('UPDATE \\"people\\" SET \\"bio\\" = \'…\' WHERE \\"bio\\" IS NULL');
         expect(hint).toContain("Two ways forward");
-        expect(hint).toContain("Nothing in this push was applied");
+        expect(hint).toContain("The schema plan was not applied");
         expect(hint).not.toContain("for this column");
     });
 
@@ -285,7 +285,7 @@ describe("a retype a generated column stands in the way of", () => {
         });
         expect(hint).toContain("A generated column reads a column this push retypes");
         expect(hint).toContain('ALTER TABLE "public"."people" ALTER COLUMN "nickname" TYPE character varying(100);');
-        expect(hint).toContain("nothing in this push was applied");
+        expect(hint).toContain("the plan was not applied");
         expect(hint).toContain("DROP COLUMN");
     });
 
@@ -325,7 +325,7 @@ describe("a retype PostgreSQL has no implicit cast for (42804)", () => {
             stderr: UNCASTABLE_DRY_RUN
         });
         expect(hint).toContain('ALTER TABLE "public"."people" ALTER COLUMN "wake_at" TYPE date USING "wake_at"::date;');
-        expect(hint).toContain("nothing in this push was applied");
+        expect(hint).toContain("the schema plan was not applied");
         expect(hint).toContain("columnType");
     });
 });
@@ -348,7 +348,7 @@ describe("a unique constraint over rows that already repeat a value (23505)", ()
         });
         expect(hint).toContain('Cannot make "public"."people" ("nickname") unique');
         expect(hint).toContain('SELECT "nickname", count(*) FROM "public"."people" GROUP BY "nickname" HAVING count(*) > 1;');
-        expect(hint).toContain("nothing in");
+        expect(hint).toContain("was not applied");
     });
 
     it("lists the repeated values when the database could say which", () => {
@@ -400,7 +400,7 @@ describe("Atlas losing its connection", () => {
             managedDatabase: true
         });
 
-        expect(hint).toContain("Atlas lost its connection to the database (EOF)");
+        expect(hint).toContain("Ptah lost its connection to the database (EOF)");
         expect(hint).toContain("rebase dev");
         expect(hint).toContain("Run the command again");
     });

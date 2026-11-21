@@ -42,7 +42,7 @@ rebase migrate collections-to-tables
 rebase migrate collections-to-tables --check      # --accept-rule-changes once step 3 is reviewed
 
 # 5. Against the project's database: neither should report a difference.
-rebase db push --dry-run     # "No changes: the database already matches these tables."
+rebase db push --dry-run     # "No changes: the database already matches the declared schema."
 rebase doctor --policies     # no policy drift
 ```
 

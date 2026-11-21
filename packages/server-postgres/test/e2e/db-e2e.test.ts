@@ -70,6 +70,8 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    // This suite owns and removes the PostgreSQL server after the run.
+    env.PTAH_DEV_SERVER_DISPOSABLE = "1";
     // The schema modules import `@rebasepro/types` from a directory outside the
     // workspace; the typecheck config maps every `@rebasepro/*` onto source, so
     // the driver and the modules share one copy of the builders.
@@ -425,4 +427,43 @@ describe("Database migration E2E", () => {
             await booted.end();
         }
     }, 240_000);
+    it("plans a policy-only migration while preserving unmanaged PostgreSQL objects", async () => {
+        const cliScript = resolveCliScript();
+        const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
+        const run = (...args: string[]) => execa(tsxBin, [cliScript, ...args], {
+            cwd: workDir, env, all: true, reject: false
+        });
+        await dbClient.query("CREATE TABLE public.unmanaged_sidecar (id integer PRIMARY KEY)");
+        await dbClient.query("CREATE INDEX tasks_manual_title_idx ON public.tasks (title)");
+
+        const tasksPath = path.join(schemaDir, "tasks.ts");
+        const existing = fs.readFileSync(tasksPath, "utf-8");
+        expect(existing).toContain('rls: "admin-only"');
+        fs.writeFileSync(tasksPath, existing.replace(
+            'rls: "admin-only"',
+            'rls: [{ operation: "select", access: "public" }]'
+        ));
+
+        const planned = await run("db", "push", "--dry-run", "--schema-dir", schemaDir);
+        expect(planned.exitCode, planned.all).toBe(0);
+        expect(planned.all).toMatch(/(?:CREATE|ALTER|DROP) POLICY/);
+        expect(planned.all).not.toMatch(/DROP (?:TABLE|INDEX|EXTENSION)/);
+
+        const generated = await run("db", "generate", "--schema-dir", schemaDir, "policy_only");
+        expect(generated.exitCode, generated.all).toBe(0);
+        const migrations = fs.readdirSync(path.join(workDir, "drizzle", "migrations"))
+            .filter(file => file.endsWith(".sql")).sort();
+        const migration = fs.readFileSync(path.join(workDir, "drizzle", "migrations", migrations.at(-1)!), "utf-8");
+        expect(migration).toMatch(/(?:CREATE|ALTER|DROP) POLICY/);
+        expect(migration).not.toMatch(/DROP (?:TABLE|INDEX|EXTENSION)/);
+
+        const applied = await run("db", "migrate");
+        expect(applied.exitCode, applied.all).toBe(0);
+        const repeat = await run("db", "push", "--dry-run", "--schema-dir", schemaDir);
+        expect(repeat.exitCode, repeat.all).toBe(0);
+        expect(repeat.all).toContain("No changes");
+        expect((await dbClient.query("SELECT 1 FROM public.unmanaged_sidecar")).rowCount).toBe(0);
+        expect((await dbClient.query("SELECT 1 FROM pg_indexes WHERE indexname = 'tasks_manual_title_idx'")).rowCount).toBe(1);
+    }, 240_000);
+
 });

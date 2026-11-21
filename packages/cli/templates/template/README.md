@@ -53,14 +53,23 @@ built bundle). Pin a port with `rebase dev --port 3001` if you need a stable one
 Uncomment `DATABASE_URL` in `.env` and run `pnpm dev` again. Nothing else
 changes. A `DATABASE_URL` that is already set is never touched.
 
-The migration commands work on either database. They plan changes with Atlas,
-which needs a second empty database to compare against: beside your own
-database Rebase makes one, and on the managed one, which serves exactly one,
-the command starts a throwaway in-memory PGlite:
+The database commands work on either database. `pnpm install` installs
+`@stokaro/ptah-compat` for schema planning and migrations. Planning needs a
+second, empty database. Rebase creates one beside your PostgreSQL database;
+for the managed database it starts a throwaway in-memory PGlite:
 
 ```bash
 pnpm run db:push
 ```
+
+When `db:generate` replays migrations on a PostgreSQL server shared with
+other work, set `PTAH_TRUST_REPLAY_SQL=1` only if you trust the migration SQL
+to run with the dev connection's privileges. The managed PGlite needs no
+such setting.
+
+Commit `backend/drizzle/ptah-managed.json` with your schema and migrations.
+Rebase updates it after `db:generate` or a non-dry-run `db:push` succeeds, so
+later plans can drop a view or table removed from the declared schema.
 
 Boot already creates missing tables and columns, and their row-level security,
 additively, so `db push` is for what it deliberately leaves alone: any change

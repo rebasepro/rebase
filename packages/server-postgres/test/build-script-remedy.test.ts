@@ -15,14 +15,13 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import {
-    ATLAS_WINDOWS_VERSION,
     declaredBinaries,
-    describeAtlasWindowsInstall,
     detectProjectPackageManager,
     describeBuildScriptRemedy,
     describeDevAddCommand,
     describeReinstallCommand,
     diagnoseMissingBin,
+    resolvePackageBin,
     workspaceMemberDir
 } from "../src/cli-helpers";
 
@@ -257,26 +256,13 @@ describe("diagnoseMissingBin", () => {
         install({ binary: true });
         expect(diagnoseMissingBin(PKG)).toBe("bin-link-missing");
     });
-});
 
-/**
- * On Windows the npm package cannot install at all — no Windows build — so the
- * advice is Atlas's own binary, and none of the npm remedies above.
- */
-describe("describeAtlasWindowsInstall", () => {
-    const text = () => describeAtlasWindowsInstall().join("\n");
-
-    it("downloads the oldest Atlas release the template's range accepts", () => {
-        expect(text()).toContain(`https://release.ariga.io/atlas/atlas-windows-amd64-v${ATLAS_WINDOWS_VERSION}.exe`);
-    });
-
-    it("saves it as atlas.exe and puts it on the user PATH, which `where atlas` reads", () => {
-        expect(text()).toContain("atlas.exe");
-        expect(text()).toContain("SetEnvironmentVariable(\"Path\"");
-        expect(text()).toContain("new terminal");
-    });
-
-    it("names no npm remedy, each of which is a loop on Windows", () => {
-        expect(text()).not.toMatch(/add -D|approve-builds|allowBuilds|allowScripts/);
+    it("resolves the installed package's own binary even when an Atlas executable is present", () => {
+        install({ binary: true });
+        const oldAtlas = path.join(root, "node_modules", ".bin", "atlas");
+        fs.mkdirSync(path.dirname(oldAtlas), { recursive: true });
+        fs.writeFileSync(oldAtlas, "#!/bin/sh\n");
+        expect(resolvePackageBin(PKG, "fixture")).toBe(path.join(root, "node_modules", PKG, "bin", "fixture"));
+        expect(resolvePackageBin(PKG, "atlas")).toBeNull();
     });
 });

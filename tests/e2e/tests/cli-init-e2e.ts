@@ -796,6 +796,8 @@ force: true });
 
     console.log("Starting temporary Postgres database container...");
     pgContainer = await startPgContainer();
+    // The PostgreSQL container belongs to this suite and is removed afterward.
+    cleanEnv.PTAH_DEV_SERVER_DISPOSABLE = "1";
 
     try {
         // 1. Scaffold the project via the CLI

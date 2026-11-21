@@ -199,6 +199,7 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    env.PTAH_DEV_SERVER_DISPOSABLE = "1";
     // The schema modules import `@rebasepro/server/schema` from a directory
     // outside the workspace; the typecheck config maps every `@rebasepro/*`
     // onto source, so the driver and the modules share one copy of the builders.
@@ -257,7 +258,7 @@ describe("introspect, then push: adopting a database changes nothing", () => {
         const { introspected, planned, adopted } = await introspectAndPlan("built");
         expect(introspected.all).not.toMatch(/would not reproduce exactly/);
         expect(planned.exitCode, planned.all).toBe(0);
-        expect(planned.all).toMatch(/No changes: the database already matches these tables/);
+        expect(planned.all).toMatch(/No changes: the database already matches the declared schema/);
         // A role rule reads back deparsed — `( SELECT (string_to_array(
         // rebase.roles(), ','::text) && ARRAY['admin'::text]))` — and the stamp
         // over the statement it renders then differed from the push's, so each
@@ -294,15 +295,14 @@ describe("introspect, then push: adopting a database changes nothing", () => {
         expect(introspected.all).toMatch(/Skipping table "readings": its key includes "taken_at" \(timestamptz\)/);
         expect(introspected.all).not.toMatch(/would not reproduce exactly/);
         expect(planned.exitCode, planned.all).toBe(0);
-        // Nothing for Atlas: no column, key or constraint moves.
-        expect(planned.all).not.toMatch(/Planned changes:/);
+        // Adopting the database must leave its existing table shapes intact.
+        expect(planned.all).not.toMatch(/(?:CREATE|DROP) TABLE|(?:ADD|DROP|ALTER) COLUMN|(?:ADD|DROP) CONSTRAINT/);
         // What does change, said in both places: RLS goes on, and with it
         // the admin baseline every table keeps.
         expect(introspected.all).toMatch(/5 table\(s\) have row-level security off, so every request reaches every row: UserAccounts, codes, customers, order, order_lines\./);
-        expect(planned.all).toMatch(/Planned row-level security changes:/);
         for (const table of ["UserAccounts", "codes", "customers", "order", "order_lines"]) {
-            expect(planned.all).toContain(`switch RLS on   public.${table}`);
-            expect(planned.all).toContain(`create policy   public.${table} → "${table}_default_admin_read"`);
+            expect(planned.all).toContain(`ALTER TABLE "public"."${table}" ENABLE ROW LEVEL SECURITY`);
+            expect(planned.all).toContain(`CREATE POLICY "${table}_default_admin_read" ON "public"."${table}"`);
         }
     }, 300_000);
 });

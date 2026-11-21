@@ -6,8 +6,8 @@
  * excludes, and every step after the apply. 21 on a fresh push, 16 on one that
  * changed nothing — against a hosted Postgres over TLS, four or five round
  * trips each before the first query. And each of the two generators ran as a
- * tsx process of its own. These count both, on a real database and the real
- * Atlas binary.
+ * tsx process of its own. These count both against a real database and the
+ * Ptah Compat executable.
  *
  * Requires Docker.
  */
@@ -72,6 +72,10 @@ for (const name of ["spawn", "spawnSync", "execFile", "execFileSync", "fork"]) {
     childProcess[name] = function (command, args, ...rest) {
         const argv = Array.isArray(args) ? args : [];
         fs.appendFileSync(process.env.SPAWN_LOG, JSON.stringify([String(command), ...argv.map(String)]) + "\\n");
+        const options = rest[0];
+        if (options?.env && argv.some(arg => /(?:^|[/\\\\])ptah-compat(?:\\.mjs|\\.exe)?$/.test(arg))) {
+            rest[0] = { ...options, env: { ...options.env, PGAPPNAME: "ptah-push-overhead" } };
+        }
         return original.call(this, command, args, ...rest);
     };
 }
@@ -122,6 +126,8 @@ describe("db push overhead E2E", () => {
             if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete vars[key];
         }
         vars.DATABASE_URL = container.connectionString;
+        vars.PTAH_DEV_SERVER_DISPOSABLE = "1";
+        vars.PGAPPNAME = "rebase-push-overhead";
         // Workspace packages from source: a worktree has no `dist`.
         vars.TSX_TSCONFIG_PATH = path.join(monorepoRoot, "tsconfig.typecheck.json");
         vars.NODE_OPTIONS = `${vars.NODE_OPTIONS ?? ""} --require ${preload}`.trim();
@@ -135,7 +141,7 @@ describe("db push overhead E2E", () => {
         return (all ?? "").split("\n").filter(line => line.includes("connection authorized"));
     }
 
-    /** Push, and count the connections it made to the app database (not Atlas's scratch one). */
+    /** Push, and count the driver and planner connections to the target database. */
     async function push(extra: string[] = []) {
         fs.writeFileSync(spawnLog, "");
         const before = (await authorizedConnections()).length;
@@ -151,20 +157,20 @@ describe("db push overhead E2E", () => {
         return { result, toApp, spawned };
     }
 
-    /**
-     * One of ours, and Atlas's own: it connects twice per plan, and a push
-     * that changes something plans twice (the dry-run the destructive gate
-     * reads, then the apply). 21 and 16 before the steps shared a connection.
-     */
+    /** The driver shares a connection across every step. Ptah plans in its own process. */
     it("opens one connection of its own, however many steps it runs", async () => {
         const fresh = await push();
         expect(fresh.result.exitCode, fresh.result.all).toBe(0);
-        expect(fresh.toApp.length, fresh.toApp.join("\n")).toBeLessThanOrEqual(5);
+        expect(fresh.toApp.filter(line => line.includes("application_name=rebase-push-overhead")), fresh.toApp.join("\n"))
+            .toHaveLength(1);
+        expect(fresh.toApp.length, fresh.toApp.join("\n")).toBeLessThanOrEqual(7);
 
         const unchanged = await push();
         expect(unchanged.result.exitCode, unchanged.result.all).toBe(0);
         expect(unchanged.result.all).toContain("Schema is synced");
-        expect(unchanged.toApp.length, unchanged.toApp.join("\n")).toBeLessThanOrEqual(3);
+        expect(unchanged.toApp.filter(line => line.includes("application_name=rebase-push-overhead")), unchanged.toApp.join("\n"))
+            .toHaveLength(1);
+        expect(unchanged.toApp.length, unchanged.toApp.join("\n")).toBeLessThanOrEqual(5);
     }, 180_000);
 
     it("starts no generator process: both generators run in the driver", async () => {
@@ -173,8 +179,8 @@ describe("db push overhead E2E", () => {
         const generators = spawned.filter(argv =>
             argv.some(arg => /schema[\\/](?:bin[\\/])?generate-(?:drizzle-schema|postgres-ddl)\.[jt]s$/.test(arg)));
         expect(generators).toEqual([]);
-        // The recorder ran: Atlas is a spawned process.
-        expect(spawned.some(argv => /atlas/.test(argv[0]))).toBe(true);
+        // The recorder ran: Ptah Compat is a spawned process.
+        expect(spawned.some(argv => argv.some(arg => /(?:^|[/\\])ptah-compat(?:\.mjs|\.exe)?$/.test(arg)))).toBe(true);
     }, 180_000);
 
     /**

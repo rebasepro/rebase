@@ -179,8 +179,11 @@ async function run(): Promise<void> {
         console.log("\n📐 Step 2: rebase db push (tables, auth tables, RLS policies)");
         await execa(process.execPath, [cliBin, "db", "push", "--yes"], {
             cwd: appDir,
-            env: { ...cleanEnv,
-DATABASE_URL: databaseUrl },
+            env: {
+                ...cleanEnv,
+                DATABASE_URL: databaseUrl,
+                PTAH_DEV_SERVER_DISPOSABLE: "1"
+            },
             stdio: "inherit"
         });
 

@@ -123,11 +123,9 @@ describe("absolutizeLocalPathArgs", () => {
 
 describe("atlasDevDatabaseFor", () => {
     /**
-     * PGlite serves one database; Atlas needs a second empty one to diff
-     * against. `CREATE DATABASE` against PGlite reports success and creates
-     * nothing, so push, generate and migrate were refused on the managed
-     * database — and with them every way to drop, rename or narrow a column
-     * there. A throwaway second PGlite now stands in for the scratch database.
+     * PGlite serves one database; Ptah needs a second empty one to plan push
+     * and generate. `migrate apply` reads only the target and its migration
+     * directory, so it does not need a scratch database.
      */
     const fake = () => {
         const stop = vi.fn(async () => undefined);
@@ -135,7 +133,7 @@ describe("atlasDevDatabaseFor", () => {
         return { start, stop };
     };
 
-    it.each(["push", "generate", "migrate"])("starts one for db %s on the managed database", async (sub) => {
+    it.each(["push", "generate"])("starts one for db %s on the managed database", async (sub) => {
         const { start } = fake();
         const dev = await atlasDevDatabaseFor(["node", "rebase", "db", sub], "managed", {}, start);
         expect(start).toHaveBeenCalledTimes(1);
@@ -150,9 +148,9 @@ describe("atlasDevDatabaseFor", () => {
         expect(start).not.toHaveBeenCalled();
     });
 
-    it("starts none for subcommands that do not use Atlas", async () => {
+    it("starts none for subcommands that do not need a planning database", async () => {
         const { start } = fake();
-        for (const sub of ["backup", "restore", "backups", "branch", "pull"]) {
+        for (const sub of ["migrate", "backup", "restore", "backups", "branch", "pull"]) {
             expect(await atlasDevDatabaseFor(["node", "rebase", "db", sub], "managed", {}, start)).toBeUndefined();
         }
         expect(start).not.toHaveBeenCalled();

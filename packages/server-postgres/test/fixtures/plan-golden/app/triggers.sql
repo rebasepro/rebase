@@ -2,8 +2,8 @@
 --
 -- `updated_at` triggers, for the properties declaring `autoValue: "on_update"`,
 -- and the triggers that keep a row in its tenant.
--- Applied by Rebase, not by Atlas — a trigger is a function plus a binding,
--- and Atlas's free tier refuses to parse a desired state containing one.
+-- Retained for boot and recovery; db generate and db push plan these
+-- objects from schema.sql.
 
 CREATE OR REPLACE FUNCTION rebase.set_updated_at() RETURNS trigger
 LANGUAGE plpgsql AS $$

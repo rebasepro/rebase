@@ -167,7 +167,10 @@ the token-refresh timer armed, so any signed-in Node script hung forever.`
         suites: [
             {
                 run: "verify:selfhost",
-                env: (pg) => ({ ACCEPTANCE_DATABASE_URL: pg.url("rebase_acceptance") }),
+                env: (pg) => ({
+                    ACCEPTANCE_DATABASE_URL: pg.url("rebase_acceptance"),
+                    PTAH_DEV_SERVER_DISPOSABLE: "1"
+                }),
                 why: `Build a real bundle from the reference app's collections, fold two static apps
 in at different paths, boot it against a real database and fetch it as a
 browser would. The script says to run it when you touch the manifest, the bundle
@@ -226,6 +229,7 @@ entry nothing matches any more, so it cannot later accept a regression.`
                     // (which `db push` shells out to) negotiates SSL first and
                     // fails with "SSL is not enabled on the server".
                     DATABASE_URL: pg.url("rebase_admin_e2e", "?sslmode=disable"),
+                    PTAH_DEV_SERVER_DISPOSABLE: "1",
                     JWT_SECRET: process.env.JWT_SECRET ?? "ci-admin-e2e-secret-ci-admin-e2e-secret-0123456789",
                     // The demo's `reset-demo` cron truncates and reseeds every
                     // collection on the hour, so a run that crossed it lost the

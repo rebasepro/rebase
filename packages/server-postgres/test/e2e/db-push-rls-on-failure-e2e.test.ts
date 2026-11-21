@@ -1,19 +1,7 @@
 /**
- * A `rebase db push` that fails part-way must not leave a table open.
- *
- * Push runs Atlas first — which commits the new tables — and then a row of
- * steps that can each refuse: the vector DDL, the search DDL, the triggers, the
- * policies. `rebase_user`, the role every authenticated request runs as, holds
- * SELECT/INSERT/UPDATE/DELETE on a new table the moment it is created (the
- * schema's default privileges), and `schema.sql` cannot carry `ENABLE ROW LEVEL
- * SECURITY` because Atlas's free tier neither plans nor reads it. So RLS was
- * switched on by the policies step, last: when the search step refused, a new
- * `secrets` table stayed RLS-off with full DML for every caller until a later
- * push or boot — and with `REBASE_MIGRATE_ON_BOOT=none`, forever.
- *
- * The failure here is deterministic and is one push itself prescribes: a
- * `search` block edited after its column was built is refused by the search
- * step, after Atlas has created the new tables in the same push.
+ * An edited search block and new RLS tables are applied in the same push.
+ * A failed apply rolls back the new tables. A successful retry protects them
+ * before the request role can read their rows.
  *
  * Requires Docker.
  */
@@ -33,7 +21,7 @@ const pkgRoot = path.resolve(__dirname, "../..");
 const monorepoRoot = path.resolve(pkgRoot, "../..");
 
 /** `people` reads `name` into its search column; `searchBio` widens the block. */
-function peopleTs(searchBio: boolean): string {
+function peopleTs(searchBio: boolean, bioRequired = false): string {
     const fields = searchBio
         ? `[{ path: "name", weight: "A" }, { path: "bio", weight: "B" }]`
         : `[{ path: "name", weight: "A" }]`;
@@ -43,7 +31,7 @@ export const people = defineTable("people", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         name: col.text(),
-        bio: col.text()
+        bio: col.text()${bioRequired ? ".notNull()" : ""}
     },
     rls: [
         { operation: "select", access: "public" }
@@ -88,13 +76,14 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    env.PTAH_DEV_SERVER_DISPOSABLE = "1";
     // The schema modules import `@rebasepro/types` from outside the workspace;
     // the typecheck config maps every `@rebasepro/*` onto source.
     env.TSX_TSCONFIG_PATH = path.join(monorepoRoot, "tsconfig.typecheck.json");
     return env;
 }
 
-describe("db push that fails after Atlas leaves every managed table RLS-on", () => {
+describe("db push applies search changes and RLS together", () => {
     let container: PgContainer;
     let dbClient: pg.Client;
     let workDir: string;
@@ -140,28 +129,38 @@ describe("db push that fails after Atlas leaves every managed table RLS-on", () 
         return Object.fromEntries(res.rows.map(r => [r.relname, r.relrowsecurity]));
     }
 
-    it("locks the tables Atlas created when the search step then refuses", async () => {
+    it("rolls back a failed apply, then updates search and protects the new tables on retry", async () => {
         // ── 1. A clean push: `people`, searched on `name` ────────────────
         fs.writeFileSync(path.join(schemaDir, "people.ts"), peopleTs(false));
         fs.writeFileSync(path.join(schemaDir, "index.ts"), `export { people } from "./people";\n`);
         const first = await runPush();
         expect(first.all ?? "").toMatch(/completed successfully/);
         expect(first.exitCode).toBe(0);
+        await dbClient.query("INSERT INTO public.people (name) VALUES ('Ada')");
 
         // ── 2. New tables + an edited search block, in one push ──────────
-        fs.writeFileSync(path.join(schemaDir, "people.ts"), peopleTs(true));
+        fs.writeFileSync(path.join(schemaDir, "people.ts"), peopleTs(true, true));
         fs.writeFileSync(path.join(schemaDir, "secrets.ts"), SECRETS_TS);
         fs.writeFileSync(path.join(schemaDir, "tags.ts"), TAGS_TS);
         fs.writeFileSync(path.join(schemaDir, "index.ts"),
             `export { people } from "./people";\nexport { secrets } from "./secrets";\nexport { tags } from "./tags";\n`);
         const failed = await runPush();
+        expect(failed.exitCode, failed.all).toBe(1);
+        expect(failed.all).toMatch(/contains null values/);
+        expect(await rlsByTable()).toEqual({ people: true });
 
-        // It failed where the scenario says it does: after Atlas, in search.
-        expect(failed.exitCode).not.toBe(0);
-        expect(failed.all ?? "").toMatch(/search block for public\.people changed/);
+        fs.writeFileSync(path.join(schemaDir, "people.ts"), peopleTs(true));
+        const revised = await runPush();
+        expect(revised.exitCode, revised.all).toBe(0);
+        const { rows } = await dbClient.query<{ expression: string }>(`
+            SELECT pg_get_expr(d.adbin, d.adrelid) AS expression
+            FROM pg_attrdef d
+            JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+            WHERE d.adrelid = 'public.people'::regclass AND a.attgenerated <> ''
+        `);
+        expect(rows.map(row => row.expression)).toEqual([expect.stringContaining("bio")]);
 
         const rls = await rlsByTable();
-        // Atlas did create them — this is the state the failure leaves behind.
         expect(Object.keys(rls)).toEqual(expect.arrayContaining(["people", "secrets", "tags"]));
         const junction = Object.keys(rls).find(t => t !== "people" && t !== "secrets" && t !== "tags");
         expect(junction).toBeDefined();
@@ -169,7 +168,7 @@ describe("db push that fails after Atlas leaves every managed table RLS-on", () 
         expect(rls).toEqual(Object.fromEntries(Object.keys(rls).map(t => [t, true])));
 
         // And what that means to the role every authenticated request runs as:
-        // a row the owner wrote is not reachable — RLS with no policy denies.
+        // the request role cannot see a row in the admin-only table.
         await dbClient.query(`INSERT INTO secrets (value) VALUES ('the launch codes')`);
         await dbClient.query("BEGIN");
         try {

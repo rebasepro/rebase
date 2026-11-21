@@ -216,15 +216,23 @@ export function collectEnvironmentFindings(
 }
 
 /**
- * What is actually on disk for `@ariga/atlas`, from the project's point of view.
+ * What is actually on disk for `@stokaro/ptah-compat`, from the project's point of view.
  *
- * Three separate questions, because the three states they distinguish need
- * three different remedies — see `checkAtlasBinary`. Directories are searched
+ * The package and native executable need separate remedies. Directories are searched
  * from the project root upwards and through the workspaces a scaffold has,
  * because `db push` runs from `backend/` and the install may be hoisted to the
  * root.
  */
-export function readAtlasBinaryState(projectRoot: string): AtlasBinaryState | null {
+export function readAtlasBinaryState(
+    projectRoot: string,
+    resolveFrom: (from: string, request: string) => string | null = (from, request) => {
+        try {
+            return createRequire(pathToFileURL(from)).resolve(request);
+        } catch {
+            return null;
+        }
+    }
+): AtlasBinaryState | null {
     const roots = [projectRoot, path.join(projectRoot, "backend"), path.join(projectRoot, "config")];
 
     const findUpwards = (starts: string[], relative: string): string | null => {
@@ -241,70 +249,49 @@ export function readAtlasBinaryState(projectRoot: string): AtlasBinaryState | nu
         return null;
     };
 
-    // `@ariga/atlas` is a dependency of `@rebasepro/server-postgres`, not of the
-    // project, so under pnpm's isolated layout — the scaffold default — it lives
-    // in `.pnpm/` and a directory walk over `node_modules/` never sees it.
-    // Resolve through the module graph the way the driver itself does.
-    const resolveFrom = (from: string, request: string): string | null => {
-        try {
-            return createRequire(pathToFileURL(from)).resolve(request);
-        } catch {
-            return null;
-        }
-    };
+    // Under pnpm's isolated layout, a compatibility CLI installed beside the
+    // driver lives in `.pnpm/`. Resolve through the module graph as well as
+    // walking the project's `node_modules/`.
     const bases = roots.map(dir => path.join(dir, "package.json")).filter(file => fs.existsSync(file));
     const driverManifests = bases
         .map(base => resolveFrom(base, "@rebasepro/server-postgres/package.json"))
         .filter((file): file is string => file !== null);
 
-    let manifest: string | null = findUpwards(roots, path.join("@ariga", "atlas", "package.json"));
+    let manifest: string | null = findUpwards(roots, path.join("@stokaro", "ptah-compat", "package.json"));
     if (!manifest) {
         for (const base of [...bases, ...driverManifests]) {
-            manifest = resolveFrom(base, "@ariga/atlas/package.json");
+            manifest = resolveFrom(base, "@stokaro/ptah-compat/package.json");
             if (manifest) break;
         }
     }
 
-    // The `.bin` shim is written beside whichever package declared the
-    // dependency, so the driver's own directory is a search root too.
-    // On Windows the npm package cannot install at all, so the binary that
-    // counts is Atlas's own `atlas.exe` on PATH — the same one the driver
-    // finds through `where atlas`.
-    const onPath = findUpwards(
-        [...roots, ...driverManifests.map(file => path.dirname(file))],
-        path.join(".bin", "atlas")
-    ) !== null || (process.platform === "win32" && windowsPathHas("atlas.exe"));
-
     let binaryOnDisk = false;
     if (manifest) {
         try {
-            const pkg = JSON.parse(fs.readFileSync(manifest, "utf-8")) as {
+            const realManifest = fs.realpathSync(manifest);
+            const pkg = JSON.parse(fs.readFileSync(realManifest, "utf-8")) as {
                 bin?: string | Record<string, string>;
             };
-            const dir = path.dirname(manifest);
+            const dir = path.dirname(realManifest);
             const targets = typeof pkg.bin === "string"
                 ? [pkg.bin]
                 : Object.values(pkg.bin ?? {}).filter((t): t is string => typeof t === "string");
-            binaryOnDisk = targets.some(target => fs.existsSync(path.resolve(dir, target)));
+            const ptah = resolveFrom(realManifest, "@stokaro/ptah/package.json");
+            const native = ptah && resolveFrom(ptah, `@stokaro/ptah-${process.platform}-${process.arch}/package.json`);
+            const executable = native && path.join(path.dirname(native), "bin", `ptah-compat${process.platform === "win32" ? ".exe" : ""}`);
+            binaryOnDisk = targets.some(target => fs.existsSync(path.resolve(dir, target)))
+                && !!executable && fs.existsSync(executable);
         } catch { /* unreadable manifest: treat the binary as absent */ }
     }
 
     return {
-        onPath,
         packageInstalled: manifest !== null,
         binaryOnDisk,
         manager: readPackageManagerName(projectRoot),
         workspaceDir: fs.existsSync(path.join(projectRoot, "backend", "package.json")) && isWorkspaceRoot(projectRoot)
             ? "backend"
-            : null,
-        platform: process.platform
+            : null
     };
-}
-
-/** Whether a directory on `PATH` holds `file`. `Path` is how Windows spells it. */
-function windowsPathHas(file: string): boolean {
-    const value = process.env.PATH ?? process.env.Path ?? "";
-    return value.split(path.delimiter).some(dir => dir !== "" && fs.existsSync(path.join(dir, file)));
 }
 
 /** Whether `dir` is a workspace root, where `pnpm add` refuses without `-w`. */

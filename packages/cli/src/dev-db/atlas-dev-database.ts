@@ -49,7 +49,18 @@ export async function startAtlasDevDatabase(): Promise<AtlasDevDatabase> {
     // there, or Atlas fails on the replay rather than the apply.
     const extensions = await loadExtensions();
     // No `dataDir`: in memory, gone with the process.
-    const db = (await PGlite.create({ extensions })) as { close(): Promise<void> };
+    const db = (await PGlite.create({ extensions })) as { close(): Promise<void>; exec(sql: string): Promise<unknown> };
+    // Ptah rehearses the target schema here. Its baseline can contain types
+    // supplied by extensions even when those extensions are excluded from the
+    // plan, so the scratch instance needs the loaded extensions installed.
+    try {
+        for (const name of Object.keys(extensions)) {
+            await db.exec(`CREATE EXTENSION IF NOT EXISTS "${name}"`);
+        }
+    } catch (err) {
+        await db.close().catch(() => undefined);
+        throw err;
+    }
     const port = await findFreePort();
     const server = new PGLiteSocketServer({
         db,

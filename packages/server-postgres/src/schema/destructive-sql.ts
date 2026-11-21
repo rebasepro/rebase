@@ -44,6 +44,7 @@ const DESTRUCTIVE_PATTERNS: { label: string; re: RegExp }[] = [
     { label: "DROP SCHEMA", re: /\bDROP\s+SCHEMA\b/i },
     { label: "DROP VIEW", re: /\bDROP\s+(MATERIALIZED\s+)?VIEW\b/i },
     { label: "DROP TYPE", re: /\bDROP\s+TYPE\b/i },
+    { label: "DROP EXTENSION", re: /\bDROP\s+EXTENSION\b/i },
     { label: "TRUNCATE", re: /\bTRUNCATE\b/i }
 ];
 
@@ -203,6 +204,7 @@ export interface ExistingColumnType {
     column: string;
     /** e.g. `character varying(255)`, `numeric(10,2)`, `timestamp with time zone`. */
     type: string;
+    storedGenerated?: boolean;
 }
 
 /**
@@ -215,7 +217,8 @@ export const COLUMN_TYPES_SQL = `
     SELECT n.nspname AS "schema",
            c.relname AS "table",
            a.attname AS "column",
-           format_type(a.atttypid, a.atttypmod) AS "type"
+           format_type(a.atttypid, a.atttypmod) AS "type",
+           a.attgenerated = 's' AS "storedGenerated"
     FROM pg_attribute a
     JOIN pg_class c     ON c.oid = a.attrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -255,7 +258,7 @@ export function detectDestructiveStatements(
         found.push({
             statement: `Planning migration statements (${announced} in total)`,
             kind: "UNREADABLE PLAN",
-            detail: `Atlas announced ${announced} statement(s) and ${statements.length} could be read — `
+            detail: `The planner reported ${announced} statement(s) and ${statements.length} could be read — `
                 + "read the plan yourself before allowing it"
         });
     }
@@ -264,7 +267,8 @@ export function detectDestructiveStatements(
         // everything else it does in the detail: Atlas folds a key change, a
         // retype and a drop into one `ALTER TABLE`, and a reader shown only
         // the first would approve the rest unread.
-        const dropped = DESTRUCTIVE_PATTERNS.find(({ re }) => re.test(statement));
+        const dropped = DESTRUCTIVE_PATTERNS.find(({ label, re }) => re.test(statement)
+            && (label !== "DROP COLUMN" || !rebuildsEveryDroppedGeneratedColumn(statement, columnTypes)));
         const rekeyed = describePrimaryKeyChange(statement);
         const lossy = parseColumnTypeChanges(statement)
             .map(change => ({ change, from: currentTypeOf(change, columnTypes) }))
@@ -297,6 +301,13 @@ const ALTER_TABLE_RE = new RegExp(
 );
 const TYPE_CLAUSE_RE = new RegExp(
     String.raw`^ALTER\s+(?:COLUMN\s+)?(${IDENT})\s+(?:SET\s+DATA\s+)?TYPE\s+([\s\S]+)$`, "i"
+);
+
+const DROP_COLUMN_CLAUSE_RE = new RegExp(
+    String.raw`^DROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?(${IDENT})\s*(?:RESTRICT)?$`, "i"
+);
+const ADD_STORED_COLUMN_CLAUSE_RE = new RegExp(
+    String.raw`^ADD\s+COLUMN\s+(${IDENT})\s+[\s\S]+?\s+GENERATED\s+ALWAYS\s+AS\s*\([\s\S]*\)\s+STORED$`, "i"
 );
 
 const unquote = (ident: string): string =>
@@ -341,6 +352,36 @@ function splitClauses(body: string): string[] {
 export function fromAlterTable(statement: string): string {
     const start = /(?:^|\n)[ \t]*(?:->[ \t]*)?(ALTER\s+TABLE\b)/i.exec(statement);
     return start ? statement.slice(start.index + start[0].length - start[1].length).trim() : statement.trim();
+}
+
+/**
+ * Ptah can rebuild a stored generated column in the same ALTER TABLE that
+ * retypes the source column. Its values are computed again from the rows.
+ * Require a catalog match and a later ADD for every dropped column.
+ */
+function rebuildsEveryDroppedGeneratedColumn(statement: string, columns: readonly ExistingColumnType[]): boolean {
+    const table = ALTER_TABLE_RE.exec(fromAlterTable(statement));
+    if (!table) return false;
+    const schema = table[2] ? unquote(table[1]) : undefined;
+    const name = unquote(table[2] ?? table[1]);
+    const clauses = splitClauses(table[3]);
+    let sawDrop = false;
+    for (const [index, clause] of clauses.entries()) {
+        if (!/^DROP\s+COLUMN\b/i.test(clause)) continue;
+        const drop = DROP_COLUMN_CLAUSE_RE.exec(clause);
+        if (!drop) return false;
+        sawDrop = true;
+        const column = unquote(drop[1]);
+        const matches = columns.filter(current => current.table === name && current.column === column
+            && (schema === undefined || current.schema === schema));
+        if (matches.length !== 1 || !matches[0].storedGenerated) return false;
+        const added = clauses.slice(index + 1).some(later => {
+            const add = ADD_STORED_COLUMN_CLAUSE_RE.exec(later);
+            return add ? unquote(add[1]) === column : false;
+        });
+        if (!added) return false;
+    }
+    return sawDrop;
 }
 
 /**

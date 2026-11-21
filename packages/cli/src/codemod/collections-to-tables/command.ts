@@ -71,7 +71,7 @@ ${chalk.bold("Safety")}
   ${chalk.bold("Review before deploying")} — printed last — lists every security rule whose policy now grants
   something different (e.g. a bare access: "authenticated", which granted nothing before and
   admits every signed-in caller now). And against the project's database, after migrating:
-    rebase db push --dry-run     expect "No changes: the database already matches these tables."
+    rebase db push --dry-run     expect "No changes: the database already matches the declared schema."
     rebase doctor --policies     expect no policy drift
   Any policy difference either lists is a change in who can access what.
 `);
@@ -165,7 +165,7 @@ function printReport(report: MigrationReport): void {
         console.log("");
         console.log("  The SQL check proves the files were converted faithfully, not what the rules mean. Before deploying,");
         console.log("  against the project's database:");
-        console.log(chalk.cyan("    rebase db push --dry-run") + chalk.gray("   expect \"No changes: the database already matches these tables.\""));
+        console.log(chalk.cyan("    rebase db push --dry-run") + chalk.gray("   expect \"No changes: the database already matches the declared schema.\""));
         console.log(chalk.cyan("    rebase doctor --policies") + chalk.gray("   expect no policy drift"));
         console.log("  Any policy difference either lists is a change in who can access what.");
     }

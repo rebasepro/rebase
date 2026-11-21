@@ -255,15 +255,15 @@ const OWN_SUBCOMMAND_PARSERS: Readonly<Record<string, ((rawArgs: readonly string
  * push `rebase dev` performs during start-up reaches the managed database too.
  */
 /**
- * The `db` subcommands that plan their work with Atlas.
+ * The `db` subcommands that plan their work with Ptah.
  *
- * Atlas computes a diff by replaying the desired schema into a **second, empty
- * database** and comparing. That is why these three are listed and `backup` and
- * `restore` are not — those shell out to `pg_dump`, which fails loudly on its
- * own. `branch` is refused too, but for its own reason and with its own
- * message: see {@link refuseBranchOnManagedDatabase}.
+ * Ptah computes a diff by replaying the desired schema into a **second, empty
+ * database** and comparing. Push and generate use that database. Migration
+ * application does not. Backup and restore use `pg_dump`, which fails loudly
+ * on its own. Branch has its own guard; see
+ * {@link refuseBranchOnManagedDatabase}.
  */
-const ATLAS_BACKED_SUBCOMMANDS = new Set(["push", "generate", "migrate"]);
+const ATLAS_BACKED_SUBCOMMANDS = new Set(["push", "generate"]);
 
 /**
  * A managed-database refusal, raised so the caller decides what it costs.
@@ -352,17 +352,17 @@ export async function atlasDevDatabaseFor(
     try {
         return await start();
     } catch (err) {
-        const summary = `rebase db ${subcommand} could not start the database Atlas plans against.`;
+        const summary = `rebase db ${subcommand} could not start the database Ptah plans against.`;
         throw new ManagedDatabaseRefusal(summary, [
             "",
             chalk.red(`  ✗ ${summary}`),
             chalk.gray(`    ${err instanceof Error ? err.message : String(err)}`),
             "",
-            chalk.gray("  Atlas plans every change against a second, empty database. On the managed"),
+            chalk.gray("  Ptah plans every change against a second, empty database. On the managed"),
             chalk.gray("  database that is a throwaway PGlite, started for the command."),
             "",
             chalk.gray(`  ${chalk.cyan("rebase dev")} still applies your tables at boot, additively. Otherwise,`),
-            chalk.gray(`  set ${ATLAS_DEV_URL_ENV} to an empty Postgres database Atlas may fill and clear,`),
+            chalk.gray(`  set ${ATLAS_DEV_URL_ENV} to an empty Postgres database Ptah may fill and clear,`),
             chalk.gray("  or point the project at a real Postgres (uncomment DATABASE_URL in .env)."),
             ""
         ]);
@@ -648,7 +648,12 @@ export async function runDriverDbCommand(
     // Started after the managed database, stopped when the driver exits —
     // whatever it exits with.
     const atlasDev = await atlasDevDatabaseFor(rawArgs, prepared.database.kind, env);
-    if (atlasDev) env[ATLAS_DEV_URL_ENV] = atlasDev.url;
+    if (atlasDev) {
+        env[ATLAS_DEV_URL_ENV] = atlasDev.url;
+        // This PGlite instance exists only for this command and may be reset.
+        env.PTAH_DEV_SERVER_DISPOSABLE = "1";
+        env.REBASE_PTAH_DEV_PGLITE = "1";
+    }
     env[INVOCATION_CWD_ENV] = process.cwd();
 
     // Resolved against the directory the developer is standing in, before the
@@ -1797,7 +1802,7 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
             "merge --on-conflict <abort|branch|target> decides a row both sides changed: write nothing (abort, the default), take the branch's, or keep the parent's. --skip-blocked merges the tables that can be and skips the rest. --sample-limit <n> rows are compared per table.",
             "delete <name> asks before it drops the branch's database; --yes answers for you.",
             "prune [--older-than <14|14d|2w>] removes branches nothing is using, and the entries that drifted.",
-            "prune --include-dev-diff also removes the Atlas scratch databases `db push` leaves behind.",
+            "prune --include-dev-diff also removes the migration scratch databases `db push` leaves behind.",
             "delete, merge and prune ask first; --yes, -y answers for you, which is the form a CI job wants.",
             "--force disconnects other sessions first — Postgres refuses to copy or drop a database anything is connected to, usually your own `rebase dev`."
         ]

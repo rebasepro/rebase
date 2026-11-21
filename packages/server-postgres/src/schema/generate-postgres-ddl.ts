@@ -50,8 +50,7 @@ export const main = async () => {
         // load with "Cannot find package 'chokidar'", and every self-hosted
         // container answered 500 with a stack trace about a file watcher.
         //
-        // Same reasoning the image already applies to @ariga/atlas: an
-        // authoring-only dependency does not belong on a boot path.
+        // An authoring-only dependency does not belong on a boot path.
         const { default: chokidar } = await import("chokidar");
         const watcher = chokidar.watch(resolvedPath, {
             persistent: true,

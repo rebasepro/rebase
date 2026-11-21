@@ -68,8 +68,9 @@ describe("the scratch database around a db command", () => {
         "Error: postgres: querying system variables: pq: SSL is not enabled on the server",
         "Error: postgres: querying system variables: EOF",
         "Error: postgres: querying system variables: pq: password authentication failed for user \"rebase\" (28P01)",
-        "Error: postgres: querying system variables: dial tcp 127.0.0.1:5432: connect: connection refused"
-    ])("is dropped after an Atlas run that failed before planning: %s", async (stderr) => {
+        "Error: postgres: querying system variables: dial tcp 127.0.0.1:5432: connect: connection refused",
+        "Error: postgres migration replay rejects CREATE routine definition because its effects cannot be confined"
+    ])("is dropped after a planner refusal before apply: %s", async (stderr) => {
         const { database, drop } = scratch(true);
 
         await expect(database.around(async () => {

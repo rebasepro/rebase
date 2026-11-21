@@ -13,32 +13,23 @@ loaded with `import`. It needs Node `>=22.22.0` (its `engines` floor), where
 `require()` of it from a CJS file works too: Node has supported `require(esm)`
 since 22.12.
 
-### Allow `@ariga/atlas` to run its install script
+### Install Ptah
 
-`db push`, `db generate` and `db migrate` shell out to the `atlas` binary, and
-`@ariga/atlas` downloads that binary in a `preinstall` script. pnpm 10+ and npm
-12+ refuse a dependency's lifecycle scripts unless the project allowlists them —
-and the install still exits 0, so the only sign is
-`ERR_PNPM_IGNORED_BUILDS: @ariga/atlas` several screens up, followed by
-`Failed to create bin … ENOENT`. Nothing then fails until the first schema push.
+`rebase db push`, `rebase db generate`, and `rebase db migrate` use the
+`ptah-compat` executable supplied by `@stokaro/ptah-compat`. Generated
+projects install it with their other dependencies. If you use this driver
+separately, add the package to your project. Existing migrations and
+`atlas.sum` keep their format.
+The ordinary `db generate` and `db push` commands plan the declared tables,
+policies, functions, search and vector indexes, triggers, and views together.
 
-A project scaffolded by `rebase init` already carries the entry. Adding this
-package to an existing project needs it:
-
-```yaml
-# pnpm-workspace.yaml
-allowBuilds:
-  "@ariga/atlas": true
-```
-
-```json
-// package.json, for npm
-{ "allowScripts": { "@ariga/atlas": true } }
-```
-
-`rebase doctor` reports the state of that binary, and tells the three apart:
-not installed, installed with its script blocked, and on disk with only the
-`node_modules/.bin` link missing.
+On a shared PostgreSQL server, `db push` (including `--dry-run`) and
+`db generate` can replay SQL in the sibling dev database. Set
+`PTAH_TRUST_REPLAY_SQL=1` only for SQL you trust. It runs with the dev
+connection's privileges, and server-wide effects such as created roles remain.
+Alternatively, set `REBASE_ATLAS_DEV_URL` to a Ptah
+`docker://postgres/<version>/dev` URL or a dedicated disposable server. Set
+`PTAH_DEV_SERVER_DISPOSABLE=1` only when the whole server is disposable.
 
 ## What This Package Does
 
@@ -100,6 +91,24 @@ process.on("SIGTERM", async () => {
   await pool.end();
 });
 ```
+
+## Schema planning
+
+`db generate` writes the declared PostgreSQL schema to
+`backend/.rebase/sql/schema.sql` and uses it to create a migration with Ptah
+Compat. `db push --dry-run` shows the same declared objects in one plan.
+`db push` applies that plan and limits it to Rebase-managed resources, leaving
+unrelated database objects alone. Vector columns require a declared `vector`
+database extension.
+
+After `db generate` or a non-dry-run `db push` succeeds, Rebase records the
+names of declared resources in `backend/drizzle/ptah-managed.json`. Commit it
+with the schema and migrations. It lets later plans recognize a removed view,
+table, or function while leaving unrelated database objects outside the plan.
+
+Review each generated migration for `DROP CONSTRAINT`. Rebase reads the live
+catalog to protect custom CHECK and EXCLUDE constraints. A constraint that
+exists only in the replayed migration history can still appear as a drop.
 
 ## From a script
 

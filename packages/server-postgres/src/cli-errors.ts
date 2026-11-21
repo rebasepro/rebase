@@ -352,7 +352,7 @@ function formatUntrustedCertificateBanner(databaseUrl: string): string {
         `\n` +
         `    DATABASE_URL=${suggestion ?? "postgresql://…?sslmode=no-verify"}\n` +
         `\n` +
-        `  Rebase's CLI passes it to Atlas, pg_dump and psql as sslmode=require.\n` +
+        `  Rebase's CLI passes it to Ptah Compat, pg_dump and psql as sslmode=require.\n` +
         `  To verify instead, download the provider's CA certificate and use\n` +
         `  ${chalk.bold("sslmode=verify-full&sslrootcert=/path/to/ca.pem")}.\n` +
         `\n` +
@@ -398,36 +398,23 @@ function formatClosedDatabaseBanner(databaseUrl: string, database: string, err?:
     );
 }
 
-/**
- * Format a diagnostic banner for a dependency-drop failure during `db push`.
- * Explains that the database may be left partially migrated and how to recover.
- *
- * The DROP reads the connection string from `rebase db url`, as the NOT NULL
- * box's backfill does: on the managed development database `.env` leaves
- * `DATABASE_URL` unset, and the shell has none.
- */
-function formatDependencyDropBanner(manager: ProjectPackageManager = detectProjectPackageManager()): string {
+/** A dependency refusal needs a corrected plan, not a suggested CASCADE. */
+function formatDependencyDropBanner(): string {
     return (
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `  ❌  Schema push failed: a type/table could not be dropped\n` +
-        `      because other objects still depend on it.\n` +
+        `  ❌  A schema change was blocked by dependent objects\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `\n` +
-        `  ${chalk.yellow("The database may now be partially migrated.")} Atlas applies\n` +
-        `  statements individually, so earlier changes in this push may\n` +
-        `  already be committed while later ones failed.\n` +
+        `  Review the failed statement and the dependencies named above.\n` +
+        `  Check the database's current schema before retrying.\n` +
         `\n` +
-        `  This commonly happens when a table is removed but an enum\n` +
-        `  type it defined is still referenced. To recover:\n` +
+        `  If the plan removes an object you need, keep it in Rebase's declared\n` +
+        `  schema or correct the planning scope. Do not remove its dependents\n` +
+        `  just to make the plan run.\n` +
         `\n` +
-        `    1. Inspect the leftover object named in the error above.\n` +
-        `    2. Drop it with CASCADE, e.g.:\n` +
-        `         psql "$(${projectRebaseCommand(manager)} db url)" -c 'DROP TYPE "<name>" CASCADE;'\n` +
-        `    3. Re-run:  ${chalk.bold.green("rebase db push")}\n` +
-        `\n` +
-        `  Prefer a safe, versioned workflow? Use ${chalk.bold("rebase db generate")}\n` +
-        `  + ${chalk.bold("rebase db migrate")} instead of push for destructive changes.\n` +
+        `  If the removal is intentional, use a versioned migration that handles\n` +
+        `  the dependent objects explicitly.\n` +
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
     );
@@ -673,7 +660,7 @@ export function parseConnectionEof(text: string): boolean {
 export function formatConnectionEofBanner(managed: boolean): string {
     const why = managed
         ? `  The managed development database accepts only a few connections at a\n` +
-          `  time, and a running ${chalk.bold("rebase dev")} holds some of them. Atlas opened one more,\n` +
+          `  time, and a running ${chalk.bold("rebase dev")} holds some of them. Ptah opened one more,\n` +
           `  and it was closed before the database answered.\n`
         : `  The server, or a proxy or pooler in front of it, closed the connection:\n` +
           `  a restart, a connection limit, or a reaper for idle connections.\n`;
@@ -686,7 +673,7 @@ export function formatConnectionEofBanner(managed: boolean): string {
     return (
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `  ❌  Atlas lost its connection to the database (EOF)\n` +
+        `  ❌  Ptah lost its connection to the database (EOF)\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `\n` +
         why +
@@ -811,7 +798,7 @@ export function formatNotNullViolationBanner(
         `\n` +
         remedies.map((r, i) => `    ${i + 1}. ${r}`).join("") +
         `\n` +
-        `  ${chalk.gray("Nothing in this push was applied: Atlas applies it as one transaction.")}\n` +
+        `  ${chalk.gray("The schema plan was not applied: Ptah applies it as one transaction.")}\n` +
         `  ${chalk.gray("`rebase dev` would have kept the column nullable instead:")}\n` +
         `  ${chalk.gray("boot sets NOT NULL only when it is safe.")}\n` +
         `\n` +
@@ -981,8 +968,8 @@ export function formatGeneratedColumnRefusalBanner(
         `\n` +
         named +
         `  PostgreSQL will not retype a column while a GENERATED ALWAYS AS …\n` +
-        `  STORED expression reads it, and Atlas applies a push as one\n` +
-        `  transaction — ${chalk.yellow("nothing in this push was applied.")}\n` +
+        `  STORED expression reads it. Ptah applies the schema plan as one\n` +
+        `  transaction — ${chalk.yellow("the plan was not applied.")}\n` +
         `\n` +
         `  A table's ${chalk.bold("search")} column is dropped and rebuilt around the apply\n` +
         `  by the push itself. If that is the column named above, run the push\n` +
@@ -1023,8 +1010,8 @@ export function formatUncastableRetypeBanner(refusal: { column: string; type: st
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `\n` +
         `  The table now declares this column as ${type}, and PostgreSQL has\n` +
-        `  no implicit conversion from what the column holds today. Atlas stops\n` +
-        `  at the first such statement — ${chalk.yellow("nothing in this push was applied")}, and a\n` +
+        `  no implicit conversion from what the column holds today. Ptah stops\n` +
+        `  at the first such statement — ${chalk.yellow("the schema plan was not applied")}, and a\n` +
         `  --dry-run cannot show the rest of the plan until this one is settled.\n` +
         `\n` +
         `  Three ways forward:\n` +
@@ -1108,8 +1095,8 @@ export function formatUniqueBuildFailureBanner(
         `\n` +
         listed +
         `  PostgreSQL will not build "${failure.index}" while two rows share a\n` +
-        `  value, and Atlas applies a push as one transaction — ${chalk.yellow("nothing in")}\n` +
-        `  ${chalk.yellow("this push was applied.")}\n` +
+        `  value. Ptah applies the schema plan as one transaction — ${chalk.yellow("the plan")}\n` +
+        `  ${chalk.yellow("was not applied.")}\n` +
         `\n` +
         `  Find them:\n` +
         `    ${chalk.gray(`SELECT ${cols}, count(*) FROM ${table} GROUP BY ${cols} HAVING count(*) > 1;`)}\n` +
@@ -1169,11 +1156,11 @@ export function formatForeignGeneratedColumnBanner(
         lines.join("\n") + `\n` +
         `\n` +
         `  PostgreSQL refuses to retype or drop a column while a GENERATED\n` +
-        `  ALWAYS AS … STORED expression reads it, and an Atlas apply is one\n` +
+        `  ALWAYS AS … STORED expression reads it, and Ptah applies the plan in one\n` +
         `  transaction — so this refusal would roll back every other statement\n` +
         `  in the push with it.\n` +
         `\n` +
-        `  ${chalk.yellow("Nothing was applied.")} Rebase rebuilds the generated columns it made\n` +
+        `  ${chalk.yellow("The plan was not applied.")} Rebase rebuilds the generated columns it made\n` +
         `  itself (a table's ${chalk.bold("search")} block) around the apply. It has no\n` +
         `  definition for this one, and a dropped generated expression is not\n` +
         `  recoverable from anywhere but your own migration.\n` +

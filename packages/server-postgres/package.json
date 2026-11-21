@@ -92,10 +92,10 @@
     "dist"
   ],
   "peerDependencies": {
-    "@ariga/atlas": "^1.2.3"
+    "@stokaro/ptah-compat": "^0.33.1"
   },
   "peerDependenciesMeta": {
-    "@ariga/atlas": {
+    "@stokaro/ptah-compat": {
       "optional": true
     }
   }
