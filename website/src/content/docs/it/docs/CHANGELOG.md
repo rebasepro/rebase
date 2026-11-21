@@ -11,6 +11,15 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ## [Unreleased]
 
+### Removed
+
+- **The Studio's Collections tool (the visual collection editor) is removed.** It edited a table's columns, relations and rules in `backend/schema` and its admin-panel presentation in one form, which stopped matching either once tables and collections were decoupled in 0.31. A table's schema is code — `defineTable` in `backend/schema`, or, for a project that declares none, the database itself — and its panel layout is `frontend/src/cms/ui-config.json` and `customizeTable`. `"schema"` is no longer a value of `<RebaseStudio tools>`. Removed from `@rebasepro/cms`: `CollectionEditorDialog`, `PropertyForm`, `PropertyFormDialog`, `CollectionStudioView`, `CollectionsStudioView`, `RouterCollectionStudioView`, `RouterCollectionsStudioView` (and their props types), `EditorCollectionAction`, `MissingReferenceWidget`, `useCollectionEditorController`, `CollectionEditorController`, `CollectionInference`, `validateCollectionJson`, the editor's extension types (`CollectionEditorTab`, `CollectionEditorExtensionProps`, `PropertyTypePreset`, `PropertyType`, `ExtraPropertyFieldsParams`, `ExtraCollectionFieldsParams`) and the AI collection generator (`buildCollectionGenerationCallback`, `CollectionGenerationApiError`, `DEFAULT_COLLECTION_GENERATION_ENDPOINT` and its types); `studioSchemaToolEnabled` from `@rebasepro/cms-types`. `@rebasepro/cms/collection_editor_ui` now exports only `SchemaChangeDialog`. The RLS editor still saves policies into `backend/schema` in development through plan → confirm → apply, and `<RebaseCMS collectionEditor>` still tunes that (`readOnly`, `getAuthToken`). Per-user layout (column widths, view switches) is still saved; the shared layout in `ui-config.json` is now edited by hand.
+
+### Fixed
+
+- **Studio's RLS editor groups tables as "Served tables" and "Not served".** In a project that declares no tables, every served table was filed under "Other Tables" beside a warning icon. The sidebar now says whether the API serves a table, and junction tables sit with the served ones. Its messages, and the API key and branch views, say "table" and `backend/schema` where they said "collection".
+- **The SQL console's role picker no longer labels `postgres` "Collections:".**
+
 ## [0.34.2] - 2026-11-20
 
 ### Added
