@@ -1,5 +1,5 @@
 ---
-sourceHash: 65f05732c36bd742
+sourceHash: e84aea60ecaa63e9
 title: Schema as Code
 sidebar_label: Schema as Code
 description: Comment Rebase utilise les tables TypeScript dans backend/schema comme source unique de vérité pour votre schéma de base de données, votre API, votre SDK et votre panneau d'administration.
@@ -21,22 +21,30 @@ Cela signifie que votre schéma est :
 - **Révisable** — les modifications de schéma passent par des pull requests
 - **Portable** — la même définition est lue par le backend, la CLI, le générateur de SDK et, sous forme de types, par le frontend
 
-## Édition visuelle avec manipulation d'AST
+## Modifier les fichiers via l'API
 
-Rebase fournit également un **éditeur de schéma visuel** dans Studio. Lorsque quelqu'un l'utilise pour ajouter une colonne :
+Les fichiers des tables peuvent aussi être modifiés par HTTP. L'éditeur RLS de
+Studio enregistre ainsi les politiques d'une table, et un script ou un agent qui
+détient le scope peut modifier une table de la même manière. La modification
+voyage sous la forme d'un `TablePatch`, et le serveur utilise
+[ts-morph](https://ts-morph.com/) pour analyser le fichier de la table dans
+`backend/schema/` en tant qu'AST :
 
-1. Le Studio ne modifie **pas** directement la base de données
-2. Au lieu de cela, il envoie la modification sous la forme d'un `TablePatch`, et le serveur utilise [ts-morph](https://ts-morph.com/) pour analyser le fichier de la table dans `backend/schema/` en tant qu'AST
-3. Il insère le nouveau constructeur `col.*` précisément dans le bloc `columns`
-4. **Tout le code existant, les hooks et la logique personnalisée sont préservés intacts** ; une modification qui toucherait à du code qu'elle ne réécrit pas est refusée
-5. Le fichier est enregistré, déclenchant le rechargement à chaud (hot reload)
+1. Il trouve le code que le patch désigne — une colonne du bloc `columns`, une relation, une règle de `rls`
+2. Il insère ou réécrit uniquement ce code, par exemple un seul constructeur `col.*`
+3. **Tout le code existant, les hooks et la logique personnalisée sont préservés intacts** ; une modification qui toucherait à du code qu'elle ne réécrit pas est refusée
+4. Le fichier est enregistré, déclenchant le rechargement à chaud (hot reload)
 
-L'*apparence* d'une table dans le panneau n'en fait pas partie : les libellés, icônes et vues
-sont enregistrés dans les préférences du panneau ou écrits dans `frontend/src/cms/`. Consultez
-[Live schema editing](/docs/backend/live-schema-editing/) pour en savoir plus sur les modifications et
-ce que l'éditeur refuse.
+`/api/admin/schema-editor/*` écrit le fichier et rien d'autre, sur votre machine
+en développement. [Live schema editing](/docs/backend/live-schema-editing/)
+(`/api/admin/schema/*`) commite la même modification dans votre dépôt, puis
+applique le DDL ; cette page liste les modifications et ce que le serveur
+refuse. L'*apparence* d'une table dans le panneau ne relève ni de l'un ni de
+l'autre : les libellés, icônes et vues sont enregistrés dans les préférences du
+panneau ou écrits dans `frontend/src/cms/`.
 
-Cette approche « UI as Code Generator » permet aux modifications visuelles de produire le même code TypeScript propre qu'un développeur écrirait à la main.
+Dans les deux cas, le résultat est le code TypeScript qu'un développeur écrirait
+à la main, dans un fichier que vous relisez et commitez.
 
 ## Pipeline de génération de schéma
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: fc0bdfb0ae7ceb1b
+sourceHash: dd9910d58ec5bf33
 title: Tablas en el CMS
 sidebar_label: Tablas en el CMS
 description: "Cómo muestra el CMS cada tabla de Postgres sin configuración en el frontend: etiquetas, el widget que recibe cada tipo de columna, campos obligatorios y de solo lectura, relaciones, display slots y controles de Crear, Editar y Eliminar que respetan la seguridad a nivel de fila (RLS) de la tabla."
@@ -49,8 +49,8 @@ del servidor; el descriptor solo indica qué hooks existen.
 - El servidor etiqueta la respuesta con un `ETag`. El cliente conserva la última
   respuesta y devuelve la etiqueta, por lo que un esquema sin cambios solo cuesta
   un `304`.
-- Recargar la navegación vuelve a consultar. El editor de esquemas hace esto
-  después de modificar una tabla.
+- Recargar la navegación vuelve a consultar. El botón de reintentar que aparece
+  cuando las tablas no se cargan hace esto.
 
 Los mismos descriptores impulsan Studio y las aplicaciones MCP, de modo que los
 tres coinciden en lo que es una tabla.

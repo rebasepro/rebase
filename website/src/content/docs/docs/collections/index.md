@@ -44,8 +44,8 @@ code never leaves the server; the descriptor only says which hooks exist.
   user or their roles change. A signed-out visitor is not sent any table.
 - The server tags the answer with an `ETag`. The client keeps the last answer
   and sends the tag back, so an unchanged schema costs a `304`.
-- Refreshing the navigation asks again. The schema editor does this after it
-  changes a table.
+- Refreshing the navigation asks again. The retry offered when the tables fail
+  to load does this.
 
 The same descriptors drive the Studio and the MCP apps, so the three agree on
 what a table is.

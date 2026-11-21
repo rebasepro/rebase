@@ -1,5 +1,5 @@
 ---
-sourceHash: b26bc6f688a4ec9b
+sourceHash: e8ad34a809d7352c
 title: Estructura del proyecto
 sidebar_label: Estructura del proyecto
 description: "La estructura de un proyecto Rebase: las tablas en backend/schema, los módulos del backend que lee el runtime y las personalizaciones del panel de administración en frontend/src/cms, con y sin el panel."
@@ -14,8 +14,8 @@ Cada una de ellas significa algo específico aquí, y la mayoría significa algo
 - **Collection** — lo que muestra el panel de administración: una tabla renderizada como una lista y un
   formulario, personalizada en `frontend/src/cms/`, o una colección de Firestore que el panel
   lee directamente.
-- **Studio** — la parte para desarrolladores del panel de administración: editor de esquemas, consola SQL,
-  explorador de políticas. La misma aplicación que utiliza tu equipo de contenido, detrás de un interruptor.
+- **Studio** — la parte para desarrolladores del panel de administración: consola SQL, políticas RLS,
+  diagrama del esquema, ramas, registros. La misma aplicación que utiliza tu equipo de contenido, detrás de un interruptor.
 - **Managed runtime** — la imagen publicada `rebasepro/server` inicia tu
   proyecto. No escribes ningún archivo de servidor y obtienes actualizaciones del runtime sin necesidad de
   recompilar. La alternativa es `rebase eject`, más abajo.
@@ -147,7 +147,7 @@ import { postsCms } from "./cms/posts";
 import { authorsCms } from "./cms/authors";
 import { tagsCms } from "./cms/tags";
 import { usersCms } from "./cms/users";
-// How the collection editor laid out the tables in development (labels, columns, views).
+// The admin panel's shared layout for each table (labels, columns, views).
 import uiConfig from "./cms/ui-config.json";
 
 // `rebase dev` injects VITE_API_URL with the port it actually bound, and that
@@ -203,7 +203,7 @@ coincidan en un único valor sin necesidad de escribirlo tres veces.
 ### Conceptos clave
 
 - **`createRebaseClient`** — Crea el cliente SDK que gestiona las solicitudes HTTP, las conexiones WebSocket y la administración de tokens de autenticación. Llámalo una sola vez, en el alcance del módulo: dentro de un componente, incluso en un `useMemo`, `<React.StrictMode>` construye un segundo cliente en desarrollo
-- **`<RebaseCMS tableCustomizations>`** — el panel renderiza cada tabla que el backend sirve en `GET /api/schema/tables`; los objetos `customizeTable` de `frontend/src/cms/` modifican la apariencia de algunas de ellas, y `uiConfig` traslada lo que el editor de colecciones guardó en desarrollo. Consulta [Personalización de una tabla](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
+- **`<RebaseCMS tableCustomizations>`** — el panel renderiza cada tabla que el backend sirve en `GET /api/schema/tables`; los objetos `customizeTable` de `frontend/src/cms/` modifican la apariencia de algunas de ellas, y `uiConfig` aporta la disposición compartida de cada tabla desde `frontend/src/cms/ui-config.json`. Consulta [Personalización de una tabla](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
 - **`useRebaseAuthController`** — Contiene el usuario autenticado y el ciclo de vida del token, y es lo que `<Rebase>` distribuye a todos los componentes que están debajo
 
 ## Backend (`backend/`)
@@ -236,8 +236,8 @@ compilados junto con un manifiesto— que el runtime administrado arranca. Nada 
 se escribe a mano; si deseas ver uno, [Runtime y bundles](/docs/architecture/runtime-and-bundles/)
 explica lo que contiene.
 
-El panel que sirve el frontend tiene dos partes. **Studio** es la parte para desarrolladores —el
-editor de esquemas, la consola SQL, el explorador de políticas RLS— y se encuentra detrás del
+El panel que sirve el frontend tiene dos partes. **Studio** es la parte para desarrolladores —la
+consola SQL, el explorador de políticas RLS, el diagrama del esquema— y se encuentra detrás del
 selector en el menú lateral desplegable, no como un despliegue independiente. Consulta [Studio](/docs/studio/).
 
 Para tomar el control del proceso en su lugar —tus propios middlewares, rutas y

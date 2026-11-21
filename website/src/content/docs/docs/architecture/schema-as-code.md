@@ -20,22 +20,28 @@ This means your schema is:
 - **Reviewable** — schema changes go through pull requests
 - **Portable** — the same definition is read by the backend, the CLI, the SDK generator and, as types, the frontend
 
-## Visual Editing with AST Manipulation
+## Editing the Files Through the API
 
-Rebase also provides a **visual schema editor** in Studio. When someone uses it to add a column:
+The table files can also be edited over HTTP. Studio's RLS editor saves a
+table's policies this way, and a script or an agent holding the scope can change
+a table the same way. The edit travels as a `TablePatch`, and the server uses
+[ts-morph](https://ts-morph.com/) to parse the table's file in `backend/schema/`
+as an AST:
 
-1. The Studio does **not** directly modify the database
-2. Instead, it sends the edit as a `TablePatch`, and the server uses [ts-morph](https://ts-morph.com/) to parse the table's file in `backend/schema/` as an AST
-3. It inserts the new `col.*` builder precisely into the `columns` block
-4. **All existing code, hooks, and custom logic are preserved untouched**; an edit that would reach into code it does not rewrite is refused
-5. The file is saved, triggering hot reload
+1. It finds the code the patch names — a column in the `columns` block, a relation, one rule of `rls`
+2. It inserts or rewrites only that code, such as one `col.*` builder
+3. **All existing code, hooks, and custom logic are preserved untouched**; an edit that would reach into code it does not rewrite is refused
+4. The file is saved, triggering hot reload
 
-How a table *looks* in the panel is not part of this: labels, icons and views
-are saved as the panel's preferences or written in `frontend/src/cms/`. See
-[Live schema editing](/docs/backend/live-schema-editing/) for the edits and
-what the editor refuses.
+`/api/admin/schema-editor/*` writes the file and nothing else, on your machine
+in development. [Live schema editing](/docs/backend/live-schema-editing/)
+(`/api/admin/schema/*`) commits the same edit to your repository, then applies
+the DDL; it lists the edits and what the server refuses. How a table *looks* in
+the panel is not part of either: labels, icons and views are saved as the
+panel's preferences or written in `frontend/src/cms/`.
 
-This "UI as Code Generator" approach means visual edits produce the same clean TypeScript a developer would write by hand.
+Either way, the result is the TypeScript a developer would write by hand, in a
+file you review and commit.
 
 ## Schema Generation Pipeline
 

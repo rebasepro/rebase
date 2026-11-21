@@ -39,7 +39,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 | `logs` | Logs Explorer | Database | Real-time system and query logs |
 | `api-keys` | API Keys | Access Control | Create and manage scoped API keys |
 
-All 11 tools are enabled by default. The `schema` tool (collection editor) is auto-injected by the CMS when `collectionEditor` is enabled — it is **not** registered here.
+All 11 tools are enabled by default. A table declared with `defineTable` in `backend/schema/` is edited in code; in development, the RLS editor saves the table's policies into that file.
 
 ## Key Exports
 

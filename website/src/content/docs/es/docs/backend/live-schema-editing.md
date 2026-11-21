@@ -1,17 +1,19 @@
 ---
-sourceHash: 97486e7c061d503d
+sourceHash: 45b2459dff0e5ec4
 title: Edición de esquemas en vivo
 description: Crea y modifica tablas en un backend en ejecución; la edición se escribe en backend/schema, primero se confirma en tu repositorio y luego se aplica.
 ---
 
-El editor de esquemas en el panel de administración reescribe los archivos de tablas en
-`backend/schema`. Eso funciona en tu máquina y en ningún otro lugar: los archivos de un
+El editor de esquemas solo de código fuente, `/api/admin/schema-editor/*`, reescribe
+los archivos de tablas en `backend/schema` y no toca nada más. Eso funciona en tu máquina y en ningún otro lugar: los archivos de un
 servidor desplegado se reconstruyen a partir de tu repositorio en cada despliegue, por lo
 que una edición realizada allí se descartaría en el siguiente.
 
 La edición de esquemas en vivo es la solución a eso. **Confirma el cambio en tu
 repositorio y luego aplica el DDL**, por lo que la edición sobrevive al siguiente despliegue,
-ya que este se construye a partir de ella.
+ya que este se construye a partir de ella. El editor RLS de Studio guarda las políticas de
+una tabla a través de estas rutas —planificadas, mostradas como SQL, confirmadas y
+luego aplicadas—, y un script o un agente que tenga el scope puede enviar las mismas ediciones.
 
 ```
 GET  /api/admin/schema/status   whether this backend can do it, and whether you may
@@ -197,7 +199,7 @@ no se aplica ningún cambio desde el panel, por lo que cada cambio sigue este ca
 botón principal del diálogo muestra **Commit** y envía `"sourceOnly": true`, y el
 proceso encargado de modificar esa base de datos aplica el esquema.
 
-Eliminar una tabla desde el panel de administración sigue el mismo camino: `/apply` con una
+Eliminar una tabla sigue el mismo camino: `/apply` con una
 edición `deleteTable` y `"sourceOnly": true` elimina el archivo de la tabla y su
 exportación en `index.ts` y confirma ambos; la tabla y sus filas permanecen en la
 base de datos. Se rechaza mientras la relación de otra tabla apunte a ella, especificando
@@ -365,8 +367,8 @@ cambio.
 
 Una edición se prepara sobre los archivos tal como están. Si uno de ellos cambia en
 el disco antes de que se aplique la edición —un guardado en el IDE, otro proceso—, la
-aplicación no escribe nada y responde 409 `SCHEMA_EDIT_STALE_FILE`. El editor de colecciones
-ofrece Reload; vuelve a realizar la edición sobre el archivo tal como se encuentra ahora.
+aplicación no escribe nada y responde 409 `SCHEMA_EDIT_STALE_FILE`. Vuelve a realizar la edición
+sobre el archivo tal como se encuentra ahora.
 
 ## Dónde funciona esto
 

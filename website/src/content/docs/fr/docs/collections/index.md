@@ -1,5 +1,5 @@
 ---
-sourceHash: fc0bdfb0ae7ceb1b
+sourceHash: dd9910d58ec5bf33
 title: Tables dans le CMS
 sidebar_label: Tables dans le CMS
 description: "Comment le CMS affiche chaque table Postgres sans aucune configuration frontend : libellés, widget associé à chaque type de colonne, champs obligatoires et en lecture seule, relations, emplacements d'affichage et contrôles Créer, Modifier et Supprimer respectant la sécurité au niveau des lignes de la table."
@@ -28,7 +28,7 @@ Le panneau lisait auparavant `config/collections` via un plugin Vite. Il lit dé
 
 - Le panneau fait la demande dès qu'un utilisateur est connecté, et la renouvelle lorsque l'utilisateur connecté ou ses rôles changent. Aucune table n'est envoyée à un visiteur déconnecté.
 - Le serveur associe un `ETag` à la réponse. Le client conserve la dernière réponse et renvoie l'étiquette, de sorte qu'un schéma inchangé ne coûte qu'un `304`.
-- Actualiser la navigation relance la demande. L'éditeur de schéma effectue cette action après avoir modifié une table.
+- Actualiser la navigation relance la demande. C'est ce que fait la nouvelle tentative proposée quand les tables ne se chargent pas.
 
 Les mêmes descripteurs pilotent le Studio et les applications MCP, garantissant que tous les trois partagent la même définition d'une table.
 

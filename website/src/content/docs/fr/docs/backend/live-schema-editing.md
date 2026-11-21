@@ -1,17 +1,19 @@
 ---
-sourceHash: 97486e7c061d503d
+sourceHash: 45b2459dff0e5ec4
 title: Édition de schéma en direct
 description: Créez et modifiez des tables sur un backend en cours d'exécution — la modification est écrite dans backend/schema, d'abord commitée dans votre dépôt, puis appliquée.
 ---
 
-L'éditeur de schéma dans le panneau d'administration réécrit les fichiers de table dans
-`backend/schema`. Cela fonctionne sur votre machine et nulle part ailleurs : les fichiers
+L'éditeur de schéma limité au code source, `/api/admin/schema-editor/*`, réécrit les
+fichiers de table dans `backend/schema` et ne touche à rien d'autre. Cela fonctionne sur votre machine et nulle part ailleurs : les fichiers
 d'un serveur déployé sont reconstruits à partir de votre dépôt à chaque déploiement, de sorte
 qu'une modification effectuée à cet endroit serait ignorée au suivant.
 
 L'édition de schéma en direct est la réponse à cela. Elle **commite la modification dans votre
 dépôt, puis applique le DDL** — ainsi, la modification survit au déploiement suivant, car le
-déploiement est construit à partir de celle-ci.
+déploiement est construit à partir de celle-ci. L'éditeur RLS de Studio enregistre les
+politiques d'une table par ces routes — planifiées, affichées en SQL, confirmées, puis
+appliquées —, et un script ou un agent qui détient le scope peut envoyer les mêmes modifications.
 
 ```
 GET  /api/admin/schema/status   whether this backend can do it, and whether you may
@@ -198,7 +200,7 @@ aucune modification n'est appliquée depuis le panneau, donc chaque modification
 le bouton principal de la boîte de dialogue indique **Commit** et envoie `"sourceOnly": true`,
 et le processus qui modifie cette base de données applique le schéma.
 
-Supprimer une table depuis le panneau d'administration suit le même chemin : `/apply` avec
+Supprimer une table suit le même chemin : `/apply` avec
 une modification `deleteTable` et `"sourceOnly": true` supprime le fichier de la table et son
 export dans `index.ts` et commite les deux ; la table et ses lignes restent dans la base de
 données. L'opération est refusée tant qu'une relation d'une autre table la cible, en nommant
@@ -361,8 +363,8 @@ d'avertissement ; redémarrez le processus pour servir la modification.
 
 Une modification est préparée d'après les fichiers tels qu'ils sont. Si l'un d'eux change sur le
 disque avant que la modification ne soit appliquée — enregistrement par un IDE, un autre processus —
-l'application n'écrit rien et renvoie une réponse 409 `SCHEMA_EDIT_STALE_FILE`. L'éditeur de collection
-propose Reload ; effectuez à nouveau la modification par rapport au fichier dans son état actuel.
+l'application n'écrit rien et renvoie une réponse 409 `SCHEMA_EDIT_STALE_FILE`. Effectuez à nouveau la
+modification par rapport au fichier dans son état actuel.
 
 ## Où cela fonctionne
 

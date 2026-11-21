@@ -1,5 +1,5 @@
 ---
-sourceHash: b26bc6f688a4ec9b
+sourceHash: e8ad34a809d7352c
 title: Structure du projet
 sidebar_label: Structure du projet
 description: "La structure d'un projet Rebase — les tables dans backend/schema, les modules backend lus par le runtime, et les personnalisations du panneau d'administration dans frontend/src/cms — avec et sans le panneau."
@@ -14,8 +14,8 @@ Chacun d'entre eux a un sens précis ici, et la plupart ont un sens différent a
 - **Collection** — ce que le panneau d'administration affiche : une table rendue sous la forme d'une liste et d'un
   formulaire, personnalisée dans `frontend/src/cms/`, ou une collection Firestore que le panneau
   lit directement.
-- **Studio** — la partie développeur du panneau d'administration : éditeur de schéma, console
-  SQL, explorateur de politiques. La même application que celle utilisée par votre équipe de contenu, derrière un commutateur.
+- **Studio** — la partie développeur du panneau d'administration : console SQL, politiques
+  RLS, diagramme du schéma, branches, journaux. La même application que celle utilisée par votre équipe de contenu, derrière un commutateur.
 - **Runtime managé** — l'image publiée `rebasepro/server` démarre votre
   projet. Vous n'écrivez aucun fichier serveur, et vous bénéficiez des mises à niveau du runtime sans
   recompilation. L'alternative est `rebase eject`, détaillée ci-dessous.
@@ -147,7 +147,7 @@ import { postsCms } from "./cms/posts";
 import { authorsCms } from "./cms/authors";
 import { tagsCms } from "./cms/tags";
 import { usersCms } from "./cms/users";
-// How the collection editor laid out the tables in development (labels, columns, views).
+// The admin panel's shared layout for each table (labels, columns, views).
 import uiConfig from "./cms/ui-config.json";
 
 // `rebase dev` injects VITE_API_URL with the port it actually bound, and that
@@ -203,7 +203,7 @@ une seule valeur sans qu'elle ait besoin d'être écrite trois fois.
 ### Concepts clés
 
 - **`createRebaseClient`** — Crée le client SDK qui gère les requêtes HTTP, les connexions WebSocket et la gestion des jetons d'authentification. Appelez-le une seule fois, à la racine du module : à l'intérieur d'un composant, même dans un `useMemo`, `<React.StrictMode>` instancie un second client en développement
-- **`<RebaseCMS tableCustomizations>`** — le panneau affiche chaque table que le backend sert à l'adresse `GET /api/schema/tables` ; les objets `customizeTable` provenant de `frontend/src/cms/` modifient l'apparence de certaines d'entre elles, et `uiConfig` transmet ce que l'éditeur de collections a enregistré en développement. Voir [Personnaliser une table](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
+- **`<RebaseCMS tableCustomizations>`** — le panneau affiche chaque table que le backend sert à l'adresse `GET /api/schema/tables` ; les objets `customizeTable` provenant de `frontend/src/cms/` modifient l'apparence de certaines d'entre elles, et `uiConfig` transmet la disposition partagée définie dans `frontend/src/cms/ui-config.json`. Voir [Personnaliser une table](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
 - **`useRebaseAuthController`** — Conserve l'utilisateur connecté ainsi que le cycle de vie des jetons, et c'est ce que `<Rebase>` distribue à tous les éléments situés en dessous de lui
 
 ## Backend (`backend/`)
@@ -237,7 +237,7 @@ n'est écrit à la main ; si vous souhaitez en voir un,
 [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) décrit ce qu'il contient.
 
 Le panneau servi par le frontend comporte deux volets. **Studio** est le volet développeur —
-l'éditeur de schéma, la console SQL, l'explorateur de politiques RLS — et il se trouve derrière
+la console SQL, l'explorateur de politiques RLS, le diagramme du schéma — et il se trouve derrière
 le commutateur dans le tiroir latéral, et non dans un déploiement séparé. Voir [Studio](/docs/studio/).
 
 Pour prendre le contrôle total du processus à la place — vos propres middlewares, routes et

@@ -163,7 +163,8 @@ if (!RLS_CHECK_COUNT) {
 const PRODUCT_PAGES = [
     ["Rebase", "https://rebase.pro/", "What Rebase is: a Postgres backend with an admin panel generated from the same schema."],
     ["Backend", "https://rebase.pro/backend", "The backend on its own — REST API, auth, RLS, realtime, storage, functions, cron."],
-    ["Admin panel (Studio)", "https://rebase.pro/studio", "The admin UI your non-technical teammates use, generated from the tables."],
+    ["Admin panel (CMS)", "https://rebase.pro/cms", "The admin UI your non-technical teammates use, generated from the tables."],
+    ["Studio", "https://rebase.pro/studio", "The developer half of the admin panel: SQL console, RLS policies, schema diagram, branches, cron and logs."],
     ["Pricing", "https://rebase.pro/pricing", "Open source and self-hosted, plus Rebase Cloud (private beta), priced per resource rather than per seat."],
     ["Security", "https://rebase.pro/security", "Row-level security compiled from code to real Postgres policies, and how it is enforced."],
     ["rls-check (free tool)", "https://rebase.pro/rls-check", `A free, read-only Row-Level Security audit for ANY Postgres database — Supabase, Neon, RDS, anything. ${RLS_CHECK_COUNT} checks, one command, no account, no Rebase required.`],

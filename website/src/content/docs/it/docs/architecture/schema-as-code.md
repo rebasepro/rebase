@@ -1,5 +1,5 @@
 ---
-sourceHash: 65f05732c36bd742
+sourceHash: e84aea60ecaa63e9
 title: Schema as Code
 sidebar_label: Schema as Code
 description: Come Rebase utilizza le tabelle TypeScript in backend/schema come unica fonte di verità per lo schema del database, l'API, l'SDK e il pannello di amministrazione.
@@ -21,22 +21,29 @@ Ciò significa che il tuo schema è:
 - **Revisionabile** — le modifiche allo schema passano attraverso pull request
 - **Portabile** — la stessa definizione viene letta dal backend, dalla CLI, dal generatore di SDK e, sotto forma di tipi, dal frontend
 
-## Modifica visuale con manipolazione dell'AST
+## Modificare i file tramite l'API
 
-Rebase fornisce anche un **editor visuale di schemi** in Studio. Quando qualcuno lo utilizza per aggiungere una colonna:
+I file delle tabelle si possono modificare anche via HTTP. L'editor RLS di
+Studio salva così i criteri di una tabella, e uno script o un agente che
+dispone dello scope può modificare una tabella allo stesso modo. La modifica
+viaggia come `TablePatch`, e il server usa [ts-morph](https://ts-morph.com/) per
+analizzare il file della tabella in `backend/schema/` come un AST:
 
-1. Studio **non** modifica direttamente il database
-2. Invia invece la modifica come `TablePatch`, e il server usa [ts-morph](https://ts-morph.com/) per analizzare il file della tabella in `backend/schema/` come un AST
-3. Inserisce il nuovo builder `col.*` con precisione all'interno del blocco `columns`
-4. **Tutto il codice esistente, gli hook e la logica personalizzata vengono preservati intatti**; una modifica che andrebbe a toccare codice che non deve riscrivere viene rifiutata
-5. Il file viene salvato, attivando l'hot reload
+1. Individua il codice indicato dalla patch — una colonna nel blocco `columns`, una relazione, una regola di `rls`
+2. Inserisce o riscrive solo quel codice, ad esempio un singolo builder `col.*`
+3. **Tutto il codice esistente, gli hook e la logica personalizzata vengono preservati intatti**; una modifica che andrebbe a toccare codice che non deve riscrivere viene rifiutata
+4. Il file viene salvato, attivando l'hot reload
 
-L'*aspetto* di una tabella all'interno del pannello non fa parte di questo processo: etichette, icone e viste
-vengono salvate come preferenze del pannello o scritte in `frontend/src/cms/`. Consulta
-[Live schema editing](/docs/backend/live-schema-editing/) per le modifiche supportate e
-per i casi in cui l'editor rifiuta un'operazione.
+`/api/admin/schema-editor/*` scrive il file e nient'altro, sulla tua macchina
+in fase di sviluppo. [Live schema editing](/docs/backend/live-schema-editing/)
+(`/api/admin/schema/*`) esegue il commit della stessa modifica nel tuo
+repository e poi applica il DDL; quella pagina elenca le modifiche supportate e
+ciò che il server rifiuta. L'*aspetto* di una tabella all'interno del pannello
+non riguarda nessuno dei due: etichette, icone e viste vengono salvate come
+preferenze del pannello o scritte in `frontend/src/cms/`.
 
-Questo approccio basato sull'"interfaccia utente come generatore di codice" fa sì che le modifiche visuali producano lo stesso TypeScript pulito che uno sviluppatore scriverebbe a mano.
+In entrambi i casi, il risultato è il TypeScript che uno sviluppatore
+scriverebbe a mano, in un file che revisioni e di cui esegui il commit.
 
 ## Pipeline di generazione dello schema
 

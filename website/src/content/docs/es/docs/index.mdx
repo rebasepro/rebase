@@ -1,5 +1,5 @@
 ---
-sourceHash: cfcb5c888d88e7ee
+sourceHash: 27ca2cec149d653e
 title: Introducción
 sidebar_label: Introducción
 description: Rebase es el backend de código abierto para Postgres, con un panel de administración para tu equipo, construido con React y TypeScript. Define tu esquema en TypeScript y Rebase generará una interfaz CRUD completa, API REST, autenticación, almacenamiento y sincronización en tiempo real, impulsado por PostgreSQL.
@@ -95,12 +95,11 @@ Para usar tu propio Postgres en su lugar, descomenta `DATABASE_URL` en `.env` y 
 | **Historial de entidades** | Registro de auditoría completo para cada creación, actualización y eliminación |
 | **API REST** | Endpoints CRUD autogenerados para cada tabla |
 | **Importación/Exportación de datos** | Importación de CSV, JSON y Excel con mapeo de campos; exportación a CSV/JSON |
-| **Editor de colecciones** | Editor visual de esquemas que escribe el código TypeScript en `backend/schema` mediante manipulación del AST |
 | **SDK tipado** | SDK de JavaScript con seguridad de tipos para tus aplicaciones frontend |
 | **Sistema de plugins** | Extiende cada parte de la interfaz de usuario: barra de herramientas, formularios, campos, página de inicio |
 | **Mejora de datos con IA** | Autocompletado impulsado por LLM para campos de texto |
 | **Tareas programadas (Cron Jobs)** | Tareas en segundo plano programadas con monitorización, registro de logs y panel en Studio |
-| **Funciones personalizadas** | Rutas de Hono basadas en archivos montadas automáticamente con middleware de autenticación y acceso a la BD |
+| **Funciones personalizadas** | Rutas de Hono basadas en archivos con acceso a la BD, públicas por defecto: el token del llamante se lee si se envía, y `requireAuth` protege una ruta |
 | **Servicio de correo electrónico** | SMTP integrado para restablecimiento de contraseña, verificación y correos transaccionales |
 | **Ramificación de base de datos** | Copias aisladas instantáneas de tu base de datos para desarrollo, staging o pruebas |
 | **Webhooks** | Notificaciones salientes firmadas con HMAC en operaciones INSERT, UPDATE, DELETE |

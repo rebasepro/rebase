@@ -1,5 +1,5 @@
 ---
-sourceHash: cfcb5c888d88e7ee
+sourceHash: 27ca2cec149d653e
 title: Introduction
 sidebar_label: Introduction
 description: Rebase est le backend open source pour Postgres, doté d'un panneau d'administration pour votre équipe, conçu avec React et TypeScript. Définissez votre schéma en TypeScript, et Rebase génère une interface CRUD complète, une API REST, l'authentification, le stockage et la synchronisation en temps réel — propulsé par PostgreSQL.
@@ -95,12 +95,11 @@ Pour utiliser plutôt votre propre base Postgres, décommentez `DATABASE_URL` da
 | **Historique des entités** | Journal d'audit complet pour chaque création, mise à jour et suppression |
 | **API REST** | Points de terminaison CRUD générés automatiquement pour chaque table |
 | **Import/Export de données** | Import CSV, JSON et Excel avec mappage de champs ; export CSV/JSON |
-| **Éditeur de collections** | Éditeur visuel de schéma qui écrit votre code TypeScript dans `backend/schema` via manipulation d'AST |
 | **SDK typé** | SDK JavaScript sécurisé au niveau des types pour vos applications frontend |
 | **Système de plugins** | Étendez chaque partie de l'interface — barre d'outils, formulaires, champs, page d'accueil |
 | **Enrichissement de données par IA** | Autocomplétion propulsée par LLM pour les champs texte |
 | **Tâches Cron** | Tâches d'arrière-plan planifiées avec supervision, journalisation et tableau de bord Studio |
-| **Fonctions personnalisées** | Routes Hono basées sur des fichiers, montées automatiquement avec middleware d'authentification et accès à la base de données |
+| **Fonctions personnalisées** | Routes Hono basées sur des fichiers, avec accès à la base de données, publiques par défaut : le jeton de l'appelant est lu s'il est envoyé, et `requireAuth` protège une route |
 | **Service d'e-mails** | SMTP intégré pour la réinitialisation de mot de passe, la vérification et les e-mails transactionnels |
 | **Branches de base de données** | Copies isolées instantanées de votre base de données pour le dev, le staging ou les tests |
 | **Webhooks** | Notifications sortantes signées par HMAC lors des opérations INSERT, UPDATE, DELETE |

@@ -1,18 +1,21 @@
 ---
-sourceHash: 97486e7c061d503d
+sourceHash: 45b2459dff0e5ec4
 title: Live-Schema-Bearbeitung
 description: Tabellen für ein laufendes Backend erstellen und ändern – die Bearbeitung wird in backend/schema geschrieben, zuerst in Ihr Repository committet und dann angewendet.
 ---
 
-Der Schema-Editor im Admin-Panel schreibt die Tabellendateien in
-`backend/schema` neu. Das funktioniert auf Ihrem Rechner und sonst nirgends: Die
+Der reine Quellcode-Schema-Editor, `/api/admin/schema-editor/*`, schreibt die
+Tabellendateien in `backend/schema` neu und rührt sonst nichts an. Das funktioniert auf Ihrem Rechner und sonst nirgends: Die
 Dateien eines bereitgestellten Servers werden bei jedem Deployment aus Ihrem
 Repository neu erstellt, sodass eine dort vorgenommene Bearbeitung beim nächsten
 Deployment verworfen werden würde.
 
 Die Live-Schema-Bearbeitung ist die Lösung dafür. Sie **committet die Änderung in
 Ihr Repository und wendet dann das DDL an** – so übersteht die Bearbeitung das
-nächste Deployment, da das Deployment darauf aufbaut.
+nächste Deployment, da das Deployment darauf aufbaut. Der RLS-Editor im Studio
+speichert die Policies einer Tabelle über diese Routen – geplant, als SQL
+angezeigt, bestätigt und dann angewendet –, und ein Skript oder ein Agent mit dem
+entsprechenden Scope kann dieselben Bearbeitungen senden.
 
 ```
 GET  /api/admin/schema/status   whether this backend can do it, and whether you may
@@ -213,7 +216,7 @@ wird keine Änderung über das Panel angewendet, sodass jede Änderung diesen We
 Die Hauptschaltfläche des Dialogs lautet **Commit** und sendet `"sourceOnly": true`,
 und der Prozess, der diese Datenbank ändert, wendet das Schema an.
 
-Das Löschen einer Tabelle über das Admin-Panel nimmt denselben Weg: `/apply` mit
+Das Löschen einer Tabelle nimmt denselben Weg: `/apply` mit
 einer `deleteTable`-Bearbeitung und `"sourceOnly": true` löscht die Datei der Tabelle
 sowie deren Export in `index.ts` und committet beides; die Tabelle und ihre Zeilen
 verbleiben in der Datenbank. Dies wird abgelehnt, solange eine Relation einer anderen
@@ -398,9 +401,8 @@ des Studios als Warnung angezeigt wird; starten Sie den Prozess neu, um die
 Eine Bearbeitung wird auf Basis der Dateien in ihrem aktuellen Zustand vorbereitet.
 Wenn sich eine davon vor dem Anwenden der Bearbeitung auf der Festplatte ändert –
 durch Speichern in einer IDE, einen anderen Prozess –, schreibt das Apply nichts
-und antwortet mit 409 `SCHEMA_EDIT_STALE_FILE`. Der Collection-Editor bietet ein
-Neuladen (Reload) an; führen Sie die Bearbeitung erneut auf Basis der Datei in
-ihrem aktuellen Zustand durch.
+und antwortet mit 409 `SCHEMA_EDIT_STALE_FILE`. Führen Sie die Bearbeitung
+erneut auf Basis der Datei in ihrem aktuellen Zustand durch.
 
 ## Wo dies funktioniert
 

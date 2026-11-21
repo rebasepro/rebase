@@ -1,5 +1,5 @@
 ---
-sourceHash: cfcb5c888d88e7ee
+sourceHash: 27ca2cec149d653e
 title: Introdução
 sidebar_label: Introdução
 description: O Rebase é o backend de código aberto para Postgres, com um painel administrativo para sua equipe, desenvolvido com React e TypeScript. Defina seu esquema em TypeScript e o Rebase gerará uma interface CRUD completa, API REST, autenticação, armazenamento e sincronização em tempo real — desenvolvido com PostgreSQL.
@@ -95,12 +95,11 @@ Para usar o seu próprio Postgres, descomente `DATABASE_URL` no `.env` e execute
 | **Histórico de Entidades** | Trilha de auditoria completa para cada criação, atualização e exclusão |
 | **API REST** | Endpoints de CRUD gerados automaticamente para cada tabela |
 | **Importação/Exportação de Dados** | Importação de CSV, JSON e Excel com mapeamento de campos; exportação em CSV/JSON |
-| **Editor de Coleções** | Editor visual de schemas que grava seu TypeScript em `backend/schema` via manipulação de AST |
 | **SDK Tipado** | SDK em JavaScript com tipagem estática (type-safe) para suas aplicações frontend |
 | **Sistema de Plugins** | Estenda cada parte da UI — barra de ferramentas, formulários, campos, página inicial |
 | **Aprimoramento de Dados com IA** | Autocompletar com inteligência artificial (LLM) para campos de texto |
 | **Tarefas Agendadas (Cron Jobs)** | Tarefas em segundo plano agendadas com monitoramento, registros de logs e painel no Studio |
-| **Funções Personalizadas** | Rotas Hono baseadas em arquivos montadas automaticamente com middleware de autenticação e acesso ao banco de dados |
+| **Funções Personalizadas** | Rotas Hono baseadas em arquivos com acesso ao banco de dados, públicas por padrão: o token de quem chama é lido quando enviado, e `requireAuth` protege uma rota |
 | **Serviço de E-mail** | SMTP integrado para redefinição de senha, verificação e e-mails transacionais |
 | **Branching de Banco de Dados** | Cópias isoladas e instantâneas do seu banco de dados para desenvolvimento, homologação ou testes |
 | **Webhooks** | Notificações de saída assinadas com HMAC em INSERT, UPDATE, DELETE |

@@ -1,5 +1,5 @@
 ---
-sourceHash: cfcb5c888d88e7ee
+sourceHash: 27ca2cec149d653e
 title: Introduzione
 sidebar_label: Introduzione
 description: Rebase è il backend open-source per Postgres, con un pannello di amministrazione per il tuo team, creato con React e TypeScript. Definisci il tuo schema in TypeScript e Rebase genera un'interfaccia utente CRUD completa, API REST, autenticazione, archiviazione e sincronizzazione in tempo reale — basato su PostgreSQL.
@@ -95,12 +95,11 @@ Per utilizzare invece il tuo Postgres, decommenta `DATABASE_URL` in `.env` ed es
 | **Cronologia delle entità** | Registro di controllo (audit trail) completo per ogni operazione di creazione, modifica ed eliminazione |
 | **API REST** | Endpoint CRUD generati automaticamente per ogni tabella |
 | **Importazione/Esportazione dati** | Importazione di CSV, JSON ed Excel con mappatura dei campi; esportazione in CSV/JSON |
-| **Collection Editor** | Editor visivo dello schema che scrive il codice TypeScript in `backend/schema` tramite manipolazione dell'AST |
 | **SDK tipizzato** | SDK JavaScript type-safe per le tue applicazioni frontend |
 | **Sistema di plugin** | Estendi ogni parte dell'interfaccia utente — barra degli strumenti, moduli, campi, home page |
 | **Ottimizzazione dati con IA** | Completamento automatico basato su LLM per i campi di testo |
 | **Cron Job** | Attività pianificate in background con monitoraggio, registrazione log e dashboard in Studio |
-| **Funzioni personalizzate** | Route Hono basate su file montate automaticamente con middleware di autenticazione e accesso al DB |
+| **Funzioni personalizzate** | Route Hono basate su file con accesso al DB, pubbliche per impostazione predefinita: il token del chiamante viene letto se inviato, e `requireAuth` protegge una route |
 | **Servizio email** | SMTP integrato per il ripristino della password, la verifica e le email transazionali |
 | **Branching del database** | Copie isolate istantanee del database per sviluppo, staging o test |
 | **Webhook** | Notifiche in uscita firmate con HMAC su INSERT, UPDATE, DELETE |

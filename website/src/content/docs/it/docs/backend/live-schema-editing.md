@@ -1,17 +1,19 @@
 ---
-sourceHash: 97486e7c061d503d
+sourceHash: 45b2459dff0e5ec4
 title: Modifica live dello schema
 description: Crea e modifica tabelle su un backend in esecuzione — la modifica viene scritta in backend/schema, prima committata nel tuo repository, poi applicata.
 ---
 
-L'editor dello schema nel pannello di amministrazione riscrive i file delle tabelle in
-`backend/schema`. Questo funziona sulla tua macchina locale e da nessun'altra parte: i file di un
+L'editor dello schema che agisce solo sul codice sorgente, `/api/admin/schema-editor/*`,
+riscrive i file delle tabelle in `backend/schema` e non tocca nient'altro. Questo funziona sulla tua macchina locale e da nessun'altra parte: i file di un
 server distribuito vengono ricompilati dal tuo repository a ogni deploy, quindi una modifica apportata
 lì verrebbe scartata al deploy successivo.
 
 La modifica live dello schema è la risposta a questo problema. **Esegue il commit della modifica nel tuo
 repository, quindi applica il DDL** — così la modifica sopravvive al deploy successivo,
-poiché il deploy viene compilato a partire da essa.
+poiché il deploy viene compilato a partire da essa. L'editor RLS di Studio salva i criteri
+di una tabella tramite queste route — pianificati, mostrati come SQL, confermati e poi
+applicati — e uno script o un agente che dispone dello scope può inviare le stesse modifiche.
 
 ```
 GET  /api/admin/schema/status   whether this backend can do it, and whether you may
@@ -196,7 +198,7 @@ nessuna modifica viene applicata dal pannello, quindi ogni operazione segue ques
 pulsante principale della finestra di dialogo recita **Commit** e invia `"sourceOnly": true`, mentre il
 processo deputato a modificare il database applica lo schema.
 
-L'eliminazione di una tabella dal pannello di amministrazione segue lo stesso percorso: `/apply` con una
+L'eliminazione di una tabella segue lo stesso percorso: `/apply` con una
 modifica `deleteTable` e `"sourceOnly": true` elimina il file della tabella e la sua
 esportazione in `index.ts` ed effettua il commit di entrambi; la tabella e le relative righe rimangono nel
 database. L'operazione viene rifiutata finché una relazione di un'altra tabella vi punta, specificando
@@ -364,8 +366,8 @@ la modifica.
 
 Una modifica viene preparata sulla base dei file così come sono. Se uno di essi viene modificato su
 disco prima che la modifica venga applicata — un salvataggio da IDE, un altro processo — l'applicazione
-non scrive nulla e risponde con 409 `SCHEMA_EDIT_STALE_FILE`. L'editor delle collection
-propone il pulsante Ricarica; ripeti la modifica sul file nello stato in cui si trova attualmente.
+non scrive nulla e risponde con 409 `SCHEMA_EDIT_STALE_FILE`. Ripeti la modifica sul file
+nello stato in cui si trova attualmente.
 
 ## Dove funziona
 

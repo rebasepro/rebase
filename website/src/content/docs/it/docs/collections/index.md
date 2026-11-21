@@ -1,5 +1,5 @@
 ---
-sourceHash: fc0bdfb0ae7ceb1b
+sourceHash: dd9910d58ec5bf33
 title: Tabelle nel CMS
 sidebar_label: Tabelle nel CMS
 description: "Come il CMS mostra ogni tabella Postgres senza configurazione frontend: etichette, il widget assegnato a ciascun tipo di colonna, campi obbligatori e di sola lettura, relazioni, display slot e controlli Crea, Modifica ed Elimina che seguono la row-level security della tabella."
@@ -46,8 +46,8 @@ Il codice degli hook non lascia mai il server; il descrittore indica solo quali 
   inviata alcuna tabella.
 - Il server etichetta la risposta con un `ETag`. Il client conserva l'ultima risposta
   e invia nuovamente il tag, quindi uno schema non modificato comporta un `304`.
-- L'aggiornamento della navigazione ripete la richiesta. L'editor dello schema
-  esegue questa operazione dopo aver modificato una tabella.
+- L'aggiornamento della navigazione ripete la richiesta. È ciò che fa il nuovo
+  tentativo proposto quando le tabelle non si caricano.
 
 Gli stessi descrittori guidano lo Studio e le app MCP, quindi tutti e tre concordano
 sulla definizione di una tabella.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 65f05732c36bd742
+sourceHash: e84aea60ecaa63e9
 title: Schema as Code
 sidebar_label: Schema as Code
 description: Como o Rebase usa as tabelas TypeScript em backend/schema como a única fonte da verdade para o esquema do seu banco de dados, API, SDK e painel administrativo.
@@ -21,22 +21,29 @@ Isso significa que seu esquema é:
 - **Revisável** — alterações no esquema passam por pull requests
 - **Portátil** — a mesma definição é lida pelo backend, pela CLI, pelo gerador de SDK e, na forma de tipos, pelo frontend
 
-## Edição Visual com Manipulação de AST
+## Editando os Arquivos pela API
 
-O Rebase também fornece um **editor visual de esquemas** no Studio. Quando alguém o utiliza para adicionar uma coluna:
+Os arquivos das tabelas também podem ser editados via HTTP. O editor de RLS do
+Studio salva assim as políticas de uma tabela, e um script ou um agente que
+tenha o scope pode alterar uma tabela da mesma forma. A edição viaja como um
+`TablePatch`, e o servidor usa o [ts-morph](https://ts-morph.com/) para analisar
+o arquivo da tabela em `backend/schema/` como uma AST:
 
-1. O Studio **não** modifica diretamente o banco de dados
-2. Em vez disso, ele envia a edição como um `TablePatch`, e o servidor usa o [ts-morph](https://ts-morph.com/) para analisar o arquivo da tabela em `backend/schema/` como uma AST
-3. Ele insere o novo construtor `col.*` precisamente dentro do bloco `columns`
-4. **Todo o código existente, hooks e lógica customizada são preservados intocados**; uma edição que interferiria em código que não deve ser reescrito é recusada
-5. O arquivo é salvo, disparando o hot reload
+1. Ele encontra o código que o patch indica — uma coluna no bloco `columns`, uma relação, uma regra de `rls`
+2. Ele insere ou reescreve apenas esse código, como um único construtor `col.*`
+3. **Todo o código existente, hooks e lógica customizada são preservados intocados**; uma edição que interferiria em código que não deve ser reescrito é recusada
+4. O arquivo é salvo, disparando o hot reload
 
-A *aparência* de uma tabela no painel não faz parte disso: rótulos, ícones e visualizações
-são salvos como preferências do painel ou escritos em `frontend/src/cms/`. Veja
-[Edição de esquema ao vivo](/docs/backend/live-schema-editing/) para entender as edições e
-o que o editor recusa.
+`/api/admin/schema-editor/*` grava o arquivo e nada mais, na sua máquina em
+desenvolvimento. A [Edição de esquema ao vivo](/docs/backend/live-schema-editing/)
+(`/api/admin/schema/*`) faz o commit da mesma edição no seu repositório e
+depois aplica o DDL; essa página lista as edições e o que o servidor recusa. A
+*aparência* de uma tabela no painel não faz parte de nenhum dos dois: rótulos,
+ícones e visualizações são salvos como preferências do painel ou escritos em
+`frontend/src/cms/`.
 
-Essa abordagem de "UI como Gerador de Código" significa que as edições visuais produzem o mesmo TypeScript limpo que um desenvolvedor escreveria manualmente.
+Em ambos os casos, o resultado é o TypeScript que um desenvolvedor escreveria
+manualmente, em um arquivo que você revisa e commita.
 
 ## Pipeline de Geração de Esquema
 

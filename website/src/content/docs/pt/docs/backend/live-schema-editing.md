@@ -1,17 +1,20 @@
 ---
-sourceHash: 97486e7c061d503d
+sourceHash: 45b2459dff0e5ec4
 title: Edição de schema em tempo real
 description: Crie e altere tabelas em um backend em execução — a edição é gravada em backend/schema, confirmada primeiro em seu repositório e depois aplicada.
 ---
 
-O editor de schema no painel de administração reescreve os arquivos de tabela em
-`backend/schema`. Isso funciona na sua máquina e em nenhum outro lugar: os
+O editor de schema somente de código-fonte, `/api/admin/schema-editor/*`, reescreve
+os arquivos de tabela em `backend/schema` e não toca em mais nada. Isso funciona na sua máquina e em nenhum outro lugar: os
 arquivos de um servidor implantado são reconstruídos a partir do seu repositório a
 cada deploy, portanto, uma edição feita lá seria descartada no próximo.
 
 A edição de schema em tempo real é a resposta para isso. Ela **faz o commit da
 alteração no seu repositório e, em seguida, aplica o DDL** — para que a edição
-sobreviva ao próximo deploy, pois o deploy é construído a partir dela.
+sobreviva ao próximo deploy, pois o deploy é construído a partir dela. O editor de RLS
+do Studio salva as políticas de uma tabela por essas rotas — planejadas, exibidas como
+SQL, confirmadas e então aplicadas —, e um script ou um agente que tenha o scope pode
+enviar as mesmas edições.
 
 ```
 GET  /api/admin/schema/status   whether this backend can do it, and whether you may
@@ -207,7 +210,7 @@ este caminho: o botão principal da caixa de diálogo exibe **Commit** e envia
 `"sourceOnly": true`, e o processo responsável por alterar esse banco de dados
 aplica o schema.
 
-Excluir uma tabela pelo painel de administração segue o mesmo fluxo: `/apply`
+Excluir uma tabela segue o mesmo fluxo: `/apply`
 com uma edição `deleteTable` e `"sourceOnly": true` exclui o arquivo da tabela
 e sua exportação em `index.ts` e comita ambos; a tabela e suas linhas permanecem
 no banco de dados. Isso é recusado enquanto uma relação de outra tabela a tiver
@@ -382,9 +385,8 @@ servir a alteração.
 
 Uma edição é preparada com base nos arquivos como eles estão. Se um deles for
 modificado no disco antes de a edição ser aplicada — salvamento na IDE, outro
-processo —, o apply não grava nada e retorna 409 `SCHEMA_EDIT_STALE_FILE`. O
-editor de coleções oferece a opção Recarregar (Reload); faça a edição novamente
-com base no arquivo em seu estado atual.
+processo —, o apply não grava nada e retorna 409 `SCHEMA_EDIT_STALE_FILE`. Faça
+a edição novamente com base no arquivo em seu estado atual.
 
 ## Onde isso funciona
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: b26bc6f688a4ec9b
+sourceHash: e8ad34a809d7352c
 title: Struttura del progetto
 sidebar_label: Struttura del progetto
 description: "La struttura di un progetto Rebase — le tabelle in backend/schema, i moduli backend letti dal runtime e le personalizzazioni del pannello di amministrazione in frontend/src/cms — con e senza il pannello."
@@ -13,8 +13,8 @@ Ognuno di essi ha un significato specifico qui, e la maggior parte ha un signifi
   tipi dell'SDK e le impostazioni predefinite del pannello di amministrazione.
 - **Collection** — ciò che mostra il pannello di amministrazione: una tabella renderizzata come elenco e
   modulo, personalizzata in `frontend/src/cms/`, oppure una collezione Firestore letta direttamente dal pannello.
-- **Studio** — la parte per sviluppatori del pannello di amministrazione: editor di schema, console SQL,
-  browser dei criteri. La stessa applicazione utilizzata dal team editoriale, accessibile tramite un selettore.
+- **Studio** — la parte per sviluppatori del pannello di amministrazione: console SQL, criteri RLS,
+  diagramma dello schema, branch, log. La stessa applicazione utilizzata dal team editoriale, accessibile tramite un selettore.
 - **Managed runtime** — l'immagine pubblicata `rebasepro/server` avvia il tuo
   progetto. Non devi scrivere alcun file server e ricevi gli aggiornamenti del runtime senza
   dover ricompilare. L'alternativa è `rebase eject`, descritta di seguito.
@@ -146,7 +146,7 @@ import { postsCms } from "./cms/posts";
 import { authorsCms } from "./cms/authors";
 import { tagsCms } from "./cms/tags";
 import { usersCms } from "./cms/users";
-// How the collection editor laid out the tables in development (labels, columns, views).
+// The admin panel's shared layout for each table (labels, columns, views).
 import uiConfig from "./cms/ui-config.json";
 
 // `rebase dev` injects VITE_API_URL with the port it actually bound, and that
@@ -202,7 +202,7 @@ lo stesso valore senza doverlo definire tre volte.
 ### Concetti chiave
 
 - **`createRebaseClient`** — Crea il client SDK che gestisce le richieste HTTP, le connessioni WebSocket e la gestione dei token di autenticazione. Va invocato una sola volta a livello di modulo: all'interno di un componente, anche in un `useMemo`, `<React.StrictMode>` creerebbe un secondo client durante lo sviluppo.
-- **`<RebaseCMS tableCustomizations>`** — il pannello esegue il rendering di ogni tabella esposta dal backend all'endpoint `GET /api/schema/tables`; gli oggetti `customizeTable` definiti in `frontend/src/cms/` ne modificano l'aspetto, mentre `uiConfig` memorizza ciò che è stato salvato nell'editor delle collezioni durante lo sviluppo. Consulta [Personalizzare una tabella](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
+- **`<RebaseCMS tableCustomizations>`** — il pannello esegue il rendering di ogni tabella esposta dal backend all'endpoint `GET /api/schema/tables`; gli oggetti `customizeTable` definiti in `frontend/src/cms/` ne modificano l'aspetto, mentre `uiConfig` contiene il layout condiviso di `frontend/src/cms/ui-config.json`. Consulta [Personalizzare una tabella](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
 - **`useRebaseAuthController`** — Mantiene lo stato dell'utente autenticato e il ciclo di vita dei token, distribuendoli tramite `<Rebase>` a tutti i componenti sottostanti
 
 ## Backend (`backend/`)
@@ -236,7 +236,7 @@ del bundle viene scritta manualmente; per approfondirne la struttura,
 [Runtime e bundle](/docs/architecture/runtime-and-bundles/) descrive cosa include.
 
 Il pannello fornito dal frontend è suddiviso in due sezioni. **Studio** è quella dedicata agli sviluppatori —
-con editor di schema, console SQL e visualizzatore dei criteri RLS — ed è accessibile
+con console SQL, visualizzatore dei criteri RLS e diagramma dello schema — ed è accessibile
 tramite il selettore nel pannello laterale (drawer), non come deployment separato. Consulta [Studio](/docs/studio/).
 
 Se invece desideri assumere il controllo completo del processo — middleware personalizzati, route
