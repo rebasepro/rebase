@@ -4,7 +4,7 @@
 import { en } from "../../app/src/locales/en";
 import React from "react";
 import { render } from "@testing-library/react";
-import type { AppView, RebaseStudioConfig } from "@rebasepro/cms-types";
+import type { AppView, RebaseStudioConfig } from "@rebasepro/app";
 
 /**
  * `devViews` was a declared prop of `<RebaseStudio>` that the component never

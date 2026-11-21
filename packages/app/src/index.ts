@@ -50,6 +50,7 @@ export * from "./locales/en";
 
 // Studio Bridge — shared context for optional admin↔Studio integration
 export * from "./hooks/useStudioBridge";
+export type { AppView, HomePageSection, PluginGenericProps, RebaseStudioConfig, RebaseTranslations } from "@rebasepro/cms-types";
 
 // Self-assembling bridge registration hook
 export { useBridgeRegistration } from "./hooks/useBridgeRegistration";

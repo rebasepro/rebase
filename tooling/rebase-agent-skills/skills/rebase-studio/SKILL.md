@@ -5,11 +5,11 @@ description: Guide for using and customizing the Rebase Studio developer tools l
 
 # Rebase Studio
 
-Rebase Studio (`@rebasepro/studio`) is the developer tools layer for Rebase. It provides 11 built-in tools — SQL Console, JS Console, RLS Editor, Storage browser, Cron Jobs manager, Schema Visualizer, Branches manager, Backups, API Explorer, Logs Explorer and API Keys — accessible via the "Studio" mode toggle in the sidebar.
+Rebase Studio (`@rebasepro/studio`) is the developer tools layer for Rebase. It provides 14 built-in tools — Tables, SQL Console, JS Console, RLS Editor, Storage browser, Cron Jobs manager, Schema Visualizer, Branches manager, Backups, API Explorer, Webhooks, Logs Explorer, Users & Roles, and API Keys — accessible via the "Studio" mode toggle in the sidebar or standalone via `<RebaseStudioApp />`.
 
 ## Overview
 
-- **11 built-in dev tools** — all lazy-loaded and code-split so they don't impact initial bundle size
+- **14 built-in dev tools** — all lazy-loaded and code-split so they don't impact initial bundle size
 - **StudioHomePage** — customizable landing page with tool cards grouped by section
 - **Studio Bridge** — hooks that connect Studio tools to CMS data (collections, navigation, side panels)
 
@@ -82,58 +82,62 @@ function RoleSimulator() {
 
 ## Studio Dev Tools
 
-The Studio ships 11 built-in dev tools, all **lazy-loaded** (code-split) so they don't impact the initial bundle. Heavy dependencies (Monaco, `@xyflow/react`, `dagre`, `pgsql-ast-parser`) are only loaded when a tool is visited.
+The Studio ships 14 built-in dev tools, all **lazy-loaded** (code-split) so they don't impact the initial bundle. Heavy dependencies (Monaco, `@xyflow/react`, `dagre`, `pgsql-ast-parser`) are only loaded when a tool is visited.
 
 ### Tool Reference
 
 | Tool Key | Component | Name | Group | Icon | Description |
 |----------|-----------|------|-------|------|-------------|
+| `"tables"` | `TableEditorView` | Tables | Database | `Table` | Create tables, edit rows, columns, indexes, and zero-code table metadata |
 | `"sql"` | `SQLEditor` | SQL Console | Database | `terminal` | Execute raw SQL queries against the database |
 | `"js"` | `JSEditor` | JS Console | Compute | `code` | Run JavaScript with the Rebase SDK in a live sandbox |
 | `"rls"` | `RLSEditor` | RLS Policies | Database | `ShieldCheck` | Configure Row Level Security for fine-grained data access |
-| `"storage"` | `StorageView` | Storage | Storage | `HardDrive` | Browse, upload, and manage files in the storage bucket |
+| `"storage"` | `StorageView` | Storage | Storage | `HardDrive` | Browse, upload, and manage files and declarative storage policies |
 | `"cron"` | `CronJobsView` | Cron Jobs | Compute | `Clock` | Monitor and manage scheduled background tasks |
 | `"schema-visualizer"` | `SchemaVisualizer` | Schema Visualizer | Database | `Network` | Interactive ERD showing tables, columns, and relationships |
 | `"branches"` | `BranchesView` | Branches | Database | `GitBranch` | Create and manage isolated database copies for development |
 | `"backups"` | `BackupsView` | Backups | Database | `Database` | Browse and download database backups |
 | `"api"` | `ApiExplorer` | API Explorer | API | `BookOpen` | Interactive API documentation with live request testing |
+| `"webhooks"` | `WebhooksView` | Webhooks | API | `Webhook` | Configure and test database webhooks triggered on row changes |
 | `"logs"` | `LogsExplorer` | Logs Explorer | Database | `Activity` | Real-time system, query, and authentication logs |
+| `"users"` | `UsersAndRolesView` | Users & Roles | Access Control | `Users` | Manage user accounts, roles, and zero-code RBAC scopes |
 | `"api-keys"` | `ApiKeysView` | API Keys | Access Control | `KeyRound` | Create and manage scoped service API keys |
 
-> **IMPORTANT FOR AGENTS:** The `"schema"` tool (collection editor) is **NOT** registered by `<RebaseStudio>`. It is auto-injected by `<RebaseShell>` when `collectionEditor` is enabled on `<RebaseCMS>` and `<RebaseStudio>` is mounted with `tools` omitted or containing `"schema"`. Do not try to register it manually — but when you pass a `tools` list, include `"schema"` in it or the collection editor's route is not registered.
+> **IMPORTANT FOR AGENTS:** There is no `"schema"` tool. The Studio's visual collection editor was removed: a table's schema is `defineTable` in `backend/schema/`, and its admin layout is `customizeTable` in `frontend/src/cms/` plus `ui-config.json`. Edit those files; do not look for an editor to drive. A database-first project with no `backend/schema` uses the **Tables** tool, which runs the DDL against the database itself.
 
 ### Enabling/Disabling Tools
 
-By default, **all 11 tools** are enabled. Use the `tools` prop on `<RebaseStudio>` to selectively enable a subset:
+By default, **all 14 tools** are enabled. Use the `tools` prop on `<RebaseStudio>` to selectively enable a subset:
 
 ```tsx
 // Enable all tools (default behavior — both are equivalent)
 <RebaseStudio />
 <RebaseStudio tools={undefined} />
 
-// Enable only specific tools (no collection editor: "schema" is not listed)
+// Enable only specific tools
 <RebaseStudio tools={["sql", "rls", "storage"]} />
 
-// Enable everything except branches ("schema" keeps the collection editor)
-<RebaseStudio tools={["sql", "js", "rls", "schema", "storage", "cron", "schema-visualizer", "backups", "api", "logs", "api-keys"]} />
+// Enable everything except branches
+<RebaseStudio tools={["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "backups", "api", "webhooks", "logs", "users", "api-keys"]} />
 ```
 
 The `tools` prop accepts an array of tool key strings:
 
 ```typescript
-type ToolKey = "sql" | "js" | "rls" | "schema" | "storage" | "cron"
-    | "schema-visualizer" | "branches" | "backups" | "api" | "logs" | "api-keys";
+type ToolKey = "tables" | "sql" | "js" | "rls" | "storage" | "cron"
+    | "schema-visualizer" | "branches" | "backups" | "api" | "webhooks" | "logs" | "users" | "api-keys";
 
-// Default when tools is undefined (plus "schema", injected when collectionEditor is on):
+// Default when tools is undefined:
 const DEFAULT_TOOLS: ToolKey[] = [
-    "sql", "js", "rls", "storage", "cron", "schema-visualizer",
-    "branches", "backups", "api", "logs", "api-keys"
+    "tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer",
+    "branches", "backups", "api", "webhooks", "logs", "users", "api-keys"
 ];
 ```
 
 ### Individual tools are not importable
 
-`@rebasepro/studio` exports **only** `RebaseStudio`, `StudioHomePage` and the
+`@rebasepro/studio` exports **only** `RebaseStudio`, `RebaseStudioApp` (the
+Studio on its own, with no `<RebaseCMS>`), `StudioHomePage` and the
 Studio Bridge re-exports (below). The
 tools (SQLEditor, JSEditor, RLSEditor,
 StorageView, …) are lazy-loaded inside `RebaseStudio.tsx` and deliberately not
@@ -376,8 +380,8 @@ interface NavigationGroupMapping {
 
 ```typescript
 interface RebaseStudioConfig {
-    tools?: ("sql" | "js" | "rls" | "schema" | "storage" | "cron"
-        | "schema-visualizer" | "branches" | "backups" | "api" | "logs" | "api-keys")[];
+    tools?: ("tables" | "sql" | "js" | "rls" | "storage" | "cron"
+        | "schema-visualizer" | "branches" | "backups" | "api" | "webhooks" | "logs" | "users" | "api-keys")[];
     homePage?: ReactNode;
     devViews?: AppView[];  // Your own Studio tools, added beside the built-in ones
 }
@@ -411,11 +415,11 @@ every tool enabled:
 
 | Section | Tools |
 |---------|-------|
-| Database | Collections (when the collection editor is on), SQL Console, RLS Policies, Schema Visualizer, Branches, Backups, Logs Explorer |
+| Database | Tables, SQL Console, RLS Policies, Schema Visualizer, Branches, Backups, Logs Explorer |
 | Compute | JS Console, Cron Jobs |
 | Storage | Storage |
-| API | API Explorer |
-| Access Control | API Keys |
+| API | API Explorer, Webhooks |
+| Access Control | Users & Roles, API Keys |
 
 Sections follow that order; a `devViews` group not in it is appended after, and
 a view with no `group` lands in "Tools".
@@ -788,43 +792,16 @@ Internally it composes:
 </RebaseAuthGate>
 ```
 
-## Visual Collection Editor
+## Editing tables and their policies
 
-The collection editor allows non-developers to:
-- Add, remove, rename and reorder columns
-- Configure column types and validation
-- Set up enum values and relations
-- Edit a table's row-level security rules
-
-Under the hood every edit is a typed change (`TablePatch`, in
-`packages/types/src/schema/table_patch.ts`) sent to `/api/admin/schema-editor`,
-which rewrites the `defineTable` files in `backend/schema/` with AST
-manipulation (via `ts-morph`) — preserving hooks and hand-written code — and
-then compiles the result. Presentation (labels, icons, enum colours, view modes)
-is not a schema edit: it lives in `frontend/src/cms/` and in UI preferences.
-The server refuses, and the editor shows as read-only "edited in code", what it
-cannot rewrite safely: a config built with a spread, a column built by a helper,
-rules held in a variable, renaming a table's slug or SQL name (a migration), or
-an edit that does not compile.
-
-### Enabling the Collection Editor
-
-```tsx
-// Simple — uses authController.getAuthToken automatically
-<RebaseCMS tableCustomizations={tableCustomizations} collectionEditor={true} />
-
-// With options
-<RebaseCMS
-    tableCustomizations={tableCustomizations}
-    collectionEditor={{
-        getAuthToken: authController.getAuthToken,
-        readOnly: false
-    }}
-/>
-```
-
-The backend side is on when it knows where the tables live: `schemaDir`
-(`backend/schema`) outside production — which is what `rebase dev` provides.
+There is no visual collection editor. A table's columns, relations and rules
+are `defineTable` in `backend/schema/` (see `rebase-tables`); how it looks in
+the admin is `customizeTable` in `frontend/src/cms/` and the shared
+`frontend/src/cms/ui-config.json`. The Studio's RLS editor still saves a
+table's policies into `backend/schema/` in development, through plan → confirm
+→ apply; `<RebaseCMS collectionEditor={{ readOnly, getAuthToken }}>` still tunes
+that. The backend side is on when it knows where the tables live: `schemaDir`
+(`backend/schema`) outside production, which is what `rebase dev` provides.
 
 ## Where the panel's collections come from
 

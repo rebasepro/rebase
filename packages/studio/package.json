@@ -28,7 +28,6 @@
   "types": "./dist/index.d.ts",
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
-    "@rebasepro/cms-types": "workspace:*",
     "@rebasepro/app": "workspace:*",
     "@rebasepro/client": "workspace:*",
     "@rebasepro/common": "workspace:*",
@@ -44,15 +43,9 @@
     "react-dropzone": "^19.1.1"
   },
   "peerDependencies": {
-    "@rebasepro/cms": "workspace:*",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router": "^8.3.0"
-  },
-  "peerDependenciesMeta": {
-    "@rebasepro/cms": {
-      "optional": true
-    }
   },
   "exports": {
     ".": {
@@ -69,7 +62,8 @@
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
-    "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
+    "build:standalone": "vite build --config vite.standalone.config.ts",
+    "clean": "rm -rf dist dist-standalone && find ./src -name '*.js' -type f | xargs rm -f"
   },
   "browserslist": {
     "production": [
@@ -85,6 +79,7 @@
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
+    "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@types/jest": "^30.0.0",
@@ -95,6 +90,7 @@
     "babel-plugin-react-compiler": "19.0.0-beta-ebf51a3-20250411",
     "jest": "^30.4.2",
     "react-router": "^8.3.0",
+    "tailwindcss": "^4.3.3",
     "ts-jest": "^29.4.12",
     "typescript": "^6.0.3",
     "vite": "^8.1.5"

@@ -38,6 +38,8 @@ import {
     TableCell,
     TableHeader,
     TableRow,
+    Tab,
+    Tabs,
     TextField,
     Tooltip,
     Trash2Icon,
@@ -51,6 +53,7 @@ import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, 
 import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStorageKey, type DownloadConfig, type StorageReference, type StorageSource } from "@rebasepro/types";
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 import { useVisibleFileMetadata } from "./useVisibleFileMetadata";
+import { StoragePoliciesPanel } from "./StoragePoliciesPanel";
 import { useSearchParams } from "react-router";
 import { useDropzone } from "react-dropzone";
 
@@ -454,7 +457,7 @@ message: e instanceof Error ? e.message : String(e) });
                 "bg-surface-card"
             )}>
                 {/* Header */}
-                <div className={cls("flex items-center justify-between p-3 border-b shrink-0", defaultBorderMixin)}>
+                <div className={cls("flex items-center justify-between h-10 px-3 border-b bg-surface-sheet shrink-0", defaultBorderMixin)}>
                     <Typography variant="body2" className="font-medium truncate flex-1 mr-2">
                         {file.name}
                     </Typography>
@@ -657,6 +660,26 @@ message: e instanceof Error ? e.message : String(e) });
 // ──────────────────────────────────────────────
 
 export const StorageView = () => {
+    const [tab, setTab] = useState<"files" | "policies">("files");
+    return (
+        <div className="flex flex-col h-full w-full overflow-hidden">
+            <Tabs
+                value={tab}
+                onValueChange={(v) => { if (v === "files" || v === "policies") setTab(v); }}
+                variant="boxy"
+                className="border-b border-hairline px-4 bg-surface-sheet shrink-0"
+            >
+                <Tab value="files">Files</Tab>
+                <Tab value="policies">Access Policies</Tab>
+            </Tabs>
+            <div className="flex-1 min-h-0 overflow-hidden">
+                {tab === "files" ? <StorageFilesBrowser /> : <StoragePoliciesPanel />}
+            </div>
+        </div>
+    );
+};
+
+const StorageFilesBrowser = () => {
     const { t } = useTranslation();
     const defaultStorageSource = useStorageSource();
     const storageSources = useStorageSources();
@@ -1538,7 +1561,7 @@ message: e instanceof Error ? e.message : String(e) });
                 {/* Main content */}
                 <div className="flex-grow flex flex-col min-w-0 h-full">
                             {/* Toolbar */}
-                            <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-card shrink-0 h-10", defaultBorderMixin)}>
+                            <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-sheet shrink-0 h-10", defaultBorderMixin)}>
                                 <div className="flex items-center gap-1.5 flex-grow overflow-hidden px-3 py-2">
                                     {/* Breadcrumbs — always visible */}
                                     {currentPath && (

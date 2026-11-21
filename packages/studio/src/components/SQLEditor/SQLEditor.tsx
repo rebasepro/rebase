@@ -1,9 +1,7 @@
 
-import { IconForView } from "@rebasepro/app";
-import { useStudioCollectionRegistry, useStudioSidePanelController, useTableDescriptors } from "@rebasepro/app";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import { IconForView, useStudioCollectionRegistry, useStudioSidePanelController, useTableDescriptors } from "@rebasepro/app";
+type StudioBridgeCollection = NonNullable<ReturnType<ReturnType<typeof useStudioCollectionRegistry>["getCollection"]>>;
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { createPortal } from "react-dom";
 import {
     Alert,
     Button,
@@ -38,7 +36,6 @@ import {
     Tab,
     Tabs,
     TerminalIcon,
-    TextareaAutosize,
     TextField,
     Tooltip,
     Typography,
@@ -50,6 +47,7 @@ import {
 import { useApiBase, useApiConfig, useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/app";
 import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
+import { FixedEditorOverlay } from "./FixedEditorOverlay";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
 import { buildExplainSql, formatSql, keepLatestColumnWidths, needsDestructiveConfirmation, quoteIdentifier, groupSchemaRows, quoteTableName, rememberColumnWidth, resolveCellEdit, resolveQueryCollections, resultsToCsv, typedJsonRows, withAutoLimit, type CellEditResolution, type ColumnWidthsByQuery, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
@@ -109,110 +107,8 @@ const QueryLoadingView = () => {
 const STORAGE_KEY_TABS = "rebase_sql_tabs";
 const STORAGE_KEY_ACTIVE_TAB = "rebase_sql_active_tab";
 
-/**
- * The box a result cell is edited in. It closes once: Enter saves, Escape
- * cancels, a click away saves — and the blur a closing box can still receive
- * is not a second answer, which made Enter save twice and Escape save at all.
- */
-export const FixedEditorOverlay = ({
-    displayValue,
-    onSave,
-    onCancel
-}: {
-    displayValue: string,
-    /** What the box holds when it closes — the text as typed. */
-    onSave: (val: string) => void,
-    onCancel: () => void
-}) => {
-    const [rect, setRect] = useState<DOMRect | null>(null);
-    const [windowSize, setWindowSize] = useState({ width: 1000,
-height: 1000 });
-    const anchorRef = useRef<HTMLDivElement>(null);
-    const closedRef = useRef(false);
-    /** Close the box, saving `typed` when it is given. Only the first call counts. */
-    const close = (typed?: string) => {
-        if (closedRef.current) return;
-        closedRef.current = true;
-        if (typed !== undefined) onSave(typed);
-        onCancel();
-    };
-
-    useEffect(() => {
-        if (anchorRef.current && anchorRef.current.parentElement) {
-            setRect(anchorRef.current.parentElement.getBoundingClientRect());
-        }
-        if (typeof window !== "undefined") {
-            setWindowSize({ width: window.innerWidth,
-height: window.innerHeight });
-            const handleResize = () => setWindowSize({ width: window.innerWidth,
-height: window.innerHeight });
-            window.addEventListener("resize", handleResize);
-            return () => window.removeEventListener("resize", handleResize);
-        }
-        return undefined;
-    }, []);
-
-    if (!rect) {
-        return <div ref={anchorRef} className="w-full h-full min-h-[20px]" />;
-    }
-
-    let top = rect.top - 2;
-    let left = rect.left - 2;
-    const minWidth = Math.max(rect.width + 4, 250);
-    const minHeight = rect.height + 4;
-
-    if (left + minWidth > windowSize.width) {
-        left = Math.max(10, windowSize.width - minWidth - 10);
-    }
-
-    // Calculate a max height that doesn't overflow the bottom
-    const maxAvailableHeight = Math.max(50, windowSize.height - top - 10);
-    const resolvedMaxHeight = Math.min(300, maxAvailableHeight);
-
-    // If even the min height overflows, adjust top
-    if (top + minHeight > windowSize.height) {
-        top = Math.max(10, windowSize.height - minHeight - 10);
-    }
-
-    return (
-        <div ref={anchorRef} className="w-full h-full min-h-[20px]">
-            {createPortal(
-                <div
-                    className="fixed z-[9999] bg-surface-sheet border-2 border-primary dark:border-primary-dark shadow-xl flex flex-col"
-                    style={{
-                        top,
-                        left,
-                        minWidth,
-                        minHeight,
-                        maxWidth: Math.min(400, windowSize.width - left - 10)
-                    }}
-                >
-                    <TextareaAutosize
-                        className="w-full h-full bg-transparent outline-none border-none ring-0 font-mono text-[13px] text-text-primary dark:text-text-primary-dark px-4 py-1.5 resize-none overflow-y-auto"
-                        defaultValue={displayValue}
-                        autoFocus
-                        style={{ minHeight: "32px",
-maxHeight: resolvedMaxHeight }}
-                        onFocus={(e) => {
-                            const val = e.target.value;
-                            e.target.value = "";
-                            e.target.value = val;
-                        }}
-                        onBlur={(e) => close(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                close(e.currentTarget.value);
-                            }
-                            if (e.key === "Escape") close();
-                        }}
-                    />
-                </div>,
-                document.body
-            )}
-        </div>
-    );
-};
+// The box a result cell is edited in, shared with the Table Editor's rows grid.
+export { FixedEditorOverlay };
 
 const getStoragePrefix = (baseUrl?: string) => {
     if (!baseUrl) return "default";
@@ -254,7 +150,7 @@ export const SQLEditor = () => {
     const collectionRegistry = useStudioCollectionRegistry();
     const { tables: declaredTables } = useTableDescriptors();
     const collectionFor = useCallback(
-        (slug: string): AdminCollection | undefined => collectionRegistry.getCollection(slug),
+        (slug: string): StudioBridgeCollection | undefined => collectionRegistry.getCollection(slug),
         [collectionRegistry]
     );
 
@@ -1256,13 +1152,13 @@ truncatedFrom: null });
     const readFromAppDatabase = activeTab.lastExecutedConnection !== null &&
         (activeTab.lastExecutedConnection.database === undefined || activeTab.lastExecutedConnection.database === appDatabase);
     const lastProvenance = activeTab.lastProvenance;
-    const actionableCollections = useMemo((): ResolvedQueryCollection<AdminCollection>[] => lastProvenance && readFromAppDatabase
+    const actionableCollections = useMemo((): ResolvedQueryCollection<StudioBridgeCollection>[] => lastProvenance && readFromAppDatabase
         ? resolveQueryCollections(lastProvenance, declaredTables, collectionFor)
             .filter(mc => resultColumnKeys.includes(mc.pkColumn))
         : [], [lastProvenance, declaredTables, collectionFor, readFromAppDatabase, resultColumnKeys]);
 
     // For each row, determine which entities can be opened
-    const getRowEntityActions = useCallback((rowData: Record<string, unknown>): { collection: ResolvedQueryCollection<AdminCollection>, entityId: string | number }[] => {
+    const getRowEntityActions = useCallback((rowData: Record<string, unknown>): { collection: ResolvedQueryCollection<StudioBridgeCollection>, entityId: string | number }[] => {
         if (!rowData) return [];
         return actionableCollections
             .filter(mc => rowData[mc.pkColumn] != null)
@@ -1460,8 +1356,8 @@ id: String(ra.entityId) })}
                                 <Tooltip key={mc.tableName} title={`Table "${mc.tableName}" → ${mc.collection.name} (PK: ${mc.pkColumn})`}>
                                     <Chip size="smallest"
                                           className="whitespace-nowrap"
-                                          icon={typeof mc.collection.icon === "string"
-                                              ? <IconForView collectionOrView={mc.collection} size="smallest"/>
+                                          icon={"icon" in mc.collection && typeof mc.collection.icon === "string"
+                                              ? <IconForView collectionOrView={{ icon: mc.collection.icon, slug: mc.tableName, name: mc.collection.name }} size="smallest"/>
                                               : undefined}>
                                         {mc.collection.name}
                                     </Chip>
@@ -1579,10 +1475,10 @@ id: String(ra.entityId) })}
                 secondPanel={
                     <div className="flex-grow flex flex-col min-w-0 h-full w-full">
                         {/* Toolbar */}
-                        <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-card", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between pl-2 pr-2 border-b bg-surface-sheet shrink-0", defaultBorderMixin)}>
                             <div className="flex items-center flex-grow overflow-hidden mr-4">
                                 <div className="flex items-center no-scrollbar overflow-x-auto min-w-0">
-                                    <Tabs value={activeTabId} onValueChange={handleTabChange} variant="boxy" className="w-[unset] flex-shrink-0" innerClassName="bg-surface-card">
+                                    <Tabs value={activeTabId} onValueChange={handleTabChange} variant="boxy" className="w-[unset] flex-shrink-0">
                                         {tabs.map(tab => (
                                             <Tab key={tab.id} value={tab.id} className="flex items-center justify-between group max-w-[200px]">
                                                 <TerminalIcon size={iconSize.smallest} className="text-blue-500 mr-1.5 flex-shrink-0"/>

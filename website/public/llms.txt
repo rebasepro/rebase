@@ -150,7 +150,7 @@
 - [Data Import & Export](https://rebase.pro/docs/frontend/data-import-export.md): Import data from CSV, JSON, and Excel files into your collections, and export collection data to CSV or JSON with optional computed fields.
 - [Plugin System](https://rebase.pro/docs/plugins.md): Extend Rebase with plugins — inject UI components, modify collections, add toolbar actions, and create custom field builders.
 - [Hooks Reference](https://rebase.pro/docs/hooks.md): React hooks provided by Rebase for accessing auth, data, navigation, side panels, storage, and UI state.
-- [Studio Tools](https://rebase.pro/docs/studio.md): Rebase Studio provides developer tools for visual schema editing, SQL queries, JavaScript scripting, RLS policy management, and storage browsing.
+- [Studio Tools](https://rebase.pro/docs/studio.md): Rebase Studio provides developer tools for SQL queries, JavaScript scripting, RLS policy management, a schema diagram, and storage browsing.
 - [Components](https://rebase.pro/docs/ui/components.md): Components in @rebasepro/ui — the component library Rebase CMS and Rebase Studio are built from.
 - [Alert](https://rebase.pro/docs/ui/components/alert.md): Alert — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [Autocomplete](https://rebase.pro/docs/ui/components/autocomplete.md): Autocomplete — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.

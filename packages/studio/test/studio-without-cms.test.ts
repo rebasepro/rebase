@@ -38,11 +38,12 @@ function specifiers(source: string): string[] {
 const isCms = (specifier: string) => specifier === "@rebasepro/cms" || specifier.startsWith("@rebasepro/cms/");
 
 describe("Studio without the CMS", () => {
-    it("imports nothing from @rebasepro/cms anywhere in its source", () => {
+    it("imports nothing from @rebasepro/cms or @rebasepro/cms-types anywhere in its source", () => {
         const files = sourceFiles(SRC);
         expect(files.length).toBeGreaterThan(20);
+        const isCmsOrTypes = (specifier: string) => isCms(specifier) || specifier === "@rebasepro/cms-types" || specifier.startsWith("@rebasepro/cms-types/");
         const offenders = files.flatMap(file =>
-            specifiers(fs.readFileSync(file, "utf8")).filter(isCms).map(specifier => `${path.relative(SRC, file)}: ${specifier}`));
+            specifiers(fs.readFileSync(file, "utf8")).filter(isCmsOrTypes).map(specifier => `${path.relative(SRC, file)}: ${specifier}`));
         expect(offenders).toEqual([]);
     });
 

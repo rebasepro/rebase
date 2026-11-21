@@ -189,6 +189,9 @@ export default [
             "test-cli-init-project/**",
             "test-cli-init-baas-project/**",
             "**/dist/**",
+            // The standalone Studio SPA (`pnpm --filter @rebasepro/studio build:standalone`),
+            // minified bundle output the runtime image serves at `/_studio`.
+            "**/dist-standalone/**",
             "**/build/**",
             "**/.next/**",
             "**/.astro/**",

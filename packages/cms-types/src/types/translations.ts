@@ -1367,6 +1367,12 @@ export interface RebaseTranslations {
     studio_tool_logs_description?: string;
     studio_tool_api_keys?: string;
     studio_tool_api_keys_description?: string;
+    studio_tool_tables?: string;
+    studio_tool_tables_description?: string;
+    studio_tool_webhooks?: string;
+    studio_tool_webhooks_description?: string;
+    studio_tool_users?: string;
+    studio_tool_users_description?: string;
     studio_backups_denied_title?: string;
     studio_backups_denied_hint?: string;
     studio_backups_read_failed?: string;

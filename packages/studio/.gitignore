@@ -17,3 +17,5 @@ dist-ssr
 *.local
 .idea
 node_modules
+# `pnpm build:standalone`: the Studio SPA the runtime image serves at /_studio
+dist-standalone

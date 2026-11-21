@@ -55,6 +55,7 @@ COPY packages/cms/package.json packages/cms/
 COPY packages/cms-types/package.json packages/cms-types/
 COPY packages/forms/package.json packages/forms/
 COPY packages/inference/package.json packages/inference/
+COPY packages/studio/package.json packages/studio/
 
 # The runtime never runs atlas — it is imported only by server-postgres's CLI
 # (migration authoring), never on the boot path, and the image only supports
@@ -70,7 +71,7 @@ RUN sed -i "s#'@ariga/atlas': true#'@ariga/atlas': false#" pnpm-workspace.yaml
 # `@rebasepro/cms...` is not a dependency of anything the server declares: the
 # views build reaches the admin through source aliases, so its packages' own
 # dependencies (react-router, prosemirror, …) have to be installed by name.
-RUN pnpm install --frozen-lockfile --filter @rebasepro/server... --filter @rebasepro/server-postgres... --filter @rebasepro/cms...
+RUN pnpm install --frozen-lockfile --filter @rebasepro/server... --filter @rebasepro/server-postgres... --filter @rebasepro/cms... --filter @rebasepro/studio...
 
 COPY packages/types packages/types
 COPY packages/utils packages/utils
@@ -100,6 +101,7 @@ COPY packages/inference/src packages/inference/src
 COPY packages/inference/tsconfig.json packages/inference/
 COPY packages/plugin-insights/src packages/plugin-insights/src
 COPY packages/ui packages/ui
+COPY packages/studio packages/studio
 COPY packages/mcp-apps packages/mcp-apps
 COPY packages/server packages/server
 COPY packages/server-postgres packages/server-postgres
@@ -116,6 +118,7 @@ RUN pnpm --filter @rebasepro/types build \
     && pnpm --filter @rebasepro/client build \
     && pnpm --filter @rebasepro/codegen build \
     && pnpm --filter @rebasepro/ui build \
+    && pnpm --filter @rebasepro/studio build:standalone \
     && pnpm --filter @rebasepro/mcp-apps build \
     && pnpm --filter @rebasepro/server build \
     && pnpm --filter @rebasepro/server-postgres build
@@ -251,6 +254,7 @@ COPY --from=build /src/packages/server/package.json ./node_modules/@rebasepro/se
 COPY --from=build /src/packages/server-postgres/dist ./node_modules/@rebasepro/server-postgres/dist
 COPY --from=build /src/packages/server-postgres/src ./node_modules/@rebasepro/server-postgres/src
 COPY --from=build /src/packages/server-postgres/package.json ./node_modules/@rebasepro/server-postgres/package.json
+COPY --from=build /src/packages/studio/dist-standalone /studio
 
 # The guard for the `--platform=$BUILDPLATFORM` above.
 #
@@ -284,7 +288,7 @@ COPY infra/docker/entrypoint.mjs ./entrypoint.mjs
 # and one mounted where the image has nothing is root's — every upload then
 # failed EACCES for the `node` user below. Every local bucket's directory sits
 # under it (`/storage/uploads`, `/storage/uploads__media`), on that one volume.
-RUN mkdir -p /bundle /storage && chown -R node:node /app /bundle /storage
+RUN mkdir -p /bundle /storage /studio && chown -R node:node /app /bundle /storage /studio
 
 # Unprivileged: nothing here needs root, and a compromised hook should not be
 # able to write to the image.

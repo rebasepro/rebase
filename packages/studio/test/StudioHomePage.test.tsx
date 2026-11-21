@@ -36,6 +36,9 @@ jest.mock("@rebasepro/app", () => ({
     useRebaseRegistry: () => mockRegistry,
     // The address the panel talks to — never the 3001 of the docs' examples.
     useApiConfig: () => ({ apiUrl: "http://localhost:3755", apiPath: "/api" }),
+    // The overview's schema card reads through the admin client.
+    useApiBase: () => "http://localhost:3755/api",
+    useAuthController: () => ({ getAuthToken: async () => "test-token" }),
     useRestoreScroll: () => ({
         containerRef: React.createRef()
     }),
