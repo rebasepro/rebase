@@ -3848,12 +3848,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // Cron admin routes require authentication + admin role
         applyAdminGate(cronRouter, "Cron", { read: "cron:read", write: "cron:write" }, "cron");
 
-        cronRouter.route("/", createCronRoutes(cronScheduler, cronProblems.length));
+        // `/jobs` first: the scheduler's own routes answer `GET /:id`, which
+        // took `GET /jobs` as a job named "jobs" and listed nothing.
         if (defaultSqlAdmin && baasCatalogReady) {
             cronJobsStore = createCronJobsStore(defaultSqlAdmin);
             await cronJobsStore.syncToScheduler(cronScheduler);
             cronRouter.route("/jobs", createCronJobsAdminRoutes(cronJobsStore));
         }
+        cronRouter.route("/", createCronRoutes(cronScheduler, cronProblems.length));
         cronSurface = cronRouter;
 
         if (loadedCronJobs.length > 0 && !ownership.cronScheduler) {

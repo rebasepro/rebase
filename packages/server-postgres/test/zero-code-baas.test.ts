@@ -581,6 +581,13 @@ describe("Zero-code BaaS foundation (PGlite)", () => {
             expect(createCronRes.status).toBe(201);
             const cronJobBody = await createCronRes.json() as { job: { id: string; name: string } };
 
+            // Listed at its own path — the scheduler's `GET /:id` once took
+            // `/jobs` for a job named "jobs".
+            const listCronRes = await app.request("/api/admin/cron/jobs", { headers: authHeaders });
+            expect(listCronRes.status).toBe(200);
+            const listCronBody = await listCronRes.json() as { jobs: Array<{ name: string }> };
+            expect(listCronBody.jobs.map(j => j.name)).toContain("touch_tasks");
+
             const schedulerListRes = await app.request("/api/admin/cron", { headers: authHeaders });
             expect(schedulerListRes.status).toBe(200);
             const schedulerList = await schedulerListRes.json() as { jobs: Array<{ id: string }> };
