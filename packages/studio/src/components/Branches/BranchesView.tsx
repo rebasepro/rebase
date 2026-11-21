@@ -195,7 +195,7 @@ export function BranchesView() {
         <div className="flex h-full w-full overflow-hidden bg-surface-card">
             {/* ── Branch List ── */}
             <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
-                <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
+                <div className={cls("flex items-center justify-between px-4 h-14 shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
                         <GitBranchIcon size={iconSize.small} className="text-primary"/>
                         <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_branches")}</Typography>
@@ -276,7 +276,7 @@ export function BranchesView() {
                 ) : (
                     <>
                         {/* Header */}
-                        <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-surface-card min-h-[56px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-5 h-14 shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"/>
                                 <div className="min-w-0">

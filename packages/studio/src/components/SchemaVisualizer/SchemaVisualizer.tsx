@@ -273,7 +273,7 @@ duration: 400 }
                     {/* Sidebar header */}
                     <div
                         className={cls(
-                            "flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]",
+                            "flex items-center justify-between px-3 border-b bg-surface-sheet h-[42px] shrink-0",
                             defaultBorderMixin
                         )}
                     >
@@ -316,9 +316,9 @@ duration: 400 }
                                             handleTableSelect(nodeId)
                                         }
                                         className={cls(
-                                            "flex items-center p-1.5 cursor-pointer rounded transition-colors group",
+                                            "flex items-center p-1.5 cursor-pointer rounded-lg transition-colors group",
                                             isSelected
-                                                ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
+                                                ? "bg-surface-active text-text-primary dark:text-text-primary-dark font-medium"
                                                 : "hover:bg-surface-hover text-text-secondary dark:text-text-secondary-dark"
                                         )}
                                     >
@@ -393,9 +393,9 @@ duration: 400 }
                                                     )
                                                 }
                                                 className={cls(
-                                                    "flex items-center p-1.5 cursor-pointer rounded transition-colors",
+                                                    "flex items-center p-1.5 cursor-pointer rounded-lg transition-colors",
                                                     isSelected
-                                                        ? "bg-primary/10 text-primary dark:bg-primary/20"
+                                                        ? "bg-surface-active text-text-primary dark:text-text-primary-dark font-medium"
                                                         : "hover:bg-surface-hover text-text-disabled dark:text-text-disabled-dark"
                                                 )}
                                             >
@@ -486,7 +486,7 @@ duration: 400 }
                     {/* Toolbar */}
                     <div
                         className={cls(
-                            "flex items-center justify-between pr-2 border-b bg-surface-card min-h-[46px]",
+                            "flex items-center justify-between pr-2 border-b bg-surface-sheet h-[42px] shrink-0",
                             defaultBorderMixin
                         )}
                     >

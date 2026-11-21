@@ -1064,7 +1064,7 @@ parentEntityIds,
             than sitting third behind two unlabelled developer tools. The row
             disappears entirely when there is nowhere else to go. */}
         {hasAdditionalViews && <div className={cls(
-            "h-10 shrink-0 flex items-stretch border-b px-2 min-w-0",
+            "shrink-0 flex items-stretch border-b px-2 min-w-0",
             ENTITY_VIEW_TAB_BAR_CLASS,
             defaultBorderMixin
         )}>

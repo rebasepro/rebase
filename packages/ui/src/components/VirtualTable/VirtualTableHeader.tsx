@@ -107,7 +107,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
         return (
             <ErrorBoundary>
                 <div
-                    className={cls("flex py-0 px-3 h-full text-xs uppercase font-semibold relative select-none items-center",
+                    className={cls("flex py-0 px-3 h-full text-xs font-medium relative select-none items-center",
                         isDragging
                             ? "bg-primary-bg"
                             : "bg-surface-sheet",

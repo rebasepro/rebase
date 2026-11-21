@@ -349,8 +349,8 @@
     /* The one surface that goes DOWN the ladder on purpose: a code well, a
        query, a log tail, a connection string, recessed into its card. */
     --surface-well: #f4f5f7;
-    --hairline: rgb(0 0 0 / 0.08);
-    --hairline-strong: rgb(0 0 0 / 0.13);
+    --hairline: rgb(0 0 0 / 0.06);
+    --hairline-strong: rgb(0 0 0 / 0.12);
 }
 
 .dark,
@@ -368,9 +368,9 @@
     --surface-field: rgb(255 255 255 / 0.065);
     --surface-field-hover: rgb(255 255 255 / 0.095);
     --surface-hover: rgb(255 255 255 / 0.06);
-    --surface-active: rgb(255 255 255 / 0.09);
+    --surface-active: rgb(255 255 255 / 0.095);
     --surface-scrim: rgb(0 0 0 / 0.6);
     --surface-well: #090a0c;
-    --hairline: rgb(255 255 255 / 0.08);
-    --hairline-strong: rgb(255 255 255 / 0.14);
+    --hairline: rgb(255 255 255 / 0.05);
+    --hairline-strong: rgb(255 255 255 / 0.12);
 }

@@ -157,7 +157,7 @@ export const DefaultAppBar = function DefaultAppBar({
         <div
             style={style}
             role="banner"
-            className={cls("w-full h-14 transition-all ease-in duration-75 absolute top-0 max-w-full overflow-x-auto no-scrollbar",
+            className={cls("w-full h-12 transition-all ease-in duration-75 absolute top-0 max-w-full overflow-x-auto no-scrollbar",
                 "flex flex-row gap-2 px-4 items-center",
                 "backdrop-blur-sm bg-surface-frame/90",
                 {

@@ -98,7 +98,7 @@ export function SearchBar({
                 className)}>
             <div
                 className={cls("absolute p-0 h-full pointer-events-none flex items-center justify-center top-0", iconPaddingClass)}>
-                {loading ? <CircularProgress size={"smallest"}/> : <SearchIcon className={"text-text-disabled dark:text-text-disabled-dark"} size={size === "smallest" ? 14 : size === "small" ? 18 : 20}/>}
+                {loading ? <CircularProgress size={"smallest"}/> : <SearchIcon className={"text-text-disabled dark:text-text-disabled-dark"} size={size === "smallest" || size === "small" ? 14 : 18}/>}
             </div>
             <input
                 value={searchText ?? ""}
@@ -121,7 +121,7 @@ export function SearchBar({
                     "placeholder-text-disabled dark:placeholder-text-disabled-dark",
                     "relative flex items-center transition-all bg-transparent outline-none focus:outline-none focus:ring-0 appearance-none border-none focus:border-transparent",
                     inputPaddingClass, "h-full w-full text-current",
-                    size === "small" ? "text-sm" : "",
+                    size === "smallest" || size === "small" ? "text-xs" : "",
                     expandable ? (active ? "w-[220px]" : "w-[180px]") : "",
                     innerClassName
                 )}
