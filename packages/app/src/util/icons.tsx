@@ -22,6 +22,20 @@ const iconKeysMap: Record<string, string> = iconKeys.reduce((acc: Record<string,
     return acc;
 }, {});
 
+const warnedIconKeys = new Set<string>();
+
+/**
+ * An icon name that names no icon fell through to a placeholder (for a table,
+ * one picked from its slug) with nothing saying why: the scaffold itself shipped
+ * "Article", "Person" and "Category", names from the old Material set. Said once
+ * per name.
+ */
+function warnUnknownIcon(iconKey: string): void {
+    if (warnedIconKeys.has(iconKey)) return;
+    warnedIconKeys.add(iconKey);
+    console.warn(`[rebase] There is no icon named "${iconKey}", so a placeholder is drawn instead. Icons are Lucide names in PascalCase, such as "FileText" or "User": https://lucide.dev/icons`);
+}
+
 /**
  * Render an icon element from a string key or existing React element.
  *
@@ -47,6 +61,7 @@ export function getIcon(iconKey?: string | React.ReactNode,
         const mappedKey = iconKeysMap[iconKey] || iconKeysMap[lowerKey] || iconKeysMap[slugifiedKey];
 
         if (!mappedKey) {
+            warnUnknownIcon(iconKey);
             return undefined;
         }
 
