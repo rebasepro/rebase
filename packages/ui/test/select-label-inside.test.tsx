@@ -77,6 +77,21 @@ describe("a labelled select", () => {
         expect(insideLabel(filled.container)?.getAttribute("data-shrink")).toBe("true");
     });
 
+    it("keeps a value drawn by renderValue on one 20px line, so a chip cannot grow the box", () => {
+        // jsdom has no layout, so this pins the class that holds the line; the
+        // admin e2e `form-control-height` measures the result beside a text field.
+        render(
+            <Select label="Status" size="large" value="draft" onValueChange={() => undefined}
+                renderValue={(value) => <span data-testid="chip" className="py-1.5">{value}</span>}>
+                <SelectItem value="draft">Draft</SelectItem>
+            </Select>
+        );
+        // chip → the primitive's value span → the line that holds it.
+        const line = screen.getByTestId("chip").parentElement?.parentElement;
+        expect(line?.className).toContain("h-5");
+        expect(line?.className).toContain("items-center");
+    });
+
     it("shrinks the label and shows the placeholder once focused", () => {
         const { container } = renderSelect({ placeholder: "Pick one" });
         act(() => screen.getByRole("combobox").focus());
