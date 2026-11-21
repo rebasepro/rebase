@@ -1,0 +1,59 @@
+# Rebase AI Coding Rules
+
+This is a backend-only Rebase project: a REST API, auth, storage and realtime over PostgreSQL, with no admin panel. Its tables are declared in code, in `backend/schema/` — `rebase schema introspect` wrote that directory from the database — and the server serves the tables `backend/schema/index.ts` exports. The database is no longer the schema: change a table in its file, not with SQL.
+
+`.mcp.json` in this directory wires the Rebase MCP server up already — no login, no token: it reads `.rebase/state.json` while `pnpm dev` is running. For the full skills (tables, auth, RLS, functions, storage, deployment), run `pnpm skills:install`, or `rebase skills install --agent <claude|cursor|windsurf|gemini|codex|kiro|copilot>` to pick one.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `pnpm dev` | The backend and the managed development database, together. Saving a file in `backend/schema/` regenerates the schema and the SDK and restarts the backend |
+| `rebase db url` | Print the connection string in use — it pipes straight into `psql` |
+| `rebase schema generate` then `pnpm generate:sdk` | The same loop with `pnpm dev` not running: `backend/schema/` → Drizzle schema and SDK types. The next boot creates what is missing |
+| `rebase db push` | The changes boot leaves alone (a rename, a narrowed type, a removed field, policies no table declares any more), on the managed development database as on your own PostgreSQL. `--dry-run` prints the plan and applies nothing |
+| `rebase db generate` then `pnpm db:migrate` | The production path — write the migration file, then apply it |
+| `pnpm schema:introspect` | Existing tables → `defineTable(...)` files in `backend/schema/`, for a table created outside this project |
+| `pnpm generate:sdk` | Regenerate the typed client in `generated/sdk/` from `backend/schema/`. `pnpm dev` already does this on start and on every save; the script is for CI and for when `pnpm dev` is not running |
+| `pnpm build` then `pnpm start` | Build the deployable bundle, then run it |
+| `pnpm skills:install` | Install the Rebase skills for your assistant |
+| `pnpm example` | Run `scripts/example.ts` against the running backend: a health check, and an SDK call to uncomment |
+| `rebase doctor` | What disagrees between `backend/schema/`, the generated schema and the live database — run this before guessing |
+| `rebase verify` | After every schema edit, and in CI: a table the server would refuse, a `rls` that does not compile, migrations behind the tables. `--json` names each file, path and fix |
+| `rebase resources --write` | After declaring a database, bucket or topic in `backend/resources.ts`: regenerate `rebase.resources.json` and commit it (`pnpm build` does this too) |
+| `pnpm deploy` | Deploys this project. Never run it; see below |
+
+## Never
+
+- **Never create or change a table in code, and never write SQL as the database owner against application tables.** A table is a file in `backend/schema/` (core rule 1), and one that already exists gets its file from `pnpm schema:introspect`. `rebase.sql()` runs as the owner — no row-level security, validation or hooks — so it is for server work that genuinely needs every row, and for reading a column marked `.private()`, which the API never returns. Prefer the SDK where it fits: `aggregate()` with `countDistinct`, `mode`, `percentile`, `distinct` and groups by `lower(…)`, `day(…)` or `unnest(tags)`; `fingerprint()` instead of hashing a table; `updateMany` and `createMany` (one statement for the batch). For anything else, write the SQL **as the caller**: `getSql(c)` in a function runs one statement in the caller's transaction under the same row-level security as the SDK, read-only unless `{ write: true }`. The query text is yours and every value goes in `params` (`$1`, `$2`, …) — never interpolate into the string.
+- **Never deploy.** `pnpm deploy`, `rebase cloud deploy`, `firebase deploy`, `gcloud run deploy` — print the command and let the human run it, even when the task list ends in "deploy" and the tests are green.
+- **`.env` is yours to change only for local settings.** It holds generated secrets and the connection string, and it is the only file the backend reads its settings from (there is no `.env.local`). Change a local switch the task needs (`AUTH_MAGIC_LINK=true`, `FRONTEND_URL`, `REBASE_FUNCTIONS_TIMEOUT_MS`) one line at a time and say which; never rewrite, print or rotate `DATABASE_URL`, `JWT_SECRET` or `REBASE_SERVICE_KEY`. Document a new variable in `.env.example`.
+- **Never edit `backend/src/schema.generated.ts`.** It is overwritten by `rebase schema generate`; `backend/schema/` is the source.
+- **Never edit `rebase.resources.json`.** It is generated from `backend/resources.ts` — declare there, then `rebase resources --write`.
+- **Never pass `--allow-destructive`** to anything pointed at a database that is not the local development one. It drops columns and tables.
+
+## Core rules
+
+1. **Schema-as-code**: a table is `backend/schema/<table>.ts` — `export const posts = defineTable("posts", { columns, relations, rls })` with `col.*` and `rel.*` from `@rebasepro/server/schema` — exported from `backend/schema/index.ts`. Only what `index.ts` exports is served; a `defineTable` it does not export is an error. Columns are nullable until `.notNull()`. A foreign key is a `rel.belongsTo(() => other)` beside its column. To remove a table, delete its file and its export. Never hand-edit generated schemas or Postgres tables.
+2. **`rls` is required on every table**: a list of rules, `"admin-only"`, or `"inherit"` for the `defaultRls` that `index.ts` exports. It is the whole authorization model, so read what introspection wrote for each table before anyone but an admin needs its rows. A policy the database already had and no table declares stays in force: `rebase db push --dry-run` lists those, and `rebase db push --prune-policies` drops them.
+3. **Applying a schema change**: while `pnpm dev` is running, saving a file in `backend/schema/` is the whole step — it regenerates `backend/src/schema.generated.ts` and the SDK types in `generated/sdk/`, restarts the backend, and boot creates the tables and columns that are missing. With `pnpm dev` stopped, that is `rebase schema generate` and `pnpm generate:sdk`. `rebase db push` is only for what boot deliberately leaves alone — a renamed column, a narrowed type, a removed column — on the managed development database as on your own PostgreSQL. In production the pair is `rebase db generate` then `pnpm db:migrate`.
+4. **Storage is not under row-level security.** `backend/storage.ts` exports `storageAuthorize`, the whole access model for files, and a production deployment with file storage enabled refuses to boot without one. Change the rule there to match your application; do not delete it.
+5. **Use the SDK**: server-side that is `rebase.dataAsAdmin.<table>` for work done as the service identity, or `getDriver(c)` inside a function when the read should run as the caller. The server client has no plain `data` accessor — it is omitted precisely so that the choice of identity is written down.
+6. **Guard every custom route**: routes in `backend/functions/` are mounted **without** an auth requirement — webhook receivers need that — so each one is public until you guard it. Import `requireAuth` / `requireAdmin` from `@rebasepro/server/functions` and pass them in the route's own middleware slot (`app.post("/", requireAuth, handler)`), not via `app.use()`, which only covers routes declared below it. Reading `getUser(c)` is not a guard: an anonymous caller gets `undefined` and the handler still runs. See `backend/functions/hello.ts` for all three tiers.
+7. **In `backend/functions/`, always import from `@rebasepro/server/functions`** — never from `@rebasepro/server`. Both work today; the subpath is the portable one, and it also gives you the typed context accessors (`getUser`, `getDriver`, `requireDriver`) instead of casting `c.get("user")`. The package root is for a server entrypoint, not for route handlers.
+8. **Never read `process.env` at the top of a function file.** A module-scope read that comes back undefined throws at import time, and the loader reports that as a *skipped function* — the route simply 404s with no error attached to it. Read configuration inside the handler with `requireEnv(c, "NAME")`, or build a client once with `lazyResource(env => new Client(env.KEY))`.
+9. **Work that outlives the response goes in `waitUntil(c, promise)`**, not a floating promise; `waitUntil(promise)` where there is no request. A floating promise is dropped when the process shuts down mid-deploy; `waitUntil` is what a graceful shutdown waits for.
+10. **Call your own routes from the browser with the client's `functions.invoke`**, never `fetch` with a token taken from `client.auth.getSession()`. The session is a snapshot that every renewal replaces, about hourly, so a kept token is refused once it expires and the app looks signed out. `invoke` renews before sending and retries once on a 401. For a request that is not to a function, ask for the token each time with `await client.auth.getAccessToken()`.
+
+## Backend runtime (`runtime: "managed"` on Rebase Cloud)
+
+`rebase.json` declares the backend as `runtime: "managed"`: Rebase Cloud runs this bundle on its own image, and nothing about that image can be changed. Plan backend features against these limits, from [Managed backend runtime](https://rebase.pro/docs/deployment/managed-runtime/). Where that page marks something **not settled**, say so instead of guessing.
+
+- **Node 22 on Debian slim, `linux`/`x64`; no native modules.** A native module (`sharp`, `canvas`, `bcrypt`, anything with a `.node` binary) makes `rebase cloud deploy` refuse the bundle. WebAssembly works, and so does `child_process` for a `linux`/`x64` binary an npm package ships inside its tarball. Install scripts never run, so a binary a package downloads in `postinstall` never arrives, and the image has no `ffmpeg`, Python or compiler. For work that needs one, call a hosted API, or ask the human about `runtime: "custom"`.
+- **Private npm packages** install through the project's `.npmrc`, with every token written as `${NPM_TOKEN}` and set by the human with `rebase cloud env set NPM_TOKEN=… --secret`. A literal token in `.npmrc` fails the build.
+- **Memory and disk belong to one instance, until the next deploy.** A module-level `new Map()` cache survives between requests on one instance, but is not shared between instances and is lost on every deploy and restart. `/tmp` is writable, with the same limits. Keep anything worth keeping in the database or in storage.
+- **Requests:** a function times out after 30 seconds (`504 FUNCTION_TIMEOUT`, `REBASE_FUNCTIONS_TIMEOUT_MS`, at most 10 minutes), and a request body over 10 MiB gets a `413` (`REBASE_MAX_BODY_SIZE`). Pass `getSignal(c)` to `fetch`. Put longer work in a job or in `waitUntil`.
+- **Instances:** at least one always runs; nothing scales a backend to zero.
+- **Outbound network:** HTTP and HTTPS (ports 80 and 443) to anywhere, plus 465, 587 and 993 for mail. Every other port is blocked, so a database or Redis outside Rebase Cloud cannot be reached. Outbound traffic comes from one fixed IP, shared by all projects and listed on that page, for third-party allowlists.
+- **Configuration:** the human sets variables with `rebase cloud env set NAME=value` (`--secret` makes a value write-only). A change applies at the next deploy. Read variables inside the handler, with `requireEnv(c, "NAME")`.
+- **Generated files** (audio, images, exports) go to storage: `rebase.storage.putObject({ file, key })`. A key under `public/` is served to anyone at `/api/storage/file/<key>`. Any other key needs a download token. The project needs `rebase cloud storage create` once, plus a `storageAuthorize` hook that allows the write.

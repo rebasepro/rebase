@@ -156,7 +156,7 @@ peut pas exécuter.
 
 ## Édition dans l'éditeur de collections
 
-En développement, l'[éditeur de collections](/docs/studio/#built-in-studio-tools)
+En développement, l'[éditeur de collections](/docs/studio/)
 permet également d'éditer les collections Firestore : la sauvegarde réécrit sur
 place l'appel `defineFirestoreCollection({...})` de la collection dans
 `frontend/src/cms`, en ne modifiant que ce que vous avez édité. Les fonctions,

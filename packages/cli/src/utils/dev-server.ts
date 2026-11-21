@@ -11,6 +11,7 @@ import fs from "fs";
 import path from "path";
 
 import { findProjectRoot } from "./project";
+import { isOwnProcessAlive, readRunningDev } from "./dev-run";
 
 /**
  * The address `rebase dev` is starting its backend on, handed to the
@@ -51,53 +52,64 @@ function readText(file: string): string | null {
     }
 }
 
-/** Is *some* process with this pid running? EPERM means it is, as someone else. */
-function processAlive(pid: number): boolean {
-    try {
-        process.kill(pid, 0);
-        return true;
-    } catch (error) {
-        return (error as NodeJS.ErrnoException).code === "EPERM";
-    }
-}
-
 /**
- * The address of this project's backend while it runs, or `null`.
+ * This project's backend while it runs — where it answers, and which record
+ * says so — or `null`.
  *
- * From `.rebase/state.json`, which the server writes when it binds — under
- * `rebase dev` and `rebase start` alike — and only while the pid it names is
- * alive: a backend that was killed leaves the file behind.
+ * One answer for every command that looks for the local backend. First the
+ * running `rebase dev`'s own record (`.rebase/dev.json`, see `dev-run.ts`):
+ * the port its backend announced, while that `rebase dev` is alive. Then the
+ * `.rebase/state.json` the server writes when it binds — under `rebase dev`
+ * and `rebase start` alike — while the pid it names is alive: a backend that
+ * was killed leaves the file behind. `.rebase-dev-url` is never one of them:
+ * it is for scripts, and it outlives a killed `rebase dev` with nothing in it
+ * to say so.
  */
-export function runningBackendUrl(projectRoot: string): string | null {
+export function runningBackend(projectRoot: string): { url: string; pid: number; source: "rebase dev" | "state" } | null {
+    const dev = readRunningDev(projectRoot);
+    if (dev?.backendUrl) return { url: dev.backendUrl, pid: dev.pid, source: "rebase dev" };
+
     const state = readText(path.join(projectRoot, ".rebase", "state.json"));
     if (!state) return null;
     try {
         const parsed: unknown = JSON.parse(state);
         if (typeof parsed !== "object" || parsed === null || !("pid" in parsed)) return null;
         const pid = parsed.pid;
-        if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0 || !processAlive(pid)) return null;
-        if ("baseUrl" in parsed && typeof parsed.baseUrl === "string" && parsed.baseUrl.trim()) return parsed.baseUrl.trim();
+        if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0 || !isOwnProcessAlive(pid)) return null;
+        if ("baseUrl" in parsed && typeof parsed.baseUrl === "string" && parsed.baseUrl.trim()) {
+            return { url: parsed.baseUrl.trim(), pid, source: "state" };
+        }
         const port = "port" in parsed ? portOf(parsed.port) : null;
-        return port !== null ? `http://localhost:${port}` : null;
+        return port !== null ? { url: `http://localhost:${port}`, pid, source: "state" } : null;
     } catch {
         return null;
     }
 }
 
+/** The address of this project's backend while it runs, or `null`: {@link runningBackend}'s URL. */
+export function runningBackendUrl(projectRoot: string): string | null {
+    return runningBackend(projectRoot)?.url ?? null;
+}
+
 /**
  * The URL `rebase dev` serves this project on, and how that is known:
  *
- *   - `running` — the URL a running dev wrote to `.rebase-dev-url`;
- *   - `recorded` — the port the last run left in `.rebase/state.json` or
- *     `.rebase-dev-port` (both outlive a dev that did not shut down cleanly);
+ *   - `running` — this project's backend is up there ({@link runningBackend});
+ *   - `recorded` — the address the last run left behind: the URL it printed
+ *     into `.rebase-dev-url`, the port in `.rebase/state.json` or
+ *     `.rebase-dev-port` (all three outlive a dev that did not shut down
+ *     cleanly, so none of them is proof that anything is serving);
  *   - `derived` — nothing is recorded, so the port it derives for this path.
  *
  * Asked only to describe where dev is; a `PORT` in the shell would move the
  * next run, and is not something a stopped dev left behind.
  */
 export function devServerUrl(projectRoot: string): { url: string; source: "running" | "recorded" | "derived" } {
-    const running = readText(path.join(projectRoot, ".rebase-dev-url"));
-    if (running) return { url: running, source: "running" };
+    const running = runningBackend(projectRoot);
+    if (running) return { url: running.url, source: "running" };
+
+    const printed = readText(path.join(projectRoot, ".rebase-dev-url"));
+    if (printed) return { url: printed, source: "recorded" };
 
     const state = readText(path.join(projectRoot, ".rebase", "state.json"));
     if (state) {

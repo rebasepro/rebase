@@ -9,9 +9,12 @@ import {
     parseAppAddress,
     parseFrameAncestor,
     reservedPrefixFor,
+    validateStaticRedirect,
     validateStaticRoute,
+    type AppAddress,
     type RebaseBundleManifest,
     type RebaseBundleStatic,
+    type RebaseStaticRedirect,
     type RebaseStaticRoute,
     type TableHooks
 } from "@rebasepro/types";
@@ -100,6 +103,13 @@ export interface LoadedStaticApp {
      * {@link RebaseBundleStatic.frameAncestors}. Absent when it names none.
      */
     frameAncestors?: string[];
+    /**
+     * Requests answered with a redirect before the build's files — see
+     * {@link RebaseBundleStatic.redirects}. Absent when it declares none.
+     */
+    redirects?: RebaseStaticRedirect[];
+    /** Serve `x.html` at `/x` — see {@link RebaseBundleStatic.cleanUrls}. Absent unless `true`. */
+    cleanUrls?: boolean;
 }
 
 /**
@@ -311,13 +321,15 @@ export function loadBundle(bundleDir: string): LoadedBundle {
         cronsDir: resolveEntry(entry.crons, "crons"),
         uiConfigFile: resolveEntry(entry.uiConfig, "uiConfig"),
         staticApps: (entry.static ?? [])
-            .map(item => {
+            .map((item): LoadedStaticApp | undefined => {
                 // Before the directory check, so a bad hostname is reported
                 // even on an app whose build is missing.
                 const host = readStaticAppHost(item);
                 refuseReservedStaticPath(item);
                 const routes = readStaticAppRoutes(item);
                 const frameAncestors = readStaticAppFrameAncestors(item);
+                const redirects = readStaticAppRedirects(item, host);
+                const cleanUrls = readStaticAppCleanUrls(item);
                 const resolved = resolveEntry(item.dir, `static app "${item.path}"`);
                 if (!resolved) return undefined;
                 return {
@@ -328,7 +340,9 @@ export function loadBundle(bundleDir: string): LoadedBundle {
                     dir: resolved,
                     spa: item.spa !== false,
                     ...(routes ? { routes } : {}),
-                    ...(frameAncestors ? { frameAncestors } : {})
+                    ...(frameAncestors ? { frameAncestors } : {}),
+                    ...(redirects ? { redirects } : {}),
+                    ...(cleanUrls ? { cleanUrls } : {})
                 };
             })
             .filter((item): item is LoadedStaticApp => item !== undefined)
@@ -433,6 +447,49 @@ function readStaticAppFrameAncestors(item: RebaseBundleStatic): string[] | undef
         return result.origin;
     });
     return valid.length > 0 ? valid : undefined;
+}
+
+/**
+ * Read a static app's redirects, refusing one the CLI would have refused.
+ *
+ * Refused rather than dropped, for the reason a bad route is: the CLI and
+ * this check are the same function (`validateStaticRedirect`), so a bundle
+ * carrying a bad redirect was written by something else, and a redirect
+ * quietly skipped is an old URL answered with a 404 or the app's index.html.
+ * Absent, or an empty list, is `undefined`.
+ */
+function readStaticAppRedirects(item: RebaseBundleStatic, host: string | undefined): RebaseStaticRedirect[] | undefined {
+    const redirects: unknown = item.redirects;
+    if (redirects === undefined) return undefined;
+    const name = item.name ?? path.basename(item.dir);
+    const refuse = (problem: string): never => {
+        throw new BundleError(
+            `Static app "${name}" (at ${item.path}) declares ${problem}`,
+            "Fix the app's `redirects` in rebase.json and rebuild with `rebase build`."
+        );
+    };
+    if (!Array.isArray(redirects)) return refuse(`redirects that are not a list: ${JSON.stringify(redirects)}.`);
+    const address: AppAddress = host !== undefined ? { host, path: item.path } : { path: item.path };
+    const valid = redirects.map((redirect: unknown) => {
+        const result = validateStaticRedirect(redirect, address);
+        if (!result.ok) {
+            return refuse(`a redirect this runtime cannot serve, ${JSON.stringify(redirect)}: ` +
+                `${result.field ? `its ${result.field}` : "it"} ${result.reason}.`);
+        }
+        return result.redirect;
+    });
+    return valid.length > 0 ? valid : undefined;
+}
+
+/** Read a static app's `cleanUrls`, refusing anything but a boolean. */
+function readStaticAppCleanUrls(item: RebaseBundleStatic): boolean {
+    const cleanUrls: unknown = item.cleanUrls;
+    if (cleanUrls === undefined || typeof cleanUrls === "boolean") return cleanUrls === true;
+    const name = item.name ?? path.basename(item.dir);
+    throw new BundleError(
+        `Static app "${name}" (at ${item.path}) declares cleanUrls ${JSON.stringify(cleanUrls)}, which is not true or false.`,
+        "Fix the app's `cleanUrls` in rebase.json and rebuild with `rebase build`."
+    );
 }
 
 /**
@@ -617,6 +674,11 @@ export function createZeroCodeBundle(dir: string = process.cwd()): LoadedBundle 
  * build && rebase start` and by nothing in `rebase dev`, which printed only
  * "No frontend/ directory found": such a site could not be developed against
  * the dev server at all. Exported for the test.
+ *
+ * Its `redirects` and `cleanUrls` are served as a bundle's are, through the
+ * same validator, so a redirect behaves in `rebase dev` as it will deployed.
+ * An app whose directory holds no `index.html` is served when it declares
+ * redirects: an app that only sends a hostname elsewhere has no page.
  */
 export function sourceStaticApps(projectRoot: string): LoadedStaticApp[] {
     let manifest: unknown;
@@ -635,18 +697,37 @@ export function sourceStaticApps(projectRoot: string): LoadedStaticApp[] {
         if (typeof app.build === "string" && app.build.trim() !== "") continue;
         const root = path.resolve(projectRoot, app.root);
         const output = path.resolve(projectRoot, app.output);
-        if (root !== output || !fs.existsSync(path.join(output, "index.html"))) continue;
+        const declaresRedirects = Array.isArray(app.redirects) && app.redirects.length > 0;
+        if (root !== output || !fs.existsSync(declaresRedirects ? output : path.join(output, "index.html"))) continue;
         const address = parseAppAddress(typeof app.path === "string" ? app.path : "/");
         if (!address.ok) {
             logger.warn(`Static app "${name}" is not served by the dev server: its path ${address.reason}.`);
             continue;
         }
         if (reservedPrefixFor(address.address.path)) continue;
+        const host = address.address.host?.toLowerCase();
+        const at: AppAddress = host ? { host, path: address.address.path } : { path: address.address.path };
+        const redirects: RebaseStaticRedirect[] = [];
+        let refused: string | undefined;
+        for (const [index, redirect] of (Array.isArray(app.redirects) ? app.redirects : []).entries()) {
+            const result = validateStaticRedirect(redirect, at);
+            if (!result.ok) {
+                refused = `redirects[${index}]${result.field ? `.${result.field}` : ""} ${result.reason}`;
+                break;
+            }
+            redirects.push(result.redirect);
+        }
+        if (refused !== undefined) {
+            logger.warn(`Static app "${name}" is not served by the dev server: its ${refused}.`);
+            continue;
+        }
         out.push({
             path: address.address.path,
-            ...(address.address.host ? { host: address.address.host.toLowerCase() } : {}),
+            ...(host ? { host } : {}),
             dir: output,
-            spa: app.spa !== false
+            spa: app.spa !== false,
+            ...(redirects.length > 0 ? { redirects } : {}),
+            ...(app.cleanUrls === true ? { cleanUrls: true } : {})
         });
     }
     return out.sort(compareStaticApps);

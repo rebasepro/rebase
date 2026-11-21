@@ -19,7 +19,7 @@
  * Change `COLLECTION`, the field lists, and `TITLE_FIELD` to your own.
  */
 import React, { useState } from "react";
-import type { AppView } from "@rebasepro/cms-types";
+import type { AppView } from "@rebasepro/cms";
 import { CollectionPanel, RecordForm } from "@rebasepro/cms";
 import { SplitView } from "@rebasepro/ui";
 

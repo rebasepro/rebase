@@ -8,6 +8,7 @@ import { EntityReference, EntityRelation, Entity } from "@rebasepro/cms-types";
 import { getTableBindingForProperty } from "./table_bindings";
 
 import { PropertyPreview } from "../../preview";
+import { isDocumentProperty } from "../../preview/document_summary";
 import { getPreviewSizeFrom } from "../../preview/util";
 
 import type { ZodTypeAny } from "zod";
@@ -301,6 +302,11 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
         // editor's own trigger, which the cell may clip.
         const cellRef = useRef<HTMLDivElement>(null);
 
+        // A JSON document is one line in a cell: its top-level keys, not the
+        // tree. The tree is a wall a row cannot hold; the cell's expand opener
+        // and the record show the whole value.
+        const compactDocument = isDocumentProperty(property) || undefined;
+
         // What the cell shows at rest. A picker renders the same node as its
         // trigger, so selecting the cell changes its frame and nothing else.
         const preview = <PropertyPreview width={width}
@@ -309,6 +315,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             value={internalValue}
             property={property}
             size={getPreviewSizeFrom(size)}
+            compact={compactDocument}
         />;
 
         let openerKind: TableCellOpenerKind | undefined;
@@ -379,6 +386,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                     property={property}
                     value={internalValue}
                     size={getPreviewSizeFrom(size)}
+                    compact={compactDocument}
                 />
             </EntityTableCell>;
         }

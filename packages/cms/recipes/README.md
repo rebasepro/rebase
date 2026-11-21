@@ -24,7 +24,7 @@ always match the version you have installed.
 | [Approval queue](approval-queue.tsx) | The rows waiting for review, Approve and Reject on every row and card (`entityActions` through `collectionOverrides`), and a live count (`useRowCount`). |
 | [Master-detail](master-detail.tsx) | `SplitView`: a `CollectionPanel` (`fields`, `onRowClick`, `highlightedIds`) beside the picked row's `RecordForm` (`fields`); in a narrow container the form covers the list. |
 | [Calendar view](calendar-view.tsx) | A new view mode for a collection: rows on a month grid. |
-| [Orders dashboard](orders-dashboard.tsx) | A total (`useRowCount`) and a count per status (`useAggregate`), drawn with `KpiTile` and `BarChart`; each bar opens the collection filtered to it. |
+| [Orders dashboard](orders-dashboard.tsx) | A total (`useRowCount`) and a count per status (`useAggregate`), drawn with `KpiTile` and `BarChart`; the total opens the collection (`KpiTile` `href` + `onClick`) and each bar opens it filtered to that status. |
 | [Custom login screen](custom-login.tsx) | Replacing a built-in screen through `<Rebase components>`. |
 
 ## Which part for which job
@@ -151,8 +151,8 @@ The override names are `Shell.AppBar`, `Shell.Drawer`, `HomePage`,
 `HomePage.CollectionCard`, `Auth.LoginView`, `Collection.View`,
 `Collection.Table`, `Collection.Card`, `Collection.EmptyState`,
 `Collection.Actions`, `Entity.Form`, `EditView.FormActions`, `Entity.SidePanel`
-and a few more: the full list is `OverridableComponentName` in
-`@rebasepro/cms-types`. A collection can override any `Collection.*` or
+and a few more: the full list is the type `OverridableComponentName`,
+exported by `@rebasepro/cms`. A collection can override any `Collection.*` or
 `Entity.*` part for itself alone with `admin.components`.
 
 ## Copying a built-in part

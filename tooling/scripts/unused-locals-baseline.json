@@ -7,7 +7,6 @@
   "packages/app/src/util/useStorageUploadController.tsx::authController": 1,
   "packages/cli/src/commands/cloud/env.ts::projectRef": 1,
   "packages/cli/templates/template/scripts/example.ts::rebase": 1,
-  "packages/cms/src/collection_editor/useLocalCollectionsConfigController.tsx::sourceEditorEnabled": 1,
   "packages/cms/src/components/CollectionTableBinding/CollectionTableBinding.tsx::updateSize": 1,
   "packages/cms/src/components/CollectionTableBinding/fields/TableRelationField.tsx::relation": 1,
   "packages/cms/src/components/CollectionTableBinding/internal/EntityTableCell.tsx::showExpandIcon": 1,

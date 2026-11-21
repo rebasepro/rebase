@@ -2,7 +2,7 @@ import type { AdminCollection, Property } from "@rebasepro/cms-types";
 import type { EntityStatus } from "@rebasepro/types";
 import type { ResolvedFormField, ResolvedFormSection } from "@rebasepro/app";
 import React, { useMemo, useRef } from "react";
-import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
+import { getFormFieldKeys, resolveFormLayout, useTranslation } from "@rebasepro/app";
 import { cls, defaultBorderMixin, Skeleton, Typography } from "@rebasepro/ui";
 import { PropertyKeyHint } from "../../components/PropertyKeyHint";
 import { isSelfLabellingProperty, spanClass } from "./FieldBlock";
@@ -52,6 +52,7 @@ export function EntityFormSkeleton({
     mode = "edit"
 }: EntityFormSkeletonProps) {
 
+    const { t } = useTranslation();
     const reading = mode === "read";
     const fieldKeys = getFormFieldKeys(collection);
     const layout = useMemo(() => resolveFormLayout({
@@ -71,7 +72,7 @@ export function EntityFormSkeleton({
         ? layout.sections
         : [...layout.sections, {
             key: "__rail",
-            title: "Settings",
+            title: t("settings_heading"),
             collapsible: false,
             collapsed: false,
             fields: layout.sidebar

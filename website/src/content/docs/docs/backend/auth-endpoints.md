@@ -62,7 +62,8 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 |--------|------|-------------|
 | `GET` | `/api/admin/users` | List users (paginated). `?search=` matches a case-insensitive part of the email or display name. It also matches any role the user holds, and the uid |
 | `GET` | `/api/admin/users/pick` | The user picker's read: `uid`, `displayName`, `email` and `photoURL` per user, nothing else. Takes `?search=`, `?limit=` (25 by default) and `?offset=`, or `?ids=a,b` for the users a stored value names. Answers `users:read`, and also anyone who may write a collection with a [`userSelect`](/docs/collections/properties/) field — so an editor can fill one in. A rule written as raw SQL (`using` / `withCheck` the policy model cannot read) cannot be judged ahead, so it counts as refusing here: on such a collection only `users:read` holders can pick. Anyone else gets `403 SCOPE_MISSING` |
-| `POST` | `/api/admin/users` | Create a user |
+| `POST` | `/api/admin/users` | Create a user. `invite: false` with no `password` creates it with no password and sends nothing |
+| `POST` | `/api/admin/users/import` | Import accounts from another system, keeping their ids. See [Importing accounts](#importing-accounts) |
 | `GET` | `/api/admin/users/:uid` | Read one user |
 | `PUT` | `/api/admin/users/:uid` | Update one user. `{ disabled: true }` switches the account off without deleting it: every sign-in and refresh is refused (`ACCOUNT_DISABLED`), its sessions end and every token it holds is refused; `false` switches it back on |
 | `DELETE` | `/api/admin/users/:uid` | Delete one user. Their sessions end, and every access token they hold is refused from that request on |
@@ -72,6 +73,58 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 | `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).
+
+### Importing accounts
+
+`POST /api/admin/users/import` creates accounts that already exist in another
+system, under the ids they have there, so every row that names one of them
+still names the same account. It needs `users:write`, like `POST /api/admin/users`.
+
+```json
+{
+  "users": [
+    { "id": "5b0a3c9e-21f4-4d3b-8a6e-7c1d2e3f4a5b", "email": "ada@example.com", "displayName": "Ada",
+      "createdAt": "2024-05-02T08:30:00Z", "emailVerified": true, "roles": ["editor"] }
+  ],
+  "dryRun": false
+}
+```
+
+- **`id`** is kept, and is optional. A uuid is the common case; any id of
+  letters, digits and `_ - . : |`, starting with a letter or digit, up to 128
+  characters, fits too (Firebase, Auth0, Clerk ids). `service`, `anonymous`,
+  `anon` and `default` are refused, as is anything else: `400 INVALID_ID` for
+  that account. A users table whose `id` column is a `uuid` takes only uuids.
+- **`email`** is required. `displayName`, `photoUrl`, `createdAt` (ISO 8601) and
+  `roles` are optional; `emailVerified` is `false` unless given. An unverified
+  account is confirmed by the first magic link or reset it follows, and cannot
+  be signed into by a provider until then.
+- **No password, no email.** A `password` or `passwordHash` field fails that
+  account, and nothing is mailed. The account signs in by magic link, an email
+  code, a provider, or a password reset.
+- **Nothing is updated.** An account whose id is taken is `skipped` with
+  `ID_EXISTS`, one whose email is taken with `EMAIL_EXISTS` (an earlier account
+  in the same request included). Running the same import twice is safe.
+- **No role above the caller's own**, as on `POST /api/admin/users`, and
+  `beforeUserCreate` runs for each account and may refuse it.
+- **At most 100 accounts per request** (`400 TOO_MANY_USERS` above that).
+  `dryRun: true` runs every check and writes nothing.
+
+The answer is `200` with one outcome per account, in order:
+
+```json
+{
+  "dryRun": false, "created": 1, "skipped": 1, "failed": 1,
+  "results": [
+    { "index": 0, "status": "created", "uid": "5b0a3c9e-…", "email": "ada@example.com" },
+    { "index": 1, "status": "skipped", "uid": "…", "email": "bob@example.com", "code": "EMAIL_EXISTS", "message": "…" },
+    { "index": 2, "status": "failed", "email": "eve@example.com", "code": "INVALID_ID", "message": "…" }
+  ]
+}
+```
+
+`rebase users import <file>` sends a CSV or JSON file this way, 100 accounts
+at a time, and `client.admin.importUsers(users, { dryRun })` is the SDK's call.
 
 ### Password policy
 

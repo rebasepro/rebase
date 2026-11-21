@@ -131,6 +131,7 @@ a table reaches none of this. See [Roles and scopes](/docs/backend/roles-and-sco
 | `POST` | `/api/admin/bootstrap` | none, and only while no admin exists | Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 | `GET` | `/api/admin/users` | `users:read` | User management |
 | `POST` | `/api/admin/users` | `users:write` | User management. Roles beyond the caller's own are refused |
+| `POST` | `/api/admin/users/import` | `users:write` | [Imports accounts](/docs/backend/auth-endpoints/#importing-accounts) keeping their ids: no password, no email, a taken id or email skipped. At most 100 per request. Roles beyond the caller's own are refused |
 | `GET` | `/api/admin/users/pick` | `users:read`, or write access to a table with a `.userId()` column | The [user picker's read](/docs/backend/auth-endpoints/): id, name, email and avatar only. A table whose write rules are raw SQL does not count |
 | `GET` | `/api/admin/users/:uid` | `users:read` | User management |
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
@@ -314,6 +315,18 @@ One route per file under `backend/functions/`, so the paths come from your
 project. `GET /api/functions` lists them only to a signed-in caller — a
 session, an API key or the service key — and answers anyone else `401`: an
 inventory of a deployment's custom endpoints is not public.
+
+## RPC
+
+<span class="since-badge" data-since="0.35">Since 0.35</span>
+
+| Method | Path | Gate | More |
+|---|---|---|---|
+| `POST` | `/api/rpc/<name>` | the RPC's `access`: none for `"public"` (rate-limited), session for `"authenticated"`; then RLS inside the function. An API key also needs `data:read` (`data:write` for a `write: true` RPC) | [SQL functions as RPC](/docs/backend/rpc/) |
+
+One route per `defineRpc` exported from `backend/schema/index.ts`, so the
+paths come from your project. A name nobody declared answers `404
+RPC_NOT_FOUND`, even when the database has a function of that name.
 
 ## Meta and operations
 

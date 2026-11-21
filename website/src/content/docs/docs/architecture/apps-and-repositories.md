@@ -68,6 +68,17 @@ One process serves all of it: the API at `/api`, the site at `/`, the admin at
 `/admin`. That is the self-hosting story, and a perfectly good small tier on
 Rebase Cloud.
 
+A static app's `path` takes one of two forms:
+
+| `path` | Where the app answers |
+| --- | --- |
+| `"/"`, `"/admin"` | At that path, on every hostname the project is served on. |
+| `"https://www.example.com"`, `"https://admin.example.com/cms"` | Only on that hostname, at the path after it. See [An app on its own hostname](#an-app-on-its-own-hostname). |
+
+The URL form is how a project with one site per domain, such as one Vercel or
+Netlify project per domain, becomes one Rebase project: one static app per
+hostname, all served by the same deploy.
+
 ## Saying where the CMS is
 
 `cms` is the URL path where an app mounts `<RebaseCMS>`. It is optional, it is
@@ -139,9 +150,9 @@ Inference cannot know two things a scaffold's `rebase.json` declares. It names
 the static app `web`, where a scaffold names it `admin`, and it cannot know the
 app's `cms` route. The name does not change: Rebase Cloud registered `web` for
 every project that deployed without a `rebase.json`.
-`rebase apps init --force` keeps the names, `path`, `cms`, `routes` and
-`frameAncestors` of the apps the file it replaces declares, and names an app it
-no longer finds as removed.
+`rebase apps init --force` keeps the names, `path`, `cms`, `routes`,
+`frameAncestors`, <span class="since-badge" data-since="0.35">Since 0.35</span> `redirects` and `cleanUrls` of the apps the file it replaces
+declares, and names an app it no longer finds as removed.
 
 ## An app on its own hostname
 
@@ -349,6 +360,15 @@ can frame a server-rendered page as they can frame the rest of the site.
 Under `rebase dev` the app is served by its own dev server, which knows nothing
 of the routes; call the function at `/api/functions/<name>` there, or try the
 routes against a build with `rebase start`.
+
+## Redirects and clean URLs
+
+<span class="since-badge" data-since="0.35">Since 0.35</span>
+
+A static app takes `redirects` (`{ "from": "/blog/:slug", "to": "/posts/:slug" }`,
+including to another domain) and `cleanUrls: true` (`/x` serves `x.html`). See
+[Redirects and clean URLs](/docs/architecture/redirects-and-clean-urls/), which
+also maps a `vercel.json` onto `rebase.json`.
 
 ## Building and deploying apps
 

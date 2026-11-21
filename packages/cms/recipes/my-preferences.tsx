@@ -16,7 +16,7 @@
  */
 import React from "react";
 import { col, defineTable } from "@rebasepro/types";
-import type { AppView } from "@rebasepro/cms-types";
+import type { AppView } from "@rebasepro/cms";
 import { useAuthController } from "@rebasepro/app";
 import { customizeTable, RecordForm } from "@rebasepro/cms";
 import { Container, Typography } from "@rebasepro/ui";

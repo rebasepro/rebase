@@ -47,4 +47,44 @@ describe("sourceStaticApps", () => {
         dirs.push(root);
         expect(sourceStaticApps(root)).toEqual([]);
     });
+
+    it("carries redirects and cleanUrls, as a bundle would", () => {
+        const root = project({
+            site: {
+                type: "static", root: "site", output: "site", path: "https://www.example.com", cleanUrls: true,
+                redirects: [{ from: "/old", to: "/new", status: 301, extra: true }]
+            }
+        }, ["site/index.html"]);
+        expect(sourceStaticApps(root)).toEqual([{
+            path: "/",
+            host: "www.example.com",
+            dir: path.join(root, "site"),
+            spa: true,
+            redirects: [{ from: "/old", to: "/new", status: 301 }],
+            cleanUrls: true
+        }]);
+    });
+
+    it("serves an app that only redirects, with no index.html", () => {
+        const root = project({
+            apex: {
+                type: "static", root: "apex", output: "apex", path: "https://example.com",
+                redirects: [{ from: "/:path*", to: "https://www.example.com/:path*" }]
+            }
+        }, ["apex/.keep"]);
+        expect(sourceStaticApps(root)).toEqual([{
+            path: "/",
+            host: "example.com",
+            dir: path.join(root, "apex"),
+            spa: true,
+            redirects: [{ from: "/:path*", to: "https://www.example.com/:path*" }]
+        }]);
+    });
+
+    it("leaves out an app whose redirect the CLI would refuse", () => {
+        const root = project({
+            site: { type: "static", root: "site", output: "site", redirects: [{ from: "/:path*", to: "/new/:path*" }] }
+        }, ["site/index.html"]);
+        expect(sourceStaticApps(root)).toEqual([]);
+    });
 });

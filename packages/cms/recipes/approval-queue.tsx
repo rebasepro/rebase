@@ -18,7 +18,7 @@
  * `COLLECTION` / `STATUS_FIELD` and the three values to your own.
  */
 import React, { useMemo } from "react";
-import type { AdminCollection, AppView, EntityAction } from "@rebasepro/cms-types";
+import type { AdminCollection, AppView, EntityAction } from "@rebasepro/cms";
 import type { FilterValues } from "@rebasepro/types";
 import { useRowCount, useRowWrites, useSnackbarController } from "@rebasepro/app";
 import { CollectionPanel } from "@rebasepro/cms";

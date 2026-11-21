@@ -166,6 +166,7 @@
     // validates the @ts-expect-error annotations"; nothing had.
     "packages/server/src/cron/define-cron.test.ts",
     "packages/server/test/auth-config-types.test.ts",
+    "packages/server/test/rpc-args.test.ts", // its @ts-expect-error lines pin what defineRpc refuses at compile time
     // The MCP surface's tests, listed the day they were written rather than
     // after the drift — because the drift had already started. `mcp-oauth-flow`
     // builds an in-memory `OAuthStore` to drive the protocol against, and when

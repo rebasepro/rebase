@@ -296,6 +296,13 @@ export interface RebaseRoutes {
      * was created without `push`.
      */
     push(): Hono<HonoEnv>;
+    /**
+     * The declared SQL functions (`defineRpc`), normally at `/api/rpc`:
+     * `POST /<name>` with a JSON body of named arguments, run as the caller.
+     * Part of the data surface; with no RPC declared, every name answers
+     * `404 RPC_NOT_FOUND`.
+     */
+    rpc(): Hono<HonoEnv>;
 }
 
 /** A route group, by the name `routes` gives it. */
@@ -3078,6 +3085,32 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     dataSurface.use("/*", restRoutes.middleware);
     dataSurface.route("/", tableRegistry.list().length > 0 ? buildActiveDataRouter() : buildEmptyDataStub());
 
+    // The declared SQL functions, `POST /rpc/<name>`: with the data surface,
+    // whose driver they run on. Given as values, they win over what the
+    // `schemaDir` index exports, as `tables` does. Mounted with none declared
+    // too, so a call to an undeclared name answers `RPC_NOT_FOUND`, saying how
+    // to declare one.
+    const declaredRpc = config.rpc ?? declaredTables.rpc ?? [];
+    let rpcSurface: Hono<HonoEnv> | undefined;
+    if (surfaces.data) {
+        const { createRpcRouter } = await import("../rpc/rpc-routes");
+        // `requireAuth: false`: an anonymous caller reaches the router as the
+        // anonymous identity, and each RPC's `access` decides who may call it.
+        const rpcAuth = authAdapter
+            ? createAdapterAuthMiddleware({ adapter: authAdapter, driver: defaultDriver, requireAuth: false, apiKeyStore })
+            : createAuthMiddleware({ driver: defaultDriver, requireAuth: false, serviceKey: internalServiceKey, apiKeyStore });
+        rpcSurface = createRpcRouter({
+            rpc: declaredRpc,
+            auth: rpcAuth,
+            // The caller's one budget, shared with the data API. Each `public`
+            // RPC also has its own limit, inside the router.
+            ...(rateLimitConfig ? { rateLimiter: createDataRateLimiter(rateLimitConfig) } : {})
+        });
+        if (declaredRpc.length > 0) {
+            logger.info("Serving declared RPCs", { count: declaredRpc.length, names: declaredRpc.map(def => def.name) });
+        }
+    }
+
     /**
      * Serve the tables a live schema apply left, without a restart.
      *
@@ -3574,7 +3607,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     if ((config.functionsDir || config.functions) && surfaces.functions) {
         const { functionList, readFunctionsDirectory } = await import("../functions/function-loader");
         const { createFunctionRoutes } = await import("../functions/function-routes");
-        const { createFunctionsRequestTimeout, resolveFunctionsTimeoutMs } = await import("../functions/request-timeout");
+        const { createFunctionsRequestTimeout, resolveFunctionsMaxTimeout, resolveFunctionsTimeout } = await import("../functions/request-timeout");
 
         // Values, or a directory read into exactly those values. Only the
         // directory can have files that failed to load.
@@ -3615,10 +3648,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // A ceiling on how long one function request may hold a socket and a
         // request object. First in the chain on purpose: it covers the auth
         // middleware too, so a wedged driver answers 504 rather than hanging.
-        const functionsTimeoutMs = resolveFunctionsTimeoutMs(config.functionsTimeoutMs);
-        if (functionsTimeoutMs > 0) {
-            functionsRouter.use("/*", createFunctionsRequestTimeout(functionsTimeoutMs));
-        }
+        // Mounted even when the server-wide ceiling is off (`0`): a function
+        // that declares its own timeout (`defineFunction(…, { timeoutMs })`)
+        // declares it to this middleware, capped by the server's maximum.
+        const functionsTimeout = resolveFunctionsTimeout(config.functionsTimeoutMs);
+        const functionsMaxTimeout = resolveFunctionsMaxTimeout();
+        const functionsTimeoutMs = functionsTimeout.ms;
+        functionsRouter.use("/*", createFunctionsRequestTimeout(functionsTimeout, functionsMaxTimeout));
 
         // Custom functions do NOT require authentication at the global level by default.
         // This allows custom functions to define public endpoints (like webhooks).
@@ -3693,7 +3729,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         if (loadedFunctions.length > 0) {
             logger.info("Loaded custom functions", {
                 count: loadedFunctions.length,
-                timeoutMs: functionsTimeoutMs
+                timeoutMs: functionsTimeoutMs,
+                maxTimeoutMs: functionsMaxTimeout.ms
             });
         } else {
             logger.warn(
@@ -4420,6 +4457,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             requireSurface("data");
             return group(dataSurface, "honoured");
         },
+        rpc: () => {
+            requireSurface("data");
+            if (!rpcSurface) throw new Error("routes.rpc(): this backend built no RPC routes.");
+            return group(rpcSurface, "honoured");
+        },
         storage: () => {
             requireSurface("storage");
             return group(storageSurface);
@@ -4508,6 +4550,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     const routes: RebaseRoutes = {
         auth: servedGroup("auth"),
         data: servedGroup("data"),
+        rpc: servedGroup("rpc"),
         storage: servedGroup("storage"),
         functions: servedGroup("functions"),
         admin: servedGroup("admin"),
@@ -4570,7 +4613,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // by the data and functions auth middlewares and refused everywhere
         // else, never answered as the administrator who sent it. See
         // `auth/impersonation.ts`.
-        app.use(`${basePath}/*`, refuseUnhonouredImpersonation([`${basePath}/data`, `${basePath}/functions`]));
+        app.use(`${basePath}/*`, refuseUnhonouredImpersonation([`${basePath}/data`, `${basePath}/functions`, `${basePath}/rpc`]));
         // The other end of the RLS simulator — a simulated request's response
         // naming what it ran as — is installed by the data and functions
         // groups themselves (see `group`), so it holds wherever they are mounted.
@@ -4625,6 +4668,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
         if (surfaces.data) {
             app.route(`${basePath}/data`, groups.data());
+            app.route(`${basePath}/rpc`, groups.rpc());
             if (announce && tableRegistry.list().length === 0) {
                 logger.info("No tables to serve — /data returns 404 NO_TABLES");
             }

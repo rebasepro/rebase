@@ -23,6 +23,7 @@ import {
     parseAppAddress,
     parseFrameAncestor,
     reservedPrefixFor,
+    validateStaticRedirect,
     validateStaticRoute,
     type AppAddress,
     type ManagedCompatibility,
@@ -30,6 +31,7 @@ import {
     type RebaseBackendAppConfig,
     type RebaseProjectManifest,
     type RebaseStaticAppConfig,
+    type RebaseStaticRedirect,
     type RebaseStaticRoute
 } from "@rebasepro/types";
 import { MANIFEST_FILENAME } from "./utils/project";
@@ -436,6 +438,78 @@ function checkFrameAncestors(
 }
 
 /**
+ * Validate a static app's `redirects`: the requests it answers with a
+ * redirect before its files.
+ *
+ * Each is held to `validateStaticRedirect`, the rule the runtime applies to
+ * the bundle as well. Two redirects matching the same requests are refused
+ * here, where both are visible: the first match answers, so the second would
+ * look declared and never fire.
+ */
+function checkRedirects(
+    value: unknown,
+    app: AppAddress,
+    fieldPath: string,
+    issues: ManifestValidationIssue[]
+): RebaseStaticRedirect[] | undefined {
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value)) {
+        issues.push({
+            path: fieldPath,
+            message: 'must be a list like [{ "from": "/old", "to": "/new" }]'
+        });
+        return undefined;
+    }
+    const redirects: RebaseStaticRedirect[] = [];
+    const byMatch = new Map<string, number>();
+    value.forEach((entry: unknown, index) => {
+        const result = validateStaticRedirect(entry, app);
+        if (!result.ok) {
+            issues.push({
+                path: `${fieldPath}[${index}]${result.field ? `.${result.field}` : ""}`,
+                message: result.reason
+            });
+            return;
+        }
+        const unknownKeys = isRecord(entry)
+            ? Object.keys(entry).filter(key => !REDIRECT_FIELDS.has(key))
+            : [];
+        for (const key of unknownKeys) {
+            const hint = key === "source" || key === "destination"
+                ? ` — write "${key === "source" ? "from" : "to"}"`
+                : key === "permanent" ? ' — write "status": 308 (or 307 for a temporary one)' : "";
+            console.warn(`⚠ rebase.json: ${fieldPath}[${index}].${key} is not a field of a redirect — it is ignored${hint}.`);
+        }
+        const { from, host, query } = result.redirect;
+        const key = JSON.stringify([from, host ?? "", Object.entries(query ?? {}).sort()]);
+        const earlier = byMatch.get(key);
+        if (earlier !== undefined) {
+            issues.push({
+                path: `${fieldPath}[${index}].from`,
+                message: `matches the same requests as ${fieldPath}[${earlier}], which answers first — this one would never fire`
+            });
+            return;
+        }
+        byMatch.set(key, index);
+        redirects.push(result.redirect);
+    });
+    return redirects;
+}
+
+/** The fields a redirect has. Anything else is a typo, or Vercel's spelling. */
+const REDIRECT_FIELDS = new Set(["from", "to", "status", "host", "query"]);
+
+/** The leading literal segments of a redirect's `from`: what every match is under. */
+function redirectPrefix(from: string): string {
+    const literals: string[] = [];
+    for (const segment of from.split("/").slice(1)) {
+        if (segment.startsWith(":")) break;
+        literals.push(segment);
+    }
+    return `/${literals.join("/")}`;
+}
+
+/**
  * Report routes another app answers instead.
  *
  * A route belongs to the app that answers its path, and that is not always
@@ -456,19 +530,32 @@ function checkRouteOwnership(
         .map(([name, app]) => ({ name, app, address: staticAppAddress(name, app) }));
 
     for (const { name, app, address } of statics) {
+        const ownerOf = (prefix: string) => statics
+            .filter(other => (address.host
+                ? other.address.host === undefined || other.address.host === address.host
+                : other.address.host === undefined)
+                && isUnderPath(prefix, other.address.path))
+            .sort((a, b) => compareMountOrder(a.address, b.address))[0];
         app.routes?.forEach((route, index) => {
-            const prefix = route.path.endsWith("/*") ? route.path.slice(0, -2) || "/" : route.path;
-            const owner = statics
-                .filter(other => (address.host
-                    ? other.address.host === undefined || other.address.host === address.host
-                    : other.address.host === undefined)
-                    && isUnderPath(prefix, other.address.path))
-                .sort((a, b) => compareMountOrder(a.address, b.address))[0];
+            const owner = ownerOf(route.path.endsWith("/*") ? route.path.slice(0, -2) || "/" : route.path);
             if (owner && owner.name !== name) {
                 issues.push({
                     path: `apps.${name}.routes[${index}].path`,
                     message: `"${route.path}" is answered by "${owner.name}", at "${formatAppAddress(owner.address)}" — ` +
                         "declare the route on that app instead"
+                });
+            }
+        });
+        // The same rule for a redirect, judged by the literal part of its
+        // `from`: everything it matches is under that, and another app nested
+        // there answers every request it would.
+        app.redirects?.forEach((redirect, index) => {
+            const owner = ownerOf(redirectPrefix(redirect.from));
+            if (owner && owner.name !== name) {
+                issues.push({
+                    path: `apps.${name}.redirects[${index}].from`,
+                    message: `"${redirect.from}" is answered by "${owner.name}", at "${formatAppAddress(owner.address)}" — ` +
+                        "declare the redirect on that app instead"
                 });
             }
         });
@@ -537,7 +624,7 @@ message: "must stay inside the project directory" });
 const KNOWN_APP_FIELDS: Record<string, readonly string[]> = {
     backend: ["type", "runtime", "tables", "functions", "crons", "schema",
         "registerDatabase", "dockerfile", "context", "port"],
-    static: ["type", "root", "build", "output", "path", "spa", "cms", "routes", "frameAncestors"]
+    static: ["type", "root", "build", "output", "path", "spa", "cms", "routes", "frameAncestors", "redirects", "cleanUrls"]
 };
 
 /**
@@ -738,11 +825,15 @@ message: "must be a boolean" });
             checkCmsPath(raw.cms, address ?? { path: "/" }, `${base}.cms`, issues);
             const routes = checkRoutes(raw.routes, address ?? { path: "/" }, `${base}.routes`, issues);
             const frameAncestors = checkFrameAncestors(raw.frameAncestors, `${base}.frameAncestors`, issues);
+            const redirects = checkRedirects(raw.redirects, address ?? { path: "/" }, `${base}.redirects`, issues);
+            if (raw.cleanUrls !== undefined && typeof raw.cleanUrls !== "boolean") {
+                issues.push({ path: `${base}.cleanUrls`, message: "must be a boolean" });
+            }
             // See the backend branch: constructed for the same reasons. `path`
             // is kept as written — see `staticAppAddress` for why the split
-            // pieces are not what the manifest stores. `routes` and
-            // `frameAncestors` only when declared, so a manifest without them
-            // is written back without them.
+            // pieces are not what the manifest stores. `routes`,
+            // `frameAncestors`, `redirects` and `cleanUrls` only when declared,
+            // so a manifest without them is written back without them.
             return {
                 type: "static",
                 root: raw.root as string,
@@ -752,7 +843,9 @@ message: "must be a boolean" });
                 spa: raw.spa as boolean | undefined,
                 cms: raw.cms as string | undefined,
                 ...(routes !== undefined ? { routes } : {}),
-                ...(frameAncestors !== undefined ? { frameAncestors } : {})
+                ...(frameAncestors !== undefined ? { frameAncestors } : {}),
+                ...(redirects !== undefined ? { redirects } : {}),
+                ...(typeof raw.cleanUrls === "boolean" ? { cleanUrls: raw.cleanUrls } : {})
             };
         }
         default:

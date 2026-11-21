@@ -45,6 +45,9 @@ const CONTROL_PLANE_FUNCTIONS: Record<string, Status> = {
     "env-vars": "served",
     ephemeral: "served",
     extensions: "served",
+    // `orgs members invite` on a control plane without `invites`: resolves an
+    // address to an account, as the console's "Add member" does.
+    "invite-by-email": "served",
     "linked-instances": "served",
     metrics: "served",
     "platform-config": "served",

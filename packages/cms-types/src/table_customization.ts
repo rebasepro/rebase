@@ -416,9 +416,9 @@ export interface FieldOptions<Row = Record<string, unknown>> {
     name?: string;
     /** Help text under the field. */
     description?: string;
-    /** Kept out of the table and card views. Still on the form, and still read and written by the API. */
+    /** Kept out of the table, list and card views, and off the record (its form and its read view). Still read and written by the API. */
     hidden?: boolean;
-    /** Kept off the form: the field cannot be edited there. Still in the views. */
+    /** Kept off the record (its form and its read view): the field cannot be edited there. Still in the views. */
     hiddenInForm?: boolean;
     /** The control is drawn greyed out. An object says why. */
     disabled?: boolean | FieldDisabled;
@@ -884,7 +884,8 @@ export type TableComponentOverrides = {
 };
 
 /**
- * A computed column of the collection view.
+ * A computed column of the collection table. It is not on the record unless
+ * `form.sections` or `form.sidebar` names its `key`.
  *
  * @group Table customization
  */
@@ -978,13 +979,21 @@ export interface TableCustomizationOptions<T extends CustomizableTable | undefin
 
     /** The order fields are drawn in. Fields it leaves out follow, so nothing disappears. */
     fieldOrder?: TableColumnId<T>[];
-    /** The columns of the list view. */
+    /**
+     * The columns of the table and of the list view: the fields they draw,
+     * and no others. The table orders them by `fieldOrder` (or the order a
+     * visitor drags them to) when there is one, by this list otherwise. Fields
+     * it leaves out are still on the record.
+     */
     listFields?: TableColumnId<T>[];
     /** The fields shown when a record of this table is referenced from another. */
     previewFields?: TableFieldKey<T>[];
     /** What fills a record's title, subtitle, image, status, date and tags. */
     display?: TableDisplay<TableFieldPath<T>, TableRow<T>, USER>;
-    /** Computed columns of the collection view. */
+    /**
+     * Computed columns of the table. On the record only where `form.sections`
+     * or `form.sidebar` names one.
+     */
     additionalFields?: TableAdditionalField<TableFieldPath<T>, USER>[];
     /** Hide the id column. */
     hideIdFromCollection?: boolean;

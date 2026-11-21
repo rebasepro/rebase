@@ -206,6 +206,8 @@ const MOUNTS = new Map([
     // row for each family instead; enumerating them would mean enumerating
     // somebody's collections.
     ["packages/server/src/functions/function-routes.ts#router", null],
+    // `POST /api/rpc/<name>`: one route per `defineRpc` the project declares.
+    ["packages/server/src/rpc/rpc-routes.ts#router", null],
     ["packages/server/src/api/rest/api-generator.ts#this.router", null],
     // Live schema editing's stand-in for the data group: it re-mounts the
     // regenerated per-table routes above, so it has no path of its own.
@@ -213,6 +215,8 @@ const MOUNTS = new Map([
     // The router a *project's* own `defineFunction` returns, and the proxy that
     // forwards to a functions process. Neither has a path of its own.
     ["packages/server/src/functions/define-function.ts#app", null],
+    // The same, wrapped to declare the function's own `timeoutMs`.
+    ["packages/server/src/functions/define-function.ts#declared", null],
     ["packages/server/src/functions/proxy.ts#router", null],
     // `deprecatedAlias`'s forwarder, and the adapter's optional extra
     // router: both re-serve routes that are already counted where they are
@@ -306,7 +310,7 @@ const DATA_FAMILY = {
  * The data API is checked against the source by the OpenAPI parity gate
  * instead; this one only has to stop treating those rows as fiction.
  */
-const DATA_DRIVEN_PREFIXES = ["/api/data", "/api/functions"];
+const DATA_DRIVEN_PREFIXES = ["/api/data", "/api/functions", "/api/rpc"];
 
 /**
  * A docs table row that names an endpoint: `| \`GET\` | \`/api/…\` | … |`.

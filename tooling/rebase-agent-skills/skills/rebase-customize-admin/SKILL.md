@@ -39,6 +39,29 @@ There are three things to know:
    beside a built-in part (`<Rebase slots>`), or a replacement for a built-in
    part (`<Rebase components>`, `wrap: true` to keep the original inside).
 
+## First, the `customizeTable` pass
+
+The admin derived from the tables is a draft: every column, ids, foreign keys
+and raw JSON included. Before building anything custom, and before calling an
+admin done, give each table a `frontend/src/cms/<table>.tsx`:
+
+1. **Title:** `display: { title: "<column>" }`, a name, title or email column,
+   or a key inside a JSON column (`"data.name"`). A relation is never picked on
+   its own; a table with no text column is titled by its id until you set one.
+2. **Columns:** `listFields: [...]`, what the table and the list show, in order.
+3. **Hide the machinery:** `fields: { <column>: { hidden: true } }` for foreign
+   keys, order keys, tokens and raw JSON. `hidden` keeps a field out of the
+   views and off the record; `hiddenInForm` only off the record.
+4. **Labels:** `name` where the derived label reads as a column name;
+   `enumLabels` (label and colour) on every enum.
+5. **JSON columns:** a cell shows the first four top-level keys; name the ones
+   that matter in `fields: { <column>: { previewFields: [...] } }`, or give it a
+   `Preview` component.
+6. **Look at it** in the running admin: as a table, as a list, and one record.
+
+A computed column (`additionalFields`) is the table's; the record shows one only
+where `form.sections` or `form.sidebar` names it.
+
 ## Changing the look is tokens, not components
 
 A request to rebrand the admin (brand colour, fonts, corners, a warmer dark
@@ -148,7 +171,7 @@ import only package entry points, so they compile as copied.
   server — the `rebase-dashboards` skill is the whole method.
 - **When a built-in part almost fits, override or wrap it** with
   `<Rebase components={{ "<Name>": { Component, wrap? } }}>`. The names are
-  `OverridableComponentName` in `@rebasepro/cms-types`. Prefer `wrap: true`:
+  the type `OverridableComponentName` from `@rebasepro/cms`. Prefer `wrap: true`:
   you keep the original inside yours and still get its fixes on upgrade. When
   wrapping is not enough, copy the original and change the copy — see
   "Copying a built-in part" below. The props your component receives are the

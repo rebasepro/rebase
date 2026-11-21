@@ -21,15 +21,16 @@ import * as ui from "@rebasepro/ui";
 const RECIPES = path.resolve(__dirname, "../../recipes");
 const TESTS = __dirname;
 
-const ALLOWED = new Set([
-    "react",
-    "react-router",
-    "@rebasepro/app",
-    "@rebasepro/cms",
-    "@rebasepro/cms-types",
-    "@rebasepro/types",
-    "@rebasepro/ui"
-]);
+/**
+ * What a recipe may import: the dependencies `rebase init` gives a project's
+ * frontend. Read from the scaffold itself, so a recipe that reaches for a
+ * package the scaffold does not install (`@rebasepro/cms-types` was one) fails
+ * here rather than in the project it was copied into.
+ */
+const SCAFFOLD_FRONTEND = path.resolve(__dirname, "../../../cli/templates/template/frontend/package.json");
+const ALLOWED = new Set(Object.keys(
+    (JSON.parse(fs.readFileSync(SCAFFOLD_FRONTEND, "utf8")) as { dependencies: Record<string, string> }).dependencies
+));
 
 function recipeFiles(): string[] {
     return fs.readdirSync(RECIPES).filter(f => f.endsWith(".tsx")).sort();
@@ -58,7 +59,14 @@ describe("admin recipes", () => {
         expect(recipeFiles().length).toBeGreaterThanOrEqual(6);
     });
 
-    it.each(recipeFiles())("%s imports only package entry points and React", (file) => {
+    it("reads the scaffold's frontend dependencies", () => {
+        // Guards the guard: an empty set would fail every recipe, a moved
+        // template would throw above; either way the list must name the kit.
+        expect(ALLOWED.has("@rebasepro/cms")).toBe(true);
+        expect(ALLOWED.has("react")).toBe(true);
+    });
+
+    it.each(recipeFiles())("%s imports only packages a scaffolded project installs", (file) => {
         const outside = importsOf(path.join(RECIPES, file)).filter(s => !ALLOWED.has(s));
         expect(outside).toEqual([]);
     });

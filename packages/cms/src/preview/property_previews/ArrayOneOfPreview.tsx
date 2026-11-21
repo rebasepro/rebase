@@ -1,9 +1,9 @@
 import type { ArrayProperty, Property } from "@rebasepro/cms-types";
 import React from "react";
 import type { PropertyPreviewProps, PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useAuthController, useCustomizationController } from "@rebasepro/app";
+import { useAuthController, useCustomizationController, useTranslation } from "@rebasepro/app";
 import { PropertyPreview } from "../PropertyPreview";
-import { cls, defaultBorderMixin } from "@rebasepro/ui";
+import { cls, defaultBorderMixin, Typography } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/cms-types";
 
@@ -41,9 +41,7 @@ export function ArrayOneOfPreview({
     // As in {@link ArrayPropertyPreview}: blocks stacked vertically, so a
     // single line can only report the count.
     if (compact) {
-        return <span className={"text-sm truncate"}>
-            {values.length === 1 ? "1 block" : `${values.length} blocks`}
-        </span>;
+        return <CompactBlockCount count={values.length}/>;
     }
 
     const childSize: PreviewSize = size === "medium" ? "medium" : "small";
@@ -76,4 +74,12 @@ export function ArrayOneOfPreview({
                 })}
         </div>
     );
+}
+
+/** The count a one-line list of typed blocks shows, in the admin language. */
+function CompactBlockCount({ count }: { count: number }) {
+    const { t } = useTranslation();
+    return <Typography variant={"body2"} component={"span"} className={"block truncate"}>
+        {t("preview_blocks_count", { count })}
+    </Typography>;
 }

@@ -1,14 +1,20 @@
 /**
  * `rebase cloud orgs` — list / create / rename / delete / members / invites.
  *
- * Members: list, invite by email, remove, change a role. Inviting goes through
- * the control plane's `invites` function, which always opens an invitation —
- * nobody joins an organization until they accept, an existing account
- * included: a link, valid 7 days, that only an account which has verified that
- * address can accept. Nobody is invited as owner; an owner promotes them once
- * they have joined. The link is printed, because the control plane may send no email;
- * the output says whether it did. Inviting takes a `rebase cloud login`
- * session — a token cannot hand out access to an organization.
+ * Members: list, add by email, remove, change a role. `members invite` asks
+ * the control plane's `invites` function first, which opens an invitation —
+ * nobody joins until they accept: a link, valid 7 days, that only an account
+ * which has verified that address can accept. The link is printed, because the
+ * control plane may send no email; the output says whether it did.
+ *
+ * A control plane that does not serve `invites` — Rebase Cloud today — adds a
+ * person who already has an account with a verified address, as the console's
+ * "Add member" does: `invite-by-email` resolves the address, and the
+ * membership is a row. Someone with no account is told to sign up first.
+ *
+ * Nobody is invited or added as owner; an owner promotes them once they have
+ * joined. Inviting takes a `rebase cloud login` session — a token cannot hand
+ * out access to an organization.
  */
 import chalk from "chalk";
 import inquirer from "inquirer";
@@ -33,7 +39,8 @@ import {
     warn,
     type CloudClient
 } from "./context";
-import { reportCallError, type Unserved } from "./not-served";
+import { isRouteNotServed, reportCallError, type Unserved } from "./not-served";
+import { requireOrg } from "./org-scope";
 
 /** What the invitation commands say on a control plane that has no `invites` function yet. */
 const INVITES_UNSERVED: Unserved = {
@@ -204,7 +211,7 @@ async function renameOrg(rawArgs: string[]): Promise<void> {
         fail(`--slug ${slug} is not a slug.`, `Lowercase letters, digits and hyphens, e.g. ${slugify(slug) || "acme"}.`, "usage");
     }
     const { client, url } = await requireClient(rawArgs);
-    const org = orgFor(flags["--org"], url);
+    const org = await requireOrg(client, url, flags["--org"]);
     const patch: Record<string, string> = { name };
     if (slug) patch.slug = slug;
     try {
@@ -232,7 +239,9 @@ async function deleteOrg(rawArgs: string[]): Promise<void> {
         maxPositionals: 0
     });
     const { client, url } = await requireClient(rawArgs);
-    const org = orgFor(flags["--org"], url);
+    // Named, never inferred: a stale link file is not a reason to delete an organization.
+    const org = flags["--org"] || getContextOrg(url);
+    if (!org) fail("No organization selected.", `Pass ${chalk.bold("--org <id>")} or run ${chalk.bold("rebase cloud use")}.`, "no_org");
 
     let row: OrgRow | undefined;
     let projects: Array<{ id: string | number; subdomain?: string; name?: string }>;
@@ -304,13 +313,6 @@ const MEMBER_ROLES = ["owner", "admin", "member"] as const;
 
 const MEMBERS_ACTIONS = ["list", "invite", "remove", "role"] as const;
 const INVITES_ACTIONS = ["list", "revoke", "resend"] as const;
-
-/** The organization a members/invites command acts on: `--org`, else the active one. */
-function orgFor(flag: string | undefined, url: string): string {
-    const org = flag || getContextOrg(url);
-    if (!org) fail("No organization selected.", `Pass ${chalk.bold("--org <id>")} or run ${chalk.bold("rebase cloud use")}.`, "no_org");
-    return org;
-}
 
 async function loadMembers(client: CloudClient, org: string): Promise<MemberRow[]> {
     const rows = cloudRows<{ id: string | number; userId?: string; role?: string }>((await client.data.table("organization-members").find({
@@ -404,7 +406,7 @@ async function membersCommand(rawArgs: string[]): Promise<void> {
 
 async function listMembers(rawArgs: string[], orgFlag: string | undefined): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
-    const org = orgFor(orgFlag, url);
+    const org = await requireOrg(client, url, orgFlag);
     let members: MemberRow[];
     try {
         members = await loadMembers(client, org);
@@ -426,7 +428,7 @@ async function listMembers(rawArgs: string[], orgFlag: string | undefined): Prom
                 console.log(`  ${chalk.bold(who)}  ${colorStatus(m.role ?? undefined)}${m.email && m.userId ? chalk.gray(`  ${m.userId}`) : ""}`);
             }
             console.log("");
-            note(chalk.gray("Invite someone: `rebase cloud orgs members invite <email>`. Pending: `rebase cloud orgs invites`."));
+            note(chalk.gray("Add someone: `rebase cloud orgs members invite <email>`."));
             console.log("");
         },
         { org, members }
@@ -453,16 +455,20 @@ function reportDelivery(delivery: EmailDelivery, email: string): void {
 
 async function inviteMember(rawArgs: string[], orgFlag: string | undefined, email: string | undefined, role: string): Promise<void> {
     if (!email) fail("Name the address to invite.", "`rebase cloud orgs members invite <email> [--role admin|member]`.", "usage");
+    const address = email.trim().toLowerCase();
     const { client, url } = await requireSessionClient(rawArgs, "invite people to an organization");
-    const org = orgFor(orgFlag, url);
+    const org = await requireOrg(client, url, orgFlag);
     type Result =
         | { kind: "added"; userId: string; role: string; email: string }
         | { kind: "invited"; invite: CliInvite; link: string; emailDelivery: EmailDelivery };
     let result: Result;
     try {
-        result = await client.functions.invoke<Result>("invites", { organizationId: org, email: email.trim().toLowerCase(), role });
+        result = await client.functions.invoke<Result>("invites", { organizationId: org, email: address, role });
     } catch (e) {
-        reportCallError(e, `Failed to invite ${email}`, INVITES_UNSERVED);
+        if (!isRouteNotServed(e)) reportError(e, `Failed to invite ${email}`);
+        // No invitations on this control plane: it adds a person who already
+        // has an account, as the console's "Add member" does.
+        return addExistingAccount(client, url, org, address, role);
     }
     if (result.kind === "added") {
         // Only a control plane from before invitations-for-everyone adds
@@ -484,10 +490,76 @@ async function inviteMember(rawArgs: string[], orgFlag: string | undefined, emai
     reportDelivery(invited.emailDelivery, invited.invite.email);
 }
 
+/** What `invite-by-email` answers: the id of an account whose address is verified, or nothing. */
+interface AccountLookup {
+    found: boolean;
+    uid?: string;
+}
+
+/** What `members invite` says when the control plane can neither invite nor add by email. */
+const ADD_BY_EMAIL_UNSERVED: Unserved = {
+    what: "invitations or adding members by email",
+    hint: "Nothing was changed. Add them from the console's Members page."
+};
+
+/**
+ * Add someone who already has an account: the control plane resolves the
+ * address (owners and admins only, and only an account whose owner verified
+ * it), and the membership is a row the data API's hooks check. A person with no
+ * account cannot be added, and is told how to get one: nothing here sends an
+ * invitation.
+ */
+async function addExistingAccount(client: CloudClient, url: string, org: string, email: string, role: string): Promise<void> {
+    let lookup: AccountLookup;
+    try {
+        lookup = await client.functions.invoke<AccountLookup>("invite-by-email", { email, organizationId: org });
+    } catch (e) {
+        // The server's words for a member who is not an owner or admin.
+        reportCallError(e, `Failed to add ${email}`, ADD_BY_EMAIL_UNSERVED);
+    }
+    if (!lookup.found || !lookup.uid) {
+        fail(
+            `${email} has no Rebase account with a verified email address, so they cannot be added yet.`,
+            `This control plane adds people who already have an account; it sends no invitations. `
+                + `Ask them to sign up at ${url}/login and verify their address, then run this again.`,
+            "no_account"
+        );
+    }
+    const userId = lookup.uid;
+    let members: MemberRow[];
+    try {
+        members = await loadMembers(client, org);
+    } catch (e) {
+        reportError(e, "Failed to list members");
+    }
+    const existing = members.find((m) => m.userId === userId);
+    if (existing) {
+        const current = existing.role ?? "member";
+        emit(
+            () => success(`${email} is already a member (${current}) of org ${org}`),
+            { org, kind: "already_member", userId, role: current, email }
+        );
+        return;
+    }
+    try {
+        await client.data.table("organization-members").create({ organizationId: org, userId, role });
+    } catch (e) {
+        // The server's words: not an owner or admin, or already a member.
+        reportError(e, `Failed to add ${email}`);
+    }
+    emit(
+        () => {
+            success(`Added ${email} to org ${org} as ${role}`);
+            note(chalk.gray("They have access now. Nothing was emailed, so let them know."));
+        },
+        { org, kind: "added", userId, role, email }
+    );
+}
+
 async function removeMember(rawArgs: string[], orgFlag: string | undefined, ref: string | undefined, yes: boolean): Promise<void> {
     if (!ref) pickMember([], ref, "remove");
     const { client, url } = await requireClient(rawArgs);
-    const org = orgFor(orgFlag, url);
+    const org = await requireOrg(client, url, orgFlag);
     let members: MemberRow[];
     try {
         members = await loadMembers(client, org);
@@ -515,7 +587,7 @@ async function changeRole(
 ): Promise<void> {
     if (!ref || !role) fail("Name the member and the role.", "`rebase cloud orgs members role <email|uid> <owner|admin|member>`.", "usage");
     const { client, url } = await requireClient(rawArgs);
-    const org = orgFor(orgFlag, url);
+    const org = await requireOrg(client, url, orgFlag);
     let members: MemberRow[];
     try {
         members = await loadMembers(client, org);
@@ -588,7 +660,7 @@ async function invitesCommand(rawArgs: string[]): Promise<void> {
     if (action !== "list" && !ref) pickInvite([], ref, action);
 
     const { client, url } = await requireSessionClient(rawArgs, "manage invitations");
-    const org = orgFor(flags["--org"], url);
+    const org = await requireOrg(client, url, flags["--org"]);
     let listed: { invites: CliInvite[]; canManage: boolean };
     try {
         listed = await loadInvites(client, org);
@@ -691,7 +763,7 @@ description: "List organizations you belong to" },
                 description: "Rename the organization. Owners and admins",
                 flags: [
                     ["--slug <slug>", "Change its slug too. Kept when omitted"],
-                    ["--org <id>", "The organization. Default: the active one"]
+                    ["--org <id>", "The organization. Default: the active one, else the linked project's"]
                 ]
             },
             {
@@ -704,13 +776,13 @@ description: "List organizations you belong to" },
                 args: "[list]",
                 section: "Members",
                 description: "List members of the organization, with their email and role",
-                flags: [["--org <id>", "The organization. Default: the active one"]]
+                flags: [["--org <id>", "The organization. Default: the active one, else the linked project's"]]
             },
             {
                 action: "members invite",
                 args: "<email>",
                 section: "Members",
-                description: "Invite by email: a 7-day, single-use link they accept. Nobody joins until they do",
+                description: "Add someone by email. They need a Rebase account with a verified address: someone without one is told to sign up first",
                 flags: [["--role <role>", "admin or member (default). Never owner: promote them with `members role` once they have joined"]]
             },
             {
@@ -729,7 +801,7 @@ description: "List organizations you belong to" },
                 action: "invites",
                 args: "[list]",
                 section: "Invitations",
-                description: "Pending invitations: email, role, who invited, expiry. Owners and admins only"
+                description: "Pending invitations, on a control plane that serves them: email, role, who invited, expiry. Owners and admins only"
             },
             {
                 action: "invites revoke",
@@ -745,11 +817,12 @@ description: "List organizations you belong to" },
             }
         ],
         notes: [
-            "The active one is what `rebase cloud use` selects, and what billing is scoped to.",
+            "The active one is what `rebase cloud use` selects, and what billing is scoped to. With none selected, a linked "
+                + "directory's commands act on the linked project's organization and say so. `delete` always needs --org or an active one.",
             "An organization with projects cannot be deleted: delete each project first, which is what tears down its database and cancels its subscription.",
-            "Inviting and invitations take a `rebase cloud login` session, not REBASE_TOKEN, and the owner or admin role.",
-            "The invitation link is printed because the control plane may send no email; the output says whether it did. "
-                + "Only an account that has verified the invited address can accept it."
+            "Adding members and invitations take a `rebase cloud login` session, not REBASE_TOKEN, and the owner or admin role.",
+            "Rebase Cloud adds people who already have an account with a verified email; nothing is emailed. A control plane "
+                + "that serves invitations opens one instead and prints its single-use, 7-day link."
         ]
     });
 }

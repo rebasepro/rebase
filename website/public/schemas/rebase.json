@@ -202,6 +202,53 @@
                         "pattern": "^https://(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+(?![0-9]+(?::|$))[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?::(?!443$)[0-9]{1,5})?$|^https://(?:localhost|127\\.0\\.0\\.1|\\[::1\\])(?::(?!443$)[0-9]{1,5})?$|^http://(?:localhost|127\\.0\\.0\\.1|\\[::1\\])(?::(?!80$)[0-9]{1,5})?$"
                     },
                     "examples": [["https://admin.example.com"]]
+                },
+                "redirects": {
+                    "type": "array",
+                    "description": "Requests this app answers with a redirect instead of a file — moved pages, a renamed section, a whole hostname sent to another. Checked in declaration order, before the build's files; the first match answers. The request's query string is kept unless `to` has one of its own. A path `routes` sends to a function is the function's, and is not redirected. An app at \"https://example.com\" whose only redirect is { \"from\": \"/:path*\", \"to\": \"https://www.example.com/:path*\" } sends the bare domain to www.",
+                    "items": {
+                        "type": "object",
+                        "required": ["from", "to"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "from": {
+                                "type": "string",
+                                "pattern": "^/$|^(?=/)(?:/(?:(?!(?:%2[eE]|\\.){1,2}(?:/|$))[^/?#\\\\*:.\\s\\u0000-\\u001f\\u007f][^/?#\\\\*:\\s\\u0000-\\u001f\\u007f]*|:[A-Za-z_][A-Za-z0-9_]*))*(?:/:[A-Za-z_][A-Za-z0-9_]*\\*)?$",
+                                "not": { "pattern": "^/(api|health|healthz|livez|readyz|metrics)(/|$)" },
+                                "description": "The path it matches, absolute and inside the app's `path` (the path part, when `path` is a URL): literal segments, \":name\" for one segment, and \":name*\" as the last segment for the rest of the path, none included. A trailing slash on the request is ignored; matching is case-sensitive. No empty segment, no trailing slash, no segment starting with \".\", and a \":\" only to start a parameter. Never under a path the backend owns (/api, /health, /healthz, /livez, /readyz, /metrics). A query string is matched with `query`, a hostname with `host`.",
+                                "examples": ["/old", "/blog/:slug", "/docs/:path*", "/:path*"]
+                            },
+                            "to": {
+                                "type": "string",
+                                "pattern": "^(?:/(?![/\\\\])|[Hh][Tt][Tt][Pp][Ss]?://)[^\\s\\\\\\u0000-\\u001f\\u007f]*$",
+                                "description": "Where it sends the request: a path on the same address, e.g. \"/new\", or an absolute http:// or https:// URL. \":name\" and \":name*\" are replaced by what `from` captured, in the path and query only, and must be parameters `from` declares. A redirect to a path its own `from` matches again is refused, since it would loop.",
+                                "examples": ["/new", "/posts/:slug", "https://www.example.com/:path*"]
+                            },
+                            "status": {
+                                "enum": [301, 302, 307, 308],
+                                "default": 308,
+                                "description": "The redirect's status: 301 or 308 for a permanent move (308 keeps the method), 302 or 307 for a temporary one (307 keeps the method)."
+                            },
+                            "host": {
+                                "type": "string",
+                                "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+(?![0-9]+$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$",
+                                "description": "Only for requests to this hostname, lowercase, with no scheme, port or path. On an app whose `path` names a hostname, it can only be that one.",
+                                "examples": ["example.com"]
+                            },
+                            "query": {
+                                "type": "object",
+                                "propertyNames": { "minLength": 1 },
+                                "additionalProperties": { "type": "string" },
+                                "description": "Only for requests whose query string holds each of these parameters with exactly this value, compared after decoding. \"\" matches the parameter present with no value (?k or ?k=); there is no wildcard.",
+                                "examples": [{ "lang": "es" }]
+                            }
+                        }
+                    }
+                },
+                "cleanUrls": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Serve `x.html` at /x, and answer /x.html with a 308 to /x, query kept: /privacidad serves privacidad.html, /legal/terms serves legal/terms.html. A file or directory of the request's exact name is served first, and an index.html redirects to its directory (/docs/index.html to /docs/)."
                 }
             }
         }

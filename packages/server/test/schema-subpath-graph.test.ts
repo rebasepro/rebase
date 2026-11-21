@@ -89,10 +89,10 @@ describe("@rebasepro/server/schema", () => {
         expect(loaded.urls.some(url => url.startsWith(typesSource))).toBe(true);
     });
 
-    it("exports the builders, Drizzle's `pgEnum` and `sql`, and `policy`", () => {
+    it("exports the builders, `defineRpc`, Drizzle's `pgEnum` and `sql`, and `policy`", () => {
         // `PgEnum` and `SqlTemplate` are types: nothing at run time.
         expect(loaded.exported).toEqual([
-            "col", "defineAuthTable", "defineTable", "defineView", "isAuthTableDef", "isTableDef", "isViewDef", "json", "pgEnum", "policy", "rel", "sql"
+            "col", "defineAuthTable", "defineRpc", "defineTable", "defineView", "isAuthTableDef", "isRpcDef", "isTableDef", "isViewDef", "json", "pgEnum", "policy", "rel", "sql"
         ]);
     });
 });

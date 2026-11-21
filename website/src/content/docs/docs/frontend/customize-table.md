@@ -188,10 +188,10 @@ Every key is optional. A key you leave out keeps what the panel derived.
 | Option | Type | Effect |
 |---|---|---|
 | `fieldOrder` | `TableColumnId[]` | The order fields are drawn in. Fields it leaves out follow, so nothing disappears. |
-| `listFields` | `TableColumnId[]` | The columns of the list view. |
+| `listFields` | `TableColumnId[]` | The columns of the table and of the list view: the fields they draw, and no others. The table orders them by `fieldOrder` (or the order a visitor drags them to) when there is one, by `listFields` otherwise. Fields it leaves out are still on the record. |
 | `previewFields` | `TableFieldKey[]` | The fields shown when a record of this table is referenced from another. |
 | `display` | `TableDisplay` | What fills a record's `title`, `subtitle`, `image`, `status`, `date` and `tags`: a field path or a resolver. See [display slots](/docs/frontend/view-modes/#display-slots). |
-| `additionalFields` | `TableAdditionalField[]` | Computed columns. See [Additional columns](/docs/frontend/additional-columns/). |
+| `additionalFields` | `TableAdditionalField[]` | Computed columns of the table. Not on the record unless `form.sections` or `form.sidebar` names one. See [Additional columns](/docs/frontend/additional-columns/). |
 | `hideIdFromCollection` | `boolean` | Hide the id column. |
 
 A computed column takes:
@@ -286,8 +286,8 @@ changes.
 |---|---|---|
 | `name` | `string` | The label. Derived from the key otherwise (`publishDate` → "Publish Date"). |
 | `description` | `string` | Help text under the field. |
-| `hidden` | `boolean` | Kept out of the table and card views. Still on the form, and still read and written by the API. |
-| `hiddenInForm` | `boolean` | Kept off the form. Still in the views. |
+| `hidden` | `boolean` | Kept out of the table, list and card views, and off the record: its form and its read view. Still read and written by the API. |
+| `hiddenInForm` | `boolean` | Kept off the record (its form and its read view). Still in the views. |
 | `disabled` | `boolean \| { disabledMessage?, clearOnDisabled? }` | The control is greyed out. `disabledMessage` says why, beside it; `clearOnDisabled` clears the value when it becomes disabled. |
 | `readOnly` | `boolean` | The value is drawn as text, with no control. |
 | `Field` | `Component` | Replaces the form control. The component itself. See [Custom fields](/docs/frontend/custom-fields/). |
@@ -400,7 +400,7 @@ drawn, never what is stored.
 | `minimalistView` | `boolean` | The document's fields without their frame. |
 | `spreadChildren` | `boolean` | The document's fields laid out as if they were the record's own. |
 | `keyValue` | `boolean` | Edited as free key/value pairs. |
-| `previewFields` | `string[]` | The document's keys shown in its preview. |
+| `previewFields` | `string[]` | The document's keys named in its one-line summary, in this order. |
 | `fields` | `{ [key]: field options }` | The options of each key of the document. |
 | `fieldOrder` | `string[]` | The order the document's keys are shown in. |
 | `of` | field options | The options of each item, for a document that is a list. |
@@ -408,6 +408,14 @@ drawn, never what is stored.
 
 With `col.jsonb().$type<T>()` or a `json.object({…})` shape, `fields` and `fieldOrder`
 are typed by the document's keys. See [Arrays and JSON](/docs/collections/arrays-and-maps/).
+
+In a table cell, a list row or a card, a JSON document is one line: its first
+four top-level keys (or its `previewFields`), labelled with their `name`, each
+with its value when that is short text, a number or a yes/no, `3 items` for a
+list and `4 fields` for a nested object, which is not opened. A list of
+documents is its count. The whole document is on the record, and in the cell's
+expand editor. For a better line, name the keys that matter in
+`previewFields`, or give the field a `Preview` component.
 
 ### Relations
 

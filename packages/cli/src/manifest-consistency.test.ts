@@ -22,7 +22,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
-import { RESERVED_BACKEND_PREFIXES } from "@rebasepro/types";
+import { RESERVED_BACKEND_PREFIXES, STATIC_REDIRECT_STATUSES } from "@rebasepro/types";
 import { buildableApps, validateManifest } from "./manifest";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -643,5 +643,71 @@ describe("rebase.json — the route and frame-ancestor rules agree", () => {
 
     it.each(ORIGINS)("judges the frame ancestor %j the same way on both sides", (value) => {
         expect({ value, schema: schemaAcceptsOrigin(value) }).toEqual({ value, schema: cliAcceptsOrigin(value) });
+    });
+});
+
+/**
+ * A static app's `redirects` and `cleanUrls` are judged the same way by the
+ * editor and the CLI.
+ *
+ * `from` is the hand-written rule most likely to drift: a parameter is a whole
+ * segment, the rest-of-path one comes last, a literal holds no ":" or "*", and
+ * a dot-segment is refused however it is spelled. Sampled on an app at "/",
+ * with targets that cannot loop. The CLI also refuses what the schema cannot
+ * see — a parameter named twice, one `to` names and `from` does not declare, a
+ * `from` outside its app, a loop — so none of those appears here.
+ */
+describe("rebase.json — the redirect rules agree", () => {
+    const schemaPath = path.join(repoRoot, "website/public/schemas/rebase.json");
+    const redirectProps = () => JSON.parse(fs.readFileSync(schemaPath, "utf8")).$defs.staticApp.properties.redirects.items.properties;
+
+    function cliAccepts(redirect: Record<string, unknown>, field: string): boolean {
+        const { issues } = validateManifest({
+            rebase: "^1",
+            apps: { web: { type: "static", root: "web", output: "web", redirects: [redirect] } }
+        });
+        return !issues.some(issue => issue.path === `apps.web.redirects[0].${field}`);
+    }
+
+    const FROMS = [
+        "/", "/old", "/old/page.html", "/blog/:slug", "/docs/:path*", "/:path*", "/a/:x/b/:y", "/café", "/caf%C3%A9",
+        "/a-b_c.d~e", "/apidocs", "/old/", "/a//b", "old", "//old", "/.well-known/x", "/a/..", "/a/%2e%2e", "/a/%2E.",
+        "/a b", "/old?x=1", "/old#x", "/blog/*", "/post-:id", "/:1st", "/:path*/edit", "/a\\b", "/api", "/api/:x",
+        "/health/x", "/metrics"
+    ];
+
+    function schemaAcceptsFrom(value: string): boolean {
+        const node = redirectProps().from;
+        return new RegExp(node.pattern).test(value) && !new RegExp(node.not.pattern).test(value);
+    }
+
+    it.each(FROMS)("judges the redirect from %j the same way on both sides", (value) => {
+        expect({ value, schema: schemaAcceptsFrom(value) })
+            .toEqual({ value, schema: cliAccepts({ from: value, to: "https://www.example.com/" }, "from") });
+    });
+
+    const TOS = [
+        "/new", "/", "/new?x=1", "/new#top", "https://www.example.com", "https://www.example.com/x?y=1",
+        "HTTPS://www.example.com/", "http://example.com/", "new", "//evil.example", "/\\evil.example", "/a b",
+        "javascript:alert(1)", "mailto:a@example.com", "ftp://example.com/", "https://www.exa mple.com/"
+    ];
+
+    function schemaAcceptsTo(value: string): boolean {
+        return new RegExp(redirectProps().to.pattern).test(value);
+    }
+
+    it.each(TOS)("judges the redirect to %j the same way on both sides", (value) => {
+        expect({ value, schema: schemaAcceptsTo(value) }).toEqual({ value, schema: cliAccepts({ from: "/old", to: value }, "to") });
+    });
+
+    it("offers exactly the statuses the type declares", () => {
+        expect(redirectProps().status.enum).toEqual([...STATIC_REDIRECT_STATUSES]);
+    });
+
+    const HOSTS = ["example.com", "www.example.com", "xn--bcher-kva.example", "Example.com", "localhost", "10.0.0.1", "example.com:443", "https://example.com"];
+
+    it.each(HOSTS)("judges the redirect host %j the same way on both sides", (value) => {
+        expect({ value, schema: new RegExp(redirectProps().host.pattern).test(value) })
+            .toEqual({ value, schema: cliAccepts({ from: "/old", to: "/new", host: value }, "host") });
     });
 });

@@ -21,7 +21,7 @@ import path from "path";
 import { execa } from "execa";
 
 import { getProjectPort } from "../utils/dev-server";
-import { appBannerLines, backendWatchCommand, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devServedSiteUrl, devStaticShape, devWatchArgs, devWatchIncludes, envFileHiddenFromTsx, needsStaleSchemaPreflight, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
+import { appBannerLines, backendWatchCommand, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devServedSiteUrl, devStaticShape, devWatchArgs, devWatchIncludes, envFileHiddenFromTsx, needsStaleSchemaPreflight, pathWithinApp, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
 import { validateManifest } from "../manifest";
 
@@ -964,6 +964,34 @@ describe("the banner's app lines", () => {
             staff: { type: "static", root: "staff", output: "staff/dist", path: "/staff", cms: "/staff" }
         });
         expect(appBannerLines(LOCAL, API, shape)).toContainEqual(["➜ CMS:   ", "/staff"]);
+    });
+
+    it("prints an admin app declared at /admin at Vite's root, where `rebase dev` serves it", () => {
+        // `rebase apps add admin` beside a site at `/` declares this shape.
+        // `rebase dev` runs the app with base "/", so `<vite>/admin` was a
+        // route the admin's own router does not have.
+        const shape = shapeOf({
+            site: { type: "static", root: "site", output: "site", path: "/", spa: false },
+            admin: { type: "static", root: "frontend", output: "frontend/dist", path: "/admin", cms: "/admin" }
+        });
+        expect(shape.cms?.localPath).toBe("/");
+        const lines = appBannerLines(LOCAL, API, shape);
+        expect(lines).toContainEqual(["➜ Admin: ", LOCAL]);
+        expect(values(lines).join("\n")).not.toContain(`${LOCAL}/admin`);
+    });
+
+    it("prints a CMS route beneath an app's path relative to the app", () => {
+        const shape = shapeOf({ admin: { type: "static", root: "frontend", output: "frontend/dist", path: "/admin", cms: "/admin/cms" } });
+        expect(appBannerLines(LOCAL, API, shape)).toContainEqual(["➜ CMS:   ", `${LOCAL}/cms`]);
+    });
+
+    it("maps a CMS path into its app's own paths", () => {
+        expect(pathWithinApp("/", "/")).toBe("/");
+        expect(pathWithinApp("/admin", "/")).toBe("/admin");
+        expect(pathWithinApp("/admin", "/admin")).toBe("/");
+        expect(pathWithinApp("/admin/", "/admin/")).toBe("/");
+        expect(pathWithinApp("/admin/cms", "/admin")).toBe("/cms");
+        expect(pathWithinApp("/administer", "/admin")).toBe("/administer");
     });
 
     it("reads the CMS as the running frontend's when no declared app is `frontend/`", () => {

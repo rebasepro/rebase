@@ -237,6 +237,7 @@ export default defineConfig({
                         { label: "Custom Functions", slug: "docs/backend/custom-functions" },
                         { label: "Background Work", slug: "docs/backend/background-work" },
                         { label: "Rate limits in functions", slug: "docs/backend/function-rate-limits" },
+                        { label: "SQL functions (RPC)", slug: "docs/backend/rpc" },
                         { label: "Runtime portability", slug: "docs/backend/runtime-portability" },
                         { label: "Typed server-side data", slug: "docs/backend/typed-server-data" },
                         { label: "Global Hooks", slug: "docs/backend/hooks" },
@@ -346,7 +347,8 @@ export default defineConfig({
                         { label: "How Rebase Works", slug: "docs/architecture" },
                         { label: "Schema as Code", slug: "docs/architecture/schema-as-code" },
                         { label: "Runtime & Bundles", slug: "docs/architecture/runtime-and-bundles" },
-                        { label: "Apps & Repositories", slug: "docs/architecture/apps-and-repositories" }
+                        { label: "Apps & Repositories", slug: "docs/architecture/apps-and-repositories" },
+                        { label: "Redirects & Clean URLs", slug: "docs/architecture/redirects-and-clean-urls" }
                     ]
                 },
                 {

@@ -234,7 +234,7 @@ export function DirectRlsPoliciesPanel() {
                                 <ShieldIcon size={iconSize.small} className={"text-text-secondary shrink-0"} />
                                 <Typography variant="subtitle2" className="font-mono truncate">{selected.schema}.{selected.name}</Typography>
                                 <Chip size="smallest" colorScheme={selected.rlsEnabled ? "greenLight" : "orangeLight"}>
-                                    {selected.rlsEnabled ? "RLS Enabled" : "RLS Disabled"}
+                                    {selected.rlsEnabled ? t("studio_rls_enabled") : t("studio_rls_disabled")}
                                 </Chip>
                             </div>
                             <Button size="small" color="primary" variant="filled" onClick={() => setDialogOpen(true)}>

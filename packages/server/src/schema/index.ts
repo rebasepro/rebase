@@ -26,7 +26,9 @@ export {
     policy,
     isTableDef,
     isAuthTableDef,
-    isViewDef
+    isViewDef,
+    defineRpc,
+    isRpcDef
 } from "@rebasepro/types";
 
 export type {
@@ -39,6 +41,14 @@ export type {
     ViewConfig,
     AnyTableDef,
     AnyViewDef,
+    // SQL functions exposed at `/api/rpc/<name>`.
+    RpcDef,
+    RpcConfig,
+    RpcAccess,
+    RpcArgs,
+    RpcArgsShape,
+    RpcRateLimit,
+    AnyRpcDef,
     ColumnsShape,
     RelationsShape,
     RlsPosture,

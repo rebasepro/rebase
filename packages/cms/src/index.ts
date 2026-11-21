@@ -26,6 +26,20 @@ export type {
     TableCustomization,
     TableCustomizationOptions
 } from "@rebasepro/cms-types";
+// The types a page, an action or a view written in a project's `frontend/`
+// names. A scaffolded project installs `@rebasepro/cms`, not
+// `@rebasepro/cms-types`, so what it writes against is reachable from here.
+export type {
+    AdditionalFieldKey,
+    AdminCollection,
+    AppView,
+    AuthControllerExtended,
+    CollectionActionsProps,
+    CollectionCustomView,
+    CollectionCustomViewParams,
+    EntityAction,
+    OverridableComponentName
+} from "@rebasepro/cms-types";
 
 // Components — explicitly listed to avoid conflicts with ./types re-exports
 export {

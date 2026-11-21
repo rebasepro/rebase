@@ -477,6 +477,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // schema editor rewrites on a source boot.
         tables: loadedSchema?.defs,
         defaultRls: loadedSchema?.defaultRls,
+        // The SQL functions the same index exports with `defineRpc`.
+        rpc: loadedSchema?.rpc,
         schemaDir: bundle.tablesDir,
         functionsDir: bundle.functionsDir,
         cronsDir: bundle.cronsDir,
@@ -726,7 +728,9 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
                 ],
                 owns,
                 spa: staticApp.spa,
-                frameAncestors: staticApp.frameAncestors
+                frameAncestors: staticApp.frameAncestors,
+                redirects: staticApp.redirects,
+                cleanUrls: staticApp.cleanUrls
             });
         }
     }
@@ -962,7 +966,9 @@ async function bootStaticApp(
             excludePaths: ["/health", "/livez", "/metrics", ...siblingPaths],
             owns,
             spa: staticApp.spa,
-            frameAncestors: staticApp.frameAncestors
+            frameAncestors: staticApp.frameAncestors,
+            redirects: staticApp.redirects,
+            cleanUrls: staticApp.cleanUrls
         });
     }
 

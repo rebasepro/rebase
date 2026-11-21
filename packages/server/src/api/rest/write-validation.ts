@@ -862,6 +862,18 @@ function collectJsonViolations(key: string, node: JsonShape, value: unknown, int
     }
 }
 
+/**
+ * The rules a value breaks under a JSON shape node — ranges, lengths,
+ * patterns, closed sets, list rules — recursing into objects, arrays and typed
+ * blocks, each named by its path under `key`. A value of the wrong kind
+ * breaks none of these: its type is the caller's to check.
+ */
+export function jsonShapeViolations(key: string, node: JsonShape, value: unknown): WriteViolation[] {
+    const violations: WriteViolation[] = [];
+    collectJsonViolations(key, node, value, violations);
+    return violations;
+}
+
 /** Whether the server writes a JSON field a write leaves out: a default, or a stamp. */
 function serverFills(node: JsonShape): boolean {
     if (node.default !== undefined) return true;

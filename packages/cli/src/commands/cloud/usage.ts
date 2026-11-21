@@ -16,7 +16,6 @@ import {
     displayProjectRef,
     emit,
     fail,
-    getContextOrg,
     parseCloudArgs,
     requireClient,
     requireKnownAction,
@@ -24,6 +23,7 @@ import {
     type CloudClient
 } from "./context";
 import { reportCallError, type Unserved } from "./not-served";
+import { requireOrg } from "./org-scope";
 
 /** What `usage` says on a control plane that has no `usage` function yet. */
 const USAGE_UNSERVED: Unserved = {
@@ -189,8 +189,7 @@ export async function usageCommand(rawArgs: string[]): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
 
     if (action === "org") {
-        const org = getContextOrg(url);
-        if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
+        const org = await requireOrg(client, url);
         let usage: CliOrgUsage;
         try {
             usage = await readOrgUsage(client, org, month);

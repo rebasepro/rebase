@@ -16,7 +16,7 @@
  * Change `DATE_FIELD` / `TITLE_FIELD` to your collection's keys.
  */
 import React, { useMemo, useState } from "react";
-import type { CollectionCustomView, CollectionCustomViewParams } from "@rebasepro/cms-types";
+import type { CollectionCustomView, CollectionCustomViewParams } from "@rebasepro/cms";
 import { Button, Typography } from "@rebasepro/ui";
 import { getDatePropertyTimezone } from "@rebasepro/cms";
 

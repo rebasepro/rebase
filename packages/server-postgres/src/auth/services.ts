@@ -291,8 +291,25 @@ export class UserService implements UserRepository {
         } catch (error) {
             // Drizzle wraps the pg error, so the SQLSTATE is down the `cause`
             // chain rather than on the error itself.
-            if (extractPgError(error)?.code === "23505") {
+            const pgError = extractPgError(error);
+            if (pgError?.code === "23505") {
+                // A kept id (an import) can collide on the key as well as on
+                // the email; the key's constraint is the one ending `_pkey`.
+                if (data.id !== undefined && pgError.constraint?.endsWith("_pkey")) {
+                    throw ApiError.conflict("An account with this id already exists", "ID_EXISTS");
+                }
                 throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+            }
+            // A kept id the id column cannot hold: not a uuid on a uuid column,
+            // not a number on an integer one (22P02), or a column that
+            // generates every id itself (428C9, GENERATED ALWAYS).
+            if (data.id !== undefined && (pgError?.code === "22P02" || pgError?.code === "428C9")) {
+                throw ApiError.badRequest(
+                    pgError.code === "428C9"
+                        ? "The users table generates its ids, so an account cannot keep one: leave `id` out."
+                        : `The users table's id column cannot hold this id: ${pgError.message}`,
+                    "INVALID_ID"
+                );
             }
             throw error;
         }
@@ -301,7 +318,16 @@ export class UserService implements UserRepository {
     async getUserById(id: string): Promise<UserData | null> {
         const idCol = getColumn(this.usersTable, "id");
         if (!idCol) return null;
-        const [row] = await this.db.select().from(this.usersTable).where(eq(idCol, id));
+        let row: unknown;
+        try {
+            [row] = await this.db.select().from(this.usersTable).where(eq(idCol, id));
+        } catch (error) {
+            // An id the column cannot hold (`abc` against a uuid key) names no
+            // account; Postgres refuses to compare it (22P02) rather than
+            // finding nothing.
+            if (extractPgError(error)?.code === "22P02") return null;
+            throw error;
+        }
         return row ? this.mapRowToUser(row as Record<string, unknown>) : null;
     }
 

@@ -51,6 +51,12 @@ export interface UseKanbanDragAndDropParams<M extends Record<string, unknown>> {
     context: RebaseContext;
     boardDataController: BoardDataController<M>;
     analyticsController: AnalyticsController;
+    /**
+     * Called when a card is dropped at a new place in its own column on a
+     * board with no `orderProperty`: the position cannot be stored, and the
+     * board says why only then. A move to another column is saved either way.
+     */
+    onOrderNotKept?: () => void;
 }
 
 export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
@@ -61,7 +67,8 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
     dataClient,
     context,
     boardDataController,
-    analyticsController
+    analyticsController,
+    onOrderNotKept
 }: UseKanbanDragAndDropParams<M>) {
 
     const snackbarController = useSnackbarController();
@@ -87,8 +94,12 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
 
         const isColumnChange = moveInfo.sourceColumn !== moveInfo.targetColumn;
 
-        // If no orderProperty and not a column change, nothing to do
-        if (!orderProperty && !isColumnChange) return;
+        // A move within the column on a board with nowhere to store the
+        // position: nothing to save, and the order goes back on the next read.
+        if (!orderProperty && !isColumnChange) {
+            onOrderNotKept?.();
+            return;
+        }
 
         // Build updated values
         let updatedValues: Record<string, unknown> = {};
@@ -178,7 +189,7 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
             });
             boardDataController.refreshAll();
         }
-    }, [collection, columnProperty, orderProperty, context, dataClient, boardDataController, analyticsController, fullPath, snackbarController, t]);
+    }, [collection, columnProperty, orderProperty, context, dataClient, boardDataController, analyticsController, fullPath, snackbarController, t, onOrderNotKept]);
 
     return useMemo(() => ({ handleItemsReorder }), [handleItemsReorder]);
 }

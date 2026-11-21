@@ -366,7 +366,7 @@ export { createHistoryRoutes } from "./history";
 export { loadFunctions, loadFunctionsFromDirectory, loadFunctionsWithDiagnostics, createFunctionRoutes } from "./functions/internal";
 export type { FunctionApp, FunctionsRecord, LoadDirectoryOptions, LoadedFunction, LoadedFunctions } from "./functions/internal";
 export { defineFunction } from "./functions";
-export type { RebaseFunctionContext } from "./functions";
+export type { DefineFunctionOptions, RebaseFunctionContext } from "./functions";
 export {
     // Request context
     getUser,

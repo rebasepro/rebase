@@ -301,8 +301,6 @@ export function useLocalCollectionsConfigController(
         // eslint-disable-next-line react-hooks/exhaustive-deps -- `request` and `resolveToken` are rebuilt every render over the editor URL and the token source, which `editorUrl` and `authKey` stand for; listing them would re-ask on every render
     }, [editorUrl, forcedReadOnly, authKey]);
 
-    const sourceEditorEnabled = availability.state === "known" && availability.enabled;
-
     // ── Live schema editing ───────────────────────────────────────────
     const liveSchema = useLiveSchemaEditing({
         baseUrl: `${clientBaseUrl}${clientApiPath}/admin/schema`,

@@ -23,6 +23,7 @@ import { absolutizeLocalPathArgs } from "./db";
 import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir, refuseRemovedCollectionsFlag } from "../utils/path-flags";
 import { schemaDirArgs } from "../utils/schema-dir";
 import { RECONCILE_USAGE } from "./schema-reconcile";
+import { adoptSchemaInCodeInstructions, cliTemplatesDir, instructionsAfterIntrospectLines } from "../utils/introspected-instructions";
 
 /**
  * The line handed to the driver, its paths resolved from where the command was
@@ -149,6 +150,7 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
             { projectRoot, backendDir, pluginCli, env },
             [...driverArgs, ...schemaDirArgs(projectRoot, driverArgs)]
         );
+        if (subcommand === "introspect") reportInstructionsAfterIntrospect(projectRoot);
     } catch (error) {
         // A child that ran and exited non-zero already printed its diagnostics
         // through inherited stdio; a child that never started (ENOENT on tsx,
@@ -157,6 +159,27 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
         reportSpawnFailure(error);
         process.exit(1);
     }
+}
+
+/**
+ * After introspection has written `backend/schema/`: the headless
+ * `ai-instructions.md` becomes the schema-in-code one, or, when it has been
+ * edited, the command says which of its rules no longer hold. See
+ * `utils/introspected-instructions.ts`. Never a reason to fail the command.
+ */
+function reportInstructionsAfterIntrospect(projectRoot: string): void {
+    const templatesDir = cliTemplatesDir();
+    if (!templatesDir) return;
+    let lines: string[];
+    try {
+        lines = instructionsAfterIntrospectLines(adoptSchemaInCodeInstructions(projectRoot, templatesDir), projectRoot);
+    } catch (error) {
+        lines = [`⚠ ai-instructions.md could not be updated for backend/schema/: ${error instanceof Error ? error.message : String(error)}`];
+    }
+    if (lines.length === 0) return;
+    console.log("");
+    for (const line of lines) console.log(line.startsWith("✓") ? chalk.green(`  ${line}`) : chalk.yellow(`  ${line}`));
+    console.log("");
 }
 
 /** One page per subcommand, so `rebase schema <action> --help` says something. */

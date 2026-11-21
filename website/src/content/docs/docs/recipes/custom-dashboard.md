@@ -200,7 +200,7 @@ Build the path rather than hard-coding it: collection URLs are prefixed
 `useSidePanel` opens an entity in the side panel instead of navigating, which is
 usually what you want for a row in a list.
 
-## Charts that open their records
+## Charts and figures that open their records
 
 `BarChart` draws categories as bars with their values beside them. Given
 `onBarClick`, each row is a button: open the list filtered to what the bar
@@ -226,6 +226,28 @@ function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; 
     );
 }
 ```
+
+A `KpiTile` opens its records the same way. Given `onClick`, the whole tile
+is a button; given `href`, it is a link, which a modified click opens in a new
+tab and a plain click hands to `onClick`, so the admin's router navigates
+without reloading the page:
+
+```tsx
+const pending = `${urls.buildUrlCollectionPath("orders")}?status_op=${encodeURIComponent("==")}&status_value=pending`;
+
+<KpiTile
+    label="Pending orders"
+    icon="Inbox"
+    value={counts?.pending}
+    loading={loading}
+    href={pending}
+    onClick={() => urls.navigate(pending)}
+/>
+```
+
+Without either, the tile is a plain card. Do not wrap a tile in a `<button>`
+or `<a>` of your own: the tile's control is named by its label, figure and
+change, and takes the focus ring.
 
 The charts are SVG in the admin's own tokens, in light and dark, with a hover
 and arrow-key readout and a table for screen readers; no chart library is
