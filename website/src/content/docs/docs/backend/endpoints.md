@@ -181,9 +181,6 @@ a table reaches none of this. See [Roles and scopes](/docs/backend/roles-and-sco
 | `POST` | `/api/admin/schema-editor/apply` | `schema:write` | The same edit, written to `backend/schema`; the database is not touched |
 | `GET` | `/api/admin/schema-editor/unmapped-tables` | `schema:read` | Tables the database has and `backend/schema` does not declare: `{ tables: [{ schema, table, rlsEnabled, policies, unimportable? }] }` |
 | `GET` | `/api/admin/schema-editor/unmapped-tables/:schema/:table` | `schema:read` | One of them described: `{ table: { …, descriptor, rlsRaised?, notes } }`, for "Import an existing table". `404` when unknown or already declared, `400 SCHEMA_EDIT_REFUSED` without a primary key |
-| `GET` | `/api/admin/schema-editor/frontend/calls` | `schema:read` | The `defineFirestoreCollection` calls in `frontend/src/cms` the editor can rewrite (development only) |
-| `POST` | `/api/admin/schema-editor/frontend/preview` | `schema:write` | The files an edit of one of those calls would write; writes nothing |
-| `POST` | `/api/admin/schema-editor/frontend/apply` | `schema:write` | The same edit, written in place. `409 SCHEMA_EDIT_STALE_FILE` when the file changed on disk |
 | `GET` | `/api/admin/ui-config` | session | The workspace's UI preferences per table, the caller's own, and whether the caller may write the workspace's — see [Customizing a table](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences) |
 | `PUT` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | Merge a `UiTablePreferences` delta into one table's workspace preferences (`replace` replaces). Written to `frontend/src/cms/ui-config.json` where the server may write the project's source, else to `rebase.ui_preferences` |
 | `DELETE` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | Remove one table's workspace preferences |

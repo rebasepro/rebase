@@ -150,7 +150,7 @@ nunca se les ofrezcan pestañas de relaciones ni filtros que Firestore no pueda 
 
 ## Editarla en el editor de colecciones
 
-En desarrollo, el [editor de colecciones](/docs/studio/#collection-editor) también edita
+En desarrollo, el [editor de colecciones](/docs/studio/#built-in-studio-tools) también edita
 colecciones de Firestore: al guardar, se reescribe directamente la llamada a
 `defineFirestoreCollection({...})` de la colección en `frontend/src/cms`,
 modificando solo lo que hayas editado. Las funciones, los componentes personalizados, los

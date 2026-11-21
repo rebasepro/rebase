@@ -149,7 +149,7 @@ recebam abas de relacionamento ou filtros que o Firestore não consiga executar.
 
 ## Editando no editor de coleções
 
-Em ambiente de desenvolvimento, o [editor de coleções](/docs/studio/#collection-editor) edita
+Em ambiente de desenvolvimento, o [editor de coleções](/docs/studio/#built-in-studio-tools) edita
 coleções do Firestore também: salvar reescreve a chamada
 `defineFirestoreCollection({...})` da coleção diretamente em `frontend/src/cms`,
 alterando apenas o que você editou. Funções, componentes customizados, comentários e

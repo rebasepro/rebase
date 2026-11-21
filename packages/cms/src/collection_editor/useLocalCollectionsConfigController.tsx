@@ -19,7 +19,6 @@ import { LiveSchemaError, type SchemaEditProblem } from "./liveSchemaClient";
 import type { SplitEdit } from "./split_edit";
 import { SplitEditError } from "./split_edit_error";
 import { useDetachRulesConfirmation } from "./useDetachRulesConfirmation";
-import { FIRESTORE_COLLECTION_CALLEE } from "./firestore_callee";
 
 /**
  * What the backend said about its schema editor, and how sure we are.
@@ -118,33 +117,6 @@ function readSummaries(body: unknown): TableSourceSummary[] {
             columns: listed(entry.columns, "key").map(c => ({ key: c.id, ...(c.reason ? { editedInCode: c.reason } : {}) })),
             relations: listed(entry.relations, "name").map(r => ({ name: r.id, ...(r.reason ? { editedInCode: r.reason } : {}) })),
             ...(typeof entry.rlsEditedInCode === "string" ? { rlsEditedInCode: entry.rlsEditedInCode } : {})
-        }];
-    });
-}
-
-/** How the frontend source editor's `GET /frontend/calls` describes one Firestore collection. */
-interface FrontendCallSummary {
-    slug: string;
-    file: string;
-    version: string;
-    info: TableSourceInfo;
-}
-
-function readCalls(body: unknown): FrontendCallSummary[] {
-    if (!isRecord(body) || !Array.isArray(body.calls)) return [];
-    return body.calls.flatMap((entry): FrontendCallSummary[] => {
-        if (!isRecord(entry) || typeof entry.value !== "string" || typeof entry.file !== "string" || typeof entry.version !== "string") return [];
-        const fields: Record<string, string> = {};
-        if (isRecord(entry.members)) {
-            for (const [member, reason] of Object.entries(entry.members)) {
-                if (typeof reason === "string" && member.startsWith("fields.")) fields[member.slice("fields.".length)] = reason;
-            }
-        }
-        return [{
-            slug: entry.value,
-            file: entry.file,
-            version: entry.version,
-            info: { file: entry.file, fields, ...(typeof entry.editedInCode === "string" ? { editedInCode: entry.editedInCode } : {}) }
         }];
     });
 }
@@ -278,17 +250,6 @@ export function useLocalCollectionsConfigController(
     const authKey = options?.authKey ?? null;
     const [availability, setAvailability] = useState<SchemaEditorAvailability>({ state: "unknown" });
     const [sources, setSources] = useState<Record<string, TableSourceInfo>>({});
-    /** The Firestore collections the frontend source editor found, by slug. */
-    const [frontendCalls, setFrontendCalls] = useState<Record<string, FrontendCallSummary>>({});
-
-    /** Ask the frontend source editor where each Firestore collection is written, and what in it is code. */
-    const refreshFrontendCalls = async (): Promise<void> => {
-        const listed = await request("GET", `/frontend/calls?callee=${FIRESTORE_COLLECTION_CALLEE}&key=slug&list=fields`).catch(() => undefined);
-        if (listed === undefined) return;
-        const next: Record<string, FrontendCallSummary> = {};
-        for (const call of readCalls(listed)) next[call.slug] = call;
-        setFrontendCalls(next);
-    };
 
     useEffect(() => {
         if (forcedReadOnly === true) return;
@@ -322,7 +283,6 @@ export function useLocalCollectionsConfigController(
                             for (const summary of readSummaries(listed)) next[summary.slug] = sourceInfoOf(summary);
                             setSources(next);
                         }
-                        if (!cancelled) await refreshFrontendCalls();
                     }
                 } else {
                     setAvailability({
@@ -338,17 +298,10 @@ export function useLocalCollectionsConfigController(
         })();
 
         return () => { cancelled = true; };
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- `request`, `resolveToken` and `refreshFrontendCalls` are rebuilt every render over the editor URL and the token source, which `editorUrl` and `authKey` stand for; listing them would re-ask on every render
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `request` and `resolveToken` are rebuilt every render over the editor URL and the token source, which `editorUrl` and `authKey` stand for; listing them would re-ask on every render
     }, [editorUrl, forcedReadOnly, authKey]);
 
-    // A Firestore collection's file is re-read after every save (the dev
-    // server reloads the module, and the collections change): its version
-    // is what the next save is checked against.
     const sourceEditorEnabled = availability.state === "known" && availability.enabled;
-    useEffect(() => {
-        if (sourceEditorEnabled && forcedReadOnly !== true) void refreshFrontendCalls();
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- re-read when the served collections change (the module reloaded); the availability effect does its own first read when the editor turns on
-    }, [parsedCollections]);
 
     // ── Live schema editing ───────────────────────────────────────────
     const liveSchema = useLiveSchemaEditing({
@@ -405,26 +358,17 @@ export function useLocalCollectionsConfigController(
     };
 
     /**
-     * Whether Firestore collections can be edited here: the dev server's
-     * source editor is on, which writes their `defineFirestoreCollection`
-     * calls in frontend/src/cms. Off — production, a deployed API, no
-     * `schema:read` — they are read-only, with where to edit them.
+     * External/Firestore collections live in frontend code (`frontend/src/cms`)
+     * and are never rewritten by the backend server.
      */
-    const frontendEditable = forcedReadOnly !== true && sourceEditorEnabled;
+    const frontendEditable = false;
 
-    /** Save a Firestore collection: the whole edit is an edit of its definition in the frontend. */
-    const saveFirestore = async (slug: string, after: AdminCollection, before?: AdminCollection): Promise<void> => {
-        if (!frontendEditable) {
-            throw new SplitEditError("EXTERNAL_COLLECTION",
-                `"${slug}" is a Firestore collection: it is defined in the frontend (frontend/src/cms), and only a development server's source editor writes the frontend. Edit it there.`);
-        }
-        const loaded = before ?? findCollection(slug);
-        if (!loaded) throw new Error(`No collection "${slug}" is open in the editor.`);
-        const { firestoreCollectionPatches, firestoreSourceEdit } = await import("./firestore_edit");
-        const patches = firestoreCollectionPatches(loaded, after);
-        if (patches.length === 0) return;
-        await request("POST", "/frontend/apply", firestoreSourceEdit(slug, patches, frontendCalls[slug]?.version));
-        await refreshFrontendCalls();
+    /** Save a Firestore collection: refused — external collections are edited in frontend source. */
+    const saveFirestore = async (slug: string, _after: AdminCollection, _before?: AdminCollection): Promise<void> => {
+        throw new SplitEditError(
+            "EXTERNAL_COLLECTION",
+            `"${slug}" is an external/Firestore collection defined in frontend source (frontend/src/cms). Edit it directly in your frontend codebase.`
+        );
     };
 
     /** A table being imported, projected as the served tables are, its relations resolved among them. */
@@ -525,7 +469,7 @@ export function useLocalCollectionsConfigController(
         readOnlyReason,
         frontendCollectionsEditable: frontendEditable,
         collections: parsedCollections,
-        tableSource: (slug: string) => sources[slug] ?? frontendCalls[slug]?.info,
+        tableSource: (slug: string) => sources[slug],
         dialog: (
             <>
                 {liveSchema.dialog}
@@ -655,8 +599,6 @@ export function useLocalCollectionsConfigController(
         readOnly,
         readOnlyReason,
         sources,
-        frontendCalls,
-        frontendEditable,
         tablesBySlug,
         options?.getAuthToken,
         liveSchema.dialog,
