@@ -76,6 +76,7 @@ import { schemaDirArgs, resolveSchemaDir } from "../utils/schema-dir";
 import { BootRetry } from "../utils/boot-retry";
 import { ensureDevDatabase, probeTcp } from "../utils/dev-preflight";
 import { DEV_BACKEND_URL_ENV, getProjectPort } from "../utils/dev-server";
+import { forgetDevRun, preparedDatabaseUrl, recordDevBackendUrl, recordDevRun } from "../utils/dev-run";
 import { runDriverDbCommand, runDriverSchemaCommand } from "./db";
 import dotenv from "dotenv";
 import { recordEvent } from "../telemetry";
@@ -671,6 +672,12 @@ export interface DevStaticShape {
         appName: string;
         /** Always a path. */
         path: string;
+        /**
+         * The same address inside the app that serves it. `rebase dev` runs an
+         * app at Vite's root (`REBASE_APP_BASE` is set by `rebase build` only),
+         * so an admin declared at `/admin` with `cms: "/admin"` is at `/` locally.
+         */
+        localPath: string;
         /** The serving app's hostname, when its `path` names one. */
         host?: string;
         /** Whether the app serving it is the one `rebase dev` runs, so it has a local address. */
@@ -729,12 +736,24 @@ export function devStaticShape(
                 cms: {
                     appName: mount.appName,
                     path: mount.path,
+                    localPath: pathWithinApp(mount.path, staticAppAddress(mount.appName, mount.app).path),
                     ...(mount.host ? { host: mount.host } : {}),
                     servedLocally: served ? served.appName === mount.appName : true
                 }
             }
             : {})
     };
+}
+
+/**
+ * `cmsPath` (an address on the app's whole path) as a path inside the app:
+ * `/admin` in an app at `/admin` is `/`. Exported for its test.
+ */
+export function pathWithinApp(cmsPath: string, appPath: string): string {
+    const base = appPath.replace(/\/+$/, "");
+    if (base === "") return cmsPath;
+    if (cmsPath === base || cmsPath === `${base}/`) return "/";
+    return cmsPath.startsWith(`${base}/`) ? cmsPath.slice(base.length) : cmsPath;
 }
 
 /**
@@ -776,8 +795,8 @@ export function appBannerLines(frontendUrl: string, api: string, shape: DevStati
     }
     // The CMS at the root of the running app is the Admin line, deployed
     // address included, and printing it twice only makes the box longer.
-    if (cms.path === "/" && cmsDeployed === servedDeployed) return lines;
-    lines.push(["➜ CMS:   ", cms.path === "/" ? frontendUrl : `${frontendUrl.replace(/\/$/, "")}${cms.path}`]);
+    if (cms.localPath === "/" && cmsDeployed === servedDeployed) return lines;
+    lines.push(["➜ CMS:   ", cms.localPath === "/" ? frontendUrl : `${frontendUrl.replace(/\/$/, "")}${cms.localPath}`]);
     if (cmsDeployed) lines.push(deployedNote(cmsDeployed));
     return lines;
 }
@@ -1692,6 +1711,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             const urlFile = path.join(projectRoot, ".rebase-dev-url");
             if (fs.existsSync(urlFile)) fs.unlinkSync(urlFile);
         } catch { /* ignore */ }
+        forgetDevRun(projectRoot);
 
         children.forEach(killChildTree);
         const exitLines = devExitLines(prepared?.database.kind ?? null);
@@ -1837,6 +1857,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // The database was resolved — and the managed one started — beside the
         // generators above; see `overlapDevStartup`.
         if (prepared) Object.assign(env, prepared.env);
+        // For the commands run beside this one: where the backend is, and
+        // which database it applies schema edits to. See `utils/dev-run.ts`.
+        recordDevRun(projectRoot, preparedDatabaseUrl(prepared));
         /**
          * Whether this run is on the managed database.
          *
@@ -2339,6 +2362,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 // Save the url to a temp file for scripts to pick up
                 const urlFile = path.join(projectRoot, ".rebase-dev-url");
                 fs.writeFileSync(urlFile, `http://localhost:${resolvedBackendPort}`, "utf-8");
+                // …and for the CLI, beside the pid that proves it current.
+                recordDevBackendUrl(projectRoot, `http://localhost:${resolvedBackendPort}`);
 
                 // Save the port to .rebase-dev-port for port affinity
                 const portFile = path.join(projectRoot, DEV_PORT_FILENAME);

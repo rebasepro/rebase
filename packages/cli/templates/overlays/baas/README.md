@@ -68,6 +68,30 @@ const rebase = createRebaseClient({ baseUrl: process.env.REBASE_URL! });
 const posts = await rebase.data.table("posts").find();
 ```
 
+## Rebase Cloud
+
+`rebase cloud deploy` deploys this project to the Rebase Cloud project this
+directory is linked to. For that project's database, with nothing installed
+but the CLI (an organization owner or admin only):
+
+```bash
+rebase cloud db query "select count(*) from posts"   # one statement, its result printed
+rebase cloud db query --file backend/sql/extras.sql  # a file of functions, triggers or DO blocks, as one script
+rebase cloud db connect                              # a local port for psql or a GUI, while it runs
+```
+
+### Cloning this project
+
+The link to the cloud project is `.rebase/cloud.json`, and `.rebase/` is not
+committed: it also holds this machine's development database. A fresh clone is
+not linked, so every `rebase cloud` command answers "this directory is not
+linked" until you run, once:
+
+```bash
+rebase cloud login
+rebase cloud link --project <slug>   # `rebase cloud projects list` names the slugs
+```
+
 ## Declaring your tables in code
 
 The one-line switch: create `backend/schema/index.ts`. Once it exists, the
@@ -97,9 +121,11 @@ export { posts } from "./posts";
 
 ## Adding an admin UI later
 
-Nothing here locks you out of it. `rebase init` without `--headless` scaffolds
-the same backend with a `frontend/` beside it: `<RebaseCMS />` lists every table
-the backend serves with no code, and `frontend/src/cms/<table>.tsx` customizes
-one with `customizeTable(...)`. There is no `backend/src/index.ts` to edit — the
+Nothing here locks you out of it. `pnpm rebase apps add admin` (add
+`--path /admin` to serve it there) writes the `frontend/` that `rebase init`
+without `--headless` would have, with its workspace and its app in
+`rebase.json`; then `pnpm install` and `pnpm run dev`. `<RebaseCMS />` lists
+every table the backend serves with no code, and `frontend/src/cms/<table>.tsx`
+customizes one with `customizeTable(...)`. There is no `backend/src/index.ts` to edit — the
 published runtime boots this project — and `rebase eject` writes one if you want
 to own the entrypoint.

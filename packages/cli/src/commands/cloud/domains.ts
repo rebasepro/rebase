@@ -23,7 +23,12 @@
  * publish an A or a CNAME depends on apex-vs-subdomain and on the ingress
  * address behind the tenant host, which the CLI cannot know. Adding a host only
  * registers it — it is unverified until the records are published and `verify`
- * passes.
+ * passes. Adding one the project already has (a deploy registers the hosts
+ * `rebase.json` names) answers with that host's records and state.
+ *
+ * Verified is not yet served over HTTPS: the certificate is issued after
+ * verification, and the rows say nothing about it. `list`, `verify` and an
+ * `add` of a known host ask the host itself — see `certificate.ts`.
  */
 import chalk from "chalk";
 import {
@@ -41,6 +46,7 @@ import {
     reportError,
     type CloudClient
 } from "./context";
+import { checkCertificates, verifiedLabel, type CertificateCheck } from "./certificate";
 
 interface DomainRecord {
     type: "A" | "CNAME" | "TXT";
@@ -244,6 +250,24 @@ function pickDomain(set: DomainSet, named: string | undefined, action: string): 
     );
 }
 
+/** The certificate state of each verified host; a pending one is not on the Ingress, so it is not asked. */
+async function certificatesOf(domains: readonly DomainEntry[]): Promise<Map<string, CertificateCheck>> {
+    return checkCertificates(domains.filter(d => d.status === "verified").map(d => d.host));
+}
+
+/** A host's state as a person reads it: `pending`, `verified`, or `verified, certificate pending`. */
+function stateText(d: DomainEntry, certificate: CertificateCheck | undefined): string {
+    if (d.status !== "verified") return chalk.yellow(d.status);
+    const label = verifiedLabel(certificate);
+    return certificate && certificate.state !== "ready" ? chalk.yellow(label) : chalk.green(label);
+}
+
+/** The line under a verified host whose HTTPS is not ready, saying why. */
+function printCertificateNote(certificate: CertificateCheck | undefined): void {
+    if (!certificate || certificate.state === "ready") return;
+    console.log(chalk.gray(`    HTTPS: ${certificate.reason ?? "not ready"}. Browsers refuse the site until it is; check again in a few minutes.`));
+}
+
 function printRecords(instructions: DomainInstructions | undefined): void {
     const recs = [instructions?.pointing, instructions?.ownership].filter(Boolean) as DomainRecord[];
     if (!recs.length) return;
@@ -298,6 +322,7 @@ maxPositionals: 0 });
     const projectRef = displayProjectRef(rawArgs);
     try {
         const set = await loadDomains(client, projectId);
+        const certificates = await certificatesOf(set.domains);
         emit(
             () => {
                 console.log("");
@@ -313,23 +338,82 @@ maxPositionals: 0 });
                     console.log("");
                 }
                 for (const d of set.domains) {
-                    const status = d.status === "verified" ? chalk.green(d.status) : chalk.yellow(d.status);
+                    const certificate = certificates.get(d.host);
                     const role = d.primary && set.domains.length > 1
                         ? chalk.gray("  primary")
                         : d.redirectToPrimary ? chalk.gray("  redirects to the primary") : "";
-                    console.log(`  ${chalk.bold(d.host)}  ${status}${role}`);
+                    console.log(`  ${chalk.bold(d.host)}  ${stateText(d, certificate)}${role}`);
                     if (d.verifiedAt) console.log(chalk.gray(`    verified ${d.verifiedAt}`));
+                    printCertificateNote(certificate);
                     if (d.status !== "verified") printRecords(d.instructions);
                 }
                 console.log("");
             },
             { projectId,
 tenantHost: set.tenantHost ?? null,
-domains: set.domains }
+domains: set.domains.map(d => withCertificate(d, certificates)) }
         );
     } catch (e) {
         reportError(e, "Failed to load custom domains");
     }
+}
+
+/**
+ * A host as `--json` reports it: the row, and `certificate` — what its HTTPS
+ * answered (`ready`, `pending`, `unreachable`), or null for a host not verified,
+ * which is not served and was not asked.
+ */
+function withCertificate(d: DomainEntry, certificates: Map<string, CertificateCheck>): DomainEntry & { certificate: CertificateCheck | null } {
+    return { ...d, certificate: d.status === "verified" ? certificates.get(d.host) ?? null : null };
+}
+
+/** One custom domain as `cloud status` reports it. */
+export interface DomainStatus {
+    host: string;
+    status: "pending" | "verified";
+    primary: boolean;
+    /** What its HTTPS answered; null for a host not verified, which was not asked. */
+    certificate: CertificateCheck | null;
+}
+
+/**
+ * Every custom domain of a project with its certificate state, for `cloud
+ * status`; undefined when they could not be read — status says nothing then
+ * rather than "none".
+ */
+export async function projectDomainStates(client: CloudClient, projectId: string): Promise<DomainStatus[] | undefined> {
+    let set: DomainSet;
+    try {
+        set = await loadDomains(client, projectId);
+    } catch {
+        return undefined;
+    }
+    const certificates = await certificatesOf(set.domains);
+    return set.domains.map(d => ({
+        host: d.host,
+        status: d.status,
+        primary: d.primary,
+        certificate: d.status === "verified" ? certificates.get(d.host) ?? null : null
+    }));
+}
+
+/** One domain in a sentence: `shop.example.com (verified, certificate pending)`. */
+export function describeDomainStatus(d: DomainStatus): string {
+    const state = d.status === "verified" ? verifiedLabel(d.certificate ?? undefined) : "pending DNS verification";
+    return `${d.host} (${state})`;
+}
+
+/** Whether a failed `domains` add is the control plane saying the host is already on this project. */
+function alreadyOnProject(e: unknown): boolean {
+    return typeof e === "object" && e !== null && "status" in e && e.status === 409;
+}
+
+/** The entry for `host` in a set, as `add` compares hosts: case and a trailing dot aside. */
+function findHost(set: DomainSet, host: string): DomainEntry | undefined {
+    const wanted = host.trim().toLowerCase().replace(/\.$/, "");
+    // The column's domain held beside host rows is NOT on the list: adding it
+    // is how it joins the rows, which is what the warning below recommends.
+    return set.domains.find(d => d.host.toLowerCase() === wanted && (set.model === "column" || d.id !== null));
 }
 
 /**
@@ -357,9 +441,17 @@ async function addDomain(rawArgs: string[]): Promise<void> {
     const projectId = await requireProject(rawArgs, client);
 
     let added: DomainEntry | undefined;
+    // Already on the project — typically registered by a deploy, from a host
+    // `rebase.json` names. Not an error and not silence: the same answer a
+    // fresh add gives, records and state, flagged.
+    let alreadyRegistered = false;
     try {
         const set = await loadDomains(client, projectId);
-        if (set.model === "column") {
+        const existing = findHost(set, domain);
+        if (existing) {
+            added = existing;
+            alreadyRegistered = true;
+        } else if (set.model === "column") {
             // No `domains` function: the column is the project's one domain.
             await client.data.table("projects").update(projectId, { customDomain: domain });
             added = columnEntry(await fetchColumnSetup(client, projectId))[0];
@@ -374,23 +466,45 @@ async function addDomain(rawArgs: string[]): Promise<void> {
                     `Keep it by adding it too: \`rebase cloud domains add ${legacy.host}\`, then \`rebase cloud domains verify ${legacy.host}\`.`
                 );
             }
-            added = rowEntry(await client.functions.invoke<DomainRow>("domains", { host: domain }, { path: projectId })) ?? undefined;
+            try {
+                added = rowEntry(await client.functions.invoke<DomainRow>("domains", { host: domain }, { path: projectId })) ?? undefined;
+            } catch (e) {
+                // Registered between the read above and this write — a deploy
+                // in flight registers its hosts. The row is what to report.
+                if (!alreadyOnProject(e)) throw e;
+                added = findHost(await loadDomains(client, projectId), domain);
+                if (!added) throw e;
+                alreadyRegistered = true;
+            }
         }
     } catch (e) {
         reportError(e, "Failed to register domain");
     }
     if (!added) fail(`The control plane did not return ${domain}, so whether it was registered is unknown.`, "Run `rebase cloud domains list`.");
     const registered = added;
+    const certificate = registered.status === "verified"
+        ? (await certificatesOf([registered])).get(registered.host)
+        : undefined;
     emit(
         () => {
-            success(`Registered ${chalk.bold(registered.host)} — not yet verified`);
+            if (!alreadyRegistered) success(`Registered ${chalk.bold(registered.host)} — not yet verified`);
+            else if (registered.status === "verified") {
+                success(`${chalk.bold(registered.host)} is already on this project — ${verifiedLabel(certificate)}`);
+            } else success(`${chalk.bold(registered.host)} is already on this project — not yet verified`);
+            if (registered.status === "verified") {
+                printCertificateNote(certificate);
+                console.log("");
+                return;
+            }
             printRecords(registered.instructions);
             console.log(chalk.gray(`  Publish the records above, then run \`rebase cloud domains verify ${registered.host}\`.`));
             console.log("");
         },
         { success: true,
 projectId,
-...registered }
+...registered,
+certificate: certificate ?? null,
+alreadyRegistered }
     );
 }
 
@@ -412,11 +526,17 @@ async function verifyDomain(rawArgs: string[]): Promise<void> {
                 : await client.functions.invoke<VerifyAnswer>("domains", {}, { path: `${projectId}/${target.id}/verify` }),
             target
         );
+        // Verified is the DNS; live is HTTPS answering with a real certificate,
+        // which is issued only after verification and takes minutes.
+        const certificate = res.verified ? (await certificatesOf([res.entry])).get(res.entry.host) : undefined;
         emit(
             () => {
                 console.log("");
-                if (res.verified) success(`${target.host} is verified and live`);
-                else {
+                if (res.verified && (!certificate || certificate.state === "ready")) success(`${target.host} is verified and live`);
+                else if (res.verified) {
+                    success(`${target.host} is ${verifiedLabel(certificate)} — not live until HTTPS works`);
+                    printCertificateNote(certificate);
+                } else {
                     console.log(chalk.yellow(`  ⚠ ${target.host} is not verified yet`));
                     console.log("");
                     const rows: Array<[string, DomainCheck]> = [
@@ -439,6 +559,7 @@ id: res.entry.id,
 host: res.entry.host,
 verified: res.verified,
 status: res.entry.status,
+certificate: certificate ?? null,
 checks: res.checks,
 instructions: res.entry.instructions ?? null }
         );
@@ -687,7 +808,7 @@ export function printDomainsHelp(): void {
 description: "Every host, its status, and the DNS records it needs" },
             { action: "add",
 args: "<domain>",
-description: "Register a host" },
+description: "Register a host. One already on the project prints its records and state" },
             { action: "verify",
 args: "[domain]",
 description: "Check a host's DNS and put it live" },
@@ -704,7 +825,9 @@ description: "Stop serving a host" }
         notes: [
             "A project can be served on several hosts; each is verified on its own, and each serves the project unless it redirects.",
             "A CNAME is invalid at a zone apex: use an A record there and a CNAME below it.",
-            "`list` prints the exact records to add — copy them rather than deriving them."
+            "`list` prints the exact records to add — copy them rather than deriving them.",
+            "A verified host is served once its certificate is issued, a few minutes later: until then `list` and `verify` "
+                + "say `verified, certificate pending`."
         ]
     });
 }

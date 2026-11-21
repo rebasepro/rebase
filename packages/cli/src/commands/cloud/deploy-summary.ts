@@ -14,6 +14,7 @@
 import chalk from "chalk";
 import type { RebaseBundleManifest } from "@rebasepro/types";
 import type { DeployHost } from "./bundle-deploy";
+import { isCertificateErrorCode } from "./certificate";
 
 /**
  * Where a backend's API is mounted on its host. The runtime's default
@@ -241,7 +242,13 @@ function networkReason(e: unknown): string {
         if (e.name === "TimeoutError" || e.name === "AbortError") return "no answer within 10s";
         const cause = "cause" in e ? e.cause : undefined;
         if (cause instanceof Error && "code" in cause && typeof cause.code === "string") {
-            return cause.code === "ENOTFOUND" ? "hostname does not resolve yet" : `unreachable (${cause.code})`;
+            if (cause.code === "ENOTFOUND") return "hostname does not resolve yet";
+            // The host answers TLS with a certificate a browser refuses —
+            // after a domain is verified, the ingress's placeholder until the
+            // real one is issued. Not "unreachable": it is reachable, and the
+            // wait is minutes, not a fault.
+            if (isCertificateErrorCode(cause.code)) return `HTTPS certificate not ready yet (${cause.code})`;
+            return `unreachable (${cause.code})`;
         }
         return e.message;
     }

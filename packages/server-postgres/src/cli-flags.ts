@@ -68,6 +68,9 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "--schema-dir": String,
         "--dry-run": Boolean,
         "--allow-destructive": Boolean,
+        // Drop the policies on declared tables that no table declares
+        // (`schema/prune-policies.ts`), gated like a destructive statement.
+        "--prune-policies": Boolean,
         "--yes": Boolean,
         "-y": "--yes"
     },

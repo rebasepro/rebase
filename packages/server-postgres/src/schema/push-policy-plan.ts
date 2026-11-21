@@ -24,7 +24,8 @@
  *   store exactly as it is now is no change. Only one that could not be probed
  *   is listed as unstamped.
  * - **Policies dropped and kept:** {@link partitionOrphans}, which is how the
- *   push's reconcile step decides.
+ *   push's reconcile step decides. With `--prune-policies`, the kept ones on
+ *   declared tables are dropped too ({@link prunablePolicies}).
  */
 import type { CompiledTable } from "@rebasepro/types";
 import {
@@ -37,6 +38,7 @@ import {
     type Queryable
 } from "../security/policy-drift";
 import { probeRenderedPolicies, readPolicyStamps, tablesRlsWouldEnable } from "./ensure-policies";
+import { describePrunedPolicy, prunablePolicies } from "./prune-policies";
 
 export interface PolicyPushPlan {
     /** Declared tables in the database with row-level security off, as `schema.table`: the push switches it on. */
@@ -49,6 +51,10 @@ export interface PolicyPushPlan {
     drop: PolicyRef[];
     /** Policies no table describes, which the push leaves in force. */
     keep: PolicyRef[];
+    /** Of {@link keep}, the ones `--prune-policies` would drop: on declared tables, outside the `rebase` schema. */
+    prunable: PolicyRef[];
+    /** Policies on declared tables that no table describes, which `--prune-policies` makes the push drop. */
+    prune: PolicyRef[];
     /** Declared policies the database has with no stamp of Rebase's: re-created from their rules, changed or not. */
     unstamped: PolicyRef[];
 }
@@ -70,11 +76,13 @@ const UNSTAMPED_DIFFERS = "it carries no stamp of Rebase's, and its rule defines
  * @param options.adminRoleAvailable where the push writes the server-or-admin
  *        policies (`TO rebase_admin`, or `TO public` where the admin switch is
  *        not live); `"detect"` reads it off the database. Left out, as compiled.
+ * @param options.prunePolicies `--prune-policies`: the policies on declared
+ *        tables that no table describes are dropped, not kept.
  */
 export async function planPolicyPush(
     client: Queryable,
     compiledTables: readonly CompiledTable[],
-    options: { searchPath?: string; adminRoleAvailable?: AdminPoliciesExpectation } = {}
+    options: { searchPath?: string; adminRoleAvailable?: AdminPoliciesExpectation; prunePolicies?: boolean } = {}
 ): Promise<PolicyPushPlan> {
     const adminRoleAvailable = await resolveAdminPolicies(client, options.adminRoleAvailable);
     const drift = await checkPolicyDrift(client, compiledTables, { adminRoleAvailable });
@@ -104,12 +112,17 @@ export async function planPolicyPush(
         else unstamped.push(policy);
     }
 
-    return { enableRls, create: drift.missing, replace, drop: dropped, keep: kept, unstamped };
+    const prunable = prunablePolicies(kept, compiledTables);
+    if (options.prunePolicies) {
+        const pruned = new Set(prunable.map(keyOf));
+        return { enableRls, create: drift.missing, replace, drop: dropped, keep: kept.filter(p => !pruned.has(keyOf(p))), prunable: [], prune: prunable, unstamped };
+    }
+    return { enableRls, create: drift.missing, replace, drop: dropped, keep: kept, prunable, prune: [], unstamped };
 }
 
 /** Whether the push would change any row-level security. Kept and unstamped policies are not changes. */
 export function policyPlanChanges(plan: PolicyPushPlan): boolean {
-    return plan.enableRls.length + plan.create.length + plan.replace.length + plan.drop.length > 0;
+    return plan.enableRls.length + plan.create.length + plan.replace.length + plan.drop.length + plan.prune.length > 0;
 }
 
 const describe = (p: PolicyRef): string => `${p.schema}.${p.table} → "${p.name}" (${p.command} TO ${p.roles.join(", ")})`;
@@ -127,6 +140,11 @@ export function formatPolicyPushPlan(plan: PolicyPushPlan): { changes: string[];
         for (const p of plan.create) changes.push(`       create policy   ${describe(p)}`);
         for (const { policy, why } of plan.replace) changes.push(`       replace policy  ${describe(policy)}: ${why.join("; ")}`);
         for (const p of plan.drop) changes.push(`       drop policy     ${describe(p)}, left by a rule edited since`);
+        for (const p of plan.prune) changes.push(`       drop policy     ${describePrunedPolicy(p)}, which no table declares (--prune-policies)`);
+        if (plan.prune.length > 0) {
+            changes.push("  Dropping a policy changes who can read and write the table's rows: the push asks first,");
+            changes.push("  and without a terminal it needs --allow-destructive.");
+        }
     }
 
     const notes: string[] = [];
@@ -139,6 +157,10 @@ export function formatPolicyPushPlan(plan: PolicyPushPlan): { changes: string[];
     if (plan.keep.length > 0) {
         notes.push("  Policies in the database that no table describes, which the push leaves in force:");
         for (const p of plan.keep) notes.push(`       ${describe(p)}`);
+        if (plan.prunable.length > 0) {
+            notes.push(`  \`rebase db push --prune-policies\` drops the ${plan.prunable.length === 1 ? "one" : plan.prunable.length} on tables backend/schema declares; ` +
+                "it never touches a table it does not declare.");
+        }
     }
     return { changes, notes };
 }
@@ -151,6 +173,7 @@ export function summarizePolicyPushPlan(plan: PolicyPushPlan): string | null {
         plan.create.length > 0 ? count(plan.create.length, "policy to create", "policies to create") : "",
         plan.replace.length > 0 ? `${plan.replace.length} to replace` : "",
         plan.drop.length > 0 ? `${plan.drop.length} to drop` : "",
+        plan.prune.length > 0 ? `${plan.prune.length} no table declares to drop (--prune-policies)` : "",
         plan.enableRls.length > 0 ? `RLS to switch on for ${count(plan.enableRls.length, "table", "tables")}` : ""
     ].filter(Boolean);
     return `  Row-level security: ${parts.join(", ")}. \`rebase db push --dry-run\` lists them.`;

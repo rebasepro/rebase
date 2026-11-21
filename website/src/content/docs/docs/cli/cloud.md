@@ -59,12 +59,19 @@ tokens. See [Rebase Cloud](/docs/deployment/cloud#link-a-project).
 ## Project link
 
 ```bash
-rebase cloud link         # link this directory to a cloud project
+rebase cloud link         # link this directory to a cloud project (picked from a list)
+rebase cloud link <slug>  # link the project with that slug or id, as --project <slug> does
 rebase cloud link [url]   # or straight at a backend: no control plane, no login, and the rest of the family refuses until you unlink
 rebase cloud unlink       # remove the link
 rebase cloud use [org]    # select the active organization
 rebase cloud open         # open the dashboard in a browser
 ```
+
+The organization commands (`orgs`, `billing`, `usage org`, `activity`,
+`projects create`, `tokens create --can billing`) act on `--org <id>`, else the
+organization `cloud use` selected, else the linked project's organization. In
+that last case they say which one they used. `orgs delete` never takes it from
+the link: it needs `--org` or a selected organization.
 
 ### Connect a self-hosted instance to Claude
 
@@ -126,13 +133,21 @@ deploy also uploads the project's source — what git tracks, never a `.env` —
 platform upgrade can rebuild it; `--no-source` skips that once, and `cloud settings set
 --platform-rebuilds off` stops it and deletes the stored copy. `--allow-downgrade` deploys an older release.
 
+A platform upgrade can rebuild a managed app on a newer `@rebasepro` release
+than your checkout pins. A deploy from that checkout would put the older admin
+panel and driver back, so it is refused before anything is built, with the
+command that fixes it (`rebase upgrade --to <version>`). `rebase cloud status`
+says the same thing earlier: a `Rebuilt on` line, and in `--json`,
+`runtime.platformRebuiltVersion` and `frameworkDrift`.
+
 A followed `deploy` ends on a summary: each app it shipped with its URL, the
 deployment id, how long it took, and whether the new version answers there. It
 waits up to `--live-timeout` seconds (default 60; `0` skips the check) for a
 backend's `/health` and each static app's address to answer. A failed deploy
 ends on one line naming the app and the reason, and exits non-zero. The summary
 prints even when piped; `--json` (or `REBASE_JSON=1`) prints one object instead,
-with `apps`, `hosts`, `live`, `liveChecks` and `durationMs`.
+with `apps`, `hosts`, `live`, `liveChecks` and `durationMs`. A host whose HTTPS
+certificate is not issued yet is reported as not live, with that reason.
 
 Before uploading, `deploy` parses the JavaScript of every static app it ships:
 the `.js`/`.mjs`/`.cjs` files in its `output` and the inline `<script>` blocks in
@@ -208,6 +223,16 @@ rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
 rebase cloud service-key [rotate] --preview <name>  # a backend preview's own key
 ```
 
+`domains add` for a host the project already has, such as one a deploy
+registered from `rebase.json`, prints that host's DNS records and state as a
+fresh add does; `--json` adds `alreadyRegistered: true`. A verified host is
+served over HTTPS once its certificate is issued, a few minutes after
+verification. Until then the ingress answers with a placeholder certificate,
+and `domains list`, `domains verify` and `status` say
+`verified, certificate pending` rather than live. The CLI finds this out with
+one TLS handshake to each verified host; `--json` carries it as `certificate`
+(`ready`, `pending` or `unreachable`, with a `reason`).
+
 `app-key` lists the
 key `rebase cloud init --claim` minted on the app and wrote into `.env` as
 `REBASE_API_TOKEN`, by its prefix and never its value. Claiming the project
@@ -253,6 +278,12 @@ printf %s "$STRIPE_KEY" | rebase cloud env set STRIPE_KEY --stdin --secret
 One trailing newline is dropped. The MCP server's `rebase_cloud_env_set` sets
 values this way.
 
+`env set KEY --prompt` asks for the value at a hidden prompt on your terminal.
+Nothing is echoed, and the value is stored as a secret, as with `--stdin
+--secret`. An agent can give you the command to run, so the value never goes
+through the chat. Without a terminal it refuses (`input_required`) and points
+at `--stdin`.
+
 ## Organizations
 
 ```bash
@@ -262,17 +293,19 @@ rebase cloud orgs invites [list] | revoke <id|email> | resend <id|email>
 rebase cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit N] [--before <cursor>]
 ```
 
-`members invite` opens an invitation and prints its link: single use,
-valid 7 days, accepted only by an account that has verified that address.
-Nobody joins until they accept, even someone who already has a Rebase account.
-The output (and `emailDelivery` in `--json`) says whether it was emailed; when
-it was not, a warning says to send the link yourself. `--role` is `admin` or
-`member` (default). Nobody is invited as `owner`: invite them as an admin, and
-an owner promotes them with `members role <email> owner` once they have joined.
-`invites resend` gives a new link and the old one stops working.
-Inviting and `invites` need a `rebase cloud login` session; `REBASE_TOKEN` is
-refused. Inviting, listing, resending and revoking take the owner or admin
-role; a member is told so.
+`members invite <email>` adds someone who already has a Rebase account with a
+verified email address, as the console's Add member does. They have access at
+once and nothing is emailed. Rebase Cloud does not send invitations yet, so a
+person with no account gets no link: the command refuses with `no_account` and
+asks you to have them sign up first, then run it again. A control plane that
+serves invitations opens one instead and prints its link (single use, valid 7
+days, accepted only by an account that has verified that address); `invites`
+lists, revokes and resends those, and answers `not_served` elsewhere.
+`--role` is `admin` or `member` (default). Nobody is added as `owner`: add them
+as an admin, and an owner promotes them with `members role <email> owner`.
+Adding members and `invites` need a `rebase cloud login` session;
+`REBASE_TOKEN` is refused. Both take the owner or admin role; a member is told
+so.
 `members remove` asks first (`--yes` skips it); removing or demoting an owner
 takes an owner, and the last owner stays. `--org <id>` picks an organization
 other than the selected one.

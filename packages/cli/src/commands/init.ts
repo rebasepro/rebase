@@ -45,6 +45,39 @@ function findParentDir(currentDir: string, targetName: string): string | null {
 
 const cliRoot = findParentDir(__dirname, "cli");
 
+/**
+ * A path under this CLI's `templates/`: the scaffold (`template/`), its
+ * overlays and presets, and the outputs shipped beside them. `rebase apps add`
+ * builds from the same files `init` does.
+ */
+export function templatesPath(...segments: string[]): string {
+    return path.resolve(cliRoot!, "templates", ...segments);
+}
+
+/**
+ * Copy a template tree into a project, leaving out what a checkout of the CLI
+ * may hold beside the template files: `node_modules` and `.DS_Store`.
+ */
+export async function copyTemplateTree(from: string, to: string): Promise<void> {
+    await cp(from, to, {
+        recursive: true,
+        filter: (source: string) => {
+            const basename = path.basename(source);
+            return basename !== "node_modules" && basename !== ".DS_Store";
+        }
+    });
+}
+
+/**
+ * A template file's text with the project written in: `{{PROJECT_NAME}}`, and
+ * every `"@rebasepro/<package>": "workspace:*"` pinned to `version`.
+ */
+export function fillTemplatePlaceholders(content: string, projectName: string, version: string): string {
+    return content
+        .replace(/\{\{PROJECT_NAME\}\}/g, () => projectName)
+        .replace(/"(@rebasepro\/[^"]+)":\s*"workspace:\*"/g, (_match, pkgName: string) => `"${pkgName}": "${version}"`);
+}
+
 const PROJECT_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/;
 
 /**
@@ -1017,14 +1050,7 @@ async function createProject(options: InitOptions) {
     // Copy template files
     console.log(chalk.gray("  Copying project files..."));
     try {
-        await cp(options.templateDirectory, options.targetDirectory, {
-            recursive: true,
-            filter: (source: string) => {
-                const basename = path.basename(source);
-                // Skip node_modules and .DS_Store
-                return basename !== "node_modules" && basename !== ".DS_Store";
-            }
-        });
+        await copyTemplateTree(options.templateDirectory, options.targetDirectory);
     } catch (err: unknown) {
         console.error(`${chalk.red.bold("ERROR")} Failed to copy template files: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
@@ -1330,7 +1356,7 @@ export function presetOverlayPath(preset: Exclude<TemplatePreset, "blog">): stri
  * Lay the preset's tables and customizations over the blog preset the template
  * ships. Returns the preset actually applied.
  */
-async function applyPreset(targetDirectory: string, preset: TemplatePreset): Promise<TemplatePreset> {
+export async function applyPreset(targetDirectory: string, preset: TemplatePreset): Promise<TemplatePreset> {
     if (preset === "blog") return preset;
     const presetDir = presetOverlayPath(preset);
     if (!fs.existsSync(presetDir)) {
@@ -1512,14 +1538,7 @@ async function replacePlaceholders(options: InitOptions) {
     }
 
     for (const [fullPath, originalContent] of fileContents.entries()) {
-        let content = originalContent.replace(/\{\{PROJECT_NAME\}\}/g, options.projectName);
-        for (const pkgName of allPackages) {
-            content = content.replace(
-                new RegExp(`"${pkgName}":\\s*"workspace:\\*"`, "g"),
-                `"${pkgName}": "${version}"`
-            );
-        }
-        fs.writeFileSync(fullPath, content, "utf-8");
+        fs.writeFileSync(fullPath, fillTemplatePlaceholders(originalContent, options.projectName, version), "utf-8");
     }
 }
 

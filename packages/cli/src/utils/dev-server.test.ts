@@ -28,11 +28,22 @@ function writeState(contents: unknown): void {
     fs.writeFileSync(path.join(root, ".rebase", "state.json"), JSON.stringify(contents));
 }
 
+function writeDevRun(contents: unknown): void {
+    fs.mkdirSync(path.join(root, ".rebase"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".rebase", "dev.json"), JSON.stringify(contents));
+}
+
 describe("devServerUrl", () => {
-    it("is the URL a running `rebase dev` wrote", () => {
+    it("is where this project's backend runs, while it does", () => {
+        writeState({ port: 3732, baseUrl: "http://localhost:3732", pid: process.pid });
+        expect(devServerUrl(root)).toEqual({ url: "http://localhost:3732", source: "running" });
+    });
+
+    it("reads `.rebase-dev-url` as the URL the last run printed, never as proof that it runs", () => {
+        // A killed `rebase dev` leaves the file behind, naming a port that may be another server's by now.
         fs.writeFileSync(path.join(root, ".rebase-dev-url"), "http://localhost:3555\n");
         writeState({ port: 3732 });
-        expect(devServerUrl(root)).toEqual({ url: "http://localhost:3555", source: "running" });
+        expect(devServerUrl(root)).toEqual({ url: "http://localhost:3555", source: "recorded" });
     });
 
     it("is the port the last run recorded, once it has stopped", () => {
@@ -94,6 +105,20 @@ describe("runningBackendUrl", () => {
         // Far above any real pid_max: a backend that was killed leaves the file behind.
         writeState({ port: 3755, baseUrl: "http://localhost:3755", pid: 2 ** 30 });
         expect(runningBackendUrl(root)).toBeNull();
+    });
+
+    it("is the port the running `rebase dev` recorded for its backend, over a state file another backend rewrote", () => {
+        // An orphaned backend from an earlier `rebase dev` restarts on a save and writes state.json again.
+        writeState({ port: 3083, baseUrl: "http://localhost:3083", pid: process.pid });
+        writeDevRun({ pid: process.pid, database: null, backendUrl: "http://localhost:3082" });
+        expect(runningBackendUrl(root)).toBe("http://localhost:3082");
+        expect(devServerUrl(root)).toEqual({ url: "http://localhost:3082", source: "running" });
+    });
+
+    it("falls back to the state file when the `rebase dev` that recorded itself is gone", () => {
+        writeState({ port: 3083, baseUrl: "http://localhost:3083", pid: process.pid });
+        writeDevRun({ pid: 2 ** 30, database: null, backendUrl: "http://localhost:3082" });
+        expect(runningBackendUrl(root)).toBe("http://localhost:3083");
     });
 
     it("is null with no state file, or one with no pid", () => {

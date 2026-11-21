@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { afterEach, describe, expect, it } from "vitest";
 import { assertBuiltForPath, foldableApps, foldFrontendIntoBundle, staticBuildEnv } from "./fold-static";
 import { buildAssetApp } from "./commands/build";
+import { workspaceSourceAliases } from "../vitest.config";
 
 describe("choosing which frontends to serve from the backend", () => {
     it("folds the single static app", () => {
@@ -44,6 +45,23 @@ spa: true });
         });
         expect(apps.find(a => a.name === "docs")).not.toHaveProperty("routes");
         expect(apps.find(a => a.name === "docs")).not.toHaveProperty("frameAncestors");
+    });
+
+    it("carries an app's redirects and cleanUrls to the fold, and leaves cleanUrls off unless true", () => {
+        const { apps } = foldableApps({
+            apps: {
+                site: {
+                    type: "static",
+                    output: "site",
+                    redirects: [{ from: "/old", to: "/new" }],
+                    cleanUrls: true
+                },
+                docs: { type: "static", output: "docs/dist", path: "/docs", redirects: [], cleanUrls: false }
+            }
+        });
+        expect(apps.find(a => a.name === "site")).toMatchObject({ redirects: [{ from: "/old", to: "/new" }], cleanUrls: true });
+        expect(apps.find(a => a.name === "docs")).not.toHaveProperty("redirects");
+        expect(apps.find(a => a.name === "docs")).not.toHaveProperty("cleanUrls");
     });
 
     it("folds every static app rather than picking one", () => {
@@ -304,6 +322,13 @@ describe("a caller whose stdout carries a JSON result", () => {
             await buildAssetApp(root, "admin", admin, "^1", undefined, { quietStdout: true });
             process.stdout.write(JSON.stringify({ success: true }) + "\\n");
         `);
+
+        // The workspace packages from their source, as vitest resolves them
+        // for every other test here: left to `node_modules`, this process
+        // would run against their last build.
+        const paths = Object.fromEntries(workspaceSourceAliases().map(({ find, replacement }) =>
+            [find.source.replace(/^\^|\$$/g, "").replace(/\\\//g, "/"), [replacement]]));
+        fs.writeFileSync(path.join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { paths } }));
 
         const run = spawnSync(process.execPath, [tsxCli, script], { cwd: root, encoding: "utf8" });
 

@@ -18,7 +18,7 @@ These commands talk to a running app over its own API, so row-level security, fi
 | `--session` | Send the person session `rebase auth login` stored for that server |
 | `--anon` | Send nothing: what a visitor gets |
 
-Nothing else is guessed: with no `REBASE_BASE_URL` and no running `rebase dev`, a command refuses rather than send the service key to whatever listens on a port. Every command takes `--json` (and is JSON whenever stdout is not a terminal, as `rebase cloud` is) and `--yes`, which answers the confirmation that every destructive one asks; with no terminal it refuses with `confirmation_required` instead of prompting.
+Nothing else is guessed: with no `REBASE_BASE_URL` and no running `rebase dev`, a command refuses rather than send the service key to whatever listens on a port. The running `rebase dev` is the one whose process is alive, at the port its backend announced (`.rebase/dev.json`, else the backend's own `.rebase/state.json`); `.rebase-dev-url` is for your scripts, and a killed run leaves it behind, so no command reads it. Every command takes `--json` (and is JSON whenever stdout is not a terminal, as `rebase cloud` is) and `--yes`, which answers the confirmation that every destructive one asks; with no terminal it refuses with `confirmation_required` instead of prompting.
 
 `rebase api-keys`, `rebase storage orphans|move` and `rebase schema reconcile` take the same flags.
 
@@ -84,6 +84,7 @@ The accounts, through `/api/admin/users`, `/roles` and `/guests`. An account is 
 ```bash
 rebase users list --search ada
 rebase users create ada@example.com --role admin
+rebase users import users.csv --dry-run
 rebase users update bob@example.com --add-role editor
 rebase users update bob@example.com --disable
 rebase users reset-password bob@example.com
@@ -93,6 +94,31 @@ rebase users guests prune --older-than 30d --yes
 ```
 
 `create` emails an invitation, or answers a temporary password once when no mail can be sent. `--no-invite` creates the account with no password and sends nothing, for an app that signs in by magic link, an email code or a provider (`POST /api/admin/users` with `invite: false`). Granting a role, `--disable`, `delete` and `mfa-reset` ask first. No caller may grant a role above its own, or act on an account that outranks it. `rebase auth reset-password` is the older spelling, and still falls back to the database when the server is not running.
+
+### Importing accounts
+
+`import` brings accounts over from another system and keeps their ids, so the rows that point at a user still point at the same one. It takes a CSV, a JSON array or NDJSON (`--format`, else the extension), with these columns:
+
+| Column | |
+|---|---|
+| `id` | Kept as the account's id. Optional: without it the users table generates one. A uuid is the common case; letters, digits and `_ - . : \|` up to 128 characters also fit, though a `uuid` id column takes only uuids |
+| `email` | Required |
+| `display_name` / `displayName` | |
+| `photo_url` / `photoUrl` | |
+| `created_at` / `createdAt` | When the account was created there. Optional: now |
+| `email_verified` / `emailVerified` | `true`/`t`/`1` or `false`/`f`/`0`. Optional: `false`, and the first magic link or reset the account follows confirms it |
+| `roles` | `editor;viewer`, a quoted `"editor,viewer"`, or a Postgres array `{editor,viewer}` |
+
+No password and no hash is imported, and no email is sent: an imported account signs in by magic link, an email code, a provider, or a password reset. An account whose id or email is already taken is reported as skipped and left as it is, never updated, so a file can be run again. Each account is reported as created, skipped or failed with the reason; the command exits 1 when any failed. `--dry-run` checks every account and writes nothing. The CLI sends 100 accounts per request (`POST /api/admin/users/import`), on `rebase dev`, a server or a Rebase Cloud project alike.
+
+From Supabase:
+
+```bash
+SUPABASE_DB_URL="postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
+psql "$SUPABASE_DB_URL" -c "\copy (select id, email, created_at, email_confirmed_at is not null as email_verified from auth.users) to users.csv csv header"
+rebase users import users.csv --dry-run
+rebase users import users.csv --project my-app
+```
 
 ## `rebase cron`
 
@@ -172,7 +198,7 @@ rebase auth keys create --name ci --scopes data:read:posts --expires-in 30
 rebase auth keys revoke <id> --yes
 ```
 
-`auth emails` reads the development mailbox a server with no `SMTP_HOST` keeps instead of sending; `--clear` empties it. `auth keys` manages your own `rk_` keys, which act as you, narrowed to the scopes named; the server answers it only when the auth table sets `auth.personalKeys: true`. Service keys are `rebase api-keys`, which also gained `update <id>`.
+`auth emails` reads the development mailbox a server with no `SMTP_HOST` keeps instead of sending; `--clear` empties it. An empty mailbox is answered with the server that was asked (`The development mailbox at http://localhost:3082 (rebase dev) is empty.`, and `server` in the JSON), since an empty answer from another backend reads exactly like mail that was never sent. `auth keys` manages your own `rk_` keys, which act as you, narrowed to the scopes named; the server answers it only when the auth table sets `auth.personalKeys: true`. Service keys are `rebase api-keys`, which also gained `update <id>`.
 
 ## Next steps
 

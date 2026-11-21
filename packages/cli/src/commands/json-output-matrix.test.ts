@@ -137,6 +137,10 @@ const COMMANDS: Array<[name: string, command: Command]> = [
         argv: ["node", "rebase", "apps", "list", "--json"],
         run: () => appsCommand("list", ["node", "rebase", "apps", "list", "--json"])
     }],
+    ["apps add", {
+        argv: ["node", "rebase", "apps", "add", "admin", "--json"],
+        run: () => appsCommand("add", ["node", "rebase", "apps", "add", "admin", "--json"])
+    }],
     // `--no-install` and an exact version, so a refusal that failed to happen
     // could not reach the registry or an installer either.
     ["upgrade", {
@@ -148,9 +152,10 @@ const COMMANDS: Array<[name: string, command: Command]> = [
 /**
  * Commands that never read the backend or its declarations, so the two cases
  * about those have nothing to refuse. `upgrade` moves version strings in
- * package.json files; a project with no backend has them too.
+ * package.json files; a project with no backend has them too. `apps add`
+ * writes the admin beside whatever backend there is, and loads nothing of it.
  */
-const NO_BACKEND_NEEDED = new Set(["apps list", "upgrade"]);
+const NO_BACKEND_NEEDED = new Set(["apps list", "apps add", "upgrade"]);
 
 describe("--json on a failing command", () => {
     it.each(COMMANDS)("%s answers with an envelope outside a project", async (_name, command) => {

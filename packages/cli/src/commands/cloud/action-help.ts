@@ -129,7 +129,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--subdomain <slug>", "The <slug>.rebase.website host. Required, and not editable afterwards"],
             ["--db <managed|byodb|none>", "Which database to attach. Default: managed"],
             ["--connection-string <url>", "The PostgreSQL URL, for --db byodb"],
-            ["--org <id>", "Organization to create it in (default: the selected one)"],
+            ["--org <id>", "Organization to create it in (default: the selected one, else the linked project's)"],
             ["--link", "Link this directory to the new project"],
             ["--repo <url>", "Git repository to build from"],
             ["--branch <name>", "Git branch. Default: main"],
@@ -675,7 +675,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "env set": {
         command: "cloud env set",
-        usage: "cloud env set KEY=VALUE | KEY VALUE | KEY --stdin [--secret] [--force] [--preview]",
+        usage: "cloud env set KEY=VALUE | KEY VALUE | KEY --stdin | KEY --prompt [--secret] [--force] [--preview]",
         summary:
             "Set one environment variable on the project. Takes effect on the next deploy — "
             + "a running instance does not pick it up.",
@@ -683,6 +683,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--secret", "Store it encrypted and never return it in a listing"],
             ["--force", "Set a build-time key (VITE_*, NEXT_PUBLIC_*, …) anyway, for a build that reads it at run time"],
             ["--stdin", "Read the value from standard input, so it never appears in `ps` or your shell history. Give only KEY"],
+            ["--prompt", "Type the value at a hidden prompt on this terminal (nothing is echoed). Give only KEY. Stored as a secret"],
             ["--preview", "Set it for the project's previews only; production keeps its value"]
         ],
         examples: [
@@ -694,6 +695,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         notes: [
             "A value starting with `-` must use the KEY=VALUE form; the KEY VALUE form refuses it.",
             "`printf %s \"$STRIPE_KEY\" | rebase cloud env set STRIPE_KEY --stdin --secret` sets a value without putting it on the command line.",
+            "`rebase cloud env set STRIPE_KEY --prompt` asks for it instead: an agent can hand you the command, and the value never reaches the chat. "
+                + "Without a terminal it refuses and points at --stdin.",
             "Variables the platform sets for every project cannot be overridden — `env reveal` reads them."
         ]
     },
@@ -1282,15 +1285,16 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     link: {
         command: "cloud link",
-        usage: "cloud link [<url>] [--project <slug>]",
+        usage: "cloud link [<slug> | <url>] [--project <slug>]",
         summary:
             "Bind this directory to a backend, by writing .rebase/cloud.json. With a cloud project "
-            + "(picked interactively, or named with --project) the rest of the family needs no flags. "
+            + "(picked interactively, or named as the argument or with --project) the rest of the family needs no flags. "
             + "With a positional URL it links straight at a running Rebase API — no control plane, no "
             + "login — which is what makes the multi-repo workflow available to self-hosters.",
         flags: [],
         examples: [
             "rebase cloud link",
+            "rebase cloud link shop",
             "rebase cloud link --project shop",
             "rebase cloud link https://api.example.com"
         ],
@@ -1316,7 +1320,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         usage: "cloud use [<org>]",
         summary:
             "Select the active organization — the one `projects create`, `billing` and `orgs` act on. "
-            + "Named, it is set; omitted, you pick from the ones this account belongs to.",
+            + "Named, it is set; omitted, you pick from the ones this account belongs to. With none selected, those "
+            + "commands act on the linked project's organization, and say so.",
         flags: [],
         examples: ["rebase cloud use", "rebase cloud use acme"]
     },

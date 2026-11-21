@@ -554,6 +554,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("migrate collections-to-tables")} config/collections → backend/schema, SQL-checked
   ${chalk.blue.bold("migrate sdk-calls")}       Rewrite your own code for the table renames (data.table, rule keys)
   ${chalk.blue.bold("apps list")}               Show the apps this repository declares
+  ${chalk.blue.bold("apps add admin")}          Add the admin panel to a headless project ${chalk.gray("(--path /admin)")}
 
 ${chalk.green.bold("Schema")}
   ${chalk.blue.bold("schema generate")}         Generate the Drizzle schema from backend/schema

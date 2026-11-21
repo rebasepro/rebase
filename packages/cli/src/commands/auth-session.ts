@@ -292,16 +292,28 @@ export async function authEmails(rawArgs: string[]): Promise<void> {
     if (flags["--latest"]) messages = messages.slice(0, 1);
     if (flags["--links"]) {
         // Only the links, one per line: what a script pipes into the next step.
+        // None at all is said on stderr, with the server that was asked.
+        if (messages.length === 0) process.stderr.write(`${emptyMailboxLine(target.label)}\n`);
         for (const message of messages) for (const link of Array.isArray(message.links) ? message.links : []) process.stdout.write(`${String(link)}\n`);
         return;
     }
     emit(() => {
-        if (messages.length === 0) return note("The development mailbox is empty.");
+        if (messages.length === 0) return note(emptyMailboxLine(target.label));
         for (const message of messages) {
             console.log(`  ${chalk.gray(stringOf(message.at) ?? "")}  ${chalk.bold(stringOf(message.to) ?? "?")}  ${stringOf(message.subject) ?? ""}`);
             for (const link of Array.isArray(message.links) ? message.links : []) console.log(`      ${chalk.cyan(String(link))}`);
         }
-    }, { messages });
+    }, { server: target.label, messages });
+}
+
+/**
+ * What an empty mailbox says: which server was asked. An empty answer from
+ * the wrong server — a backend an earlier `rebase dev` left running — reads
+ * exactly like a mail that was never sent, and the address is the one thing
+ * that tells them apart.
+ */
+export function emptyMailboxLine(server: string): string {
+    return `The development mailbox at ${server} is empty.`;
 }
 
 /* ═══════════════════════════════════════════════════════════════

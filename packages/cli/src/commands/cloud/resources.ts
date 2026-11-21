@@ -18,7 +18,6 @@ import {
     requireProject,
     lookupProjectId,
     displayProjectRef,
-    getContextOrg,
     readLink,
     colorStatus,
     emit,
@@ -48,6 +47,9 @@ import { wantsRawError } from "./errors";
 import { billingInvoices, billingUpcoming } from "./billing-invoices";
 import { switchOn } from "../../utils/args";
 import { reportCallError, type Unserved } from "./not-served";
+import { NO_ORG_HINT, requireOrg } from "./org-scope";
+import { describeDomainStatus, projectDomainStates } from "./domains";
+import { driftSentence, frameworkDrift, localFrameworkVersion } from "./framework-drift";
 
 /* ─── status: quick project dashboard ──────────────────────────── */
 
@@ -330,11 +332,12 @@ maxPositionals: 0 });
                 gitBranch?: string; runtimeMode?: string | null; runtimeVersion?: string | null;
                 runtimeFrameworkVersion?: string | null; runtimeContract?: number | null;
                 runtimeRange?: string | null; runtimeVersionPin?: string | null;
+                platformRebuiltVersion?: string | null;
             }
             | undefined;
         if (!project) fail(`Project ${displayProjectRef(rawArgs)} not found.`, undefined, "not_found");
 
-        const [db, storage, deploy, baseDomain, maintenanceRead] = await Promise.all([
+        const [db, storage, deploy, baseDomain, maintenanceRead, domains] = await Promise.all([
             firstRow(client, "databases", projectId),
             // A control plane that does not have this route yet, or a lookup
             // that fails, yields `undefined` — which prints as a blank. A blank
@@ -347,7 +350,11 @@ path: projectId })
             fetchTenantBaseDomain(client, url),
             // A control plane without the maintenance function leaves the
             // section out and says so; the rest of the page is still the answer.
-            readMaintenance(client, projectId)
+            readMaintenance(client, projectId),
+            // Custom domains with whether HTTPS works on each: verified is the
+            // DNS, and the certificate comes minutes later. Undefined when they
+            // could not be read, which prints nothing rather than "none".
+            projectDomainStates(client, projectId)
         ]);
         const maintenance = maintenanceRead.kind === "ok" ? maintenanceRead.status : undefined;
         const notServed = maintenanceRead.kind === "not_served" ? ["maintenance"] : [];
@@ -359,6 +366,12 @@ path: projectId })
         const link = readLink();
         const grant = link?.projectId === projectId ? grantForLink(link) : undefined;
         const appKeyNote = grant && projectDotenvSetsAppKey() ? appKeyExpiryNote(grant.expiresAt) : undefined;
+        // A platform upgrade that moved the live app past this checkout: only
+        // when the checkout is this project's, since another directory's
+        // packages say nothing about it.
+        const drift = link?.projectId === projectId
+            ? frameworkDrift(project.platformRebuiltVersion, localFrameworkVersion(process.cwd()))
+            : undefined;
         const appUrl = projectHost(project, baseDomain);
         const blocked = resolveBlockedState({
             projectStatus: project.status,
@@ -382,6 +395,10 @@ path: projectId })
                     // A database change waiting for its window: said here so it
                     // is never a surprise on Sunday morning.
                     ["Maintenance", describePending(maintenance?.open)],
+                    ["Domains", domains && domains.length > 0 ? domains.map(describeDomainStatus).join(", ") : undefined],
+                    ["Rebuilt on", project.platformRebuiltVersion
+                        ? `@rebasepro ${project.platformRebuiltVersion} ${chalk.gray("· by a platform upgrade, from your last deploy")}`
+                        : undefined],
                     ["Claim URL", grant ? chalk.bold(grant.claimUrl) : undefined],
                     ["Expires", grant ? `${new Date(grant.expiresAt).toLocaleString()} unless claimed, then deleted` : undefined]
                 ]);
@@ -396,6 +413,12 @@ path: projectId })
                     console.log("");
                     console.log(`  ${chalk.yellow("Waiting on you")} ${chalk.gray(`— ${blocked.blockedOn}`)}`);
                     console.log(`  ${chalk.bold(blocked.nextAction ?? "")}`);
+                }
+                if (drift) {
+                    const said = driftSentence(drift);
+                    console.log("");
+                    console.log(`  ${chalk.yellow(`⚠ ${said.message}`)}`);
+                    console.log(`  ${chalk.bold(drift.nextAction)} ${chalk.gray("before the next deploy, or it is refused.")}`);
                 }
                 console.log("");
                 if (notServed.length > 0) note(chalk.gray(MAINTENANCE_NOT_SERVED_NOTE));
@@ -429,8 +452,17 @@ createdAt: deploy.createdAt ?? null } : null,
                     imageFrameworkVersion: project.runtimeFrameworkVersion ?? null,
                     contract: project.runtimeContract ?? null,
                     range: project.runtimeRange ?? null,
-                    pin: project.runtimeVersionPin ?? null
+                    pin: project.runtimeVersionPin ?? null,
+                    // The @rebasepro release a platform upgrade rebuilt the live
+                    // bundle on, while that rebuild is what runs; null otherwise.
+                    platformRebuiltVersion: project.platformRebuiltVersion ?? null
                 },
+                // Set when the live app runs a newer @rebasepro than this
+                // checkout: `nextAction` is what to run before deploying.
+                frameworkDrift: drift ?? null,
+                // Each custom domain, and `certificate` — what its HTTPS
+                // answered — for the verified ones. Null when unreadable.
+                domains: domains ?? null,
                 database: db ? { type: db.type ?? null,
 connectionStatus: db.connectionStatus ?? null } : null,
                 storage: storage ?? null,
@@ -1827,12 +1859,13 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
     }
 
     const { client, url } = await requireClient(rawArgs);
-    const org = getContextOrg(url);
+    // Every action but `checkout`, which names a project, is about an organization.
+    const org = action === "checkout" ? undefined : await requireOrg(client, url);
 
     // `rebase cloud billing email <address>` — where Stripe sends the invoices.
     // Written to the billing account and to the Stripe customer; owner/admin.
     if (action === "email") {
-        if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
+        if (!org) fail("No organization selected.", NO_ORG_HINT, "no_org");
         let res: { billingEmail?: string | null };
         try {
             res = await client.functions.invoke<{ billingEmail?: string | null }>(
@@ -1854,7 +1887,7 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
     // `rebase cloud billing invoices|upcoming` — what Stripe has invoiced the
     // org, and what it will invoice next. Read-only; owner/admin only.
     if (action === "invoices" || action === "upcoming") {
-        if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
+        if (!org) fail("No organization selected.", NO_ORG_HINT, "no_org");
         try {
             if (action === "invoices") await billingInvoices(client, org, limit);
             else await billingUpcoming(client, org);
@@ -1868,7 +1901,7 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
     // `rebase cloud billing setup` — attach a card to the org (one-time, opens a
     // browser). Once done, project create/deploy work headlessly (off_session).
     if (action === "setup") {
-        if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
+        if (!org) fail("No organization selected.", NO_ORG_HINT, "no_org");
         try {
             const res = await client.functions.invoke<{ url?: string; simulated?: boolean }>(
                 "stripe-billing",
@@ -1921,7 +1954,7 @@ projectId }
     }
 
     // default: show the active org's billing account.
-    if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
+    if (!org) fail("No organization selected.", NO_ORG_HINT, "no_org");
     try {
         const billingId = billingAccountIdOf(await client.data.table("organizations").findById(org));
         if (!billingId) {

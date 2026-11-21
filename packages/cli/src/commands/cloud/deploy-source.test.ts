@@ -348,6 +348,75 @@ describe("a bundle refused as a downgrade", () => {
     });
 });
 
+/**
+ * A platform upgrade rebuilt the live app on a newer release than this
+ * checkout. Intake refuses the older bundle; the preflight says so before
+ * anything is built or uploaded, with the command that fixes it.
+ */
+describe("a deploy from a checkout the platform has moved past", () => {
+    function rebuiltOn(version: string | null): void {
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                session: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }),
+                collection: () => ({ findById: async () => ({ id: "proj_1", platformRebuiltVersion: version }), find: async () => ({ data: [] }) }),
+                invoke
+            }),
+            url: "https://cp.example"
+        });
+    }
+
+    it("is refused before the upload, naming the live version and `rebase upgrade --to` it", async () => {
+        bundle("backend"); // built against 0.21.0
+        controlPlane();
+        rebuiltOn("0.34.2");
+
+        await expect(deploy("--no-source")).rejects.toMatchObject({ code: 1 });
+
+        expect(requests).toEqual([]);
+        expect(invoke.mock.calls.filter(([name]) => name === "deploy")).toEqual([]);
+        const text = said.join("\n");
+        expect(text).toContain("rebuilt this app on @rebasepro 0.34.2; this checkout is on 0.21.0");
+        expect(text).toContain("rebase upgrade --to 0.34.2");
+    });
+
+    it("refuses with the intake's own code in --json", async () => {
+        bundle("backend");
+        controlPlane();
+        rebuiltOn("0.34.2");
+        const out: string[] = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string) => { out.push(String(chunk)); return true; }) as typeof process.stdout.write);
+        context.setJsonModeForTest(true);
+        try {
+            await expect(deploy("--no-source")).rejects.toMatchObject({ code: 1 });
+        } finally {
+            context.setJsonModeForTest(false);
+        }
+        expect(JSON.parse(out.join("")).error).toMatchObject({ code: "FRAMEWORK_DOWNGRADE" });
+    });
+
+    it("warns and deploys with --allow-downgrade", async () => {
+        bundle("backend");
+        controlPlane();
+        rebuiltOn("0.34.2");
+
+        await deploy("--no-source", "--allow-downgrade");
+
+        expect(triggered().allowFrameworkDowngrade).toBe(true);
+        expect(said.join("\n")).toContain("Deploying 0.21.0 anyway (--allow-downgrade)");
+    });
+
+    it("says nothing when the live app is not a newer rebuild", async () => {
+        bundle("backend");
+        controlPlane();
+        rebuiltOn("0.20.0");
+
+        await deploy("--no-source");
+
+        expect(triggered().bundleId).toBe("b1");
+        expect(said.join("\n")).not.toContain("rebuilt this app");
+    });
+});
+
 describe("a bundle deploy blocked by another deploy", () => {
     it("names the blocking deployment and how to stop it, as a source deploy does", async () => {
         bundle("backend");

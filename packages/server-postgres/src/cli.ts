@@ -86,6 +86,7 @@ import { DESIRED_STATE_URL, GENERATED_SQL_DIR, generatedSqlDir, prepareGenerated
 import { backupActionOf } from "./backup-argv";
 import { DRIVER_DB_SUBCOMMANDS, isDriverDbSubcommand } from "./db-subcommands";
 import type { TableLockResult } from "./schema/ensure-policies";
+import type { PolicyRef } from "./security/policy-drift";
 import type { DeferredIndexBuild } from "./schema/plan/diff-plan";
 
 import { ACTIVE_BRANCH_DATABASE_ENV, planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
@@ -476,6 +477,7 @@ async function reportDestructiveMigration(migrationSql: string, migrationFile: s
 const DB_FLAGS = {
     "--schema-dir": String,
     "--allow-destructive": Boolean,
+    "--prune-policies": Boolean,
     "--refuse-destructive": Boolean,
     "--dry-run": Boolean,
     "--yes": Boolean,
@@ -846,7 +848,11 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // cannot show: it has no model for a policy. Read once, here, for
             // the dry run to list and the push to summarize — see
             // `schema/push-policy-plan.ts`.
-            const policyPlan = databaseUrl ? await readPolicyPushPlan(databaseUrl, schemaDir) : undefined;
+            const policyPlan = databaseUrl
+                ? await readPolicyPushPlan(databaseUrl, schemaDir, { prunePolicies: argsList["--prune-policies"] === true })
+                : undefined;
+            // `--prune-policies`: gated with the destructive statements — see `schema/prune-policies.ts`.
+            const pruned = policyPlan?.prune ?? [];
             const policyLines = policyPlan ?? { changes: [], notes: [] };
 
             // `--dry-run` stops here, having printed the SQL and nothing else.
@@ -931,19 +937,28 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
 
             const optIn = destructiveOptInFlag(argsList);
             const decision = decidePushSafety({
-                destructiveCount: destructive.length,
+                destructiveCount: destructive.length + pruned.length,
                 allowDestructive: optIn !== undefined,
                 interactive: process.stdin.isTTY === true
             });
 
-            if (destructive.length > 0) {
-                outWarn(chalk.yellow(`  ⚠️  This push includes ${destructive.length} change(s) that need confirming: ${describeDestructiveFindings(destructive)}.`));
-                outWarn("");
-                for (const line of destructiveLines(destructive)) outWarn(line);
-                outWarn("");
-                outWarn(chalk.yellow("  Full planned changes:"));
-                outWarn(chalk.gray(planListing.split("\n").map((l) => `       ${l}`).join("\n")));
-                outWarn("");
+            if (destructive.length + pruned.length > 0) {
+                if (destructive.length > 0) {
+                    outWarn(chalk.yellow(`  ⚠️  This push includes ${destructive.length} change(s) that need confirming: ${describeDestructiveFindings(destructive)}.`));
+                    outWarn("");
+                    for (const line of destructiveLines(destructive)) outWarn(line);
+                    outWarn("");
+                    outWarn(chalk.yellow("  Full planned changes:"));
+                    outWarn(chalk.gray(planListing.split("\n").map((l) => `       ${l}`).join("\n")));
+                    outWarn("");
+                }
+                if (pruned.length > 0) {
+                    const { prunedPolicyLines } = await import("./schema/prune-policies");
+                    const [heading, ...lines] = prunedPolicyLines(pruned);
+                    outWarn(chalk.yellow(`  ⚠️ ${heading}`));
+                    for (const line of lines) outWarn(chalk.gray(line));
+                    outWarn("");
+                }
 
                 if (decision === "refuse") {
                     outError(chalk.red("  ✗ Aborting: destructive changes require confirmation."));
@@ -961,7 +976,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 } else {
                     // decision === "apply" via --allow-destructive or --yes
                     outWarn(chalk.yellow(`  Proceeding because ${optIn ?? "--allow-destructive"} was passed.`));
-                    warnIfYesApprovedDestructive(optIn, destructive.length);
+                    warnIfYesApprovedDestructive(optIn, destructive.length + pruned.length);
                 }
             }
 
@@ -1018,7 +1033,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     // them, a fresh database got them TO public and its first boot
                     // moved every one.
                     await ensureRlsUserRole(databaseUrl);
-                    await applyPolicies(databaseUrl, schemaDir);
+                    await applyPolicies(databaseUrl, schemaDir, pruned);
                     await reconcilePolicies(databaseUrl, schemaDir);
                     await retireLegacyAuthSchema(databaseUrl);
                     // Last: the push has applied the whole schema, tables and
@@ -1514,10 +1529,13 @@ async function retireLegacyAuthSchema(databaseUrl: string): Promise<void> {
     }
 }
 
-async function applyPolicies(databaseUrl: string, schemaDir: string): Promise<void> {
+async function applyPolicies(databaseUrl: string, schemaDir: string, pruned: readonly PolicyRef[] = []): Promise<void> {
     try {
         const policiesPath = path.join(generatedSqlDir(), "policies.sql");
-        if (!fs.existsSync(policiesPath)) return;
+        if (!fs.existsSync(policiesPath)) {
+            if (pruned.length > 0) outWarn(chalk.yellow("  ⚠️  No policies.sql was generated, so --prune-policies dropped nothing."));
+            return;
+        }
         
         out(chalk.gray("  Step 3/3: Applying RLS policies to database..."));
         out("");
@@ -1540,8 +1558,13 @@ async function applyPolicies(databaseUrl: string, schemaDir: string): Promise<vo
             policiesContent = (await policiesToPublic(schemaDir, policiesContent)).split(`${ADMIN_POLICY_ROLE_SQL};`).join("");
         }
         const stamping = await policyStamping(databaseUrl, schemaDir, policiesContent, adminRoleAvailable);
+        // `--prune-policies`: in the same transaction, so a table gets its
+        // declared policies and loses the undeclared ones at once, or neither.
+        const { describePrunedPolicy, prunePoliciesSql } = await import("./schema/prune-policies");
+        if (pruned.length > 0) policiesContent = `${policiesContent}\n${prunePoliciesSql(pruned)}\n`;
         const { stampError } = await withAppClient(databaseUrl, client => applyPoliciesFile(client, policiesContent, stamping));
         out(chalk.green("  ✓ RLS policies applied successfully."));
+        for (const policy of pruned) out(chalk.gray(`  ✓ Dropped policy ${describePrunedPolicy(policy)}, which no table declares (--prune-policies)`));
         if (stampError) {
             // The policies are in; only the boot's shortcut is not. See applyPoliciesFile.
             outWarn(chalk.yellow(`  ⚠️  The policies could not be stamped (${stampError}); the next boot applies them again.`));
@@ -1680,10 +1703,12 @@ async function policyStamping(databaseUrl: string, schemaDir: string, policiesSq
  * prints and the one the push does; `undefined`, having said why, when it
  * cannot be read.
  */
-async function readPolicyPushPlan(databaseUrl: string, schemaDir: string): Promise<{
+async function readPolicyPushPlan(databaseUrl: string, schemaDir: string, options: { prunePolicies?: boolean } = {}): Promise<{
     changes: string[];
     notes: string[];
     summary: string | null;
+    /** What `--prune-policies` drops: exactly what the plan lists. */
+    prune: PolicyRef[];
 } | undefined> {
     try {
         const { formatPolicyPushPlan, planPolicyPush, summarizePolicyPushPlan } = await import("./schema/push-policy-plan");
@@ -1694,9 +1719,9 @@ async function readPolicyPushPlan(databaseUrl: string, schemaDir: string): Promi
         const plan = await withAppClient(databaseUrl, client => planPolicyPush(
             { query: async (text, values) => ({ rows: (await client.query(text, values)).rows }) },
             tables,
-            { searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public", adminRoleAvailable }
+            { searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public", adminRoleAvailable, prunePolicies: options.prunePolicies }
         ));
-        return { ...formatPolicyPushPlan(plan), summary: summarizePolicyPushPlan(plan) };
+        return { ...formatPolicyPushPlan(plan), summary: summarizePolicyPushPlan(plan), prune: plan.prune };
     } catch (err) {
         outWarn(chalk.yellow(`  ⚠️  Could not read the database's row-level security: ${err instanceof Error ? err.message : String(err)}`));
         return undefined;

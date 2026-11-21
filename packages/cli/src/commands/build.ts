@@ -519,7 +519,9 @@ export async function buildAssetApp(
         spa: asset.spa ?? true,
         cms: asset.cms,
         routes: asset.routes,
-        frameAncestors: asset.frameAncestors
+        frameAncestors: asset.frameAncestors,
+        redirects: asset.redirects,
+        cleanUrls: asset.cleanUrls
     });
     const rel = path.relative(projectRoot, result.outDir);
     say(

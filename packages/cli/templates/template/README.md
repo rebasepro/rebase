@@ -240,6 +240,30 @@ untouched.
 > editing `.env` directly — see `.env.example` for the full list. Do not
 > `cp .env.example .env`; that discards the values `init` generated.
 
+## Rebase Cloud
+
+`rebase cloud deploy` deploys this project to the Rebase Cloud project this
+directory is linked to. For that project's database, with nothing installed
+but the CLI (an organization owner or admin only):
+
+```bash
+rebase cloud db query "select count(*) from posts"   # one statement, its result printed
+rebase cloud db query --file backend/sql/extras.sql  # a file of functions, triggers or DO blocks, as one script
+rebase cloud db connect                              # a local port for psql or a GUI, while it runs
+```
+
+### Cloning this project
+
+The link to the cloud project is `.rebase/cloud.json`, and `.rebase/` is not
+committed: it also holds this machine's development database. A fresh clone is
+not linked, so every `rebase cloud` command answers "this directory is not
+linked" until you run, once:
+
+```bash
+rebase cloud login
+rebase cloud link --project <slug>   # `rebase cloud projects list` names the slugs
+```
+
 ## Documentation
 
 - [Rebase Docs](https://rebase.pro/docs)

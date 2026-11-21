@@ -407,11 +407,13 @@ trust under **Settings → Access tokens**.
 
 ## Invite your team
 
-**Members → Invite member** gives a link to copy (emailed when this control plane
-sends email) that works once, for 7 days, for an account that has verified that
-address; nobody joins until they accept. Invite an admin or a member, and make
-them an owner once they have joined. Owners and admins see, resend or revoke it in
-**Pending invitations**; from a terminal, [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+**Members → Add member** adds someone who already has a Rebase account with a
+verified email address, as an admin or a member; an owner can make them an owner
+afterwards. They have access at once and nothing is emailed. Rebase Cloud does
+not send invitations yet, so ask a teammate without an account to sign up and
+verify their address first. From a terminal:
+[`rebase cloud orgs members invite <email>`](/docs/cli/cloud/#organizations), which
+says so when the address has no account.
 
 ## See who did what
 
@@ -494,7 +496,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `env` | Environment variables. `list` never prints values; `--secret` is write-only |
 | `app-key` | The key `init --claim` wrote into `.env` as `REBASE_API_TOKEN`, handed over at the claim; `rotate` replaces it and revokes the old one. Owners and admins |
 | `service-key` | `REBASE_SERVICE_KEY`, admin on the app's own API: when it was last rotated; `rotate` gives the app a new one. Owners and admins |
-| `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). Every verified domain serves the project as itself; `primary <domain>` picks the canonical one and `redirect <domain>` answers another with a 308 to it, path and query kept (`--off` serves it again) — do that for `www.` beside an apex, since Google sign-in, cookies and passkeys are per origin. A domain one app is served on (an app `path` with a hostname) never redirects. `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
+| `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). Every verified domain serves the project as itself; `primary <domain>` picks the canonical one and `redirect <domain>` answers another with a 308 to it, path and query kept (`--off` serves it again) — do that for `www.` beside an apex, since Google sign-in, cookies and passkeys are per origin. A domain one app is served on (an app `path` with a hostname) never redirects. An apex domain (`example.com`, no subdomain) takes an **A** record, because DNS allows no CNAME there. That address is the platform's ingress, and it is not guaranteed to stay the same: if the platform moves, an A record keeps pointing at the old address. Where your DNS host offers ALIAS, ANAME or CNAME flattening at the apex, point the apex at the project's `tenantHost` instead, which follows the platform. A subdomain's CNAME follows it already. `list` says `verified, certificate pending` until HTTPS answers with a real certificate. `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
 | `guests` | The guest users anonymous sign-in left behind: count them, delete one, prune the ones not seen for an age. See [Guests](/docs/cli/cloud/#guests). Owners and admins |
 | `extensions` | The Postgres extension allowlist |
