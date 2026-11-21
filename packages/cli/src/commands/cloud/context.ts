@@ -1096,11 +1096,48 @@ permissive: true });
     if (parsed["--project"]) return parsed["--project"];
     const link = readLink();
     if (link?.projectId) return link.projectId;
-    fail(
+    const [message, hint] = notLinkedGuidance(hasCloudCredential(resolveCloudUrl(rawArgs)));
+    fail(message, hint, "no_project");
+}
+
+/**
+ * Whether this machine can act on the control plane at `url` as someone: a
+ * `rebase cloud login` session for that host, or `REBASE_TOKEN`. Read from the
+ * credentials file only — no request — so a refusal can say which step is next.
+ */
+export function hasCloudCredential(url: string): boolean {
+    return Boolean(envToken()) || Boolean(readCredentials().contexts[url]?.auth);
+}
+
+/**
+ * What a command that needs a project says in a directory that is not linked.
+ *
+ * It said "Pass --project <slug> or run rebase cloud link" to everyone, and
+ * `deploy` is the last step `rebase init` prints — so a new user's first
+ * deploy bounced four times: link wants a sign-in, then a project, which
+ * `link` cannot make. Someone with no session is shown the whole first deploy
+ * in order, as the Cloud docs give it; someone signed in, the two ways to get
+ * a project linked here.
+ */
+export function notLinkedGuidance(signedIn: boolean): [message: string, hint: string] {
+    if (!signedIn) {
+        return [
+            "This directory is not linked to a Rebase Cloud project, and you are not signed in.",
+            [
+                "To deploy it for the first time:",
+                `  ${chalk.bold("rebase cloud login")}`,
+                `  ${chalk.bold("rebase cloud billing setup")}            once per organization`,
+                `  ${chalk.bold("rebase cloud projects create --link")}   creates the project and links this directory`,
+                `  ${chalk.bold("rebase cloud deploy")}`,
+                `A project you already have: ${chalk.bold("rebase cloud link <slug>")} after signing in, or ${chalk.bold("--project <slug>")}.`
+            ].join("\n  ")
+        ];
+    }
+    return [
         "No project specified and this directory is not linked.",
-        `Pass ${chalk.bold("--project <slug>")} or run ${chalk.bold("rebase cloud link")}.`,
-        "no_project"
-    );
+        `Create one and link this directory: ${chalk.bold("rebase cloud projects create --link")}.\n`
+        + `  Link one you have: ${chalk.bold("rebase cloud link <slug>")}, or pass ${chalk.bold("--project <slug>")}.`
+    ];
 }
 
 /**
