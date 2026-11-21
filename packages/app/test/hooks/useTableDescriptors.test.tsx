@@ -254,3 +254,37 @@ describe("useTableDescriptors", () => {
         expect(tables).toHaveBeenCalledTimes(1);
     });
 });
+
+describe("useTableDescriptors after the backend comes back", () => {
+    it("asks again when the socket reconnects, and shows the table that appeared", async () => {
+        // `rebase dev` restarts the backend after a table file changes; the page
+        // showed the new table only after a manual reload.
+        const { schema, tables } = fakeSchema(async call => call === 1 ? [table("posts")] : [table("posts"), table("comments")]);
+        const reconnectHandlers = new Set<(...args: unknown[]) => void>();
+        const ws = {
+            on: (event: string, cb: (...args: unknown[]) => void) => {
+                if (event !== "reconnect") return () => undefined;
+                reconnectHandlers.add(cb);
+                return () => { reconnectHandlers.delete(cb); };
+            }
+        };
+        const client = { schema, ws };
+        const signedIn = auth(user("u1", ["admin"]));
+        const wrapper = ({ children }: { children: React.ReactNode }) => (
+            <RebaseClientInstanceContext.Provider value={client}>
+                <AuthControllerContext.Provider value={signedIn}>{children}</AuthControllerContext.Provider>
+            </RebaseClientInstanceContext.Provider>
+        );
+        const hook = renderHook(() => useTableDescriptors(), { wrapper });
+
+        await waitFor(() => expect(slugs(hook.result.current)).toEqual(["posts"]));
+        expect(reconnectHandlers.size).toBe(1);
+
+        act(() => reconnectHandlers.forEach(handler => handler()));
+        await waitFor(() => expect(slugs(hook.result.current)).toEqual(["posts", "comments"]));
+        expect(tables).toHaveBeenCalledTimes(2);
+
+        hook.unmount();
+        expect(reconnectHandlers.size).toBe(0);
+    });
+});

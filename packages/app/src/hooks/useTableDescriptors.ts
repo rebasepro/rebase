@@ -153,6 +153,16 @@ export function useTableDescriptors(options: UseTableDescriptorsOptions = {}): T
     const active = enabled && schema !== undefined && typeof caller === "string";
     const identity = active ? `${caller}#${reloads}` : undefined;
 
+    // A backend that comes back — `rebase dev` restarting after a table file
+    // changed, a deploy — may serve other tables than it did, and the page
+    // showed a new table only after a manual reload. The socket reconnecting
+    // is the sign it came back; an unchanged schema answers the ETag with 304.
+    const ws = client?.ws;
+    useEffect(() => {
+        if (!active || !ws) return;
+        return ws.on("reconnect", reload);
+    }, [active, ws, reload]);
+
     const [settled, setSettled] = useState<Settled | undefined>(undefined);
 
     // Signing out forgets what the last caller was served, so signing in again

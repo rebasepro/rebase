@@ -71,7 +71,7 @@ describe("a navigation group has one label", () => {
     it("translates all three, rather than leaving two in English", () => {
         const labels = GROUPS.map(group => homeLabel(group, "es"));
 
-        expect(labels).toEqual(["Vistas", "Base de datos", "Ajustes"]);
+        expect(labels).toEqual(["Tablas", "Base de datos", "Ajustes"]);
     });
 
     it("renders a group the app declared itself exactly as written", () => {
