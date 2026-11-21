@@ -100,7 +100,7 @@ The Studio ships 11 built-in dev tools, all **lazy-loaded** (code-split) so they
 | `"logs"` | `LogsExplorer` | Logs Explorer | Database | `Activity` | Real-time system, query, and authentication logs |
 | `"api-keys"` | `ApiKeysView` | API Keys | Access Control | `KeyRound` | Create and manage scoped service API keys |
 
-> **IMPORTANT FOR AGENTS:** The `"schema"` tool (collection editor) is **NOT** registered by `<RebaseStudio>`. It is auto-injected by `<RebaseShell>` when `collectionEditor` is enabled on `<RebaseCMS>` and `<RebaseStudio>` is mounted with `tools` omitted or containing `"schema"`. Do not try to register it manually — but when you pass a `tools` list, include `"schema"` in it or the collection editor's route is not registered.
+> **IMPORTANT FOR AGENTS:** There is no `"schema"` tool. The Studio's visual collection editor was removed: a table's schema is `defineTable` in `backend/schema/`, and its admin layout is `customizeTable` in `frontend/src/cms/` plus `ui-config.json`. Edit those files; do not look for an editor to drive.
 
 ### Enabling/Disabling Tools
 
@@ -111,20 +111,20 @@ By default, **all 11 tools** are enabled. Use the `tools` prop on `<RebaseStudio
 <RebaseStudio />
 <RebaseStudio tools={undefined} />
 
-// Enable only specific tools (no collection editor: "schema" is not listed)
+// Enable only specific tools
 <RebaseStudio tools={["sql", "rls", "storage"]} />
 
-// Enable everything except branches ("schema" keeps the collection editor)
-<RebaseStudio tools={["sql", "js", "rls", "schema", "storage", "cron", "schema-visualizer", "backups", "api", "logs", "api-keys"]} />
+// Enable everything except branches
+<RebaseStudio tools={["sql", "js", "rls", "storage", "cron", "schema-visualizer", "backups", "api", "logs", "api-keys"]} />
 ```
 
 The `tools` prop accepts an array of tool key strings:
 
 ```typescript
-type ToolKey = "sql" | "js" | "rls" | "schema" | "storage" | "cron"
+type ToolKey = "sql" | "js" | "rls" | "storage" | "cron"
     | "schema-visualizer" | "branches" | "backups" | "api" | "logs" | "api-keys";
 
-// Default when tools is undefined (plus "schema", injected when collectionEditor is on):
+// Default when tools is undefined:
 const DEFAULT_TOOLS: ToolKey[] = [
     "sql", "js", "rls", "storage", "cron", "schema-visualizer",
     "branches", "backups", "api", "logs", "api-keys"
@@ -376,7 +376,7 @@ interface NavigationGroupMapping {
 
 ```typescript
 interface RebaseStudioConfig {
-    tools?: ("sql" | "js" | "rls" | "schema" | "storage" | "cron"
+    tools?: ("sql" | "js" | "rls" | "storage" | "cron"
         | "schema-visualizer" | "branches" | "backups" | "api" | "logs" | "api-keys")[];
     homePage?: ReactNode;
     devViews?: AppView[];  // Your own Studio tools, added beside the built-in ones
@@ -411,7 +411,7 @@ every tool enabled:
 
 | Section | Tools |
 |---------|-------|
-| Database | Collections (when the collection editor is on), SQL Console, RLS Policies, Schema Visualizer, Branches, Backups, Logs Explorer |
+| Database | SQL Console, RLS Policies, Schema Visualizer, Branches, Backups, Logs Explorer |
 | Compute | JS Console, Cron Jobs |
 | Storage | Storage |
 | API | API Explorer |
@@ -788,43 +788,16 @@ Internally it composes:
 </RebaseAuthGate>
 ```
 
-## Visual Collection Editor
+## Editing tables and their policies
 
-The collection editor allows non-developers to:
-- Add, remove, rename and reorder columns
-- Configure column types and validation
-- Set up enum values and relations
-- Edit a table's row-level security rules
-
-Under the hood every edit is a typed change (`TablePatch`, in
-`packages/types/src/schema/table_patch.ts`) sent to `/api/admin/schema-editor`,
-which rewrites the `defineTable` files in `backend/schema/` with AST
-manipulation (via `ts-morph`) — preserving hooks and hand-written code — and
-then compiles the result. Presentation (labels, icons, enum colours, view modes)
-is not a schema edit: it lives in `frontend/src/cms/` and in UI preferences.
-The server refuses, and the editor shows as read-only "edited in code", what it
-cannot rewrite safely: a config built with a spread, a column built by a helper,
-rules held in a variable, renaming a table's slug or SQL name (a migration), or
-an edit that does not compile.
-
-### Enabling the Collection Editor
-
-```tsx
-// Simple — uses authController.getAuthToken automatically
-<RebaseCMS tableCustomizations={tableCustomizations} collectionEditor={true} />
-
-// With options
-<RebaseCMS
-    tableCustomizations={tableCustomizations}
-    collectionEditor={{
-        getAuthToken: authController.getAuthToken,
-        readOnly: false
-    }}
-/>
-```
-
-The backend side is on when it knows where the tables live: `schemaDir`
-(`backend/schema`) outside production — which is what `rebase dev` provides.
+There is no visual collection editor. A table's columns, relations and rules
+are `defineTable` in `backend/schema/` (see `rebase-tables`); how it looks in
+the admin is `customizeTable` in `frontend/src/cms/` and the shared
+`frontend/src/cms/ui-config.json`. The Studio's RLS editor still saves a
+table's policies into `backend/schema/` in development, through plan → confirm
+→ apply; `<RebaseCMS collectionEditor={{ readOnly, getAuthToken }}>` still tunes
+that. The backend side is on when it knows where the tables live: `schemaDir`
+(`backend/schema`) outside production, which is what `rebase dev` provides.
 
 ## Where the panel's collections come from
 
@@ -850,7 +823,7 @@ This starts both frontend and backend. The Studio is at the frontend URL `rebase
 |---------|-------------|
 | `@rebasepro/app` | Core framework, hooks, types, `<Rebase>` provider |
 | `@rebasepro/studio` | Studio admin panel (`<RebaseStudio>`, `StudioHomePage`, bridge hooks) |
-| `@rebasepro/cms` | CMS frontend (`<RebaseCMS>`, `<RebaseShell>`, `CollectionPanel`, collection editor) |
+| `@rebasepro/cms` | CMS frontend (`<RebaseCMS>`, `<RebaseShell>`, `CollectionPanel`) |
 | `@rebasepro/ui` | Component library (Tailwind v4 + Radix) |
 | `@rebasepro/types` | Shared TypeScript types |
 | `@rebasepro/plugin-ai` | AI-powered autofill |

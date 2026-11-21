@@ -157,7 +157,7 @@ nicht ausführen kann.
 ## Bearbeiten im Collection-Editor
 
 In der Entwicklungsumgebung bearbeitet der
-[Collection-Editor](/docs/studio/#collection-editor) auch Firestore-Collections:
+[Collection-Editor](/docs/studio/) auch Firestore-Collections:
 Beim Speichern wird der Aufruf von `defineFirestoreCollection({...})` in
 `frontend/src/cms` direkt überschrieben, wobei nur das geändert wird, was Sie
 editiert haben. Funktionen, benutzerdefinierte Komponenten, Kommentare und

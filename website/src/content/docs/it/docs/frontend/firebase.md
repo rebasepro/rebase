@@ -149,7 +149,7 @@ mai proposte schede di relazione o filtri che Firestore non è in grado di esegu
 
 ## Modifica nell'editor delle collezioni
 
-In fase di sviluppo, l'[editor delle collezioni](/docs/studio/#collection-editor) permette di modificare
+In fase di sviluppo, l'[editor delle collezioni](/docs/studio/) permette di modificare
 anche le collezioni Firestore: un salvataggio riscrive sul posto la chiamata
 `defineFirestoreCollection({...})` della collezione in `frontend/src/cms`,
 modificando esclusivamente ciò che hai cambiato. Funzioni, componenti personalizzati, commenti e
