@@ -154,6 +154,13 @@ const MOUNTS = new Map([
     ["packages/server/src/mcp/mcp-routes.ts#router", "/mcp"],
     ["packages/server/src/mcp/oauth-routes.ts#router", "/api/oauth"],
 
+    // Zero-code BaaS admin surfaces (`packages/server/src/baas/*`).
+    ["packages/server/src/baas/db-admin-routes.ts#router", "/api/admin/db"],
+    ["packages/server/src/baas/roles-and-crons-store.ts#rolesRouter", "/api/admin/roles"],
+    ["packages/server/src/baas/roles-and-crons-store.ts#cronJobsRouter", "/api/admin/cron/jobs"],
+    ["packages/server/src/baas/storage-policies-store.ts#router", "/api/admin/storage/policies"],
+    ["packages/server/src/baas/webhooks-store.ts#router", "/api/admin/webhooks"],
+
     // ── backend/create-backend.ts, one line per router ────────────────────
     // `createRebaseBackend` builds them; `mount()` puts them where
     // `initializeRebaseBackend` always did, which is the layout this index
@@ -165,6 +172,12 @@ const MOUNTS = new Map([
     ["packages/server/src/backend/create-backend.ts#uiConfigRouter", "/api/admin/ui-config"],
     ["packages/server/src/backend/create-backend.ts#storageRouter", "/api/storage"],
     ["packages/server/src/backend/create-backend.ts#dataRouter", "/api/data"],
+    ["packages/server/src/backend/create-backend.ts#dataSurface", null],
+    ["packages/server/src/backend/create-backend.ts#reloadRouter", "/api/admin/schema/reload"],
+    ["packages/server/src/backend/create-backend.ts#dbRouter", "/api/admin/db"],
+    ["packages/server/src/backend/create-backend.ts#rRouter", "/api/admin/roles"],
+    ["packages/server/src/backend/create-backend.ts#spRouter", "/api/admin/storage/policies"],
+    ["packages/server/src/backend/create-backend.ts#whRouter", "/api/admin/webhooks"],
     ["packages/server/src/backend/create-backend.ts#functionsRouter", "/api/functions"],
     ["packages/server/src/backend/create-backend.ts#cronRouter", "/api/admin/cron"],
     ["packages/server/src/backend/create-backend.ts#backupRouter", "/api/admin/backups"],

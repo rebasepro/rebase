@@ -28,6 +28,7 @@ import {
     type RebaseCallContext,
     type TableDescriptor,
     type TableHooks,
+    type TableMutationListener,
     type TableRow,
     type TransformNode
 } from "@rebasepro/types";
@@ -51,6 +52,8 @@ export interface TableHookSet {
     readonly own: TableHooks | undefined;
     /** The table's field-level hooks, one tree per column key. */
     readonly transforms: Record<string, TransformNode> | undefined;
+    /** Passive post-mutation listeners (e.g. zero-code webhooks). */
+    readonly listeners?: readonly TableMutationListener[];
 }
 
 /** A hook set with nothing in it. */
@@ -74,11 +77,18 @@ export function resolveTableHooks(
 
 /** The hooks of a runtime table already in hand (a relation's target). */
 export function hookSetOf(registry: PostgresTableRegistry | undefined, table: RuntimeTable | undefined): TableHookSet {
+    // Only the listeners that watch this table: one that does not must not
+    // cost the table its fast paths, and one that does must not be skipped
+    // by them (the single-statement delete never ran `afterDelete`).
+    const listeners = table
+        ? registry?.mutationListeners().filter(listener => !listener.watches || listener.watches(table.slug))
+        : undefined;
     return {
         table,
         global: registry?.globalHooks(),
         own: table?.compiled.hooks,
-        transforms: table?.compiled.transforms
+        transforms: table?.compiled.transforms,
+        ...(listeners && listeners.length > 0 ? { listeners } : {})
     };
 }
 
@@ -113,7 +123,11 @@ export function hasBeforeQueryHook(set: TableHookSet): boolean {
 
 /** Whether a hook of this name runs for this table, global or the table's. */
 export function hasRowHook(set: TableHookSet, hook: keyof TableHooks): boolean {
-    return Boolean(set.global?.[hook] || set.own?.[hook]);
+    if (set.global?.[hook] || set.own?.[hook]) return true;
+    if ((hook === "afterSave" || hook === "afterDelete") && set.listeners) {
+        return set.listeners.some(listener => Boolean(listener[hook]));
+    }
+    return false;
 }
 
 /** Whether any application code at all runs for this table: a hook on any tier, or a transform. */
@@ -121,6 +135,7 @@ export function declaresAnyHook(set: TableHookSet): boolean {
     const declares = (hooks: TableHooks | undefined): boolean =>
         hooks !== undefined && Object.values(hooks).some(value => typeof value === "function");
     return declares(set.global) || declares(set.own)
+        || Boolean(set.listeners?.some(listener => listener.afterSave || listener.afterDelete))
         || transformsDeclare(set, "beforeSave") || transformsDeclare(set, "afterRead");
 }
 
@@ -423,16 +438,22 @@ export async function beforeSave<V extends TableRow>(set: TableHookSet, values: 
     return out;
 }
 
-/** `afterSave`: global, then the table's, each awaited. */
+/** `afterSave`: global, then the table's, then passive listeners, each awaited. */
 export async function afterSave(set: TableHookSet, savedId: string | number, values: TableRow, call: WriteHookCall): Promise<void> {
     if (!hasRowHook(set, "afterSave")) return;
     const table = requireHookTable(set, call.path);
     const { path, previousValues, status, context } = call;
+    const props = {
+        table, path, context, status, id: savedId, values,
+        ...(previousValues !== undefined ? { previousValues } : {})
+    };
     for (const hooks of [set.global, set.own]) {
-        await hooks?.afterSave?.({
-            table, path, context, status, id: savedId, values,
-            ...(previousValues !== undefined ? { previousValues } : {})
-        });
+        await hooks?.afterSave?.(props);
+    }
+    if (set.listeners) {
+        for (const listener of set.listeners) {
+            await listener.afterSave?.(props);
+        }
     }
 }
 
@@ -490,11 +511,17 @@ export async function beforeDeleteVetoes(set: TableHookSet, call: DeleteHookCall
     return vetoed;
 }
 
-/** `afterDelete`: global, then the table's, each awaited. */
+/** `afterDelete`: global, then the table's, then passive listeners, each awaited. */
 export async function afterDelete(set: TableHookSet, call: DeleteHookCall): Promise<void> {
     if (!hasRowHook(set, "afterDelete")) return;
     const table = requireHookTable(set, call.path);
+    const props = { table, ...call };
     for (const hooks of [set.global, set.own]) {
-        await hooks?.afterDelete?.({ table, ...call });
+        await hooks?.afterDelete?.(props);
+    }
+    if (set.listeners) {
+        for (const listener of set.listeners) {
+            await listener.afterDelete?.(props);
+        }
     }
 }

@@ -168,6 +168,11 @@ export class WebhookDispatcher {
         this.webhooks = webhooks.filter(w => w.enabled);
     }
 
+    /** Whether any enabled webhook listens to the table `table` (by slug). */
+    watchesTable(table: string): boolean {
+        return this.webhooks.some(w => w.table === table);
+    }
+
     /**
      * Called when a entity changes — checks if any webhook matches, and awaits
      * every delivery, retries included. The matching webhooks are delivered to
@@ -342,6 +347,13 @@ export class WebhookDispatcher {
      * id still sends the same `X-Webhook-Delivery` on every retry (the job's
      * id). Without it, every attempt says it is the first.
      */
+    /** Send a single test delivery through the same SSRF guard and HMAC signer. */
+    async sendTest(webhook: WebhookConfig, payload: Record<string, unknown>): Promise<WebhookDeliveryResult> {
+        const deliveryId = randomUUID();
+        const attempt = await this.deliver(webhook, "test", payload, 1, deliveryId);
+        return attempt.result;
+    }
+
     async deliverQueuedJob(
         job: QueuedWebhookDelivery,
         context?: { id?: string; attempt?: number }

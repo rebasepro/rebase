@@ -8,7 +8,7 @@
 class ApiError { badRequest, code, conflict, databaseUnavailable, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
 class BlockedUrlError
 class BundleError { hint }
-class CronScheduler { fetchJob, fetchJobs, getJob, getJobLogs, getJobLogsFromDb, jobIdsWhere, listJobs, listRejectedJobs, persistJobEnabled, registerJobs, rejectedJobsWhere, setClient, setJobEnabled, setStore, start, startJob, stop, triggerJob }
+class CronScheduler { fetchJob, fetchJobs, getJob, getJobLogs, getJobLogsFromDb, jobIdsWhere, listJobs, listRejectedJobs, persistJobEnabled, registerJobs, rejectedJobsWhere, setClient, setJobEnabled, setStore, start, startJob, stop, triggerJob, unregisterJob }
 class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class GCSStorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
@@ -26,7 +26,7 @@ class TableRegistry { authTable, get, list, named, replaceAll, revision, setHook
 class TransformCache { buildKey, get, set }
 class TusHandler { create, delete, head, options, patch, startCleanup }
 class UnknownStorageSourceError { knownKeys, storageId }
-class WebhookDispatcher { deliverQueuedJob, enqueueEntityChange, flush, onEntityChange, setWebhooks }
+class WebhookDispatcher { deliverQueuedJob, enqueueEntityChange, flush, onEntityChange, sendTest, setWebhooks }
 const ACCOUNT_SCOPED_STORAGE_BASES
 const BATCH_REF_KEY
 const CONCURRENT_DDL_SQLSTATES
@@ -146,6 +146,7 @@ function createUploadConstraintResolver
 function createUploadPathResolver
 function createUserThroughAuthTable
 function createWebPushSender
+function createZeroCodeBundle
 function decideImpersonation
 function declareCrons
 function declaredErrorAnswer
@@ -329,9 +330,9 @@ interface BackendInstance { admin, connection, destroy, entityRepository, health
 interface BackendMountOptions { basePath }
 interface BackendServices { access, apiKeyStore, authAdapter, authLimiters, clientAddress, jwt, queues, rateLimitStore, tables, topics }
 interface BackupRoutesConfig { getDestination, getSchedule, scheduledElsewhere, storageFor }
-interface BootOptions { bundle, bundleDir, bundleFallbackDir, handleSignals, listen, provisionSchema }
+interface BootOptions { bundle, bundleDir, bundleFallbackDir, handleSignals, listen, provisionSchema, studioDir, zeroCode }
 interface BootedRuntime { app, backend, bundle, dataSources, env, port, server, shutdown }
-interface BuiltinAuthAdapterConfig { access, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, authTableHooks, captcha, cookieAuth, defaultRole, deviceLogin, disableSelfRegistration, emailConfig, emailService, enableEmailOtp, enableMagicLink, jwt, limiters, magicLinkCreatesUsers, oauthProviders, platformSignIn, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireEmailVerification, serviceKey }
+interface BuiltinAuthAdapterConfig { access, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, authTableHooks, captcha, cookieAuth, defaultRole, deviceLogin, disableSelfRegistration, emailConfig, emailService, enableEmailOtp, enableMagicLink, jwt, limiters, magicLinkCreatesUsers, oauthProviders, platformSignIn, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireEmailVerification, resolveDefaultRole, serviceKey }
 interface BundleProjectExports { hooks, storageAuthorize }
 interface BundleSchema { enums, relations, tables }
 interface CapturedEmail { at, html, id, links, messageId, subject, text, to }
@@ -388,7 +389,7 @@ interface ListUsersOptions { limit, offset, orderBy, orderDir, roleId, search }
 interface LiveSchemaConfig { allowMachineApply, repository }
 interface LoadBackendSchemaOptions { importModule, projectRoot }
 interface LoadDirectoryOptions { importModule, onSkip }
-interface LoadedBundle { cronsDir, dir, functionsDir, hooksModule, isSource, manifest, resourcesModule, staticApps, storageModule, tablesDir, uiConfigFile }
+interface LoadedBundle { cronsDir, dir, functionsDir, hooksModule, isSource, isZeroCode, manifest, resourcesModule, staticApps, storageModule, tablesDir, uiConfigFile }
 interface LoadedCronJob { definition, id }
 interface LoadedFunction { app, name }
 interface LoadedFunctions { functions, problems }
@@ -434,7 +435,7 @@ interface QueuedWebhookDelivery { deliveryId, event, payload, webhookId }
 interface RealtimeProvider { counts, destroy, health, notifyUpdate, onServerReady, setScopeRunner, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RebaseApiError { code, details, statusCode }
 interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, captcha, cookieAuth, defaultRole, deviceLogin, disableSelfRegistration, discord, email, emailOtp, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, magicLinkCreatesUsers, microsoft, providers, refreshExpiresIn, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireAuth, requireEmailVerification, serviceKey, signingKeys, slack, spotify, twitter }
-interface RebaseBackend { attachRealtime, auth, cronScheduler, driver, driverRegistry, fetch, getTableDescriptor, getTableDescriptors, healthCheck, history, jobQueue, metricsHistory, mount, realtimeService, realtimeServices, rebase, routes, services, setTableHooks, shutdown, start, storageController, storageRegistry, verifyCredential }
+interface RebaseBackend { attachRealtime, auth, cronScheduler, driver, driverRegistry, fetch, getTableDescriptor, getTableDescriptors, healthCheck, history, jobQueue, metricsHistory, mount, realtimeService, realtimeServices, rebase, reloadSchema, routes, services, setTableHooks, shutdown, start, storageController, storageRegistry, verifyCredential }
 interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, defaultRls, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, hooks, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provisionSchema, provisioningDriverResult, push, rateLimit, requireFilesLoaded, rlsAudit, runtimeVersion, schemaDir, schemaEditor, schemaTables, schemaVersion, server, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces, tables, uiConfigFile }
 interface RebaseBackendOptions { auth, baas, bootstrappers, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, defaultRls, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, hooks, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provision, provisioningDriverResult, push, rateLimit, requireFilesLoaded, rlsAudit, runtimeVersion, schemaDir, schemaEditor, schemaTables, schemaVersion, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces, tables, uiConfigFile }
 interface RebaseFunctionContext { rebase }
@@ -464,7 +465,7 @@ interface SingleSubscriptionConfig { clientId, id, path }
 interface SqlTemplate { brand, text }
 interface StorageAuthorizeContext { bucket, data, key, operation, storageId, user }
 interface StorageAuthorizeData { table }
-interface StorageAuthorizeUser { email, roles, uid }
+interface StorageAuthorizeUser { claims, email, roles, uid }
 interface StorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
 interface StoragePolicy { allow, operations, path }
 interface StoragePolicyContext { bucket, data, key, operation, params, storageId, user }
@@ -986,7 +987,7 @@ interface HistoryRetentionConfig { maxEntries, ttlDays }
 interface IncludeOptions { count, fields, include, limit, logical, orderBy, where }
 interface IncludeOptionsFor { count, fields, include, limit, logical, orderBy, where }
 interface InitialColumnFlags { exposed, hasDefault, notNull, primaryKey, writable }
-interface InitializedDriver { connection, driver, internals, realtimeProvider, refreshTables, tableRegistry, tables, unprotectedTables }
+interface InitializedDriver { connection, driver, internals, realtimeProvider, refreshTables, reintrospectTables, tableRegistry, tables, unprotectedTables }
 interface JoinCondition { from, to }
 interface JoinStep { on, table }
 interface JsonGeoPoint { latitude, longitude }
@@ -1094,7 +1095,7 @@ interface RolesOverlapPolicyExpression { kind, roles }
 interface RowPrecondition { check, lock }
 interface SDKQueryBuilderInterface { after, aggregate, count, distinct, fields, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
 interface SDKTableClient { after, aggregate, count, create, create, createMany, delete, deleteMany, deleteWhere, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, listenCount, offset, orderBy, refresh, search, trash, update, update, updateMany, updateWhere, upsert, upsert, upsert, vectorSearch, where, where, where }
-interface SQLAdmin { executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase, listen, openSqlCursor, poolStats, probe, runSqlScript, sampleHealth }
+interface SQLAdmin { executeSql, executeSqlTransaction, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase, listen, openSqlCursor, poolStats, probe, runSqlScript, sampleHealth }
 interface SaveManyProps { conflictWhere, ignoreDuplicates, onConflict, path, rows, upsert }
 interface SaveProps { id, onConflict, path, precondition, previousValues, status, upsert, values }
 interface SchemaAPI { tables }
@@ -1130,7 +1131,7 @@ interface SqlScriptTable { hasInheritors, kind, primaryKey, schema, table }
 interface SqlTemplate { brand, text }
 interface StorageAuthorizeContext { bucket, data, key, operation, storageId, user }
 interface StorageAuthorizeData { table }
-interface StorageAuthorizeUser { email, roles, uid }
+interface StorageAuthorizeUser { claims, email, roles, uid }
 interface StorageImageResize { format, maxHeight, maxWidth, mode, quality }
 interface StorageListResult { items, nextPageToken, prefixes }
 interface StorageOptions { accept, fileName, imageResize, includeBucketUrl, maxBytes, metadata, path, public, source, storeUrl }
@@ -1163,10 +1164,11 @@ interface TableIndex { columns, include, reason, unique, using, where }
 interface TableIndexKey { column, direction, nulls }
 interface TableJunctionInfo { junction_table_name, source_column_name, target_column_name, target_table_name }
 interface TableMetadata { columns, foreignKeys, junctions, policies }
+interface TableMutationListener { afterDelete, afterSave }
 interface TableOptionValues { defaultPolicies, description, history, indexes, metadata, rlsRequired, search, softDelete, strictWrites, tenant }
 interface TablePatchProblem { index, key, message, table }
 interface TablePolicyInfo { cmd, permissive, policy_name, qual, roles, with_check }
-interface TableRegistryInterface { getTable, setGlobalHooks, setTableHooks }
+interface TableRegistryInterface { addMutationListener, getTable, setGlobalHooks, setTableHooks }
 interface TableTenant { bypassRoles, field, from }
 interface TenantClaimSource { claim }
 interface TenantDescriptor { bypassRoles, field, from }
@@ -1322,6 +1324,7 @@ type RebaseCallbackClient
 type RebaseErrorCode
 type RebaseSdkData
 type RegisteredDatabase
+type ReintrospectOutcome
 type RelationAggregateFn
 type RelationDef
 type RelationDescriptor

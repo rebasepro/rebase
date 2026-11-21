@@ -589,6 +589,7 @@ export class PostgresBackendDriver implements DataDriver {
     get admin(): DatabaseAdmin {
         return {
             executeSql: (...args: Parameters<NonNullable<DatabaseAdmin["executeSql"]>>) => this.executeSql(...args),
+            executeSqlTransaction: (statements: readonly string[]) => this.executeSqlTransaction(statements),
             probe: (timeoutMs: number) => this.probe(timeoutMs),
             runSqlScript: (...args: Parameters<NonNullable<DatabaseAdmin["runSqlScript"]>>) => this.runSqlScript(...args),
             openSqlCursor: (...args: Parameters<NonNullable<DatabaseAdmin["openSqlCursor"]>>) => this.openSqlCursor(...args),
@@ -2929,6 +2930,43 @@ export class PostgresBackendDriver implements DataDriver {
             ? await this.dataService.executeSql(sqlText, options?.params)
             : await this.executeSqlOn(await this.getTargetDb(options?.database), sqlText, options);
         return options?.maxResultBytes === undefined ? rows : refuseOversizedRows(rows, options.maxResultBytes);
+    }
+
+    /**
+     * Run a sequence of statements atomically on a single connection.
+     * On `pg.Pool` checks out one `PoolClient` so `BEGIN`/`COMMIT`/`ROLLBACK`
+     * all bind to the same session and never leak an idle transaction back
+     * into the pool; on single-client handles (PGlite) runs directly in order.
+     */
+    async executeSqlTransaction(statements: readonly string[]): Promise<void> {
+        if (statements.length === 0) return;
+        const pool = "$client" in this.db ? this.db.$client : undefined;
+        if (pool instanceof Pool) {
+            const client = await pool.connect();
+            try {
+                await client.query("BEGIN");
+                for (const stmt of statements) {
+                    await client.query(stmt);
+                }
+                await client.query("COMMIT");
+            } catch (err) {
+                await client.query("ROLLBACK").catch(() => undefined);
+                throw err;
+            } finally {
+                client.release();
+            }
+            return;
+        }
+        await this.db.execute(drizzleSql.raw("BEGIN"));
+        try {
+            for (const stmt of statements) {
+                await this.db.execute(drizzleSql.raw(stmt));
+            }
+            await this.db.execute(drizzleSql.raw("COMMIT"));
+        } catch (err) {
+            await this.db.execute(drizzleSql.raw("ROLLBACK")).catch(() => undefined);
+            throw err;
+        }
     }
 
     /**

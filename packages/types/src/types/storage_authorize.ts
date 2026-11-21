@@ -16,6 +16,7 @@ export interface StorageAuthorizeUser {
     uid: string;
     email?: string;
     roles?: string[];
+    claims?: Record<string, unknown>;
 }
 
 export interface StorageAuthorizeContext {

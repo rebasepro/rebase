@@ -99,6 +99,8 @@ export interface BuiltinAuthAdapterConfig {
     captcha?: CaptchaConfig;
     /** Default role to assign to new users. */
     defaultRole?: string;
+    /** Dynamic fallback default role (e.g. a role marked `isDefault` in `rebase.roles`). */
+    resolveDefaultRole?: () => string | undefined;
     /** OAuth providers to register. */
     oauthProviders?: OAuthProvider<unknown>[];
     /** Redirect URIs the OAuth routes accept, for every provider. */
@@ -146,6 +148,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         allowUserLookup = false,
         captcha,
         defaultRole,
+        resolveDefaultRole,
         oauthProviders = [],
         allowedRedirectUris,
         serviceKey,
@@ -382,6 +385,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 allowAnonymous,
                 allowUserLookup,
                 defaultRole,
+                resolveDefaultRole,
                 oauthProviders,
                 allowedRedirectUris,
                 authHooks,

@@ -96,6 +96,7 @@ the ID you got. Read the response header.
 | `CAPTCHA_FAILED` | 400 | The provider rejected the CAPTCHA token. | Solve a fresh challenge. |
 | `CAPTCHA_REQUIRED` | 400 | The route requires a CAPTCHA token and none was sent. | Include the token. |
 | `CHALLENGE_EXHAUSTED` | 401 | Too many wrong codes against one MFA challenge. | Start a new challenge. |
+| `CONFIRMATION_REQUIRED` | 400 | A destructive DDL operation (`DELETE /api/admin/db/tables/:table` or `DELETE …/columns/:column`) was called without `{ confirm: "<name>" }`. | Re-send with the exact target name in `confirm`, or pass `dryRun: true` to preview SQL. |
 | `DEVICE_LOGIN_DECIDED` | 409 | The device sign-in was already approved or denied. A sign-in is decided once. | Start a new one on the device. |
 | `DEVICE_LOGIN_EXPIRED` | 410 | The device sign-in passed its ten minutes before it was decided. | Start a new one on the device. |
 | `DEVICE_LOGIN_NOT_FOUND` | 404 | No device sign-in has that user code. The device's poll itself answers RFC 8628's lowercase codes instead: `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, `invalid_grant`. | Check the code against the one the device shows. |

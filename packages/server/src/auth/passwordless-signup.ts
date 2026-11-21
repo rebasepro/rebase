@@ -56,7 +56,8 @@ export async function accountForPasswordlessRequest(
         if (made) return made;
         throw error;
     }
-    if (config.defaultRole) await authRepo.assignDefaultRole(user.id, config.defaultRole);
+    const roleToAssign = config.defaultRole ?? config.resolveDefaultRole?.();
+    if (roleToAssign) await authRepo.assignDefaultRole(user.id, roleToAssign);
     if (ops.afterUserCreate) {
         ops.afterUserCreate(user).catch((err: unknown) => {
             logger.error("[AuthHooks] afterUserCreate error", { error: err instanceof Error ? err.message : err });

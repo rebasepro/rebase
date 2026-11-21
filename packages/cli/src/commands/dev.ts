@@ -58,6 +58,7 @@ import {
     staticAppAddress
 } from "../manifest";
 import {
+    findProjectRoot,
     requireProjectRoot,
     findBackendDir,
     findFrontendDir,
@@ -935,6 +936,8 @@ export const DEV_FLAGS = {
     "--database-url": String,
     /** Use Postgres in Docker rather than the managed database. */
     "--docker": Boolean,
+    /** Run directly in zero-code BaaS mode without requiring a project checkout or backend/ directory. */
+    "--zero-code": Boolean,
     "-b": "--backend-only",
     "-f": "--frontend-only",
     // `-P` for port, not `-p`. `-p` is `--project` across all ~20 cloud
@@ -1399,6 +1402,50 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         maxPositionals: 0
     });
 
+    /**
+     * Start no database at all — not the compose container, and not the managed
+     * one either. Read once, here, because both halves of `dev` have to agree:
+     * gating only the preflight left the managed PGlite starting anyway, which
+     * is the one database a scaffolded project would otherwise get.
+     */
+    const noDb = Boolean(args["--no-db"]) || parseEnvBoolean(process.env.REBASE_DEV_NO_DB) === true;
+
+    const detectedRoot = findProjectRoot();
+    const zeroCodeFlag = Boolean(args["--zero-code"]);
+    const hasProject = Boolean(detectedRoot || findBackendDir(process.cwd()));
+
+    // True zero-code BaaS dev mode: works in an empty directory with zero
+    // `rebase.json`, zero `backend/`, zero `package.json`, and zero `tsx`.
+    if (zeroCodeFlag || (!hasProject && !args["--frontend-only"])) {
+        const workDir = detectedRoot ?? process.cwd();
+        const envFile = findEnvFile(workDir);
+        if (envFile && fs.existsSync(envFile)) {
+            const dotenv = await import("dotenv");
+            dotenv.config({ path: envFile, quiet: true });
+        }
+        const flagUrl = typeof args["--database-url"] === "string" ? args["--database-url"] : null;
+        const { port: startPort } = resolveStartPort(workDir, args["--port"]);
+
+        console.log("");
+        console.log(chalk.bold("  🚀 Rebase Zero-Code BaaS Dev Server"));
+        console.log("");
+
+        const prepared = noDb
+            ? null
+            : await prepareDatabaseEnv(workDir, { flagUrl, flagDocker: Boolean(args["--docker"]) });
+        if (prepared?.env) {
+            Object.assign(process.env, prepared.env);
+        }
+        if (flagUrl) process.env.DATABASE_URL = flagUrl;
+        process.env.PORT = String(startPort);
+        process.env.NODE_ENV = process.env.NODE_ENV || "development";
+        process.env.REBASE_DEV_PROJECT_ROOT = workDir;
+
+        const { runFromBundle } = await import("@rebasepro/server");
+        await runFromBundle({ zeroCode: true });
+        return;
+    }
+
     const projectRoot = requireProjectRoot();
 
     // Fire-and-forget, and a no-op unless the developer opted in. Deliberately
@@ -1412,13 +1459,6 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     const frontendDir = findFrontendDir(projectRoot);
     const backendOnly = args["--backend-only"] || false;
     const frontendOnly = args["--frontend-only"] || false;
-    /**
-     * Start no database at all — not the compose container, and not the managed
-     * one either. Read once, here, because both halves of `dev` have to agree:
-     * gating only the preflight left the managed PGlite starting anyway, which
-     * is the one database a scaffolded project would otherwise get.
-     */
-    const noDb = Boolean(args["--no-db"]) || parseEnvBoolean(process.env.REBASE_DEV_NO_DB) === true;
 
     // Resolve the ports ONCE, before starting anything. Both, because the
     // backend is told where the frontend will be and cannot be told later: its
@@ -2437,6 +2477,7 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--port, -P")}            Backend port (default: auto-detected per project)
   ${chalk.blue("--database-url")} ${chalk.gray("<url>")}  Use this Postgres, ahead of everything else
   ${chalk.blue("--docker")}              Use the project's docker-compose ${chalk.gray("db")} service
+  ${chalk.blue("--zero-code")}           Start zero-code BaaS mode directly (no project files needed)
   ${chalk.blue("--no-db")}               Start no database at all
 
 ${chalk.green.bold("Which database")}

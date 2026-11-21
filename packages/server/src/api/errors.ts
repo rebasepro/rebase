@@ -81,7 +81,7 @@ export function schemaDriftRemedy(): { short: string; lines: string[] } {
 }
 
 /** Shape of Postgres / network errors with diagnostic codes */
-interface PgLikeError {
+export interface PgLikeError {
     code?: string;
     address?: string;
     port?: number;
@@ -118,7 +118,7 @@ const READ_ONLY_TRANSACTION_MESSAGE =
  * code sometimes wraps drizzle again, so the real error may sit several
  * levels down.
  */
-function extractDbError(error: unknown, depth = 0): PgLikeError | null {
+export function extractDbError(error: unknown, depth = 0): PgLikeError | null {
     if (!error || typeof error !== "object" || depth > 8) return null;
     const e = error as PgLikeError & { cause?: unknown };
     if (typeof e.code === "string" && SQLSTATE_RE.test(e.code)) return e;

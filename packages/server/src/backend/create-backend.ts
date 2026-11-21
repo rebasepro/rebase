@@ -41,6 +41,7 @@ import {
     type AdminScope,
     type AuthConfigDocument,
     type RebaseServerClient,
+    type StorageAuthorize,
     type TableDescriptor,
     type TableHooks
 } from "@rebasepro/types";
@@ -94,6 +95,26 @@ import { tsMorphInstallSentence } from "../utils/dev-dependency-command";
 import { configureMiddlewares } from "../init/middlewares";
 import { initializeStorage, assertStorageAccessControlConfigured } from "../init/storage";
 import { resolveStorageAccessControl } from "../storage/policies";
+import {
+    SCHEMA_CHANGE_CHANNEL,
+    ensureBaasCatalogTables,
+    ensureSchemaChangeEventTrigger,
+    createStoragePoliciesStore,
+    createStoragePoliciesRoutes,
+    storeBackedStorageAuthorize,
+    createWebhooksStore,
+    createWebhookAdminRoutes,
+    createRolesStore,
+    createRolesAdminRoutes,
+    createCronJobsStore,
+    createCronJobsAdminRoutes,
+    createDbAdminRoutes,
+    type StoragePoliciesStore,
+    type WebhooksStore,
+    type RolesStore,
+    type CronJobsStore
+} from "../baas";
+import { WebhookDispatcher, WEBHOOK_DELIVERY_TASK, type QueuedWebhookDelivery } from "../services/webhook-service";
 import { loadOpenApiGenerator, mountOpenApiDocs, type OpenApiDocsAudience, type OpenApiGenerator } from "../init/docs";
 import { createHealthCheck } from "../init/health";
 import { createShutdown } from "../init/shutdown";
@@ -399,6 +420,13 @@ export interface RebaseBackend {
     start(): void;
 
     /**
+     * Re-introspect the live database schema (in zero-code / BaaS mode) or
+     * refresh declared tables and swap REST, OpenAPI, Realtime, MCP and
+     * `GET /api/schema/tables` in place without restarting.
+     */
+    reloadSchema(): Promise<{ tables: number; revision: number; unprotectedTables: { schema: string; table: string }[] }>;
+
+    /**
      * Attach a table's hooks after the backend is built.
      *
      * Use this instead of mutating anything the registries hold. Every
@@ -702,8 +730,35 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     }
 
     // Global table hooks — applied to every table, on all data paths: each
-    // driver is handed them below (`handGlobalHooksTo`), as declared.
-    const globalHooks = config.hooks;
+    // driver is handed `config.hooks` directly, as declared. Zero-code
+    // webhooks attach separately as passive mutation listeners so `globalHooks`
+    // keeps its exact identity.
+    let activeWebhookDispatcher: WebhookDispatcher | undefined;
+    const webhookMutationListener = {
+        // Only the tables a webhook names: every other table keeps the
+        // driver's fast write paths.
+        watches: (slug: string): boolean => activeWebhookDispatcher?.watchesTable(slug) ?? false,
+        afterSave: async (props: Parameters<NonNullable<TableHooks["afterSave"]>>[0]) => {
+            if (!activeWebhookDispatcher) return;
+            const event = props.status === "existing" ? "UPDATE" : "INSERT";
+            activeWebhookDispatcher.enqueueEntityChange(
+                props.table.slug,
+                event,
+                String(props.id),
+                props.values,
+                props.previousValues
+            );
+        },
+        afterDelete: async (props: Parameters<NonNullable<TableHooks["afterDelete"]>>[0]) => {
+            if (!activeWebhookDispatcher) return;
+            activeWebhookDispatcher.enqueueEntityChange(
+                props.table.slug,
+                "DELETE",
+                String(props.id),
+                props.values
+            );
+        }
+    };
     // The auth table's secret columns are private in its descriptor whatever
     // the declaration says (the compiler sees to it); say so when the
     // declaration does not. See implicit-auth-secrets.ts.
@@ -864,9 +919,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             provision: provision.database
         });
         // Each driver runs global hooks from its own registry — see `handGlobalHooksTo`.
-        if (globalHooks) {
-            handGlobalHooksTo(b.id || bootstrapper.type, driverResult, globalHooks);
+        // User-declared `config.hooks` is handed untouched (preserving identity);
+        // zero-code webhook dispatch attaches as a passive mutation listener.
+        if (config.hooks) {
+            handGlobalHooksTo(b.id || bootstrapper.type, driverResult, config.hooks);
         }
+        driverResult.tableRegistry?.addMutationListener?.(webhookMutationListener);
         delegates[b.id || bootstrapper.type] = driverResult.driver;
         // Kept because a later step has to hand each bootstrapper back its own
         // result: `finalizeSecurityPosture` reaches into the driver it
@@ -1243,6 +1301,25 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         authAdapter = withBackendServiceKey(authAdapter, internalServiceKey);
     }
 
+    // ─── Zero-Code BaaS System Catalog (`rebase.*`) ──────────────────────
+    // Provision `rebase.table_meta`, `rebase.storage_policies`, `rebase.webhooks`,
+    // `rebase.cron_jobs` and `rebase.roles` so BaaS primitives work without custom code.
+    const defaultSqlAdmin = isSQLAdmin(defaultDriver.admin) ? defaultDriver.admin : undefined;
+    let baasCatalogReady = false;
+    if (defaultSqlAdmin && provision.database) {
+        try {
+            await ensureBaasCatalogTables(defaultSqlAdmin);
+            await ensureSchemaChangeEventTrigger(defaultSqlAdmin);
+            baasCatalogReady = true;
+        } catch (err) {
+            logger.warn("[baas] Could not provision rebase.* catalog tables; zero-code catalog routes will be degraded.", {
+                error: err instanceof Error ? err.message : String(err)
+            });
+        }
+    } else if (defaultSqlAdmin) {
+        baasCatalogReady = true;
+    }
+
     // ─── API Key Store Bootstrap ──────────────────────────────────────────
     // Bootstrapped before the routers are built so `rk_` pre-auth can sit in
     // front of every admin surface (Hono runs middleware in registration order
@@ -1302,7 +1379,16 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // This backend's roles and scopes. Every scope check on its routes, its
     // socket and its key verification reads this one, never another
     // backend's — a role declared here grants nothing anywhere else.
-    const access: AccessControl = { model: accessModel, resolveKeyOwner };
+    // Backed by a mutable reference so zero-code roles stored in `rebase.roles`
+    // take effect live without restarting the server.
+    let liveAccessModel: import("@rebasepro/types").AccessModel = accessModel;
+    let liveDefaultRole: string | undefined;
+    const access: AccessControl = {
+        get model() {
+            return liveAccessModel;
+        },
+        resolveKeyOwner
+    };
 
     // What a key's scope target may name, read when a key is minted.
     let servedFunctionNames: string[] = [];
@@ -1610,6 +1696,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 allowUserLookup: safeAuthConfig.allowUserLookup ?? false,
                 captcha: safeAuthConfig.captcha,
                 defaultRole: safeAuthConfig.defaultRole,
+                resolveDefaultRole: () => liveDefaultRole,
                 oauthProviders,
                 allowedRedirectUris: safeAuthConfig.allowedRedirectUris,
                 // The internal per-boot fallback is included so the closure the
@@ -2557,6 +2644,30 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // drops a `local` default and keeps the named buckets that are bound; the
     // routes serve those and answer a request that names no source with
     // STORAGE_NOT_CONFIGURED, where the stub below would refuse all of them.
+    let storagePoliciesStore: StoragePoliciesStore | undefined;
+    let storagePoliciesSurface: Hono<HonoEnv> | undefined;
+    if (defaultSqlAdmin && baasCatalogReady) {
+        const codeStorageFallback = resolveStorageAccessControl({
+            storagePolicies: config.storagePolicies,
+            storageAuthorize: config.storageAuthorize,
+            storagePublicRead: config.storagePublicRead === true
+        });
+        const effectiveFallback = codeStorageFallback
+            ?? (config.storageInsecureAllowAnyAuthenticated === true
+                ? () => true
+                : undefined);
+        storagePoliciesStore = createStoragePoliciesStore(defaultSqlAdmin, {
+            fallback: effectiveFallback
+        });
+        await storagePoliciesStore.reload();
+        if (surfaces.admin) {
+            const spRouter = new Hono<HonoEnv>();
+            applyAdminGate(spRouter, "Storage policies", { read: "database:read", write: "database:write" });
+            spRouter.route("/", createStoragePoliciesRoutes(storagePoliciesStore));
+            storagePoliciesSurface = spRouter;
+        }
+    }
+
     if (storageRegistry || storageController) {
         // `POST /upload` gets its own body limit, the storage config's
         // maxFileSize (default 50MB), in place of the global API body limit.
@@ -2584,26 +2695,37 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                     : undefined
             ) ?? DEFAULT_MAX_FILE_SIZE;
 
-        // Storage is not under RLS and its keys share one flat namespace, so an
-        // allow-all default is a cross-user read/write/delete hole. Refuse to
-        // boot in production unless the deployment has stated an access-control
-        // intent (a hook, public-read, or the explicit insecure opt-out); warn
-        // loudly in development.
-        // Compiled before the guard runs, so a malformed pattern fails the boot
-        // here rather than on the first upload.
-        const storageAccessControl = resolveStorageAccessControl({
+        // Declarative policies in `rebase.storage_policies` (deny-by-default)
+        // satisfy the production access-control guard even with zero custom code.
+        const codeStorageAccessControl = resolveStorageAccessControl({
             storagePolicies: config.storagePolicies,
             storageAuthorize: config.storageAuthorize,
-            // `storagePublicRead` alone satisfies the guard below but only
-            // relaxes the READ gate, leaving write/delete/list on the global
-            // requireAuth — which is off on precisely the public-site
-            // configuration this flag is for. See publicReadOnlyAuthorize.
             storagePublicRead: config.storagePublicRead === true
         });
+        // See `storeBackedStorageAuthorize`: deny-by-default once a policy
+        // exists; before that, a development project with no storage rule
+        // keeps its old allow-every-signed-in-caller (warned below). In
+        // production the guard refuses to boot — except a database-first
+        // backend, which boots deny-by-default so its policies can be written
+        // from the Studio.
+        const storePolicies = storagePoliciesStore;
+        const storageAccessControl: StorageAuthorize | undefined = storePolicies
+            ? storeBackedStorageAuthorize(storePolicies, {
+                unconfiguredAllows: !isProduction
+                    && !codeStorageAccessControl
+                    && config.storageInsecureAllowAnyAuthenticated !== true
+            })
+            : codeStorageAccessControl;
 
         assertStorageAccessControlConfigured(
             {
-                hasAuthorize: !!config.storageAuthorize || !!config.storagePolicies?.length,
+                hasAuthorize: !!config.storageAuthorize
+                    || !!config.storagePolicies?.length
+                    || Boolean(storePolicies?.hasEnabledPolicies())
+                    // Only when the store is there to deny by default: an
+                    // introspected backend whose catalog failed to provision
+                    // has nothing standing between a caller and every object.
+                    || (introspectCollections && storePolicies !== undefined),
                 publicRead: config.storagePublicRead === true,
                 allowAnyAuthenticated: config.storageInsecureAllowAnyAuthenticated === true
             },
@@ -2772,10 +2894,33 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     const serverSlugs = servedOverServer(tableRegistry.list());
 
     // The data group: the REST routes, or the stub that says there are none.
-    let dataSurface: Hono<HonoEnv>;
-    /** The REST routes, replaceable after a live schema apply. See `serveTables`. */
-    let restRoutes: ReplaceableRoutes | undefined;
-    if (tableRegistry.list().length > 0) {
+    //
+    // The stub is for no collections and no tables to derive them from — the
+    // state a fresh `--headless` project starts in, since it declares nothing
+    // and the database is empty — or tables the driver would not serve,
+    // because row-level security is off on every one; then the answer names
+    // them. Without it the data surface is simply absent, so Hono's default
+    // answers: a bare `404 Not Found` in `text/plain`, which reads as a typo in
+    // the URL when the truth is that the server is working and there is
+    // nothing to serve yet. 404, not 501: the collection genuinely does not
+    // exist, and this resolves by creating a table rather than by configuring
+    // the deployment.
+    const buildEmptyDataStub = (): Hono<HonoEnv> => {
+        const emptyDataStub = new Hono<HonoEnv>();
+        const emptyDataAnswer = {
+            error: {
+                message: `This project serves no tables yet. ${noCollectionsCause(unprotectedTables)}`,
+                code: "NO_TABLES",
+                ...(unprotectedTables.length > 0 && {
+                    details: { unprotectedTables: unprotectedTables.map(({ schema, table }) => `${schema}.${table}`) }
+                })
+            }
+        };
+        emptyDataStub.all("/*", (c) => c.json(emptyDataAnswer, 404));
+        return emptyDataStub;
+    };
+
+    const buildActiveDataRouter = (): Hono<HonoEnv> => {
         const dataRouter = new Hono<HonoEnv>();
         dataRouter.onError(errorHandler);
         // First, so everything after it knows where the group is mounted.
@@ -2800,55 +2945,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // Developers who intentionally want public data access (relying
         // entirely on Postgres RLS) must explicitly set `auth.requireAuth: false`.
         const dataRequireAuth = resolveRequireAuth(config.auth);
-
-        if (!dataRequireAuth) {
-            logger.warn(
-                "Data routes running WITHOUT authentication enforcement. " +
-                "Access control is fully delegated to Postgres RLS policies. " +
-                "If no RLS policies exist, data is publicly accessible. " +
-                "Set auth.requireAuth to true (or remove it) to require authentication."
-            );
-        } else {
-            // The other half of the same decision, and the one nobody sees.
-            //
-            // `{ operation: "select", access: "public" }` means "no row filter",
-            // not "no login" — the API gate still answers 401 to a caller with no
-            // token, whatever RLS would have allowed. Read on its own, a 401 from
-            // a collection the author called public looks like broken RLS or a
-            // missing table, and gets debugged as one (it has been). Say it once
-            // at boot, where the operator is already reading, naming the switch.
-            const publicSelect = declaredTables.descriptors
-                .filter(table => tableEffectiveRules(policyTableFromDescriptor(table)).some(rule =>
-                    "access" in rule && rule.access === "public" &&
-                    (rule.operation === "select" || rule.operation === "all" ||
-                        (Array.isArray(rule.operations) && rule.operations.includes("select")))
-                ))
-                .map(c => c.slug);
-
-            if (publicSelect.length > 0) {
-                // One line, not the paragraph this used to be.
-                //
-                // The explanation is right and worth having somewhere; it was
-                // 90 words of documentation printed on every single boot,
-                // which is how a log trains people to stop reading it. The
-                // sentence below carries the fact (public rows still need a
-                // token) and the switch (AUTH_REQUIRE); the reasoning lives in
-                // the docs, at the link, where it can be read once. The full
-                // text stays reachable at `debug`.
-                logger.info(
-                    `${publicSelect.length} table(s) grant unfiltered reads (${publicSelect.join(", ")}) — ` +
-                    "reads still require a token. Set AUTH_REQUIRE=false to let RLS alone decide: " +
-                    "https://rebase.pro/docs/collections/security-rules"
-                );
-                logger.debug(
-                    "`access: \"public\"` widens which ROWS a caller sees, not who may call, so an " +
-                    "unauthenticated read of a public table answers 401 rather than returning rows. " +
-                    "Setting AUTH_REQUIRE=false (or `auth.requireAuth: false`) removes the API-level gate " +
-                    "and delegates the decision entirely to the Postgres RLS policies — the usual choice " +
-                    "for a public website reading its own backend."
-                );
-            }
-        }
 
         // Multi-data-source routing: when more than one Postgres database is
         // registered (`database("analytics")` beside the default), resolve the
@@ -2918,45 +3014,69 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             undefined,
             { provision: provision.database }
         );
-        // Ahead of the routes it may replace: it passes every request on to
-        // them until a live schema apply hands it new ones.
-        restRoutes = replaceableRoutes();
-        dataRouter.use("/*", restRoutes.middleware);
         dataRouter.route("/", restGenerator.generateRoutes());
+        return dataRouter;
+    };
 
-        // As with storage: the registry, the generator and the driver wiring are
-        // built either way, because the singleton's data plane and every custom
-        // function read through them. Only the HTTP mount is conditional.
-        dataSurface = dataRouter;
-    } else {
-        // No collections and no tables to derive them from — the state a fresh
-        // `--headless` project starts in, since it declares nothing and the
-        // database is empty — or tables the driver would not serve, because
-        // row-level security is off on every one; then the answer names them.
-        //
-        // Without this the data surface is simply absent, so Hono's default
-        // answers: a bare `404 Not Found` in `text/plain`. That reads as a typo
-        // in the URL and sends the reader to check their path, when the truth is
-        // that the server is working and there is nothing to serve yet. Every
-        // other error this API returns is JSON, so a client parsing the body
-        // gets a surprise on top.
-        //
-        // 404, not 501: the collection genuinely does not exist, and unlike
-        // storage this resolves by creating a table rather than by configuring
-        // the deployment. Same reasoning as `storageStub` above, different verb.
-        const emptyDataStub = new Hono<HonoEnv>();
-        const emptyDataAnswer = {
-            error: {
-                message: `This project serves no tables yet. ${noCollectionsCause(unprotectedTables)}`,
-                code: "NO_TABLES",
-                ...(unprotectedTables.length > 0 && {
-                    details: { unprotectedTables: unprotectedTables.map(({ schema, table }) => `${schema}.${table}`) }
-                })
+    // Said once, at boot, however many times the routes are rebuilt.
+    if (tableRegistry.list().length > 0) {
+        const dataRequireAuth = resolveRequireAuth(config.auth);
+        if (!dataRequireAuth) {
+            logger.warn(
+                "Data routes running WITHOUT authentication enforcement. " +
+                "Access control is fully delegated to Postgres RLS policies. " +
+                "If no RLS policies exist, data is publicly accessible. " +
+                "Set auth.requireAuth to true (or remove it) to require authentication."
+            );
+        } else {
+            // The other half of the same decision, and the one nobody sees.
+            //
+            // `{ operation: "select", access: "public" }` means "no row filter",
+            // not "no login" — the API gate still answers 401 to a caller with no
+            // token, whatever RLS would have allowed. Read on its own, a 401 from
+            // a collection the author called public looks like broken RLS or a
+            // missing table, and gets debugged as one (it has been). Say it once
+            // at boot, where the operator is already reading, naming the switch.
+            const publicSelect = declaredTables.descriptors
+                .filter(table => tableEffectiveRules(policyTableFromDescriptor(table)).some(rule =>
+                    "access" in rule && rule.access === "public" &&
+                    (rule.operation === "select" || rule.operation === "all" ||
+                        (Array.isArray(rule.operations) && rule.operations.includes("select")))
+                ))
+                .map(c => c.slug);
+
+            if (publicSelect.length > 0) {
+                // One line, not the paragraph this used to be: the sentence
+                // carries the fact (public rows still need a token) and the
+                // switch (AUTH_REQUIRE); the reasoning lives in the docs, at
+                // the link. The full text stays reachable at `debug`.
+                logger.info(
+                    `${publicSelect.length} table(s) grant unfiltered reads (${publicSelect.join(", ")}) — ` +
+                    "reads still require a token. Set AUTH_REQUIRE=false to let RLS alone decide: " +
+                    "https://rebase.pro/docs/collections/security-rules"
+                );
+                logger.debug(
+                    "`access: \"public\"` widens which ROWS a caller sees, not who may call, so an " +
+                    "unauthenticated read of a public table answers 401 rather than returning rows. " +
+                    "Setting AUTH_REQUIRE=false (or `auth.requireAuth: false`) removes the API-level gate " +
+                    "and delegates the decision entirely to the Postgres RLS policies — the usual choice " +
+                    "for a public website reading its own backend."
+                );
             }
-        };
-        emptyDataStub.all("/*", (c) => c.json(emptyDataAnswer, 404));
-        dataSurface = emptyDataStub;
+        }
     }
+
+    // Always mount via `replaceableRoutes()` so a zero-code BaaS server that
+    // starts with 0 tables transitions seamlessly to full REST routes the
+    // moment tables are created via SQL or `/api/admin/db/tables` — with no restart.
+    // `recordMountPath()` runs first on `dataSurface` so `restRoutes.middleware`
+    // knows where the group is mounted when routes are swapped at runtime.
+    const restRoutes: ReplaceableRoutes = replaceableRoutes();
+    const dataSurface = new Hono<HonoEnv>();
+    dataSurface.onError(errorHandler);
+    dataSurface.use("/*", recordMountPath());
+    dataSurface.use("/*", restRoutes.middleware);
+    dataSurface.route("/", tableRegistry.list().length > 0 ? buildActiveDataRouter() : buildEmptyDataStub());
 
     /**
      * Serve the tables a live schema apply left, without a restart.
@@ -3015,16 +3135,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         servedPolicyTables = schema.descriptors;
         servedCompiledTables = schema.tables;
         serverSlugs.splice(0, serverSlugs.length, ...servedOverServer(tableRegistry.list()));
-        if (restRoutes) {
-            restRoutes.replace(new RestApiGenerator(
-                { descriptors: tableRegistry.list(), served: serverSlugs },
-                defaultDriver,
-                authAdapter,
-                undefined,
-                undefined,
-                { provision: provision.database }
-            ).generateRoutes());
-        }
+        restRoutes.replace(tableRegistry.list().length > 0 ? buildActiveDataRouter() : buildEmptyDataStub());
         logger.info("Serving the tables the schema edit left", {
             tables: schema.descriptors.length,
             revision: tableRegistry.revision,
@@ -3037,12 +3148,149 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         };
     };
 
+    let webhooksStore: WebhooksStore | undefined;
+    let rolesStore: RolesStore | undefined;
+    let cronJobsStore: CronJobsStore | undefined;
+    let dbAdminSurface: Hono<HonoEnv> | undefined;
+    let schemaReloadSurface: Hono<HonoEnv> | undefined;
+    let webhooksSurface: Hono<HonoEnv> | undefined;
+    let rolesSurface: Hono<HonoEnv> | undefined;
+
+    /**
+     * Re-introspect PostgreSQL (in zero-code / BaaS mode) or refresh declared
+     * tables, reload zero-code catalog stores (storage policies, webhooks,
+     * scheduled jobs), and atomically swap REST, OpenAPI, Realtime, MCP, and
+     * `GET /api/schema/tables` in place — zero restarts required.
+     */
+    const reloadCatalogStores = async (): Promise<void> => {
+        if (storagePoliciesStore) await storagePoliciesStore.reload();
+        if (webhooksStore) await webhooksStore.reload();
+        if (rolesStore) await syncRolesIntoAccessModel();
+        if (cronJobsStore && cronScheduler) await cronJobsStore.syncToScheduler(cronScheduler);
+    };
+
+    const reloadSchema = async (): Promise<{
+        tables: number;
+        revision: number;
+        unprotectedTables: { schema: string; table: string }[];
+    }> => {
+        if (introspectCollections) {
+            const nextCompiled: CompiledTable[] = [];
+            const nextDescriptors: TableDescriptor[] = [];
+            const nextUnprotected: { schema: string; table: string }[] = [];
+
+            for (const [bootstrapper, driverResult] of driverResults) {
+                if (!driverResult.reintrospectTables) continue;
+                try {
+                    const outcome = await driverResult.reintrospectTables();
+                    if (outcome.status === "served") {
+                        nextCompiled.push(...outcome.tables);
+                        nextDescriptors.push(...outcome.descriptors);
+                        nextUnprotected.push(...outcome.unprotectedTables);
+                    }
+                } catch (err) {
+                    const source = bootstrapper.id || DEFAULT_DRIVER_ID;
+                    logger.error(`[baas] Live schema reload failed on "${source}"`, {
+                        error: err instanceof Error ? err.message : String(err)
+                    });
+                    throw err;
+                }
+            }
+
+            tableRegistry.replaceAll(nextCompiled);
+            servedPolicyTables = nextDescriptors;
+            servedCompiledTables = nextCompiled;
+            unprotectedTables.splice(0, unprotectedTables.length, ...nextUnprotected);
+            serverSlugs.splice(0, serverSlugs.length, ...servedOverServer(tableRegistry.list()));
+            restRoutes.replace(tableRegistry.list().length > 0 ? buildActiveDataRouter() : buildEmptyDataStub());
+        } else {
+            for (const [, driverResult] of driverResults) {
+                if (driverResult.refreshTables) {
+                    await driverResult.refreshTables(servedCompiledTables);
+                }
+            }
+            restRoutes.replace(tableRegistry.list().length > 0 ? buildActiveDataRouter() : buildEmptyDataStub());
+        }
+
+        await reloadCatalogStores();
+
+        return {
+            tables: tableRegistry.list().length,
+            revision: tableRegistry.revision,
+            unprotectedTables: [...unprotectedTables]
+        };
+    };
+
+    const syncRolesIntoAccessModel = async (): Promise<void> => {
+        if (!rolesStore) return;
+        const stored = await rolesStore.list();
+        const nextRoles: Record<string, import("@rebasepro/types").RoleDefinition> = { ...accessModel.roles };
+        const nextScopes: Record<string, import("@rebasepro/types").ScopeDefinition> = { ...accessModel.scopes };
+        let dbDefaultRole: string | undefined;
+        for (const role of stored) {
+            nextRoles[role.name] = {
+                name: role.name,
+                ...(role.description ? { description: role.description } : {}),
+                scopes: role.scopes
+            };
+            if (role.isDefault && !dbDefaultRole) {
+                dbDefaultRole = role.name;
+            }
+            for (const scope of role.scopes) {
+                const base = scope.split(":").slice(0, 2).join(":");
+                if (base && !nextScopes[base]) {
+                    nextScopes[base] = { label: base };
+                }
+            }
+        }
+        liveAccessModel = { roles: nextRoles, scopes: nextScopes };
+        liveDefaultRole = dbDefaultRole;
+    };
+
+    if (defaultSqlAdmin && baasCatalogReady) {
+        rolesStore = createRolesStore(defaultSqlAdmin);
+        await syncRolesIntoAccessModel();
+    }
+
+    if (surfaces.admin) {
+        const reloadRouter = new Hono<HonoEnv>();
+        applyAdminGate(reloadRouter, "Schema reload", { read: "schema:read", write: "schema:write" });
+        reloadRouter.post("/", async (c) => {
+            const result = await reloadSchema();
+            return c.json({ status: "reloaded", ...result });
+        });
+        schemaReloadSurface = reloadRouter;
+
+        if (defaultSqlAdmin && baasCatalogReady) {
+            const dbRouter = new Hono<HonoEnv>();
+            applyAdminGate(dbRouter, "Database DDL admin", { read: "database:read", write: "database:write" });
+            dbRouter.route("/", createDbAdminRoutes({
+                admin: defaultSqlAdmin,
+                getServedTables: () => tableRegistry.list(),
+                reloadSchema
+            }));
+            dbAdminSurface = dbRouter;
+
+            if (rolesStore) {
+                const codeDefaultRole = typeof config.auth === "object" && config.auth !== null && "defaultRole" in config.auth
+                    ? config.auth.defaultRole
+                    : undefined;
+                const rRouter = new Hono<HonoEnv>();
+                applyAdminGate(rRouter, "Roles", { read: "users:read", write: "users:write" });
+                rRouter.route("/", createRolesAdminRoutes(rolesStore, {
+                    onChanged: syncRolesIntoAccessModel,
+                    getAccessModel: () => liveAccessModel,
+                    codeDefaultRole
+                }));
+                rolesSurface = rRouter;
+            }
+        }
+    }
+
     // ── OpenAPI / Swagger ─────────────────────────────────────────────────
-    // Follows the data surface: the document describes the collection routes, so
-    // a process that does not serve them would publish a spec for URLs it 404s.
-    // The generator is loaded here; the routes are `mount()`'s, because the
-    // document names the paths it mounted the data group at.
-    const openApiGenerator: OpenApiGenerator | undefined = surfaces.data && serverSlugs.length > 0
+    // Always load when the data surface is enabled so zero-code servers that
+    // boot with 0 tables immediately document new tables after live DDL reload.
+    const openApiGenerator: OpenApiGenerator | undefined = surfaces.data
         ? await loadOpenApiGenerator()
         : undefined;
 
@@ -3564,6 +3812,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         applyAdminGate(cronRouter, "Cron", { read: "cron:read", write: "cron:write" }, "cron");
 
         cronRouter.route("/", createCronRoutes(cronScheduler, cronProblems.length));
+        if (defaultSqlAdmin && baasCatalogReady) {
+            cronJobsStore = createCronJobsStore(defaultSqlAdmin);
+            await cronJobsStore.syncToScheduler(cronScheduler);
+            cronRouter.route("/jobs", createCronJobsAdminRoutes(cronJobsStore));
+        }
         cronSurface = cronRouter;
 
         if (loadedCronJobs.length > 0 && !ownership.cronScheduler) {
@@ -3722,6 +3975,25 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 "Job queue requested but unavailable on this driver — the backend's `jobQueue` is undefined, " +
                 "and webhook deliveries fall back to the in-memory queue."
             );
+        }
+    }
+
+    if (defaultSqlAdmin && baasCatalogReady) {
+        const dispatcher = new WebhookDispatcher({
+            jobQueue
+        });
+        activeWebhookDispatcher = dispatcher;
+        if (jobQueue) {
+            jobQueue.register<QueuedWebhookDelivery>(WEBHOOK_DELIVERY_TASK, (ctx) =>
+                dispatcher.deliverQueuedJob(ctx.payload, ctx));
+        }
+        webhooksStore = createWebhooksStore(defaultSqlAdmin, dispatcher);
+        await webhooksStore.reload();
+        if (surfaces.admin) {
+            const whRouter = new Hono<HonoEnv>();
+            applyAdminGate(whRouter, "Webhooks", { read: "database:read", write: "database:write" });
+            whRouter.route("/", createWebhookAdminRoutes(webhooksStore, dispatcher));
+            webhooksSurface = whRouter;
         }
     }
 
@@ -4174,14 +4446,21 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             adminGroup.use("/*", platformTokenPreAuth);
             if (backupLinkRouter) adminGroup.route("/backups", backupLinkRouter);
             if (apiKeyRouter) adminGroup.route("/api-keys", apiKeyRouter);
+            // Mounted ahead of `adapterAdminRouter` so `GET /roles` serves the
+            // unified built-in + code + `rebase.roles` view rather than being
+            // shadowed by `createAdminRolesRoute`'s read-only `GET /roles`.
+            if (rolesSurface) adminGroup.route("/roles", rolesSurface);
             if (adapterAdminRouter) adminGroup.route("/", adapterAdminRouter);
-            // `/schema` and `/schema-editor` are siblings, not parent and child:
-            // nested, every request to the editor would first pass the live
-            // editor's gate, which answers 501 itself when no auth is configured.
+            // `/schema/reload` is mounted on its own subpath so its admin gate
+            // never runs ahead of `liveSchemaSurface`'s `/schema/*` routes.
+            if (schemaReloadSurface) adminGroup.route("/schema/reload", schemaReloadSurface);
             if (liveSchemaSurface) adminGroup.route("/schema", liveSchemaSurface);
+            if (dbAdminSurface) adminGroup.route("/db", dbAdminSurface);
             if (schemaEditorSurface) adminGroup.route("/schema-editor", schemaEditorSurface);
             if (uiConfigSurface) adminGroup.route("/ui-config", uiConfigSurface);
+            if (storagePoliciesSurface) adminGroup.route("/storage/policies", storagePoliciesSurface);
             if (storageMaintenanceSurface) adminGroup.route("/storage", storageMaintenanceSurface);
+            if (webhooksSurface) adminGroup.route("/webhooks", webhooksSurface);
             if (backupSurface) adminGroup.route("/backups", backupSurface);
             if (rlsAuditSurface) adminGroup.route("/rls-audit", rlsAuditSurface);
             if (rlsSimulatorSurface) adminGroup.route("/rls-simulator", rlsSimulatorSurface);
@@ -4356,12 +4635,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             mountOpenApiDocs(app, basePath, {
                 enableSwagger: config.enableSwagger,
                 audience: docsAudience,
-                serverTables: serverSlugs.flatMap(slug => tableRegistry.get(slug) ?? []),
+                serverTables: () => serverSlugs.flatMap(slug => tableRegistry.get(slug) ?? []),
                 requireAuth: resolveRequireAuth(config.auth),
                 adminGate: adminGate("schema:read"),
                 generate: openApiGenerator,
                 announce,
-                unprotectedTables
+                unprotectedTables: () => unprotectedTables,
+                revision: () => tableRegistry.revision
             });
         }
 
@@ -4519,6 +4799,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let stopMetricsSampler: (() => void) | undefined;
     let authTokenSweep: { stop(): Promise<void> | void } | undefined;
     let historyRetentionSweep: { stop(): Promise<void> | void } | undefined;
+    let stopSchemaChangeListener: (() => Promise<void>) | undefined;
+    let schemaChangeDebounce: ReturnType<typeof setTimeout> | undefined;
 
     const start = (): void => {
         // A process that only runs timers — a `worker` — serves too.
@@ -4600,6 +4882,38 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             persistClaims: config.cronPersistence !== false,
             provision: provision.database
         });
+
+        // ── Cross-replica live catalog & DDL reload (PostgreSQL LISTEN/NOTIFY) ─
+        // Subscribe to `rebase_schema_changed` so DDL (in introspected mode)
+        // and catalog mutations (storage policies, webhooks, roles, DB crons)
+        // propagate across peer replicas without restarting.
+        // Best-effort: silently skipped on embedded PGlite or pooled-only URLs.
+        if (baasCatalogReady && defaultSqlAdmin?.listen) {
+            const scheduleReload = () => {
+                if (schemaChangeDebounce) clearTimeout(schemaChangeDebounce);
+                schemaChangeDebounce = setTimeout(() => {
+                    schemaChangeDebounce = undefined;
+                    const task = introspectCollections ? reloadSchema() : reloadCatalogStores();
+                    void task.catch((err) => {
+                        logger.warn("[baas] Auto reload failed after LISTEN notification", {
+                            error: err instanceof Error ? err.message : String(err)
+                        });
+                    });
+                }, 150);
+            };
+            defaultSqlAdmin.listen(SCHEMA_CHANGE_CHANNEL, () => {
+                scheduleReload();
+            }, {
+                onReconnect: () => {
+                    scheduleReload();
+                }
+            }).then((stop) => {
+                stopSchemaChangeListener = stop;
+                logger.debug(`[baas] Listening on PostgreSQL channel "${SCHEMA_CHANGE_CHANNEL}" for live DDL reloads`);
+            }).catch((err: unknown) => {
+                logger.debug(`[baas] Live DDL LISTEN skipped (${err instanceof Error ? err.message : String(err)})`);
+            });
+        }
     };
 
     // ── Graceful Shutdown ─────────────────────────────────────────────────
@@ -4607,19 +4921,30 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     //
     // As this backend: one that never served says nothing at info as it goes.
     const shutdown = (timeoutMs?: number, shutdownOptions: { server?: Server } = {}): Promise<void> =>
-        announcements.run(() => createShutdown({
-            server: shutdownOptions.server,
-            cronScheduler,
-            jobQueue,
-            rlsAudit,
-            authTokenSweep,
-            historyRetentionSweep,
-            stopMetricsSampler,
-            ownedRateLimitStore: config.rateLimit?.store ? undefined : sharedRateLimitStore,
-            realtimeServices,
-            closeLongLivedResponses: () => longLivedResponses.abort(),
-            emailService
-        })(timeoutMs));
+        announcements.run(async () => {
+            if (schemaChangeDebounce) {
+                clearTimeout(schemaChangeDebounce);
+                schemaChangeDebounce = undefined;
+            }
+            if (stopSchemaChangeListener) {
+                const stop = stopSchemaChangeListener;
+                stopSchemaChangeListener = undefined;
+                await stop().catch(() => undefined);
+            }
+            await createShutdown({
+                server: shutdownOptions.server,
+                cronScheduler,
+                jobQueue,
+                rlsAudit,
+                authTokenSweep,
+                historyRetentionSweep,
+                stopMetricsSampler,
+                ownedRateLimitStore: config.rateLimit?.store ? undefined : sharedRateLimitStore,
+                realtimeServices,
+                closeLongLivedResponses: () => longLivedResponses.abort(),
+                emailService
+            })(timeoutMs);
+        });
 
     logger.debug("Rebase Backend Initialized");
 
@@ -4648,6 +4973,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         },
         attachRealtime,
         start,
+        reloadSchema,
         setTableHooks,
         getTableDescriptors: () => tableRegistry.list(),
         getTableDescriptor: (slug: string) => tableRegistry.get(slug),

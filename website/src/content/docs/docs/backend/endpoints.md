@@ -175,6 +175,35 @@ a table reaches none of this. See [Roles and scopes](/docs/backend/roles-and-sco
 | `POST` | `/api/admin/schema/apply` | `schema:write` | A person only, unless `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
 | `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | Plans relaxing `NOT NULL` and dropping the undeclared columns named in `drop`, for [schema reconcile](/docs/cli/schema/#rebase-schema-reconcile); never applies one |
 | `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | Applies a reconcile plan, only if its `digest` is the `confirm` sent |
+| `POST` | `/api/admin/schema/reload` | `schema:write` | Re-introspects PostgreSQL and reloads REST, Realtime, OpenAPI, storage policies, webhooks, roles, and scheduled jobs in place without a restart |
+| `GET` | `/api/admin/db/tables` | `database:read` | Lists user PostgreSQL tables with columns, indexes, RLS policies, and `rebase.table_meta` overlays |
+| `POST` | `/api/admin/db/tables` | `database:write` | Creates a PostgreSQL table with optional initial RLS policies and metadata (`dryRun: true` previews SQL), then reloads live |
+| `PATCH` | `/api/admin/db/tables/:table` | `database:write` | Renames a table, toggles Row Level Security (`rlsEnabled`), or updates `rebase.table_meta` API overlay settings (`meta`), then reloads live |
+| `DELETE` | `/api/admin/db/tables/:table` | `database:write` | Drops a PostgreSQL table (requires `{ confirm: "<table>" }` unless `dryRun: true`) |
+| `POST` | `/api/admin/db/tables/:table/columns` | `database:write` | Adds a column to a PostgreSQL table and reloads live |
+| `PATCH` | `/api/admin/db/tables/:table/columns/:column` | `database:write` | Alters a column (rename, type, nullability, default) and reloads live |
+| `DELETE` | `/api/admin/db/tables/:table/columns/:column` | `database:write` | Drops a column (requires `{ confirm: "<column>" }` unless `dryRun: true`) |
+| `POST` | `/api/admin/db/tables/:table/indexes` | `database:write` | Creates an index on a PostgreSQL table |
+| `DELETE` | `/api/admin/db/tables/:table/indexes/:index` | `database:write` | Drops an index on a PostgreSQL table |
+| `POST` | `/api/admin/db/tables/:table/policies` | `database:write` | Creates a PostgreSQL RLS policy on a table and reloads live |
+| `DELETE` | `/api/admin/db/tables/:table/policies/:policy` | `database:write` | Drops a PostgreSQL RLS policy on a table and reloads live |
+| `GET` | `/api/admin/storage/policies` | `database:read` | Lists declarative zero-code storage policies from `rebase.storage_policies` |
+| `POST` | `/api/admin/storage/policies` | `database:write` | Creates a declarative storage access policy |
+| `PATCH` | `/api/admin/storage/policies/:id` | `database:write` | Updates a declarative storage access policy |
+| `DELETE` | `/api/admin/storage/policies/:id` | `database:write` | Deletes a declarative storage access policy |
+| `GET` | `/api/admin/webhooks` | `database:read` | Lists zero-code database webhooks from `rebase.webhooks` |
+| `POST` | `/api/admin/webhooks` | `database:write` | Creates a database webhook |
+| `PATCH` | `/api/admin/webhooks/:id` | `database:write` | Updates a database webhook |
+| `DELETE` | `/api/admin/webhooks/:id` | `database:write` | Deletes a database webhook |
+| `POST` | `/api/admin/webhooks/:id/test` | `database:write` | Sends a live test delivery to a configured webhook endpoint |
+| `GET` | `/api/admin/roles` | `users:read` | Lists zero-code RBAC roles and scopes from `rebase.roles` |
+| `POST` | `/api/admin/roles` | `users:write` | Creates or updates a zero-code RBAC role |
+| `PUT` | `/api/admin/roles/:name` | `users:write` | Updates a zero-code RBAC role |
+| `DELETE` | `/api/admin/roles/:name` | `users:write` | Deletes a zero-code RBAC role |
+| `GET` | `/api/admin/cron/jobs` | `cron:read` | Lists zero-code scheduled SQL/HTTP jobs from `rebase.cron_jobs` |
+| `POST` | `/api/admin/cron/jobs` | `cron:write` | Creates a zero-code scheduled SQL or HTTP cron job. A SQL job runs its statement as the server's own connection, so it also takes `database:write` |
+| `PATCH` | `/api/admin/cron/jobs/:id` | `cron:write` | Updates a zero-code scheduled cron job; a SQL job, or one becoming one, also takes `database:write` |
+| `DELETE` | `/api/admin/cron/jobs/:id` | `cron:write` | Deletes a zero-code scheduled cron job |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Whether the editor is available, and the reason when it is not |
 | `GET` | `/api/admin/schema-editor/tables` | `schema:read` | Every table `backend/schema/index.ts` exports as the editor reads it, with what is edited in code (read-only) and why — [Live schema editing](/docs/backend/live-schema-editing/#the-edits-tablepatch) |
 | `POST` | `/api/admin/schema-editor/preview` | `schema:write` | `{ patches: TablePatch[] }`: the files the edit would write, compiled; writes nothing |

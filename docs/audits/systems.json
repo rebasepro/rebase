@@ -61,6 +61,7 @@
       "title": "Collection definition to database",
       "paths": [
         "packages/server/src/schema/**",
+        "packages/server/src/baas/**",
         "packages/server/src/boot/**",
         "packages/server-postgres/src/schema/**",
         "packages/server-postgres/src/model/**",

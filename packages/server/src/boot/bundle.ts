@@ -69,6 +69,12 @@ export interface LoadedBundle {
      * build wrote down, and a bundle can carry any string a builder put there.
      */
     isSource: boolean;
+    /**
+     * True when the runtime booted with no project bundle at all (zero-code
+     * BaaS mode): tables, RLS policies, storage policies, webhooks, crons and
+     * roles are served straight from PostgreSQL without custom code.
+     */
+    isZeroCode?: boolean;
 }
 
 /** One built static app inside a loaded bundle, with an absolute directory. */
@@ -558,6 +564,46 @@ createdAt: new Date().toISOString() }
         functionsDir: resolve(options.functions),
         cronsDir: resolve(options.crons),
         staticApps: sourceStaticApps(dir)
+    };
+}
+
+/**
+ * Construct a minimal in-memory bundle for zero-code BaaS mode.
+ *
+ * No `manifest.json`, no `backend/` directory, and no compiled TypeScript
+ * files are required: the runtime connects directly to PostgreSQL via
+ * `DATABASE_URL`, provisions `rebase.*` system tables, introspects the
+ * database schema live, and serves REST, Realtime, Auth, Storage, OpenAPI,
+ * MCP and Admin APIs out of the box.
+ */
+export function createZeroCodeBundle(dir: string = process.cwd()): LoadedBundle {
+    const resolvedDir = path.resolve(dir);
+    const manifest: RebaseBundleManifest = {
+        bundleFormat: BUNDLE_FORMAT_VERSION,
+        runtime: {
+            range: `^${RUNTIME_CONTRACT_VERSION}`,
+            builtAgainst: "zero-code",
+            contract: RUNTIME_CONTRACT_VERSION
+        },
+        schemaVersion: "",
+        app: "backend",
+        kind: "backend",
+        entry: {},
+        hooks: { native: false },
+        deps: { declared: {} },
+        build: {
+            cli: "zero-code",
+            node: process.versions.node.split(".")[0],
+            createdAt: new Date().toISOString()
+        }
+    };
+
+    return {
+        dir: resolvedDir,
+        manifest,
+        isSource: false,
+        isZeroCode: true,
+        staticApps: []
     };
 }
 

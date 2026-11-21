@@ -775,6 +775,18 @@ export class CronScheduler {
     }
 
     /**
+     * Unregister a dynamically registered cron job (e.g. a zero-code job
+     * deleted from `rebase.cron_jobs`) and cancel any pending timer for it.
+     */
+    unregisterJob(id: string): boolean {
+        const existed = this.jobs.has(id) || this.rejected.has(id);
+        this.stopJob(id);
+        this.jobs.delete(id);
+        this.rejected.delete(id);
+        return existed;
+    }
+
+    /**
      * Start the scheduler — begins ticking all enabled jobs.
      */
     start(): void {

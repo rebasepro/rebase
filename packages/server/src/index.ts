@@ -536,6 +536,7 @@ export {
     readBundleManifest,
     loadBundleProjectExports,
     createSourceBundle,
+    createZeroCodeBundle,
     loadBundleSchema,
     resolveModulePath
 } from "./boot/bundle";
