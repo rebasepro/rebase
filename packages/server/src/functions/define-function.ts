@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import type { RebaseServerClient, RegisteredDatabase } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import { rebase } from "../singleton";
@@ -62,6 +62,41 @@ function typedSingleton<DB>(): RebaseServerClient<DB> {
 }
 
 /**
+ * What a function declares about itself, beside its routes:
+ * `defineFunction(definition, { timeoutMs })`.
+ */
+export interface DefineFunctionOptions {
+    /**
+     * How long one request to this function may run, in milliseconds, before
+     * it is answered `504 FUNCTION_TIMEOUT` and `getSignal(c)` is aborted. It
+     * replaces the server-wide timeout (30 s by default,
+     * `REBASE_FUNCTIONS_TIMEOUT_MS`) for this function only, longer or
+     * shorter, and counts from the moment the request reached the functions
+     * router.
+     *
+     * The server caps it at `REBASE_FUNCTIONS_MAX_TIMEOUT_MS` (300 s by
+     * default): a function file cannot hold a request open for longer than
+     * the server allows. Work that takes longer belongs in a job.
+     *
+     * A positive number; a function cannot switch its timeout off.
+     */
+    timeoutMs?: number;
+}
+
+/** `options.timeoutMs`, checked as the file is loaded: a mistake fails the load, by name. */
+function declaredTimeoutMs(options: DefineFunctionOptions): number | undefined {
+    const value = options.timeoutMs;
+    if (value === undefined) return undefined;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 1) {
+        throw new TypeError(
+            `defineFunction: \`timeoutMs\` is a number of milliseconds above 0 (got ${String(value)}). ` +
+            "A function cannot switch its timeout off; the server caps it at REBASE_FUNCTIONS_MAX_TIMEOUT_MS."
+        );
+    }
+    return Math.floor(value);
+}
+
+/**
  * Typed authoring contract for a custom backend function.
  *
  * A custom function is a file in the `functionsDir` that default-exports a
@@ -91,17 +126,45 @@ function typedSingleton<DB>(): RebaseServerClient<DB> {
  * });
  * ```
  *
+ * @example A function that waits on a slow service declares its own timeout:
+ * ```ts
+ * export default defineFunction((app) => {
+ *     app.post("/", requireAuth, async (c) => c.json(await summarize(c, getSignal(c))));
+ * }, { timeoutMs: 150_000 });
+ * ```
+ *
  * @param definition Receives the function's Hono app and the typed context.
  *   Register routes on the provided `app` and return nothing, or return your
  *   own `Hono<HonoEnv>` app to use instead.
+ * @param options What the function declares about itself: its own
+ *   {@link DefineFunctionOptions.timeoutMs | timeout}.
  * @returns The Hono app to default-export from the function file.
  */
 export function defineFunction<DB = RegisteredDatabase>(
-    definition: (app: Hono<HonoEnv>, ctx: RebaseFunctionContext<DB>) => void | Hono<HonoEnv>
+    definition: (app: Hono<HonoEnv>, ctx: RebaseFunctionContext<DB>) => void | Hono<HonoEnv>,
+    options: DefineFunctionOptions = {}
 ): Hono<HonoEnv> {
+    const timeoutMs = declaredTimeoutMs(options);
+    // Declared to the functions router's timeout before any route of this
+    // function runs. Outside that router (a test calling `app.request`) there
+    // is nothing to declare it to, and nothing happens.
+    const declareTimeout: MiddlewareHandler<HonoEnv> | undefined = timeoutMs === undefined
+        ? undefined
+        : async (c, next) => {
+            c.get("functionTimeout")?.declare(timeoutMs);
+            await next();
+        };
+
     const app = new Hono<HonoEnv>();
+    if (declareTimeout) app.use("*", declareTimeout);
     const returned: unknown = definition(app, { rebase: typedSingleton<DB>() });
     // Duck-typed, as the loader does: an app from another copy of `hono` is
     // not `instanceof` this one, and was replaced by the empty `app`.
-    return isHonoLike(returned) ? returned as Hono<HonoEnv> : app;
+    if (!isHonoLike(returned)) return app;
+    if (!declareTimeout) return returned as Hono<HonoEnv>;
+    // An app of the definition's own never saw the declaration above.
+    const declared = new Hono<HonoEnv>();
+    declared.use("*", declareTimeout);
+    declared.route("/", returned as Hono<HonoEnv>);
+    return declared;
 }

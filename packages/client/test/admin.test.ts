@@ -185,6 +185,18 @@ roles: ["admin"] };
 body: JSON.stringify(data) });
         });
 
+        it("importUsers sends the accounts to POST /admin/users/import, and dryRun only when asked", async () => {
+            const admin = createAdmin(transport);
+            mockRequest.mockResolvedValue({ dryRun: false, created: 1, skipped: 0, failed: 0, results: [] });
+            const users = [{ id: "5b0a3c9e-21f4-4d3b-8a6e-7c1d2e3f4a5b", email: "ada@example.com", emailVerified: true }];
+
+            await admin.importUsers(users);
+            await admin.importUsers(users, { dryRun: true });
+
+            expect(mockRequest).toHaveBeenNthCalledWith(1, "/admin/users/import", { method: "POST", body: JSON.stringify({ users }) });
+            expect(mockRequest).toHaveBeenNthCalledWith(2, "/admin/users/import", { method: "POST", body: JSON.stringify({ users, dryRun: true }) });
+        });
+
         it("createUser with minimal payload (email only)", async () => {
             const admin = createAdmin(transport);
             mockRequest.mockResolvedValueOnce({ user: { uid: "usr_min" } });

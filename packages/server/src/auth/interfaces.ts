@@ -35,6 +35,12 @@ export interface UserData {
  * Data for creating a new user
  */
 export interface CreateUserData {
+    /**
+     * The account's id, kept as given: an import from another system keeps
+     * the ids its rows point at (`POST /admin/users/import`, which checks it
+     * with `importedUserIdProblem`). Omitted, the users table generates one.
+     */
+    id?: string;
     email: string;
     passwordHash?: string;
     displayName?: string;
@@ -42,6 +48,8 @@ export interface CreateUserData {
     emailVerified?: boolean;
     isAnonymous?: boolean;
     metadata?: Record<string, unknown>;
+    /** When the account was created, for an import that keeps the date. Omitted: now. */
+    createdAt?: Date;
 }
 
 /**
@@ -336,6 +344,10 @@ export interface UserRepository {
      * Server Error", which tells the person who clicked twice that the server
      * is broken rather than that they already have an account — and tells the
      * operator to go looking for a fault that is not there.
+     *
+     * With `data.id`, the row keeps that id. An id another account holds is a
+     * 409 `ID_EXISTS`; one the id column cannot store (not a uuid, on a uuid
+     * column) is a 400 `INVALID_ID`.
      */
     createUser(data: CreateUserData): Promise<UserData>;
 

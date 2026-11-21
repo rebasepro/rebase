@@ -57,7 +57,7 @@
 
 // ── Authoring ────────────────────────────────────────────────────────────
 export { defineFunction } from "./define-function";
-export type { RebaseFunctionContext } from "./define-function";
+export type { DefineFunctionOptions, RebaseFunctionContext } from "./define-function";
 
 /**
  * The app-scoped Rebase client: `dataAsAdmin`, `auth`, `storage`, `email`,

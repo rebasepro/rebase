@@ -196,7 +196,8 @@ deploys or as storage for uploads. That is also why
 
 | Limit | Default | Change it with |
 |---|---|---|
-| Function timeout | 30 s, then `504` with code `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` turns it off) |
+| Function timeout | 30 s, then `504` with code `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` turns it off), or one function's own `defineFunction(…, { timeoutMs })` |
+| A function's own timeout, at most | 300 s | `REBASE_FUNCTIONS_MAX_TIMEOUT_MS` |
 | Waiting on your instance, at the edge | 10 minutes between reads or writes | Fixed |
 | Request body, `/api/*` routes without a limit of their own | 10 MiB, then `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in bytes |
 | Request body at the edge | 64 MiB | Fixed |
@@ -212,7 +213,8 @@ Some details:
 - **The edge waits longer than the runtime.** The ingress in front of your
   instances waits up to 10 minutes, so the limit a request hits is the runtime's,
   which answers JSON and aborts the signal. Raise `REBASE_FUNCTIONS_TIMEOUT_MS`
-  up to that. For work that takes longer, or that must survive a deploy (an
+  up to that, or give the one function that needs it its own
+  [`timeoutMs`](/docs/backend/custom-functions/#timeouts-and-rate-limits). For work that takes longer, or that must survive a deploy (an
   instance drains for 15 seconds), answer at once and do the work in a
   [job](/docs/backend/jobs/).
 - **Uploads larger than 64 MiB** need the resumable (TUS) upload, which sends

@@ -1,5 +1,13 @@
 import type { Transport } from "./transport";
-import type { AdminGuest, AdminUser, DeleteGuestsResult, RoleSummary } from "@rebasepro/types";
+import type {
+    AdminGuest,
+    AdminUser,
+    DeleteGuestsResult,
+    ImportUserInput,
+    ImportUsersRequest,
+    ImportUsersResult,
+    RoleSummary
+} from "@rebasepro/types";
 
 export type { AdminUser };
 
@@ -82,6 +90,22 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         return transport.request<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>(adminPath + "/users", {
             method: "POST",
             body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * Import accounts from another system, keeping their ids (`id`, often a
+     * uuid) so the rows that point at them still do. No password, no email:
+     * an imported account signs in by magic link, an email code, a provider or
+     * a password reset. An account whose id or email is already taken is
+     * `skipped`, never updated. At most `MAX_USERS_PER_IMPORT` (100) accounts
+     * per call; `dryRun: true` checks them and writes nothing.
+     */
+    async function importUsers(users: ImportUserInput[], options?: { dryRun?: boolean }) {
+        const body: ImportUsersRequest = { users, ...(options?.dryRun ? { dryRun: true } : {}) };
+        return transport.request<ImportUsersResult>(adminPath + "/users/import", {
+            method: "POST",
+            body: JSON.stringify(body)
         });
     }
 
@@ -172,6 +196,7 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         listUsersPaginated,
         getUser,
         createUser,
+        importUsers,
         updateUser,
         deleteUser,
         resetMfa,

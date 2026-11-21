@@ -244,6 +244,84 @@ export interface RebaseStaticAppConfig {
      * that carry no policy of their own.
      */
     frameAncestors?: string[];
+    /**
+     * Requests this app answers with a redirect instead of a file: moved
+     * pages, a renamed section, a whole hostname sent to another.
+     *
+     * `from` is a path on this app's address, absolute and inside its `path`,
+     * where `:name` matches one segment and `:name*` (last only) matches the
+     * rest of the path, none included. `to` is a path on the same address or
+     * an absolute `http(s)://` URL, and every parameter it names is replaced by
+     * what `from` captured: `{ "from": "/blog/:slug", "to": "/posts/:slug" }`.
+     * `host` and `query` narrow a redirect to one hostname or to a query
+     * string holding exact values. `status` is 301, 302, 307 or 308, default
+     * 308.
+     *
+     * Checked in declaration order, before the build's files, and the first
+     * match answers. The request's query string is kept unless `to` has one
+     * of its own. A request {@link RebaseStaticAppConfig.routes} sends to a
+     * function is the function's, and is not redirected.
+     *
+     * An app whose only job is a redirect still declares a directory to
+     * serve: `{ "from": "/:path*", "to": "https://www.example.com/:path*" }`
+     * on an app at `https://example.com` sends the bare domain to `www`.
+     *
+     * @see validateStaticRedirect for every rule a redirect is held to.
+     */
+    redirects?: RebaseStaticRedirect[];
+    /**
+     * Serve `x.html` at `/x`, and answer `/x.html` with a 308 to `/x`.
+     *
+     * For a static site whose pages are files: `/privacidad` serves
+     * `privacidad.html`, `/legal/terms` serves `legal/terms.html`. A file or
+     * directory of the request's exact name is served first. `index.html`
+     * keeps the directory's address: `/docs/index.html` answers 308 to
+     * `/docs/`. The query string is kept. Default `false`.
+     */
+    cleanUrls?: boolean;
+}
+
+/** The statuses a static app's redirect may answer with. */
+export const STATIC_REDIRECT_STATUSES = [301, 302, 307, 308] as const;
+
+/** One of {@link STATIC_REDIRECT_STATUSES}. */
+export type RebaseStaticRedirectStatus = typeof STATIC_REDIRECT_STATUSES[number];
+
+/** The status a redirect answers with when it names none: permanent, method kept. */
+export const DEFAULT_STATIC_REDIRECT_STATUS: RebaseStaticRedirectStatus = 308;
+
+/** Whether `value` is one of {@link STATIC_REDIRECT_STATUSES}. */
+export function isStaticRedirectStatus(value: unknown): value is RebaseStaticRedirectStatus {
+    return STATIC_REDIRECT_STATUSES.some(status => status === value);
+}
+
+/**
+ * A request a static app answers with a redirect. See
+ * {@link RebaseStaticAppConfig.redirects}.
+ */
+export interface RebaseStaticRedirect {
+    /**
+     * The path it matches, absolute and inside the app's `path`: literal
+     * segments, `:name` for one segment, and `:name*` as the last segment for
+     * the rest of the path, none included. A trailing slash on the request is
+     * ignored. Matched case-sensitively.
+     */
+    from: string;
+    /**
+     * Where it sends the request: a path on the same address, or an absolute
+     * `http://` or `https://` URL. `:name` and `:name*` are replaced by what
+     * `from` captured, in its path and query.
+     */
+    to: string;
+    /** 301, 302, 307 or 308. Default 308. */
+    status?: RebaseStaticRedirectStatus;
+    /** Only for requests to this hostname, lowercase, e.g. `example.com`. */
+    host?: string;
+    /**
+     * Only for requests whose query string holds each of these parameters
+     * with exactly this value. `""` matches `?k` and `?k=`.
+     */
+    query?: Record<string, string>;
 }
 
 /**
@@ -496,6 +574,359 @@ export function compareStaticRoutes(a: RebaseStaticRoute, b: RebaseStaticRoute):
     const bWild = b.path.endsWith("/*");
     if (aWild !== bWild) return aWild ? 1 : -1;
     return aWild ? b.path.length - a.path.length : 0;
+}
+
+/** One segment of a redirect's `from`. */
+type RedirectSegment =
+    | { kind: "literal"; value: string }
+    | { kind: "param"; name: string; rest: boolean };
+
+/** `:name` or `:name*`, a whole segment. */
+const REDIRECT_PARAM_SEGMENT = /^:([A-Za-z_][A-Za-z0-9_]*)(\*)?$/;
+
+/** A parameter written in `to`: `:name` or `:name*`, with the slash before it. */
+const REDIRECT_PARAM_IN_TO = /(\/)?:([A-Za-z_][A-Za-z0-9_]*)(\*)?/g;
+
+/** What a literal segment may not hold. A `:` starts a parameter, which is a whole segment. */
+// eslint-disable-next-line no-control-regex
+const REDIRECT_LITERAL_FORBIDDEN = /[?#\\*:\s\u0000-\u001f\u007f]/;
+
+/**
+ * A literal segment as a browser sends it: percent-encoded where the URL
+ * standard encodes a path, so `café` in `from` matches the request
+ * `/caf%C3%A9`, and an escape already written is kept.
+ */
+function encodePathSegment(segment: string): string {
+    return new URL(`http://h/${segment}`).pathname.slice(1);
+}
+
+/** Split `from` into segments, or say why it cannot be. */
+function parseRedirectFrom(from: string): { ok: true; segments: RedirectSegment[] } | { ok: false; reason: string } {
+    if (from === "/") return { ok: true, segments: [] };
+    if (from.startsWith("//")) return { ok: false, reason: "must be a path, not a URL without its scheme — match a hostname with \"host\"" };
+    const parts = from.slice(1).split("/");
+    if (parts.some(part => part === "")) {
+        return { ok: false, reason: "must have no empty segment and no trailing slash — a request's trailing slash is ignored anyway" };
+    }
+    const segments: RedirectSegment[] = [];
+    const names = new Set<string>();
+    for (const [index, part] of parts.entries()) {
+        if (part.startsWith(":")) {
+            const param = REDIRECT_PARAM_SEGMENT.exec(part);
+            if (!param) {
+                return { ok: false, reason: `has "${part}", which is not a parameter: write ":name" for one segment or ":name*" for the rest of the path` };
+            }
+            const [, name, star] = param;
+            if (star && index !== parts.length - 1) {
+                return { ok: false, reason: `has ":${name}*" before its last segment — a parameter matching the rest of the path comes last` };
+            }
+            if (names.has(name)) return { ok: false, reason: `names ":${name}" twice` };
+            names.add(name);
+            segments.push({ kind: "param", name, rest: Boolean(star) });
+            continue;
+        }
+        if (part.startsWith(".")) {
+            return { ok: false, reason: 'must have no segment starting with "." — the backend serves /.well-known, and an app serves no dot-file' };
+        }
+        if (REDIRECT_LITERAL_FORBIDDEN.test(part)) {
+            return {
+                ok: false,
+                reason: `has "${part}", which holds a space, "?", "#", "\\", "*" or ":" — a ":" starts a parameter, ` +
+                    "which is a whole segment, and a query is matched with \"query\""
+            };
+        }
+        const encoded = encodePathSegment(part);
+        // `%2e%2e` is `..` to the URL standard, and resolves away.
+        if (encoded === "") {
+            return { ok: false, reason: `has "${part}", which is "." or ".." written with escapes — a request never arrives with one` };
+        }
+        segments.push({ kind: "literal", value: encoded });
+    }
+    return { ok: true, segments };
+}
+
+/** The leading literal segments of `from`, as a path: what every match is under. */
+function literalPrefixOf(segments: readonly RedirectSegment[]): string {
+    const literals: string[] = [];
+    for (const segment of segments) {
+        if (segment.kind !== "literal") break;
+        literals.push(segment.value);
+    }
+    return `/${literals.join("/")}`;
+}
+
+/** A request a static app's redirects are matched against. */
+export interface StaticRedirectRequest {
+    /**
+     * The request's hostname, lowercase, with no port and no trailing dot —
+     * as the runtime normalises the `Host` header.
+     */
+    host: string;
+    /** The request path, percent-encoded as it arrived (a `URL`'s `pathname`). */
+    path: string;
+    /** The query string with its `?`, or `""` (a `URL`'s `search`). */
+    search: string;
+}
+
+/** What a matched redirect answers with. */
+export interface StaticRedirectMatch {
+    status: RebaseStaticRedirectStatus;
+    /** The `Location` header: a path on the same address, or an absolute URL. */
+    location: string;
+}
+
+/**
+ * Compile one redirect into the function that answers a request with it, or
+ * `undefined` when it does not match. The redirect must have passed
+ * {@link validateStaticRedirect}; one that would not throws.
+ */
+function compileStaticRedirect(
+    redirect: RebaseStaticRedirect
+): (request: StaticRedirectRequest) => StaticRedirectMatch | undefined {
+    const parsed = parseRedirectFrom(redirect.from);
+    if (!parsed.ok) throw new Error(`Redirect from ${JSON.stringify(redirect.from)} ${parsed.reason}.`);
+    const names: string[] = [];
+    let body = "";
+    for (const segment of parsed.segments) {
+        if (segment.kind === "literal") {
+            body += `/${segment.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`;
+        } else {
+            names.push(segment.name);
+            body += segment.rest ? "(?:/([^/]+(?:/[^/]+)*))?" : "/([^/]+)";
+        }
+    }
+    const pattern = new RegExp(`^${body}/?$`);
+    const status = redirect.status ?? DEFAULT_STATIC_REDIRECT_STATUS;
+    const conditions = Object.entries(redirect.query ?? {});
+    const absolute = /^https?:\/\//i.test(redirect.to);
+
+    return (request) => {
+        if (redirect.host !== undefined && redirect.host !== request.host) return undefined;
+        const match = pattern.exec(request.path);
+        if (!match) return undefined;
+        if (conditions.length > 0) {
+            const query = new URLSearchParams(request.search);
+            if (!conditions.every(([key, value]) => query.getAll(key).includes(value))) return undefined;
+        }
+        const params = new Map(names.map((name, index) => [name, match[index + 1] ?? ""]));
+        let location = redirect.to.replace(REDIRECT_PARAM_IN_TO, (_whole, slash: string | undefined, name: string) => {
+            const value = params.get(name) ?? "";
+            // An empty `:path*` takes its slash with it: `/new/:path*` is `/new`.
+            return value === "" ? "" : `${slash ?? ""}${value}`;
+        });
+        if (!absolute) {
+            if (location === "" || location.startsWith("?") || location.startsWith("#")) location = `/${location}`;
+            // Never a protocol-relative URL: that would leave this hostname.
+            if (/^[/\\]{2}/.test(location)) return undefined;
+        }
+        const hashAt = location.indexOf("#");
+        const beforeHash = hashAt === -1 ? location : location.slice(0, hashAt);
+        if (!beforeHash.includes("?") && request.search.length > 1) {
+            location = `${beforeHash}${request.search}${hashAt === -1 ? "" : location.slice(hashAt)}`;
+        }
+        return { status, location };
+    };
+}
+
+/**
+ * Compile a static app's redirects into the one function that answers a
+ * request with the first that matches, in declaration order — `undefined`
+ * when none does. Each must have passed {@link validateStaticRedirect}.
+ *
+ * Shared so every server of a static app answers the same request the same
+ * way: `rebase dev`, `rebase start` and `rebase-server` through `serveSPA`,
+ * and any other host that serves a built app.
+ */
+export function compileStaticRedirects(
+    redirects: readonly RebaseStaticRedirect[]
+): (request: StaticRedirectRequest) => StaticRedirectMatch | undefined {
+    const compiled = redirects.map(compileStaticRedirect);
+    return (request) => {
+        for (const answer of compiled) {
+            const match = answer(request);
+            if (match) return match;
+        }
+        return undefined;
+    };
+}
+
+export type StaticRedirectResult =
+    | { ok: true; redirect: RebaseStaticRedirect }
+    | { ok: false; field?: "from" | "to" | "status" | "host" | "query"; reason: string };
+
+/**
+ * Validate one of a static app's redirects against the app's address (its
+ * hostname, when its `path` names one, and the path part).
+ *
+ * Shared for the reason {@link validateStaticRoute} is: the CLI checks a
+ * redirect while `rebase.json` is edited, and the runtime checks it again
+ * when it loads a bundle. The rules:
+ *
+ * - `from` is an absolute path with no empty segment, no trailing slash and
+ *   no segment starting with a dot. A segment is literal text or a parameter
+ *   — `:name`, or `:name*` as the last segment — and a literal holds no
+ *   space, `?`, `#`, `\`, `*` or `:`. Its leading literal segments are inside
+ *   the app's path and not under a prefix the backend owns, since the app is
+ *   what answers there.
+ * - `to` is a path (`/…`, never `//…`) or an absolute `http://` or `https://`
+ *   URL, with no space or backslash. It names only parameters `from`
+ *   declares, and none in an absolute URL's scheme, host or port.
+ * - `status` is 301, 302, 307 or 308.
+ * - `host` is a public hostname, lowercase, and is the app's own when the
+ *   app has one — on any other the redirect could never match.
+ * - `query` maps parameter names to the exact string each must hold.
+ * - A redirect to a path on the same address that its own `from` matches
+ *   again is refused: every request it answers would be sent round forever.
+ */
+export function validateStaticRedirect(value: unknown, app: AppAddress): StaticRedirectResult {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return { ok: false, reason: 'must be an object like { "from": "/old", "to": "/new" }' };
+    }
+    const { from, to, status, host, query, source, destination } = value as Record<string, unknown>;
+
+    // The spelling every `vercel.json` being migrated has.
+    if (from === undefined && source !== undefined) {
+        return { ok: false, field: "from", reason: 'is missing — Vercel\'s "source" is "from" here' };
+    }
+    if (to === undefined && destination !== undefined) {
+        return { ok: false, field: "to", reason: 'is missing — Vercel\'s "destination" is "to" here' };
+    }
+    if (typeof from !== "string" || !from.startsWith("/")) {
+        return { ok: false, field: "from", reason: 'must be an absolute path like "/old" or "/blog/:slug"' };
+    }
+    const parsed = parseRedirectFrom(from);
+    if (!parsed.ok) return { ok: false, field: "from", reason: parsed.reason };
+    const prefix = literalPrefixOf(parsed.segments);
+    const reserved = reservedPrefixFor(prefix);
+    if (reserved) {
+        return { ok: false, field: "from", reason: `cannot be "${reserved}" or under it — the backend answers that path on every hostname` };
+    }
+    if (!isPathUnder(prefix, app.path) && !isPathUnder(app.path, prefix)) {
+        return { ok: false, field: "from", reason: `must be inside this app's path, "${app.path}" — the app is what answers there` };
+    }
+    if (!isPathUnder(prefix, app.path)) {
+        // `/:slug` on an app at `/docs`: only its `/docs` matches would ever
+        // reach this app, so say that rather than let it look like it covers more.
+        return { ok: false, field: "from", reason: `must start with this app's path, "${app.path}" — write "${app.path}${from === "/" ? "" : from}" if that is what you mean` };
+    }
+
+    if (typeof to !== "string" || to === "") {
+        return { ok: false, field: "to", reason: 'must be a path like "/new" or a URL like "https://www.example.com/:path*"' };
+    }
+    // eslint-disable-next-line no-control-regex
+    if (/[\s\\\u0000-\u001f\u007f]/.test(to)) {
+        return { ok: false, field: "to", reason: "must not contain spaces, control characters or backslashes" };
+    }
+    const absolute = /^https?:\/\//i.test(to);
+    if (!absolute) {
+        if (!to.startsWith("/")) {
+            return { ok: false, field: "to", reason: 'must be a path starting with "/" or an absolute URL starting with "https://"' };
+        }
+        if (to.startsWith("//")) {
+            return { ok: false, field: "to", reason: `must be a path, not a URL without its scheme — write "https:${to}"` };
+        }
+    } else {
+        const authority = to.slice(to.indexOf("//") + 2).split(/[/?#]/)[0];
+        if (/:[A-Za-z_]/.test(authority)) {
+            return { ok: false, field: "to", reason: "may name parameters in its path and query only, not in its scheme, host or port" };
+        }
+        try {
+            const url = new URL(to.replace(REDIRECT_PARAM_IN_TO, (_whole, slash: string | undefined) => `${slash ?? ""}x`));
+            if (url.username || url.password) return { ok: false, field: "to", reason: "must not contain credentials" };
+        } catch {
+            return { ok: false, field: "to", reason: "is not a valid URL" };
+        }
+    }
+    const declared = new Set(parsed.segments.flatMap(segment => segment.kind === "param" ? [segment.name] : []));
+    for (const [, , name] of to.matchAll(REDIRECT_PARAM_IN_TO)) {
+        if (!declared.has(name)) {
+            return {
+                ok: false,
+                field: "to",
+                reason: `names ":${name}", which "from" does not declare` +
+                    (declared.size > 0 ? ` — it declares ${[...declared].map(n => `":${n}"`).join(", ")}` : "")
+            };
+        }
+    }
+
+    if (status !== undefined && !isStaticRedirectStatus(status)) {
+        return { ok: false, field: "status", reason: "must be 301, 302, 307 or 308 — 308 when left out" };
+    }
+
+    if (host !== undefined) {
+        if (typeof host !== "string" || !isValidAppHost(host)) {
+            return { ok: false, field: "host", reason: 'must be a lowercase public hostname like "example.com" — no scheme, port or path' };
+        }
+        if (app.host !== undefined && host !== app.host) {
+            return { ok: false, field: "host", reason: `can never match: this app answers only on "${app.host}"` };
+        }
+    }
+
+    let conditions: Record<string, string> | undefined;
+    if (query !== undefined) {
+        if (typeof query !== "object" || query === null || Array.isArray(query)) {
+            return { ok: false, field: "query", reason: 'must be an object of exact values like { "lang": "es" }' };
+        }
+        conditions = {};
+        for (const [key, expected] of Object.entries(query)) {
+            if (key === "" || typeof expected !== "string") {
+                return { ok: false, field: "query", reason: 'must map each parameter name to the exact string it holds, like { "lang": "es" }' };
+            }
+            conditions[key] = expected;
+        }
+    }
+
+    const redirect: RebaseStaticRedirect = {
+        from,
+        to,
+        ...(isStaticRedirectStatus(status) ? { status } : {}),
+        ...(typeof host === "string" ? { host } : {}),
+        ...(conditions ? { query: conditions } : {})
+    };
+
+    if (!absolute) {
+        // A request this redirect answers, built from `from` itself, and
+        // where it is sent: if that matches again, every request does.
+        const answer = compileStaticRedirect(redirect);
+        const samplePath = parsed.segments.length === 0
+            ? "/"
+            : parsed.segments.map(segment => `/${segment.kind === "literal" ? segment.value : "x"}`).join("");
+        const sampleSearch = conditions && Object.keys(conditions).length > 0
+            ? `?${new URLSearchParams(conditions).toString()}`
+            : "";
+        const sampleHost = redirect.host ?? app.host ?? "example.com";
+        const first = answer({ host: sampleHost, path: samplePath, search: sampleSearch });
+        if (first) {
+            const target = new URL(first.location, `https://${sampleHost}`);
+            if (answer({ host: sampleHost, path: target.pathname, search: target.search })) {
+                return {
+                    ok: false,
+                    field: "to",
+                    reason: `sends "${samplePath}${sampleSearch}" to "${first.location}", which "from" matches again — ` +
+                        "every request it answers would be redirected forever. Narrow \"from\", or send it somewhere \"from\" does not match"
+                };
+            }
+        }
+    }
+
+    return { ok: true, redirect };
+}
+
+/**
+ * Where a `cleanUrls` app sends a request for an HTML file by name: `/x.html`
+ * to `/x`, and an `index.html` to its directory, `/docs/index.html` to
+ * `/docs/`. `undefined` for a path that names no `.html` file.
+ *
+ * The path is compared as it arrives, percent-encoded; the caller keeps the
+ * query string and redirects only when the file exists.
+ */
+export function cleanUrlFor(requestPath: string): string | undefined {
+    if (!requestPath.endsWith(".html")) return undefined;
+    const slash = requestPath.lastIndexOf("/");
+    const name = requestPath.slice(slash + 1);
+    if (name === ".html") return undefined;
+    if (name === "index.html") return requestPath.slice(0, slash + 1);
+    return requestPath.slice(0, -".html".length);
 }
 
 export type FrameAncestorResult =
@@ -861,6 +1292,20 @@ export interface RebaseBundleStatic {
      * that predates this field serves `frame-ancestors 'self'`.
      */
     frameAncestors?: string[];
+    /**
+     * Requests answered with a redirect before the build's files, copied from
+     * the app's declaration — see {@link RebaseStaticAppConfig.redirects}.
+     * Each has passed {@link validateStaticRedirect}, and the runtime checks
+     * it again. A runtime that predates this field serves the build at those
+     * paths instead.
+     */
+    redirects?: RebaseStaticRedirect[];
+    /**
+     * Serve `x.html` at `/x` — see {@link RebaseStaticAppConfig.cleanUrls}.
+     * Present only when `true`. A runtime that predates this field answers
+     * `/x` as it would without it.
+     */
+    cleanUrls?: boolean;
 }
 
 /**

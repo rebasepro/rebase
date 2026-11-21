@@ -1,4 +1,4 @@
-import type { User } from "../users";
+import type { ImportUserInput, ImportUsersResult, User } from "../users";
 import type { ResourceRef } from "../types/resources";
 import type { RebaseSdkData } from "./data";
 import type { EmailService } from "./email";
@@ -243,6 +243,12 @@ export interface AdminAPI {
     }): Promise<{ users: AdminUser[]; total: number; limit: number; offset: number }>;
     getUser(uid: string): Promise<{ user: AdminUser }>;
     createUser(data: { email: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>;
+    /**
+     * Accounts from another system, keeping their ids; no password, no email.
+     * An id or email already taken is `skipped`, never updated. At most
+     * `MAX_USERS_PER_IMPORT` (100) per call.
+     */
+    importUsers(users: ImportUserInput[], options?: { dryRun?: boolean }): Promise<ImportUsersResult>;
     updateUser(uid: string, data: { email?: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
     deleteUser(uid: string): Promise<{ success: boolean }>;
     resetPassword(uid: string, options?: { password?: string }): Promise<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>;
@@ -546,6 +552,14 @@ export interface RebaseClient<DB = unknown> {
 
     /** Custom backend functions API */
     functions?: FunctionsAPI;
+
+    /**
+     * Call a SQL function the backend declares with `defineRpc` — `POST
+     * /rpc/<name>` with the named arguments as the JSON body — as the caller.
+     * Resolves to the function's result: an array for a set-returning
+     * function, the row or the value for any other, `null` for `void`.
+     */
+    rpc?<T = unknown, A extends Record<string, unknown> = Record<string, unknown>>(name: string, args?: A): Promise<T>;
 
     /** The project's service keys. Requires `keys:read` / `keys:write`. */
     apiKeys?: ApiKeysAPI;

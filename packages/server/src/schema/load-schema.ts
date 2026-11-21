@@ -3,8 +3,10 @@ import * as path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 import {
     LEGACY_LAYOUT_REMEDY,
+    isRpcDef,
     isTableDef,
     isViewDef,
+    type AnyRpcDef,
     type AnyTableDef,
     type AnyViewDef,
     type CompiledTable,
@@ -49,6 +51,11 @@ export interface LoadedSchema {
     defs: (AnyTableDef | AnyViewDef)[];
     /** The `defaultRls` the index exports: what `rls: "inherit"` resolves to. */
     defaultRls?: DefaultRls;
+    /**
+     * The SQL functions the index exports with `defineRpc`, each once: what
+     * `POST /api/rpc/<name>` serves. Absent when it exports none.
+     */
+    rpc?: AnyRpcDef[];
 }
 
 /**
@@ -221,7 +228,8 @@ function isDefaultRls(value: unknown): value is DefaultRls {
  * Import a project's `backend/schema` directory.
  *
  * - Reads `<dir>/index.(ts|mts|js|mjs)` and collects every export that is a
- *   `defineTable` / `defineAuthTable` / `defineView` result, and `defaultRls`.
+ *   `defineTable` / `defineAuthTable` / `defineView` result, every
+ *   `defineRpc` result (a name declared twice is refused), and `defaultRls`.
  * - The index is authoritative: every other module under `dir` is imported
  *   too, and one defining a table or view the index does not export is
  *   refused. A table with policies generated but no route — or a route with
@@ -282,12 +290,17 @@ export async function loadBackendSchema(dir: string, options: LoadBackendSchemaO
     const indexFile = indexName ? path.join(resolved, indexName) : "";
 
     const defs: (AnyTableDef | AnyViewDef)[] = [];
+    const rpc: AnyRpcDef[] = [];
     let defaultRls: DefaultRls | undefined;
     if (indexFile) {
         const mod = await importOrThrow(importModule, indexFile, "the schema index");
         for (const [name, value] of Object.entries(mod)) {
             if (isTableDef(value) || isViewDef(value)) {
                 if (!defs.includes(value)) defs.push(value);
+                continue;
+            }
+            if (isRpcDef(value)) {
+                if (!rpc.includes(value)) rpc.push(value);
                 continue;
             }
             if (name === "defaultRls") {
@@ -311,9 +324,9 @@ export async function loadBackendSchema(dir: string, options: LoadBackendSchemaO
 
     // The index is authoritative: a definition anywhere else that it does not
     // export is refused, every one of them reported at once.
-    const exported = new Set<unknown>(defs);
-    const exportedNames = new Set(defs.map(def => `${def.brand}:${def.name}`));
-    const problems: SchemaDefinitionProblem[] = [];
+    const exported = new Set<unknown>([...defs, ...rpc]);
+    const exportedNames = new Set([...defs, ...rpc].map(def => `${def.brand}:${def.name}`));
+    const problems: SchemaDefinitionProblem[] = rpcNameProblems(rpc);
     for (const file of siblingModules(resolved)) {
         const mod = await importOrThrow(importModule, file, "a schema module");
         const relative = path.relative(resolved, file);
@@ -321,16 +334,16 @@ export async function loadBackendSchema(dir: string, options: LoadBackendSchemaO
             if (isLegacyCollection(value)) {
                 throw legacyLayoutError(`${file} exports \`${name}\`, a collection (\`defineCollection\`)`, file);
             }
-            if (!isTableDef(value) && !isViewDef(value)) continue;
+            if (!isTableDef(value) && !isViewDef(value) && !isRpcDef(value)) continue;
             // The same object reached twice through two module instances is
             // still the exported definition; match those by kind and name.
             if (exported.has(value) || exportedNames.has(`${value.brand}:${value.name}`)) continue;
-            const kind = isViewDef(value) ? "view" : "table";
+            const kind = isViewDef(value) ? "view" : isRpcDef(value) ? "RPC" : "table";
             problems.push({
-                table: value.name,
+                table: isRpcDef(value) ? `rpc ${value.name}` : value.name,
                 message:
-                    `is a ${kind} defined in ${relative} (export \`${name}\`) that ${indexFile ? path.basename(indexFile) : "no index"} ` +
-                    `does not export. Only what backend/schema/index exports is served and protected: add ` +
+                    `is a${kind === "RPC" ? "n" : ""} ${kind} defined in ${relative} (export \`${name}\`) that ${indexFile ? path.basename(indexFile) : "no index"} ` +
+                    `does not export. Only what backend/schema/index exports is served${kind === "RPC" ? "" : " and protected"}: add ` +
                     `\`export { ${name} } from "./${relative.replace(/\.[mc]?[jt]s$/, "")}";\` to the index, or delete the definition.`
             });
         }
@@ -340,7 +353,33 @@ export async function loadBackendSchema(dir: string, options: LoadBackendSchemaO
     // Fail closed, for every caller: compiling is the validation.
     compileTables(defs, defaultRls !== undefined ? { defaultRls } : {});
 
-    return { dir: resolved, indexFile, defs, ...(defaultRls !== undefined ? { defaultRls } : {}) };
+    return {
+        dir: resolved,
+        indexFile,
+        defs,
+        ...(defaultRls !== undefined ? { defaultRls } : {}),
+        ...(rpc.length > 0 ? { rpc } : {})
+    };
+}
+
+/**
+ * Two RPCs under one name would be two answers to one URL, `/api/rpc/<name>`:
+ * one problem per name declared more than once.
+ */
+function rpcNameProblems(rpc: readonly AnyRpcDef[]): SchemaDefinitionProblem[] {
+    const seen = new Set<string>();
+    const problems: SchemaDefinitionProblem[] = [];
+    for (const def of rpc) {
+        if (!seen.has(def.name)) {
+            seen.add(def.name);
+            continue;
+        }
+        problems.push({
+            table: `rpc ${def.name}`,
+            message: `is declared more than once. Each RPC is one URL, /api/rpc/${def.name}: keep one \`defineRpc("${def.name}", …)\`.`
+        });
+    }
+    return problems;
 }
 
 /**

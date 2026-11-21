@@ -12,6 +12,19 @@ import type { BackendServices } from "../backend/services";
 import type { UserProfile } from "../functions/context";
 
 /**
+ * A function request's timeout, as the functions router hands it to the
+ * function: `defineFunction(…, { timeoutMs })` declares the function's own.
+ */
+export interface FunctionTimeoutControl {
+    /**
+     * Replace the server-wide timeout with the function's own, counted from
+     * the moment the request reached the functions router. The server caps it
+     * at its `REBASE_FUNCTIONS_MAX_TIMEOUT_MS`.
+     */
+    declare(timeoutMs: number): void;
+}
+
+/**
  * Hono Environment Variables
  * Passed to generic Hono<HonoEnv> to type `c.get()`
  */
@@ -68,6 +81,12 @@ export type HonoEnv = {
          * `@rebasepro/server/functions`. See `functions/request-timeout.ts`.
          */
         functionSignal?: AbortSignal;
+        /**
+         * The functions router's timeout for this request, which a function
+         * authored with `defineFunction(…, { timeoutMs })` replaces with its
+         * own. See `functions/request-timeout.ts`.
+         */
+        functionTimeout?: FunctionTimeoutControl;
         /**
          * Reads the caller's account — display name, photo, linked sign-in
          * providers — from the auth store, once per request. Read it with

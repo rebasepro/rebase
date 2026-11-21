@@ -8,6 +8,7 @@ import { createSchema } from "./schema";
 import { createApiKeys, CreateApiKeysOptions, createPersonalKeys, CreatePersonalKeysOptions } from "./api-keys";
 import { TableClient, createTableClient, invalidBulkBody } from "./table";
 import { createFunctionsClient } from "./functions";
+import { createRpcCall, type RpcCall } from "./rpc";
 import { createPushClient, type PushClient } from "./push";
 import { createStorage } from "./storage";
 import { ClientStorageSourceRegistry } from "./storage-registry";
@@ -118,6 +119,7 @@ export type {
     UpdateApiKeyRequest
 } from "./api-keys";
 export type { FunctionInvokeOptions, FunctionsClient } from "./functions";
+export type { RpcCall } from "./rpc";
 export type { PushClient, PushSubscribeOptions, PushRegistrationOptions } from "./push";
 
 // Realtime: the WebSocket client class is internal to `createRebaseClient()`,
@@ -347,6 +349,17 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
     apiKeys: ReturnType<typeof createApiKeys>;
     personalKeys: ReturnType<typeof createPersonalKeys>;
     functions: ReturnType<typeof createFunctionsClient>;
+    /**
+     * Call a SQL function the backend declares with `defineRpc` — `POST
+     * /rpc/<name>` with the named arguments — as the signed-in user, or
+     * anonymously. Resolves to the function's result: an array for a
+     * set-returning function, the row or the value for any other.
+     *
+     * ```ts
+     * const proposal = await client.rpc<Proposal | null>("get_public_proposal", { token });
+     * ```
+     */
+    rpc: RpcCall;
     /** Web Push from the browser: subscribe and unsubscribe through a service worker. Needs `push: true` on the backend. */
     push: PushClient;
     ws?: RebaseWebSocketClient;
@@ -527,6 +540,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     const personalKeys = createPersonalKeys(transport, options.personalKeys);
     const storage = createStorage(transport);
     const functions = createFunctionsClient(transport);
+    const rpc = createRpcCall(transport);
     const push = createPushClient(transport);
 
     // Build a server-backed StorageSource for a given storage-source key.
@@ -957,6 +971,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         apiKeys,
         personalKeys,
         functions,
+        rpc,
         push,
         storage,
         storageRegistry,

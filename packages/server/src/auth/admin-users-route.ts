@@ -6,6 +6,7 @@
  *   GET /users/pick
  *   GET /users/:uid
  *   POST /users
+ *   POST /users/import
  *   PUT /users/:uid
  *   DELETE /users/:uid
  *   DELETE /users/:uid/mfa
@@ -36,6 +37,7 @@ import {
     runAfterUserDelete
 } from "./admin-user-ops";
 import { replaceUserPassword, revokeAllSessions } from "./token-revocation";
+import { importUsers, readImportRequest } from "./import-users";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import type { AdminGuest, AdminUser, CompiledAuthHooks, DeleteGuestsResult, PickedUser } from "@rebasepro/types";
@@ -456,6 +458,16 @@ values: prepResult.values },
         const adminUser = toAdminUser(user, userRoles);
 
         return c.json({ user: adminUser, ...delivery }, 201);
+    });
+
+    /**
+     * Accounts from another system, keeping their ids: no password, no email,
+     * and an account whose id or email is taken is skipped, never updated. One
+     * outcome per account; see `import-users.ts`.
+     */
+    router.post("/users/import", requireScope("users:write"), async (c) => {
+        const { users, dryRun } = readImportRequest(await c.req.json());
+        return c.json(await importUsers(c, users, { dryRun, authRepo, hooks: ops }));
     });
 
     router.put("/users/:uid", requireScope("users:write"), async (c) => {

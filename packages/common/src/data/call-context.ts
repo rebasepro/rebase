@@ -179,6 +179,7 @@ function missingClient<DB>(): RebaseCallbackClient<DB> {
             listUsersPaginated: fail("admin.listUsersPaginated"),
             getUser: fail("admin.getUser"),
             createUser: fail("admin.createUser"),
+            importUsers: fail("admin.importUsers"),
             updateUser: fail("admin.updateUser"),
             deleteUser: fail("admin.deleteUser"),
             resetPassword: fail("admin.resetPassword"),
