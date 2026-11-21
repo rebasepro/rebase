@@ -92,6 +92,23 @@ describe("recipe: orders dashboard", () => {
         expect(window.location.href).toBe(before);
     });
 
+    it("opens the collection from the total, in place or in a new tab", async () => {
+        renderDashboard();
+        await waitFor(() => expect(bars()).toHaveLength(3));
+        const total = screen.getByRole("link", { name: /^Total 5/ });
+        expect(total.getAttribute("href")).toContain("orders");
+        expect(total.getAttribute("href")).not.toContain("status_value");
+
+        const page = screen.getByRole("heading", { name: "Orders" });
+        fireEvent.click(bar("paid"));
+        await waitFor(() => expect(window.location.search).toContain("status_value=paid"));
+        fireEvent.click(total);
+        await waitFor(() => expect(window.location.search).not.toContain("status_value"));
+        expect(new URL(window.location.href).pathname).toContain("orders");
+        // Through the router: the same page is still mounted.
+        expect(page.isConnected).toBe(true);
+    });
+
     it("counts every row, in the total and in the groups", async () => {
         // The total summed the first 5000 rows and called it "Total".
         db.rows = { orders: Array.from({ length: 5003 }, (_, i) => ({ id: String(i + 1), status: "paid" })) };

@@ -197,23 +197,39 @@ describe("resolveCollectionSlotKeys with propertiesOrder (databases collection)"
         expect(slotKeys.relationKeys).toEqual([]);
     });
 
-    it("uses project (relation) as titleKey since it is first meaningful property", () => {
+    // A relation names another record. Leading with one made it every row's
+    // title: each client of one agency read as that agency.
+    it("never titles a row by a relation, even one ordered first", () => {
         const slotKeys = resolveCollectionSlotKeys(databasesCollection, mockAuthController, fields);
-        // titleKey should be "project" (first non-id property in propertiesOrder)
-        expect(slotKeys.titleKey).toBe("project");
-        // subtitleKey should be "connectionString" (first non-title candidate in propertiesOrder)
-        expect(slotKeys.subtitleKey).toBe("connectionString");
+        expect(slotKeys.titleKey).not.toBe("project");
+        expect(slotKeys.titleKeyCandidates).not.toContain("project");
+        // The first text candidate in `propertiesOrder` takes the title.
+        expect(slotKeys.titleKey).toBe("type");
     });
 
-    // A collection that *leads* with a relation is named by it, ordered or not:
-    // the leading relation is what the row is about, and the rule reads
-    // declaration order rather than property names.
-    it("uses the leading relation as the title even without propertiesOrder", () => {
+    it("never titles a row by a leading relation without propertiesOrder; it stays a chip", () => {
         const slotKeys = resolveCollectionSlotKeys(databasesCollectionNoOrder, mockAuthController, fields);
+        expect(slotKeys.titleKey).toBe("connectionString");
+        expect(slotKeys.relationKeys).toContain("project");
+    });
+
+    it("leaves a row with nothing but a relation untitled, for the surface to show its id", () => {
+        const membership: AdminCollection = {
+            name: "Memberships",
+            slug: "memberships",
+            properties: {
+                id: { name: "ID", type: "string", isId: "uuid" },
+                project: projectRelation
+            }
+        };
+        const slotKeys = resolveCollectionSlotKeys(membership, mockAuthController, fields);
+        expect(slotKeys.titleKey).toBeUndefined();
+        expect(slotKeys.relationKeys).toEqual(["project"]);
+    });
+
+    it("titles a row by a relation that display.title names", () => {
+        const slotKeys = resolveCollectionSlotKeys({ ...databasesCollectionNoOrder, display: { title: "project" } }, mockAuthController, fields);
         expect(slotKeys.titleKey).toBe("project");
-        // Already the row's headline — not repeated as a chip below it.
-        expect(slotKeys.relationKeys).not.toContain("project");
-        expect(slotKeys.subtitleKey).not.toBe("project");
     });
 
     it("still separates a relation that is not the leading property into relationKeys", () => {

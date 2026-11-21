@@ -16,7 +16,7 @@
  * or copy it and change `FIELD` / `VALUE` / the label.
  */
 import React, { useState } from "react";
-import type { CollectionActionsProps } from "@rebasepro/cms-types";
+import type { CollectionActionsProps } from "@rebasepro/cms";
 import { useRowWrites, useSnackbarController } from "@rebasepro/app";
 import { resolveSelection } from "@rebasepro/cms";
 import { Button } from "@rebasepro/ui";

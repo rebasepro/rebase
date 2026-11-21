@@ -271,7 +271,16 @@ export function getColumnKeysForProperty(property: Property, key: string, disabl
     }];
 }
 
-export function getFormFieldKeys(collection: AdminCollection): string[] {
+/**
+ * The keys a record's form and its read-only view lay out, in order.
+ *
+ * An `additionalFields` entry is a computed column of the collection views,
+ * and the record already shows the values it is computed from, so it is laid
+ * out here only where it is asked for: named in the form's `sections` or
+ * `sidebar`, or in `named` — the `fields` a `RecordForm` or `RecordDetail` is
+ * given. A custom layout places one with `<FormField name>`.
+ */
+export function getFormFieldKeys(collection: AdminCollection, named?: readonly string[]): string[] {
     const properties = collection.properties ?? {};
     // A many-relation the entity view already lists as a tab is not an input:
     // the tab is the treatment, and rendering the same declaration again as a
@@ -292,7 +301,12 @@ export function getFormFieldKeys(collection: AdminCollection): string[] {
         if (!consumedByChildView.has(key)) return true;
         return (properties[key] as RelationProperty).admin?.renderInForm === true;
     });
-    const additionalFields = collection.additionalFields ?? [];
+    const askedFor = new Set<string>([
+        ...(collection.form?.sidebar ?? []) as string[],
+        ...(collection.form?.sections ?? []).flatMap(section => section.properties as string[]),
+        ...(named ?? [])
+    ]);
+    const additionalFields = (collection.additionalFields ?? []).filter(field => askedFor.has(field.key));
     const allKeys = [
         ...propertyKeys,
         ...additionalFields.map((field) => field.key)

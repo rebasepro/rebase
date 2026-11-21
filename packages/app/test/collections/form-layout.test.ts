@@ -335,6 +335,17 @@ describe("resolveFormLayout — defaults", () => {
         expect(keysOf(l)).toEqual(["name"]);
     });
 
+    it("drops a field hidden from the views (`hidden` in customizeTable), from the form and the read view alike", () => {
+        // `hidden: true` kept a column out of the table and left it on the
+        // record, so hiding one meant setting `hiddenInForm` as well.
+        const withHidden = collection({
+            name: { type: "string" },
+            consent: { type: "boolean", admin: { hideFromCollection: true } }
+        });
+        const l = resolveFormLayout({ collection: withHidden, fieldKeys: ["name", "consent"], status: "existing" });
+        expect(keysOf(l)).toEqual(["name"]);
+    });
+
     it("drops a field declared `conditions: { hidden: true }`", () => {
         // The unconditional case, said with a boolean instead of `{ "==": [1, 1] }`.
         const withHidden = collection({

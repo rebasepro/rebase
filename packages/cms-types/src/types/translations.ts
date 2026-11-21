@@ -626,6 +626,15 @@ export interface RebaseTranslations {
     no_enum_values_configured: string;
     items_need_backfill: string;
     kanban_order_not_configured: string;
+    /** A list in a one-line preview (a table cell, a card): `{{count}} items`. */
+    preview_items_count?: string;
+    preview_items_count_one?: string;
+    /** A nested object in a one-line preview: `{{count}} fields`. */
+    preview_fields_count?: string;
+    preview_fields_count_one?: string;
+    /** A list of typed blocks in a one-line preview: `{{count}} blocks`. */
+    preview_blocks_count?: string;
+    preview_blocks_count_one?: string;
     initialize: string;
     confirm_multiple_delete: string;
     delete_entity_confirm_title: string;

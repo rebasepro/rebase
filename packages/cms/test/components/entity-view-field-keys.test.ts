@@ -11,7 +11,14 @@ import { HEADER_DISPLAY_ROLES } from "../../src/components/EntityDisplayHeader";
  * all, so those entries cannot render there. The resolver gives every one of
  * them a full row, so dropping them at render time rather than here leaves an
  * empty row where the card should be.
+ *
+ * An additional field is on the record at all only where the form asks for it
+ * (its sections or rail name it): it is a column of the table first. The
+ * fixtures below ask, through the rail.
  */
+
+/** The rail naming the computed field, which is what puts it on the record. */
+const ASKED = { form: { sidebar: ["margin"] } };
 const collection = (
     properties: PostgresProperties,
     extra: Partial<AdminPostgresCollection> = {}
@@ -28,9 +35,18 @@ describe("readOnlyFieldKeys", () => {
     it("keeps the additional fields when there is a context to render them with", () => {
         const c = collection(
             { name: { type: "string" } },
-            { additionalFields: [{ key: "margin", name: "Margin", Builder: () => null }] }
+            { additionalFields: [{ key: "margin", name: "Margin", Builder: () => null }], ...ASKED }
         );
         expect(readOnlyFieldKeys(c, true)).toEqual(["name", "margin"]);
+    });
+
+    it("leaves out an additional field the form does not ask for, context or not", () => {
+        const c = collection(
+            { name: { type: "string" } },
+            { additionalFields: [{ key: "margin", name: "Margin", Builder: () => null }] }
+        );
+        expect(readOnlyFieldKeys(c, true)).toEqual(["name"]);
+        expect(readOnlyFieldKeys(c, true, undefined, ["name", "margin"])).toEqual(["name", "margin"]);
     });
 
     it("drops the additional fields when there is not", () => {
@@ -49,7 +65,8 @@ describe("readOnlyFieldKeys", () => {
             },
             {
                 additionalFields: [{ key: "margin", name: "Margin", Builder: () => null }],
-                propertiesOrder: ["sku", "margin", "name"]
+                propertiesOrder: ["sku", "margin", "name"],
+                ...ASKED
             }
         );
         expect(readOnlyFieldKeys(c, false)).toEqual(["sku", "name"]);
@@ -95,7 +112,7 @@ describe("readOnlyFieldKeys", () => {
                 name: { type: "string" },
                 price: { type: "number" }
             },
-            { additionalFields: [{ key: "margin", name: "Margin", Builder: () => null }] }
+            { additionalFields: [{ key: "margin", name: "Margin", Builder: () => null }], ...ASKED }
         );
         expect(readOnlyFieldKeys(c, false, new Set(["name"]))).toEqual(["price"]);
         expect(readOnlyFieldKeys(c, true, new Set(["name"]))).toEqual(["price", "margin"]);

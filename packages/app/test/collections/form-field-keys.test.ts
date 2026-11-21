@@ -69,13 +69,39 @@ describe("getFormFieldKeys", () => {
         expect(getFormFieldKeys(ordered)).toEqual(["name", "id"]);
     });
 
-    it("keeps additional fields, which have no property behind them", () => {
+    it("leaves additional fields to the table, where they are computed columns", () => {
+        // A computed summary of the record's own values, rendered again on the
+        // record, said everything twice.
         const withExtra: AdminCollection = {
             ...talents(),
             additionalFields: [{ key: "computed", name: "Computed" }]
         };
 
-        expect(getFormFieldKeys(withExtra)).toEqual(["id", "name", "computed"]);
+        expect(getFormFieldKeys(withExtra)).toEqual(["id", "name"]);
+    });
+
+    it("keeps an additional field the form's sections or rail name", () => {
+        const inSection: AdminCollection = {
+            ...talents(),
+            additionalFields: [{ key: "computed", name: "Computed" }, { key: "other", name: "Other" }],
+            form: { sections: [{ key: "main", properties: ["name", "computed"] }] }
+        };
+        expect(getFormFieldKeys(inSection)).toEqual(["id", "name", "computed"]);
+
+        const inRail: AdminCollection = {
+            ...talents(),
+            additionalFields: [{ key: "computed", name: "Computed" }],
+            form: { sidebar: ["computed"] }
+        };
+        expect(getFormFieldKeys(inRail)).toEqual(["id", "name", "computed"]);
+    });
+
+    it("keeps an additional field the caller names", () => {
+        const withExtra: AdminCollection = {
+            ...talents(),
+            additionalFields: [{ key: "computed", name: "Computed" }]
+        };
+        expect(getFormFieldKeys(withExtra, ["computed"])).toEqual(["id", "name", "computed"]);
     });
 
     it("keeps a many-relation whose tab is hidden, which is then its only surface", () => {

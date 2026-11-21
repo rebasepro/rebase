@@ -25,8 +25,11 @@ export interface AdminPropertyOptions<CustomProps = unknown> {
      */
     columnWidth?: number;
     /**
-     * Keep this property out of the table and card views. It is still on the
-     * entity form, and still read and written by the API.
+     * Keep this property out of the collection views (table, list, cards) and
+     * off the record, its form and its read-only view alike. It is still read
+     * and written by the API, and a custom layout can still place it with
+     * `<FormField>`. To keep a field in the views but off the record, use
+     * `disabled: { hidden: true }` (`hiddenInForm` in `customizeTable`).
      *
      * For a field that should not leave the server at all, use
      * `excludeFromApi` on the property itself — this one is presentation, and

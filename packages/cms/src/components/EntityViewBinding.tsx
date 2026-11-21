@@ -55,9 +55,10 @@ const NO_ERRORS: ReadonlySet<string> = new Set<string>();
 export function readOnlyFieldKeys(
     collection: AdminCollection,
     hasFormContext: boolean,
-    headerKeys?: ReadonlySet<string>
+    headerKeys?: ReadonlySet<string>,
+    named?: readonly string[]
 ): string[] {
-    const keys = getFormFieldKeys(collection);
+    const keys = getFormFieldKeys(collection, named);
     const additional = hasFormContext
         ? undefined
         : new Set((collection.additionalFields ?? []).map(field => field.key));
@@ -171,7 +172,7 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
     // object, which is rebuilt on every keystroke of the form above it.
     const hasFormContext = Boolean(formContext);
     const fieldKeys = useMemo(
-        () => readOnlyFieldKeys(shownCollection as AdminCollection, hasFormContext, headerKeys)
+        () => readOnlyFieldKeys(shownCollection as AdminCollection, hasFormContext, headerKeys, fields)
             // The form's rules: a field a dynamic condition hides for this
             // record's values, or one this user may not read, is not shown.
             // Dropped before the layout resolves, like the groups above, so it
@@ -189,6 +190,7 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
                     authController
                 });
             }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `fields` is read through `shownCollection`, which turns on its contents
         [shownCollection, hasFormContext, headerKeys, collection.properties, entity.values, entity.id, path, customizationController.propertyConfigs, authController]
     );
 

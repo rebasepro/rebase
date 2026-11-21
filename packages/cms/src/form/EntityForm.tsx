@@ -669,7 +669,7 @@ export function EntityForm<M extends Record<string, unknown>>({
         () => fieldsProp ? collectionShowing(collection, fieldsProp) : collection,
         // eslint-disable-next-line react-hooks/exhaustive-deps -- `fields` is an inline array at most call sites: its contents, not its identity
         [collection, fieldsProp?.join(",")]);
-    const formFieldKeys = getFormFieldKeys(shownCollection);
+    const formFieldKeys = getFormFieldKeys(shownCollection, fieldsProp);
 
     const layout = useMemo(() => resolveFormLayout({
         collection: shownCollection,

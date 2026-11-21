@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import type { PropertyConfig, AdminCollection, EntityDisplayRole } from "@rebasepro/cms-types";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/app";
 import { getDisplayPropertyKey } from "@rebasepro/app";
-import { getLeadingRelationTitleKey, getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/app";
+import { getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
@@ -151,15 +151,10 @@ export function resolveCollectionSlotKeys(
     authController: AuthController,
     propertyConfigs: Record<string, PropertyConfig>
 ): CollectionSlotKeys {
-    // One row per entity: when the collection leads with a relation and holds no
-    // name of its own, that relation *is* what the row is called. See
-    // `getLeadingRelationTitleKey` — the general ranking keeps relations last,
-    // which is right for a detail header but leaves a junction row titleless.
-    const rankedCandidates = getTitlePropertyCandidates(collection);
-    const leadingRelationKey = getLeadingRelationTitleKey(collection);
-    const titleKeyCandidates = leadingRelationKey
-        ? [leadingRelationKey, ...rankedCandidates.filter(key => key !== leadingRelationKey)]
-        : rankedCandidates;
+    // The same ranking every surface uses. A relation is never among the
+    // candidates: it names another record, so a row with no text of its own
+    // is titled by its id, and its relations stay chips below it.
+    const titleKeyCandidates = getTitlePropertyCandidates(collection);
     const titleKey = titleKeyCandidates[0];
     // `getEntityImagePreviewPropertyKey` prefers `display.image` itself, so
     // every caller of it — this, the reference card, the board — agrees.

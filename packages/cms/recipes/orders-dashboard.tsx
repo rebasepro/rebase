@@ -9,9 +9,10 @@
  *
  * It draws with the metric blocks of `@rebasepro/ui` — `KpiGrid` / `KpiTile`
  * for the figure, `ChartCard` / `BarChart` for the groups — which are what the
- * admin's own dashboards are drawn with, in its tokens and dark mode. Each
- * bar opens the collection filtered to its group, the filter in the URL as
- * the collection's toolbar writes it, through the admin's router.
+ * admin's own dashboards are drawn with, in its tokens and dark mode. The
+ * total opens the collection, and each bar opens it filtered to its group,
+ * the filter in the URL as the collection's toolbar writes it, through the
+ * admin's router.
  *
  * Aggregates need a data source that computes them: Postgres through the
  * server does. Where one cannot, the chart says so in place of the bars.
@@ -20,7 +21,7 @@
  * `COLLECTION` / `GROUP_FIELD` to your own.
  */
 import React from "react";
-import type { AppView } from "@rebasepro/cms-types";
+import type { AppView } from "@rebasepro/cms";
 import { useAggregate, useRowCount } from "@rebasepro/app";
 import { useUrlController } from "@rebasepro/cms";
 import { BarChart, ChartCard, Container, KpiGrid, KpiTile, Typography } from "@rebasepro/ui";
@@ -76,10 +77,14 @@ export function OrdersDashboard() {
         <Container maxWidth={"4xl"} className={"py-8 flex flex-col gap-4"}>
             <Typography variant={"h4"}>Orders</Typography>
             <KpiGrid>
+                {/* The figure opens the rows it counts: a link, so it can
+                    open in a new tab, that a plain click follows in place. */}
                 <KpiTile label={"Total"} icon={"ShoppingCart"}
                     value={total.count}
                     loading={total.loading}
-                    error={asError(total.error)}/>
+                    error={asError(total.error)}
+                    href={collectionUrl}
+                    onClick={() => urls.navigate(collectionUrl)}/>
             </KpiGrid>
             <ChartCard title={`By ${GROUP_FIELD}`} icon={"ChartBar"}>
                 <BarChart bars={bars}

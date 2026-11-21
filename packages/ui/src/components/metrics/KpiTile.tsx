@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { cls } from "../../util";
+import { cardClickableMixin } from "../../styles";
 import { describeChange, formatNumber, type ChangeTone } from "../../util/numbers";
 import { useUiLabels } from "../../hooks/UiLabelsContext";
 import { Card } from "../Card";
@@ -156,6 +157,11 @@ function Sparkline({ points, tone }: { points: number[]; tone: ChangeTone }) {
     );
 }
 
+/** True for a click the browser should handle itself: a new tab or window, a download. */
+function isModifiedClick(event: React.MouseEvent): boolean {
+    return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+}
+
 /**
  * One headline figure as a card: its label, its value and its change on the
  * previous window.
@@ -166,37 +172,77 @@ function Sparkline({ points, tone }: { points: number[]; tone: ChangeTone }) {
  *
  * Given a `sparkline` of at least two numbers, or a numeric `value` and
  * `previous`, it draws the trend at its bottom right.
+ *
+ * Given `onClick`, the whole tile is a button: use it to open the records the
+ * figure counts. Given `href`, it is a link to them instead, which a modified
+ * click opens in a new tab and a plain click hands to `onClick` when there is
+ * one (navigate with the app's router there). The control is stretched over
+ * the card and named by its label, its figure and its change; it takes the
+ * focus ring, and Enter (and Space, for the button) activates it.
  */
-export function KpiTile({ label, icon, className, ...figure }: KpiProps & {
+export function KpiTile({ label, icon, className, href, onClick, ...figure }: KpiProps & {
     /** A Lucide icon name (`"DollarSign"`) or an icon element, drawn before the label. */
     icon?: string | React.ReactNode;
     className?: string;
+    /** Where the records behind the figure live. The tile becomes a link to it. */
+    href?: string;
+    /** Makes the tile a button. With `href`, a plain click comes here instead of following the link. */
+    onClick?: () => void;
 }) {
     const { locale } = useUiLabels();
+    const id = React.useId();
     const { value, format, previous, sparkline, loading, error } = figure;
     const compares = previous !== undefined;
     const trend = loading || error ? null : sparkPoints(sparkline, value, previous);
+    const interactive = href !== undefined || onClick !== undefined;
+
+    // What the stretched control is called: the words a reader sees on the
+    // tile, in order. The change is in it as its spoken form.
+    const labelledBy = [
+        `${id}-label`,
+        `${id}-value`,
+        error ? `${id}-error` : compares ? `${id}-change` : null
+    ].filter(Boolean).join(" ");
+    const controlClass = "absolute inset-0 w-full h-full cursor-pointer rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary";
+    const control = href !== undefined
+        ? (
+            <a href={href}
+                aria-labelledby={labelledBy}
+                className={controlClass}
+                onClick={onClick && ((event: React.MouseEvent<HTMLAnchorElement>) => {
+                    if (isModifiedClick(event)) return;
+                    event.preventDefault();
+                    onClick();
+                })}/>
+        )
+        : onClick
+            ? <button type="button" aria-labelledby={labelledBy} className={controlClass} onClick={onClick}/>
+            : null;
 
     return (
-        <Card className={cls("@container min-w-0", className)}>
-            <div className="flex flex-col min-w-0 h-full px-5 py-4 @max-[200px]:px-3.5 @max-[200px]:py-3">
+        <Card className={cls("@container min-w-0", interactive && cls("relative", cardClickableMixin), className)}>
+            {control}
+            <div className={cls("flex flex-col min-w-0 h-full px-5 py-4 @max-[200px]:px-3.5 @max-[200px]:py-3", interactive && "pointer-events-none")}>
                 <div className="flex items-center gap-1.5 min-w-0 mb-2.5 @max-[200px]:mb-1">
                     <HeaderIcon icon={icon}/>
-                    <Typography variant="micro" color="secondary" className="truncate">{label}</Typography>
+                    <Typography id={`${id}-label`} variant="micro" color="secondary" className="truncate">{label}</Typography>
                 </div>
                 {/* The figure keeps its width and the trend takes what is left,
                     up to 80px; below 200px of tile there is no room for both,
                     so the trend goes and the figure may break again. */}
                 <div className="flex items-end justify-between gap-3 min-w-0">
                     <div className="shrink-0 @max-[200px]:shrink @max-[200px]:min-w-0">
-                        <Typography variant="stat" component="div" className="leading-tight break-all @max-[200px]:text-xl">
+                        <Typography id={`${id}-value`} variant="stat" component="div" className="leading-tight break-all @max-[200px]:text-xl">
                             {loading ? <Placeholder className="h-[0.8em] w-24"/> : displayValue(value, format, locale)}
                         </Typography>
                         {error
-                            ? <Typography variant="caption" color="error" className="block mt-1 truncate" title={error.message}>{error.message}</Typography>
+                            ? <Typography id={`${id}-error`} variant="caption" color="error" className="block mt-1 truncate" title={error.message}>{error.message}</Typography>
                             : compares && (
-                                <div className="mt-1 leading-4">
-                                    {loading ? <Placeholder className="h-3 w-12"/> : <KpiChange {...figure}/>}
+                                <div id={`${id}-change`} className="mt-1 leading-4">
+                                    {/* Under a control the tooltip cannot be
+                                        hovered; what it says is in the
+                                        control's name instead. */}
+                                    {loading ? <Placeholder className="h-3 w-12"/> : <KpiChange {...figure} tooltip={!interactive}/>}
                                 </div>
                             )}
                     </div>

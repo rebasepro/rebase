@@ -6,6 +6,8 @@ import { PropertyPreview } from "../PropertyPreview";
 import { cls, defaultBorderMixin, Typography } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { EmptyValue } from "../components/EmptyValue";
+import { useTranslation } from "@rebasepro/app";
+import { summarizeDocument, type DocumentSummary, type DocumentSummaryPart } from "../document_summary";
 
 /**
  * @group Preview components
@@ -28,7 +30,7 @@ export function MapPropertyPreview({
     // neither the rows nor the borders between them.
     if (compact) {
         return <CompactMapPreview property={mapProperty}
-            value={value as Record<string, unknown> | undefined}/>;
+            value={value as Record<string, unknown> | unknown[] | undefined}/>;
     }
 
     if (!mapProperty.properties || Object.keys(mapProperty.properties ?? {}).length === 0) {
@@ -113,47 +115,59 @@ export function MapPropertyPreview({
 
 }
 
-/** How many leaf values a one-line map summary shows before it gives up. */
-const COMPACT_MAP_ENTRIES = 3;
-
 /**
- * A map in one line: its first few leaf values, labelled, joined by dots.
- *
- * Nested maps and arrays are skipped rather than flattened — a line that says
- * `[object Object]` is worse than a line that says nothing about that field —
- * and a map with no leaves at all falls back to stating its size, which is at
- * least true.
+ * A map in one line: its top-level keys — its `previewFields` when it has
+ * them — labelled, each with its value when that is short and plain, `n items`
+ * for a list and `n fields` for a nested object, which is not opened. See
+ * {@link summarizeDocument}.
  */
 function CompactMapPreview({
     property,
     value
-}: { property: MapProperty, value: Record<string, unknown> | undefined }) {
+}: { property: MapProperty, value: Record<string, unknown> | unknown[] | undefined }) {
+    const summary = summarizeDocument(value, {
+        properties: property.properties,
+        order: property.propertiesOrder,
+        keys: property.admin?.previewProperties
+    });
+    return <DocumentSummaryLine summary={summary}/>;
+}
 
-    if (!value || typeof value !== "object") return <EmptyValue/>;
+/**
+ * Draws a {@link DocumentSummary}: `Label value · Label 3 items`, the labels
+ * in the secondary ink, on one line that truncates.
+ *
+ * @group Preview components
+ */
+export function DocumentSummaryLine({ summary }: { summary: DocumentSummary }) {
+    const { t } = useTranslation();
 
-    const declared = property.properties;
-    const keys = declared ? Object.keys(declared) : Object.keys(value);
-
-    const parts: string[] = [];
-    for (const key of keys) {
-        if (parts.length >= COMPACT_MAP_ENTRIES) break;
-        const childValue = value[key];
-        if (childValue === undefined || childValue === null || childValue === "") continue;
-        if (typeof childValue === "object") continue;
-        const label = declared?.[key]?.name ?? key;
-        parts.push(`${label}: ${String(childValue)}`);
-    }
-
-    if (parts.length === 0) {
-        const count = Object.keys(value).length;
-        return <Typography variant={"caption"}
-            color={"secondary"}
-            className={"truncate"}>
-            {count === 1 ? "1 field" : `${count} fields`}
+    if (summary.kind === "empty") return <EmptyValue/>;
+    if (summary.kind === "items") {
+        return <Typography variant={"body2"} component={"span"} className={"block truncate"}>
+            {t("preview_items_count", { count: summary.count })}
         </Typography>;
     }
 
-    return <span className={"truncate text-sm"}>{parts.join(" · ")}</span>;
+    const valueOf = (entry: DocumentSummaryPart): string => {
+        switch (entry.kind) {
+            case "text": return entry.text;
+            case "boolean": return entry.value ? t("yes") : t("no");
+            case "items": return t("preview_items_count", { count: entry.count });
+            case "fields": return t("preview_fields_count", { count: entry.count });
+        }
+    };
+
+    return <Typography variant={"body2"} component={"span"} className={"block truncate"}>
+        {summary.parts.map((entry, index) => (
+            <React.Fragment key={`${entry.label}_${index}`}>
+                {index > 0 && <Typography component={"span"} variant={"inherit"} color={"disabled"}>{" · "}</Typography>}
+                <Typography component={"span"} variant={"inherit"} color={"secondary"}>{entry.label}</Typography>
+                {" "}
+                {valueOf(entry)}
+            </React.Fragment>
+        ))}
+    </Typography>;
 }
 
 export function KeyValuePreview({ value }: { value: any }) {

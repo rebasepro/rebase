@@ -165,8 +165,10 @@ export type AdminCollectionOptions<
     previewProperties?: Extract<keyof M, string>[];
 
     /**
-     * Properties to display as columns in the list view.
-     * If not specified, the list view uses a smart default (Title, Status, Date).
+     * The columns of the table and of the list view: the properties they
+     * draw, and no others. The table orders them by `propertiesOrder` when
+     * there is one. If not specified, the table draws every property and the
+     * list view uses a smart default (Title, Status, Date).
      */
     listProperties?: ColumnKey<M>[];
 
@@ -378,8 +380,9 @@ export type AdminCollectionOptions<
     readonly sort?: OrderBySpec<PropertyPath<M>>;
 
     /**
-     * You can add additional fields to the collection view by implementing
-     * an additional field delegate.
+     * Computed columns of the collection table, each
+     * an additional field delegate. A record shows one only where
+     * `form.sections` or `form.sidebar` names its `key`.
      */
     readonly additionalFields?: AdditionalFieldDelegate<M, USER>[];
 

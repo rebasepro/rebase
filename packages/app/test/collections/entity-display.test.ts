@@ -71,8 +71,8 @@ describe("hasDeclaredDisplay", () => {
     });
 
     it("is false for a role the collection says nothing about, so the heuristics run", () => {
-        // `getLeadingRelationTitleKey` asks this: a collection that declares a
-        // title must not also get the leading-relation guess.
+        // The derived title asks this: a collection that declares a title must
+        // not also get the ranking's guess.
         expect(hasDeclaredDisplay(collection({ subtitle: "name" }), "title")).toBe(false);
     });
 });
