@@ -1,7 +1,7 @@
 ---
 title: Redirects and clean URLs
 sidebar_label: Redirects & Clean URLs
-description: "A static app in rebase.json can answer requests with redirects (Vercel-style :param matching, host and query conditions) and serve x.html at /x with cleanUrls."
+description: "A static app in rebase.json can answer requests with redirects (Vercel-style :param matching, host, negated host and query conditions) and serve x.html at /x with cleanUrls."
 ---
 
 <span class="since-badge" data-since="0.35">Since 0.35</span>
@@ -41,6 +41,9 @@ serve its HTML pages without the `.html`:
   and the method is kept.
 - **`host`** limits a redirect to requests for one hostname. On an app whose
   `path` names a hostname, it can only be that one.
+- **`notHost`** limits it to requests for every hostname but one. It cannot be
+  set with `host`, and on an app whose `path` names a hostname it cannot be
+  that one, since the redirect would never match.
 - **`query`** limits it to requests whose query string holds each parameter
   with exactly that value, compared after decoding. `""` matches a parameter
   present with no value (`?preview` or `?preview=`); there is no wildcard.
@@ -54,6 +57,26 @@ redirected. `rebase.json` is refused when a redirect could never match (a
 `from` outside the app, or under another app's path), when two redirects match
 the same requests, and when a redirect sends a request to a path its own
 `from` matches again, which would loop forever.
+
+## One path, a different page per hostname
+
+<span class="since-badge" data-since="0.35">Since 0.35</span>
+
+An app served on several hostnames can send the same path to a different page
+on each. Here `/` opens the app on `app.example.com` and the demo on every other
+hostname:
+
+```json
+"redirects": [
+  { "from": "/", "host": "app.example.com", "to": "/app.html", "status": 307 },
+  { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
+]
+```
+
+Without `notHost`, the second redirect can have no condition at all: the first
+match answers, so it only sees what the first one let through. `notHost` makes
+each redirect say on its own where it applies, as a `vercel.json` `missing`
+condition does, so the order no longer matters.
 
 ## Sending a domain to another
 
@@ -103,7 +126,8 @@ site answers with a 404.
   "redirects": [
     { "source": "/blog/:slug", "destination": "/posts/:slug", "permanent": true },
     { "source": "/:path*", "has": [{ "type": "host", "value": "example.com" }], "destination": "https://www.example.com/:path*" },
-    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false }
+    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false },
+    { "source": "/", "missing": [{ "type": "host", "value": "app.example.com" }], "destination": "/demo.html", "permanent": false }
   ]
 }
 ```
@@ -116,7 +140,8 @@ becomes, on the static app in `rebase.json`:
   "redirects": [
     { "from": "/blog/:slug", "to": "/posts/:slug" },
     { "from": "/:path*", "host": "example.com", "to": "https://www.example.com/:path*" },
-    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 }
+    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 },
+    { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
   ]
 }
 ```
@@ -130,11 +155,13 @@ becomes, on the static app in `rebase.json`:
 | `statusCode` | `status` |
 | `has` of `"type": "host"` | `host` |
 | `has` of `"type": "query"` with a `value` | `query` |
+| `missing` of `"type": "host"` | `notHost` |
 | `cleanUrls` | `cleanUrls` |
 
 A Vercel project per domain becomes a static app per hostname, as in
 [Sending a domain to another](#sending-a-domain-to-another). Conditions on a
-header or a cookie, and regular expressions in `source`, are logic: a
+header or a cookie, a `missing` query parameter, and regular expressions in
+`source`, are logic: a
 [route](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) hands such a path to a
 function, which can answer with any redirect it decides on.
 

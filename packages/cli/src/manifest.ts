@@ -477,11 +477,13 @@ function checkRedirects(
         for (const key of unknownKeys) {
             const hint = key === "source" || key === "destination"
                 ? ` — write "${key === "source" ? "from" : "to"}"`
-                : key === "permanent" ? ' — write "status": 308 (or 307 for a temporary one)' : "";
+                : key === "permanent" ? ' — write "status": 308 (or 307 for a temporary one)'
+                : key === "has" ? ' — write a host condition as "host" and a query one as "query"'
+                : key === "missing" ? ' — write a missing host as "notHost"' : "";
             console.warn(`⚠ rebase.json: ${fieldPath}[${index}].${key} is not a field of a redirect — it is ignored${hint}.`);
         }
-        const { from, host, query } = result.redirect;
-        const key = JSON.stringify([from, host ?? "", Object.entries(query ?? {}).sort()]);
+        const { from, host, notHost, query } = result.redirect;
+        const key = JSON.stringify([from, host ?? "", notHost ?? "", Object.entries(query ?? {}).sort()]);
         const earlier = byMatch.get(key);
         if (earlier !== undefined) {
             issues.push({
@@ -497,7 +499,7 @@ function checkRedirects(
 }
 
 /** The fields a redirect has. Anything else is a typo, or Vercel's spelling. */
-const REDIRECT_FIELDS = new Set(["from", "to", "status", "host", "query"]);
+const REDIRECT_FIELDS = new Set(["from", "to", "status", "host", "notHost", "query"]);
 
 /** The leading literal segments of a redirect's `from`: what every match is under. */
 function redirectPrefix(from: string): string {

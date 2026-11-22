@@ -254,8 +254,8 @@ export interface RebaseStaticAppConfig {
      * an absolute `http(s)://` URL, and every parameter it names is replaced by
      * what `from` captured: `{ "from": "/blog/:slug", "to": "/posts/:slug" }`.
      * `host` and `query` narrow a redirect to one hostname or to a query
-     * string holding exact values. `status` is 301, 302, 307 or 308, default
-     * 308.
+     * string holding exact values, and `notHost` to every hostname but one.
+     * `status` is 301, 302, 307 or 308, default 308.
      *
      * Checked in declaration order, before the build's files, and the first
      * match answers. The request's query string is kept unless `to` has one
@@ -317,6 +317,12 @@ export interface RebaseStaticRedirect {
     status?: RebaseStaticRedirectStatus;
     /** Only for requests to this hostname, lowercase, e.g. `example.com`. */
     host?: string;
+    /**
+     * Only for requests to any hostname but this one, lowercase: what
+     * `vercel.json` writes as `missing` with `"type": "host"`. Not with
+     * `host`, which already names the only hostname it answers on.
+     */
+    notHost?: string;
     /**
      * Only for requests whose query string holds each of these parameters
      * with exactly this value. `""` matches `?k` and `?k=`.
@@ -702,6 +708,7 @@ function compileStaticRedirect(
 
     return (request) => {
         if (redirect.host !== undefined && redirect.host !== request.host) return undefined;
+        if (redirect.notHost !== undefined && redirect.notHost === request.host) return undefined;
         const match = pattern.exec(request.path);
         if (!match) return undefined;
         if (conditions.length > 0) {
@@ -752,7 +759,7 @@ export function compileStaticRedirects(
 
 export type StaticRedirectResult =
     | { ok: true; redirect: RebaseStaticRedirect }
-    | { ok: false; field?: "from" | "to" | "status" | "host" | "query"; reason: string };
+    | { ok: false; field?: "from" | "to" | "status" | "host" | "notHost" | "query"; reason: string };
 
 /**
  * Validate one of a static app's redirects against the app's address (its
@@ -774,6 +781,8 @@ export type StaticRedirectResult =
  * - `status` is 301, 302, 307 or 308.
  * - `host` is a public hostname, lowercase, and is the app's own when the
  *   app has one — on any other the redirect could never match.
+ * - `notHost` is a public hostname, lowercase, never with `host`, and never
+ *   the app's own hostname, on which the redirect could never match.
  * - `query` maps parameter names to the exact string each must hold.
  * - A redirect to a path on the same address that its own `from` matches
  *   again is refused: every request it answers would be sent round forever.
@@ -782,7 +791,7 @@ export function validateStaticRedirect(value: unknown, app: AppAddress): StaticR
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
         return { ok: false, reason: 'must be an object like { "from": "/old", "to": "/new" }' };
     }
-    const { from, to, status, host, query, source, destination } = value as Record<string, unknown>;
+    const { from, to, status, host, notHost, query, source, destination } = value as Record<string, unknown>;
 
     // The spelling every `vercel.json` being migrated has.
     if (from === undefined && source !== undefined) {
@@ -862,6 +871,22 @@ export function validateStaticRedirect(value: unknown, app: AppAddress): StaticR
         }
     }
 
+    if (notHost !== undefined) {
+        if (typeof notHost !== "string" || !isValidAppHost(notHost)) {
+            return { ok: false, field: "notHost", reason: 'must be a lowercase public hostname like "example.com" — no scheme, port or path' };
+        }
+        if (host !== undefined) {
+            return {
+                ok: false,
+                field: "notHost",
+                reason: "cannot be set with \"host\", which already names the only hostname this redirect answers on"
+            };
+        }
+        if (app.host !== undefined && notHost === app.host) {
+            return { ok: false, field: "notHost", reason: `can never match: this app answers only on "${app.host}"` };
+        }
+    }
+
     let conditions: Record<string, string> | undefined;
     if (query !== undefined) {
         if (typeof query !== "object" || query === null || Array.isArray(query)) {
@@ -881,6 +906,7 @@ export function validateStaticRedirect(value: unknown, app: AppAddress): StaticR
         to,
         ...(isStaticRedirectStatus(status) ? { status } : {}),
         ...(typeof host === "string" ? { host } : {}),
+        ...(typeof notHost === "string" ? { notHost } : {}),
         ...(conditions ? { query: conditions } : {})
     };
 
@@ -894,7 +920,7 @@ export function validateStaticRedirect(value: unknown, app: AppAddress): StaticR
         const sampleSearch = conditions && Object.keys(conditions).length > 0
             ? `?${new URLSearchParams(conditions).toString()}`
             : "";
-        const sampleHost = redirect.host ?? app.host ?? "example.com";
+        const sampleHost = redirect.host ?? app.host ?? (redirect.notHost === "example.com" ? "example.net" : "example.com");
         const first = answer({ host: sampleHost, path: samplePath, search: sampleSearch });
         if (first) {
             const target = new URL(first.location, `https://${sampleHost}`);

@@ -209,6 +209,7 @@
                     "items": {
                         "type": "object",
                         "required": ["from", "to"],
+                        "not": { "required": ["host", "notHost"] },
                         "additionalProperties": false,
                         "properties": {
                             "from": {
@@ -234,6 +235,12 @@
                                 "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+(?![0-9]+$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$",
                                 "description": "Only for requests to this hostname, lowercase, with no scheme, port or path. On an app whose `path` names a hostname, it can only be that one.",
                                 "examples": ["example.com"]
+                            },
+                            "notHost": {
+                                "type": "string",
+                                "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+(?![0-9]+$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$",
+                                "description": "Only for requests to any hostname but this one, lowercase, with no scheme, port or path: what vercel.json writes as `missing` with \"type\": \"host\". Not with `host`, and never the hostname the app's `path` names.",
+                                "examples": ["app.example.com"]
                             },
                             "query": {
                                 "type": "object",
