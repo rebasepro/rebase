@@ -1,5 +1,5 @@
 ---
-sourceHash: 194ea0c912d942b7
+sourceHash: f79d6c28d4775887
 title: Um app em execução
 sidebar_label: Um app em execução
 description: Comandos da CLI que atuam em um app Rebase em execução por meio de sua API — linhas, usuários, cron, logs, funções, arquivos, o simulador de RLS — no rebase dev, em um servidor especificado por você ou em um projeto Rebase Cloud.
@@ -98,7 +98,7 @@ rebase users guests prune --older-than 30d --yes
 
 ### Importando contas
 
-`import` traz contas de outro sistema e preserva seus IDs, para que as linhas que apontam para um usuário continuem apontando para o mesmo. Ele aceita um CSV, um array JSON ou NDJSON (`--format`, caso contrário, pela extensão), com as seguintes colunas:
+<span class="since-badge" data-since="0.35">Desde 0.35</span> `import` traz contas de outro sistema e preserva seus IDs, para que as linhas que apontam para um usuário continuem apontando para o mesmo. Ele aceita um CSV, um array JSON ou NDJSON (`--format`, caso contrário, pela extensão), com as seguintes colunas:
 
 | Coluna | |
 |---|---|
