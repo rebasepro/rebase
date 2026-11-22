@@ -16,6 +16,16 @@ Tables (backend/schema) → Drizzle Schema → SQL Migrations → PostgreSQL
 
 This page covers every CLI command involved in that pipeline.
 
+## Which one do I use?
+
+A table change reaches PostgreSQL three ways:
+
+- **Boot, on its own.** The backend applies the additive part at every start (`REBASE_MIGRATE_ON_BOOT=ensure`, the default): missing tables, columns, enum types and row-level security policies. Under `rebase dev` an added table or column needs nothing else. Boot never drops, renames or narrows.
+- **`rebase db push`, in development.** It syncs the schema straight to the database, drops and renames included, behind its [destructive-change gate](#rebase-db-push). Use it on a database you do not migrate.
+- **`rebase db generate` + `rebase db migrate`, in production.** Each change is a reviewed SQL file in version control, applied in order.
+
+Moving a database boot or `db push` has already set up onto migrations takes one baseline, because it already holds the tables the first migration creates. `rebase db migrate` reads that before it runs anything, stops, and prints the `rebase db migrate --baseline <version>` to run with the version filled in; see [Baselining a database Rebase has already booted](#baselining-a-database-rebase-has-already-booted). The other way round, `db push` on a database that records migrations says so in one line: the next migration that makes the same change stops on `already exists`.
+
 ## The Pipeline
 
 ### 1. Tables → Drizzle Schema
@@ -371,16 +381,15 @@ without the flag to apply it.
 
 #### Baselining a database Rebase has already booted
 
-Every Rebase boot ensures the schema, and `rebase db push` applies it directly. So a database that has ever run either one already has the tables and types the first migration would create, and `rebase db migrate` stops on `pq: type "posts_status" already exists (42710)`.
+Every Rebase boot ensures the schema, and `rebase db push` applies it directly. So a database that has ever run either one already has the tables and types the first migration would create. On such a database with no migration history, `rebase db migrate` runs nothing: it names the tables already there and the command to run, with the newest migration's version filled in. It does not record the baseline itself.
 
-Nothing is wrong with the migration — the database was provisioned another way. Record where it already is, then migrate normally:
+Nothing is wrong with the migration — the database was provisioned another way. Record where it already is, once; the same command runs the migrations after it, and every later `rebase db migrate` is an ordinary one:
 
 ```bash
 rebase db migrate --baseline 20260906101530
-rebase db migrate
 ```
 
-The version is the numeric prefix of the migration file that describes what is in the database *now*. That migration and everything before it are recorded as applied; everything after it runs. On a database nothing has ever booted against, no baseline is needed — migrate straight away.
+The version is the numeric prefix of the migration file that describes what is in the database *now*. That migration and everything before it are recorded as applied; everything after it runs. Boot never drops or renames, so if one of those migrations does, baseline at the version before it. On a database nothing has ever booted against, no baseline is needed — migrate straight away.
 
 The same happens later in the ordinary loop: edit a table while `rebase dev` runs, and boot adds the column before `rebase db generate` writes the migration that adds it, so `rebase db migrate` stops on `column … already exists (42701)`. Baseline that migration the same way. `--baseline` works on a database that already records migrations: it marks everything up to the version as applied with `atlas migrate set`, and says so, or says there is nothing to record when the history already reaches it. A version no file in `drizzle/migrations` has is refused before anything runs, naming the versions there are.
 
@@ -575,7 +584,7 @@ rebase db migrate
 | Migration shows unexpected changes | Run `rebase doctor` to identify drift |
 | `db push` fails on production | Use `db generate` + `db migrate` instead |
 | A migration must not drop data in CI or production | `rebase db migrate --refuse-destructive` exits 1 and applies nothing when a pending statement destroys data |
-| `db migrate` fails with `already exists (42710)` | Boot or `db push` already provisioned the schema — record it with `rebase db migrate --baseline <version>` |
+| `db migrate` stops with "already has the tables your migrations create", or fails with `already exists (42710)` | Boot or `db push` already provisioned the schema — record it with the `rebase db migrate --baseline <version>` it prints |
 | `db migrate` fails with `column … already exists (42701)` | `rebase dev` added the column at boot — baseline that migration the same way |
 | `db push` on the managed database fails with `Error: EOF` | Atlas lost a connection the running `rebase dev` holds. Run it again; if it keeps failing, stop `rebase dev` first |
 

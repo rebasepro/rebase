@@ -262,6 +262,13 @@ describe("column facts → form behaviour", () => {
         expect(project(column("title", { kind: "text" }))).not.toHaveProperty("columnName");
     });
 
+    it("a `.serverDefault()` column is filled by the server on create, stays required on edit and stays editable", () => {
+        const property = project(column("slug", { kind: "text" }, { nullable: false, default: { kind: "server" } }));
+        expect(property).toMatchObject({ validation: { required: true }, admin: { filledByServer: true } });
+        expect(property).not.toHaveProperty("databaseDefault");
+        expect(property.admin?.readOnly).toBeUndefined();
+    });
+
     it("the tenant column is filled by the server and stays among the table columns", () => {
         const property = project(column("orgId", { kind: "uuid" }, { nullable: false }), [], "orgId");
         expect(property).toMatchObject({ validation: { required: true }, admin: { filledByServer: true } });

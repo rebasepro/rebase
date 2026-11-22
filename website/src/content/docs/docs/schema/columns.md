@@ -98,6 +98,7 @@ sense for; calling one elsewhere is a type error.
 | `.default(value)` | every column | `DEFAULT <value>` | applied by the driver on create too; optional on create |
 | `` .default(sql`expr`) `` | every column | `DEFAULT <expr>` | optional on create; `sql` is imported beside `col` |
 | `.dbDefault()` | every column | leaves the database's existing default alone | optional on create |
+| `.serverDefault()` | every column | none | a hook fills it; optional on create, and the panel's form does not require it |
 | `` .generatedAlwaysAs(sql`expr`) `` | every column | `GENERATED ALWAYS AS (<expr>) STORED` | never writable, by anyone |
 | `.$type<T>()` | every column | none | types the value for TypeScript only, as in Drizzle |
 | `.array()` | every column | `<type>[]` | see [Arrays](#arrays) |
@@ -125,8 +126,8 @@ Columns are nullable by default. `.notNull()` and `.primaryKey()` make a column
 `NOT NULL` column is `T` on a row; any other column is `T | null`.
 
 A default is any of `.default()`, `` .default(sql`…`) ``, `.defaultNow()`,
-`.dbDefault()`, `.defaultRandom()`, `.generatedByDefaultAsIdentity()`, a stamp,
-or a serial builder. A column with a
+`.dbDefault()`, `.serverDefault()`, `.defaultRandom()`,
+`.generatedByDefaultAsIdentity()`, a stamp, or a serial builder. A column with a
 default may be left out of a create:
 
 ```ts
@@ -153,6 +154,12 @@ export const tickets = defineTable("tickets", {
 - **`.dbDefault()`** says the database already holds a default that the schema
   does not state. A create may omit the column, and a schema push does not drop
   the default.
+- **`.serverDefault()`** says the table's own server code fills the column when
+  a create leaves it out: a `hooks.beforeSave` that derives a slug from the
+  title, or the column's `.transform()`. A hook is code nobody can read, so the
+  column says what it does. No DDL default is written; a create may omit the
+  column, OpenAPI does not list it as required, and the panel's form lets a
+  record be created without it (no `filledByServer` in the customization).
 
 `.generatedAlwaysAs()` cannot have a default or a stamp: Postgres computes the column
 on every write. A primary-key column cannot be `.private()`.

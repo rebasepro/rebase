@@ -6,7 +6,7 @@ export const posts = defineTable("posts", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         title: col.text().notNull(),
-        slug: col.text().notNull().unique().describe("URL-friendly identifier for this blog post. Left empty, it is derived from the title"),
+        slug: col.text().notNull().unique().serverDefault().describe("URL-friendly identifier for this blog post. Left empty, it is derived from the title"),
         hero_image: col.storage({ path: "posts/hero/" }).describe("Header image displayed at the top of the blog post"),
         excerpt: col.text().validate({ max: 300 }).describe("Short summary displayed in previews and cards"),
         content: col.jsonb(json.array(json.oneOf({

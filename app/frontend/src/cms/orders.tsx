@@ -267,9 +267,7 @@ export const ordersCms = customizeTable<typeof orders>("orders", {
             hidden: true
         },
         __order: {
-            name: "Board position",
-            disabled: true,
-            hidden: true
+            name: "Board position"
         }
     }
 });

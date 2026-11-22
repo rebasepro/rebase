@@ -157,7 +157,9 @@ describe("db push against the managed database while a dev server holds connecti
         expect(failed.all).toContain("already exists");
         expect(failed.all).toContain(`rebase db migrate --baseline ${version}`);
         expect(failed.exitCode).toBe(1);
-        expect(await revisionTables()).toEqual(["rebase"]);
+        // It stops before Atlas runs, so no revisions table exists anywhere yet.
+        expect(failed.all).toContain("Nothing was run.");
+        expect(await revisionTables()).toEqual([]);
 
         const baselined = await driver("db", "migrate", "--baseline", version);
         expect(baselined.all).not.toContain("EOF");

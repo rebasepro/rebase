@@ -218,7 +218,7 @@ Whatever the column type:
   source can run, the type's defaults and this list, intersected: you can only
   restrict.
 - `filledByServer` lets a create leave the field empty, for a server hook to
-  fill.
+  fill. A column marked `.serverDefault()` already is; the option overrides the table.
 - `Field`, `Preview` and `Filter` replace the form control, the drawing outside
   the form and the filter control with your own components; `customProps` is
   handed to them untouched. See [Custom fields](/docs/frontend/custom-fields/).

@@ -194,7 +194,17 @@ describe("rebase verify: CMS customizations", () => {
         const found = await check([hooked]);
         expect(found.map(f => [f.check, f.severity])).toEqual([["cms-hidden-required", "warning"]]);
         expect(found.every(f => f.severity === "warning")).toBe(true);
-        expect(found[0].fix).toContain("filledByServer: true");
+        expect(found[0].fix).toContain(".serverDefault()");
+    });
+
+    it("judges a column marked .serverDefault() filled", async () => {
+        const hooked = defineTable("posts", {
+            columns: { id: col.uuid().primaryKey().defaultRandom(), slug: col.text().notNull().serverDefault() },
+            rls: "admin-only",
+            hooks: { beforeSave: ({ values }) => ({ ...values, slug: "x" }) }
+        });
+        cms("posts.tsx", customization("posts", "    fields: { slug: { hiddenInForm: true } }"));
+        expect(await check([hooked])).toEqual([]);
     });
 
     it("reports a second customization of one table, naming the first", async () => {

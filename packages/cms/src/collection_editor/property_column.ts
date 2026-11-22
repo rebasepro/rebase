@@ -563,6 +563,8 @@ function defaultOf(property: Property, base: ColumnDefault | undefined): ColumnD
         // The database's own default: keep what the column states, whatever kind it is.
         return base && base.kind !== "literal" ? base : { kind: "database" };
     }
+    // `.serverDefault()`: the column's own hook fills it, as projected.
+    if (base?.kind === "server" && property.admin?.filledByServer) return base;
     const value = "defaultValue" in property ? property.defaultValue : undefined;
     if (value === undefined || value === null) return undefined;
     if (value instanceof Date) return { kind: "literal", value: value.toISOString() };

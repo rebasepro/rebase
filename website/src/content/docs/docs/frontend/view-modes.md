@@ -54,7 +54,6 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
                 done:        { label: "Done", color: "green" },
             },
         },
-        __order: { hidden: true },
     },
 });
 ```
@@ -99,8 +98,9 @@ between columns shows nothing.
 **The column must be text.** Reordering writes a
 [fractional-indexing](https://github.com/rocicorp/fractional-indexing) key
 (`"i0"`, `"i1"`, `"i0i"`), not an index. A number column can never hold one, so
-`orderField` accepts only a text column. It is machinery, not content: hide it,
-as above.
+`orderField` accepts only a text column. It is machinery, not content, so
+naming it in `orderField` hides it from the table and disables it in the form.
+A `fields.__order` entry still overrides either: `hidden: false` shows it.
 
 **Rows created outside the CMS arrive without a key.** Nothing assigns one on
 insert. A row written by a cron, a seed script, a migration or the REST API

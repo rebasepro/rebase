@@ -112,9 +112,6 @@ export const postsCms = customizeTable<typeof posts>("posts", {
         }
     ],
     fields: {
-        slug: {
-            filledByServer: true
-        },
         excerpt: {
             multiline: true
         },
@@ -158,10 +155,6 @@ export const postsCms = customizeTable<typeof posts>("posts", {
         updated_at: {
             name: "Updated at",
             readOnly: true,
-            hidden: true
-        },
-        __order: {
-            disabled: true,
             hidden: true
         }
     }

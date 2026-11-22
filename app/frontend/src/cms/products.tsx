@@ -249,9 +249,7 @@ export const productsCms = customizeTable<typeof products>("products", {
             hidden: true
         },
         __order: {
-            name: "Board position",
-            disabled: true,
-            hidden: true
+            name: "Board position"
         },
         product_locales: {
             overrides: {

@@ -17,7 +17,7 @@ export const articles = defineTable("articles", {
     columns: {
         id:     col.uuid().primaryKey().defaultRandom(),
         title:  col.text().notNull(),
-        slug:   col.text().notNull().unique(),
+        slug:   col.text().notNull().unique().serverDefault(),
         status: col.enum(["draft", "published"]).notNull().default("draft"),
     },
     rls: "admin-only",
@@ -41,6 +41,10 @@ export const articles = defineTable("articles", {
 
 The props are typed from the table's columns: `values.title` above is a
 `string`, and `values.status` is `"draft" | "published"`.
+
+`.serverDefault()` on `slug` says what the hook does, since its code cannot be
+read: a create may leave the column out, the SDK's insert type makes it
+optional, and the panel's form lets a record be created without it.
 
 :::note[Coming from collections?]
 Table hooks are the server `callbacks` of a collection, with the same

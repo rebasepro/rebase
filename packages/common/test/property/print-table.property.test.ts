@@ -49,6 +49,7 @@ type Universal = {
     describe?: string;
     defaultSql?: string;
     dbDefault: boolean;
+    serverDefault: boolean;
     generatedAs?: string;
 };
 
@@ -63,6 +64,7 @@ const universal: fc.Arbitrary<Universal> = fc.record({
     describe: fc.option(anyString, { nil: undefined }),
     defaultSql: fc.option(fc.constantFrom("now()", "gen_short_id()", "'it''s'"), { nil: undefined }),
     dbDefault: fc.boolean(),
+    serverDefault: fc.boolean(),
     generatedAs: fc.option(fc.constantFrom("1 + 1", "lower(\"name\")"), { nil: undefined })
 });
 
@@ -86,6 +88,7 @@ function applyUniversal<D, K extends BuilderKindUsed>(start: Start<D, K>, mods: 
     if (mods.unique) builder = builder.unique();
     if (mods.defaultSql !== undefined) builder = builder.default(sqlText(mods.defaultSql));
     else if (mods.dbDefault) builder = builder.dbDefault();
+    else if (mods.serverDefault) builder = builder.serverDefault();
     if (mods.generatedAs !== undefined) builder = builder.generatedAlwaysAs(sqlText(mods.generatedAs));
     if (mods.readOnly) builder = builder.readOnly();
     if (mods.private) builder = builder.private();

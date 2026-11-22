@@ -412,7 +412,7 @@ export function nestedTransforms(transforms: Readonly<Record<string, string>>, p
  * 2. `.notNull()` — left out when `.primaryKey()` implies it
  * 3. `.unique()`
  * 4. the default: `.default(v)` / `.default(sql\`…\`)` / `.defaultNow()` / `.defaultRandom()` /
- *    `.generatedByDefaultAsIdentity()` / `.dbDefault()`
+ *    `.generatedByDefaultAsIdentity()` / `.dbDefault()` / `.serverDefault()`
  * 5. `.generatedAlwaysAs(sql\`…\`)`
  * 6. the stamp: `.onCreateNow()` / `.onUpdateNow()` / `.onCreateUser()` / `.onUpdateUser()`
  * 7. `.userId()` — what the column holds, beside the stamp that may fill it
@@ -481,6 +481,9 @@ export function columnChain(def: ColumnDef, ctx: ColumnPrintContext, key: string
                 break;
             case "database":
                 parts.push(link("dbDefault"));
+                break;
+            case "server":
+                parts.push(link("serverDefault"));
                 break;
         }
     }

@@ -1717,7 +1717,7 @@ function buildTableUpdateSchema(table: TableDescriptor, lookup: TableLookup): Re
 /** Whether the database (or the server) fills a column a create leaves out: a non-literal default, or generation. */
 function databaseFills(column: ColumnDescriptor): boolean {
     const fill = column.default?.kind;
-    return fill === "database" || fill === "sql" || fill === "random-uuid" || fill === "identity" || column.generated !== undefined;
+    return fill === "database" || fill === "server" || fill === "sql" || fill === "random-uuid" || fill === "identity" || column.generated !== undefined;
 }
 
 /**

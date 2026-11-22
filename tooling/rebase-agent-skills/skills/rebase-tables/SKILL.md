@@ -107,8 +107,7 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
                 doing: { label: "Doing", color: "orange" },
                 done: { label: "Done", color: "green" }
             }
-        },
-        __order: { hidden: true, disabled: true }
+        }
     }
 });
 ```
@@ -283,6 +282,7 @@ export const products = defineTable("products", {
 | `.primaryKey()` | every column | part of the primary key (several make a composite key, in declaration order) |
 | `.unique()` | every column | single-column `UNIQUE`; a duplicate is a `409` |
 | `.default(value)` / `` .default(sql`expr`) `` / `.dbDefault()` | every column | a default; the column may be left out of a create (`sql` is imported beside `col`) |
+| `.serverDefault()` | every column | the table's `beforeSave` (or the column's `.transform()`) fills it: optional on create, and the panel's form does not require it. No DDL default |
 | `` .generatedAlwaysAs(sql`expr`) `` | every column | `GENERATED ALWAYS AS (expr) STORED`; never writable |
 | `.$type<T>()` | every column | types the value for TypeScript only, as in Drizzle |
 | `.readOnly()` | every column | client writes refused; server code and the database still fill it |
@@ -567,7 +567,8 @@ export const articles = defineTable("articles", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         title: col.text().notNull(),
-        slug: col.text().notNull().unique(),
+        // The hook below derives it from the title: say so on the column.
+        slug: col.text().notNull().unique().serverDefault(),
         status: col.enum(["draft", "published"]).notNull().default("draft")
     },
     rls: "admin-only",
@@ -869,7 +870,6 @@ export const postsCms = customizeTable<typeof posts>("posts", {
         }
     ],
     fields: {
-        slug: { filledByServer: true },
         excerpt: { multiline: true },
         content: { oneOf: { text: { markdown: true } } },
         status: {
@@ -878,8 +878,7 @@ export const postsCms = customizeTable<typeof posts>("posts", {
                 published: { label: "Published", color: "green" }
             }
         },
-        publish_date: { name: "Publish date", mode: "date_time", clearable: true },
-        __order: { disabled: true, hidden: true }
+        publish_date: { name: "Publish date", mode: "date_time", clearable: true }
     }
 });
 ```
@@ -928,9 +927,9 @@ A board is three decisions; ship all three together:
    (or `.oneOf` strings). Without `orderField` a card's position within a column
    has nowhere to be stored: it snaps back on the next read, and the board shows
    an amber "ordering is not configured" bar. Nothing errors.
-2. **`orderField` is a text column** (`__order: col.text()` in the table,
-   `fields: { __order: { hidden: true, disabled: true } }` in the
-   customization). Reordering writes a `fractional-indexing` key in the base36
+2. **`orderField` is a text column** (`__order: col.text()` in the table).
+   Naming it in `orderField` hides it from the table and disables it in the
+   form; a `fields.__order` entry still overrides either. Reordering writes a `fractional-indexing` key in the base36
    lower-case alphabet `0123456789abcdefghijklmnopqrstuvwxyz`; a number column
    or a plain counter cannot hold one.
 3. **Rows created outside the panel need a key.** Nothing assigns one on insert

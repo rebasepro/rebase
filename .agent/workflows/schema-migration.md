@@ -20,17 +20,32 @@ Applying a change is two steps:
 
 1. **Tables → Drizzle schema**: `rebase schema generate` compiles
    `backend/schema/` and writes `backend/src/schema.generated.ts`.
-2. **Drizzle schema → database**: apply it directly with `rebase db push`
-   (development), or write a migration file with `rebase db generate` and run
-   it with `rebase db migrate` (production).
+2. **Drizzle schema → database**: one of the paths in "Which one do I use?"
+   below.
 
-The backend also applies the additive part itself at every boot, on any
-database — missing tables, columns and enum types, and the RLS policies
-(`REBASE_MIGRATE_ON_BOOT=ensure`, the default) — so under `rebase dev` an added
-column or table needs neither step: saving the file regenerates the schema and
-restarts the backend. Boot never drops, renames or narrows: that is what
-`db push` and the migrations are for, and on a deployed backend
-`rebase schema reconcile` (see "Removing a Column" below).
+## Which one do I use?
+
+- **Boot, on its own.** The backend applies the additive part at every start,
+  on any database — missing tables, columns and enum types, and the RLS
+  policies (`REBASE_MIGRATE_ON_BOOT=ensure`, the default). Under `rebase dev`
+  an added column or table needs nothing else: saving the file regenerates the
+  schema and restarts the backend. Boot never drops, renames or narrows.
+- **`rebase db push`, in development.** It syncs the schema straight to the
+  database, drops and renames included, behind its destructive-change gate.
+  Use it on a database you do not migrate.
+- **`rebase db generate` + `rebase db migrate`, in production.** The change is
+  a reviewed SQL file in version control, applied in order. On a deployed
+  backend, `rebase schema reconcile` handles what boot will not relax (see
+  "Removing a Column" below).
+- **Moving a booted database onto migrations takes one baseline.** Boot or
+  `db push` already created the tables the first migration creates, so
+  `rebase db migrate` on a database with no migration history stops before
+  running anything and prints the command to run, version filled in:
+  `rebase db migrate --baseline <version>`. It records that migration and the
+  ones before it as applied and runs the rest. Agents: show the human that
+  command; the baseline is their decision. `db push` on a database that records
+  migrations says so in one line, because the next migration that makes the
+  same change stops on `already exists`.
 
 Every command that reads the tables (`schema generate`, `db generate`,
 `db push`, `doctor`, `verify`, boot) compiles them first and stops with a
@@ -127,9 +142,8 @@ rebase db migrate
 ```
 
 `rebase db migrate --refuse-destructive` dry-runs the pending files and applies
-nothing when one drops or narrows data. A database the backend has already
-booted against needs `--baseline <version>` once, because boot already created
-the tables the first migration would create.
+nothing when one drops or narrows data. For a database boot has already set
+up, see the baseline in "Which one do I use?" above.
 
 > [!WARNING]
 > Always backup your database before running migrations in production!

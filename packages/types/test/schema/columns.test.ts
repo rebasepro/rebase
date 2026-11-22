@@ -117,6 +117,7 @@ describe("col.* — modifiers", () => {
             .toEqual({ kind: "literal", value: "2024-01-02T03:04:05.000Z" });
         expect(col.text().default(sql`gen_short_id()`).def.default).toEqual({ kind: "sql", expression: "gen_short_id()" });
         expect(col.text().dbDefault().def.default).toEqual({ kind: "database" });
+        expect(col.text().serverDefault().def.default).toEqual({ kind: "server" });
         expect(col.uuid().defaultRandom().def.default).toEqual({ kind: "random-uuid" });
         expect(col.integer().generatedByDefaultAsIdentity().def.default).toEqual({ kind: "identity" });
         expect(col.smallint().generatedByDefaultAsIdentity().def.default).toEqual({ kind: "identity" });

@@ -85,8 +85,8 @@ rebase db migrate
 Applies all unapplied migrations to the database.
 
 On a database that has already booted, the first migration creates tables boot
-already made, so the first `db migrate` there stops on `already exists`. Record
-that migration as applied instead, once:
+already made, so the first `db migrate` there stops before it runs anything and
+prints the baseline to run. Record that migration as applied instead, once:
 
 ```bash
 rebase db migrate --baseline <version>

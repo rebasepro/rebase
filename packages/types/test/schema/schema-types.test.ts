@@ -148,6 +148,7 @@ const kinds = defineTable("kinds", {
         random: col.uuid().notNull().defaultRandom(),
         sql: col.text().notNull().default(sql`x()`),
         external: col.text().notNull().dbDefault(),
+        hooked: col.text().notNull().serverDefault(),
         required: col.text().notNull()
     },
     relations: {
@@ -222,7 +223,7 @@ function insertTypes(): void {
     assertType<Equal<"locked" extends keyof Insert ? true : false, false>>();
     assertType<Equal<"secret" extends keyof Insert ? true : false, false>>();
     // Optional because something else fills them.
-    for (const key of ["flag", "serial", "smallSerial", "bigSerial", "stampedAt", "stampedBy", "identity", "random", "sql", "external"] as const) {
+    for (const key of ["flag", "serial", "smallSerial", "bigSerial", "stampedAt", "stampedBy", "identity", "random", "sql", "external", "hooked"] as const) {
         const optional: undefined extends Insert[typeof key] ? true : false = true;
         void optional;
     }

@@ -45,13 +45,11 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
     // The view the collection opens in
     defaultViewMode: "table",
     // Kanban groups by an enum column, and keeps a card's place within a
-    // column in a text column; without `orderField` the order resets on every read
+    // column in a text column; without `orderField` the order resets on every
+    // read. The order column is hidden and disabled unless `fields` says otherwise
     kanban: { columnField: "status", orderField: "__order" },
     // How a row opens: "split" | "side_panel" | "full_screen" | "dialog"
-    openEntityMode: "split",
-    fields: {
-        __order: { hidden: true, disabled: true }
-    }
+    openEntityMode: "split"
 });
 ```
 

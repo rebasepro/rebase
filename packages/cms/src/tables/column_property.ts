@@ -549,7 +549,8 @@ function applyStamp(property: Property, stamp: NonNullable<ColumnDescriptor["sta
  * - `nullable: false` is `validation.required`, except where nobody types the
  *   value: a generated id, a stamp, a generated or read-only column.
  * - A DEFAULT keeps the column required on edit and lets a create leave it out:
- *   a literal opens the form with the value, anything else is `databaseDefault`.
+ *   a literal opens the form with the value, `.serverDefault()` (a hook fills
+ *   it) is `admin.filledByServer`, anything else is `databaseDefault`.
  * - `readOnly`, `generated` and stamps are read-only in the form; time stamps
  *   are also left out of the default table columns.
  * - The tenant column is filled by the server on create (`filledByServer`).
@@ -591,6 +592,7 @@ export function propertyFromColumn(column: ColumnDescriptor, context: ColumnProj
     const fallback = column.default;
     if (fallback && !generatedKey) {
         if (fallback.kind === "literal") applyLiteralDefault(property, fallback.value);
+        else if (fallback.kind === "server") property.admin = { ...property.admin, filledByServer: true };
         else property.databaseDefault = fallback.kind === "sql" ? `sql\`${fallback.expression}\`` : true;
     }
 

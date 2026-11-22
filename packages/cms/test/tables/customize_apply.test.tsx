@@ -242,6 +242,34 @@ describe("applyTableCustomization: the collection level", () => {
         }));
         expect(JSON.stringify(base)).toBe(snapshot);
     });
+
+    it("hides the kanban order column from the table and disables it in the form, with no `fields` entry", () => {
+        const out = applyTableCustomization(postsBase(), customizeTable("posts", {
+            kanban: { columnField: "status", orderField: "__order" }
+        }));
+        expect(property(out, "__order").admin).toEqual({ hideFromCollection: true, disabled: true });
+        // Only the order column: the board's column field is untouched.
+        expect(property(out, "status")).toEqual(property(postsBase(), "status"));
+    });
+
+    it("lets the order column's own `fields` entry override what `kanban.orderField` implies", () => {
+        const out = applyTableCustomization(postsBase(), customizeTable("posts", {
+            kanban: { columnField: "status", orderField: "__order" },
+            fields: { __order: { name: "Board position", hidden: false } }
+        }));
+        expect(property(out, "__order")).toMatchObject({ name: "Board position", admin: { hideFromCollection: false, disabled: true } });
+
+        const editable = applyTableCustomization(postsBase(), customizeTable("posts", {
+            kanban: { columnField: "status", orderField: "__order" },
+            fields: { __order: { disabled: false } }
+        }));
+        expect(property(editable, "__order").admin).toEqual({ hideFromCollection: true, disabled: false });
+    });
+
+    it("leaves every column alone without `kanban.orderField`", () => {
+        const out = applyTableCustomization(postsBase(), customizeTable("posts", { kanban: { columnField: "status" } }));
+        expect(property(out, "__order")).toEqual(property(postsBase(), "__order"));
+    });
 });
 
 describe("applyTableCustomization: fields", () => {
@@ -471,6 +499,24 @@ describe("end to end: defineTable → descriptor → projection → customizatio
         expect(getDefaultValuesFor(customized.properties).author).toBe(ada);
         // Without one, the picker starts empty.
         expect(getDefaultValuesFor(projected[1].properties).author).toBeNull();
+    });
+
+    it("projects `.serverDefault()` as `filledByServer`, which a customization may still override", () => {
+        const articles = defineTable("articles", {
+            columns: {
+                id: col.uuid().primaryKey().defaultRandom(),
+                title: col.text().notNull(),
+                slug: col.text().notNull().unique().serverDefault()
+            },
+            rls: "admin-only",
+            hooks: { beforeSave: ({ values }) => values }
+        });
+        const [projected] = collectionsFromTables(compileTables([articles]));
+        expect(property(projected, "slug")).toMatchObject({ validation: { required: true }, admin: { filledByServer: true } });
+        expect(property(projected, "title").admin?.filledByServer).toBeUndefined();
+
+        const overridden = applyTableCustomization(projected, customizeTable<typeof articles>("articles", { fields: { slug: { filledByServer: false } } }));
+        expect(property(overridden, "slug").admin?.filledByServer).toBe(false);
     });
 
     it("projects a JSON array's `uniqueBy` as `uniqueInArray` on the named fields of its items, which the form checks", () => {

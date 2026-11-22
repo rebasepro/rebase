@@ -563,6 +563,9 @@ function applyTyped(property: Property, field: AnyFieldCustomization, where: str
     }
 }
 
+/** What `kanban.orderField` implies for its column, before the column's own `fields` entry. */
+const BOARD_ORDER_FIELD: AnyFieldCustomization = { hidden: true, disabled: true };
+
 // ── Entry points ─────────────────────────────────────────────────────────────
 
 /**
@@ -570,7 +573,8 @@ function applyTyped(property: Property, field: AnyFieldCustomization, where: str
  *
  * Labels, icon, group, views, kanban, display slots, columns, form layout,
  * actions, custom views and every per-field option are written where the
- * panel's views read them; enum labels and colours are merged onto the
+ * panel's views read them. The `kanban.orderField` column is hidden from the
+ * table and disabled in the form unless its `fields` entry says otherwise; enum labels and colours are merged onto the
  * projected values, so a value the customization does not mention keeps its
  * seeded colour. A field, column or slot the collection does not have — the
  * server redacted it for this caller, or the table changed — is skipped with
@@ -594,11 +598,18 @@ export function applyTableCustomization(collection: TableCollection, customizati
     const presentation = presentationOf(customization, known, where);
 
     const properties: Properties = { ...collection.properties };
+    // The board's order column holds fractional keys nobody reads or types:
+    // hidden from the table and disabled in the form unless `fields` says otherwise.
+    const orderKey = presentation.orderProperty;
+    const orderColumn = orderKey !== undefined ? properties[orderKey] : undefined;
+    if (orderKey !== undefined && orderColumn) {
+        properties[orderKey] = applyField(orderColumn, BOARD_ORDER_FIELD, `${where} kanban.orderField`);
+    }
     const overrides = new Map<string, Partial<AnyCollectionConfig>>();
     for (const [key, field] of Object.entries(customization.fields ?? {})) {
         if (field === undefined) continue;
         const at = `${where} fields.${key}`;
-        const property = collection.properties[key];
+        const property = properties[key];
         if (property) {
             properties[key] = applyField(property, field, at);
         } else if (!known.relations.has(key)) {

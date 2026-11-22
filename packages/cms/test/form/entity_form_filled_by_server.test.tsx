@@ -48,23 +48,28 @@ import { customizeTable } from "../../src/tables/customize_table";
 import { rowOf, saving } from "../helpers/form_rows";
 
 /**
- * The reference app's posts, as `app/backend/schema/posts.ts` declares the two
- * columns that matter here — `slug` is NOT NULL and its `beforeSave` derives it
- * from the title — and as `app/frontend/src/cms/posts.tsx` customizes it
- * (`fields.slug.filledByServer`).
+ * The reference app's posts, as `app/backend/schema/posts.ts` declares the
+ * columns that matter here — `slug` is NOT NULL, its `beforeSave` derives it
+ * from the title, and the column says so with `.serverDefault()` — and with
+ * no `fields.slug` in the customization, as `app/frontend/src/cms/posts.tsx`.
  */
 const [postsTable] = compileTables([defineTable("posts", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         title: col.text().notNull(),
-        slug: col.text().notNull().unique(),
+        slug: col.text().notNull().unique().serverDefault(),
         excerpt: col.text().validate({ max: 300 })
     },
     rls: "admin-only"
 })]);
 const postsCollection = applyTableCustomization(
     collectionFromTable(postsTable, { tables: [postsTable] }),
-    customizeTable("posts", { fields: { slug: { filledByServer: true } } })
+    customizeTable("posts", { name: "Blog posts" })
+);
+/** The same table, with the customization taking the table's word back. */
+const requiredSlugCollection = applyTableCustomization(
+    collectionFromTable(postsTable, { tables: [postsTable] }),
+    customizeTable("posts", { fields: { slug: { filledByServer: false } } })
 );
 
 type Row = Record<string, unknown>;
@@ -131,6 +136,13 @@ describe("admin.filledByServer", () => {
         const values = Object.fromEntries(Object.keys(postsCollection.properties).map(key => [key, null]));
         const { errors } = await submit(postsCollection, { ...values, title: "Hello world" }, "new");
         expect(errors).not.toHaveProperty("slug");
+    });
+
+    it("requires the field again when the customization sets `filledByServer: false` over `.serverDefault()`", async () => {
+        const values = Object.fromEntries(Object.keys(requiredSlugCollection.properties).map(key => [key, null]));
+        const { onSubmit, errors } = await submit(requiredSlugCollection, { ...values, title: "Hello world" }, "new");
+        expect(onSubmit).not.toHaveBeenCalled();
+        expect(errors.slug).toBe("Required");
     });
 });
 

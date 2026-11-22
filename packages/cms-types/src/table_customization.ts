@@ -432,7 +432,12 @@ export interface FieldOptions<Row = Record<string, unknown>> {
     Filter?: ComponentSlot<FilterFieldBindingProps>;
     /** The column width in the table, in pixels. */
     columnWidth?: number;
-    /** The server fills this field on create (a hook): the form lets a record be created without it. */
+    /**
+     * The server fills this field on create (a hook): the form lets a record be
+     * created without it. A column marked `.serverDefault()` in its
+     * `defineTable` is already so; this overrides what the table says
+     * (`false` makes the form require it again).
+     */
     filledByServer?: boolean;
     /** How many of the form grid's four columns the field spans. */
     span?: PropertySpan;
@@ -765,6 +770,10 @@ export interface TableKanban<Column extends string = string, Order extends strin
      * The text column a card's position within its column is stored in — a
      * `col.text()` the board writes fractional order keys to. Without it the
      * order resets on every read.
+     *
+     * The column is hidden from the table and disabled in the form, as
+     * `fields: { [orderField]: { hidden: true, disabled: true } }` would say.
+     * Its own `fields` entry still overrides either (`hidden: false` shows it).
      */
     orderField?: Order;
 }

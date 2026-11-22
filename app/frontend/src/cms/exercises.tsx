@@ -242,10 +242,6 @@ export const exercisesCms = customizeTable<typeof exercises>("exercises", {
             name: "Updated at",
             readOnly: true,
             hidden: true
-        },
-        __order: {
-            disabled: true,
-            hidden: true
         }
     }
 });

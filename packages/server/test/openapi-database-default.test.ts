@@ -5,6 +5,8 @@
 import { buildTableInputSchema } from "../src/api/openapi-generator";
 import { tableFrom } from "./helpers/tables";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import { col, defineTable } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 
 describe("openapi create body and databaseDefault", () => {
     it("lists a required column the database fills as optional", () => {
@@ -19,5 +21,19 @@ describe("openapi create body and databaseDefault", () => {
         const schema = buildTableInputSchema(tableFrom(collection), () => undefined) as { required?: string[]; properties: Record<string, unknown> };
         expect(schema.required).toEqual(["title"]);
         expect(schema.properties).toHaveProperty("code");
+    });
+
+    it("lists a `.serverDefault()` column, which a hook fills, as optional", () => {
+        const [articles] = compileTables([defineTable("articles", {
+            columns: {
+                id: col.uuid().primaryKey().defaultRandom(),
+                title: col.text().notNull(),
+                slug: col.text().notNull().serverDefault()
+            },
+            rls: "admin-only"
+        })]);
+        const schema = buildTableInputSchema(articles, () => undefined) as { required?: string[]; properties: Record<string, unknown> };
+        expect(schema.required).toEqual(["title"]);
+        expect(schema.properties).toHaveProperty("slug");
     });
 });

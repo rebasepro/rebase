@@ -27,8 +27,9 @@
  *   relation of that table.
  * - `cms-hidden-required` — a field kept off the form (`hiddenInForm`,
  *   `readOnly`, `disabled`) whose column is `NOT NULL` with no default, that
- *   neither the database nor the server fills, and that the customization does
- *   not mark `filledByServer`: no record can be created from the panel. A
+ *   neither the database nor the server fills (`.serverDefault()` says a hook
+ *   does), and that the customization does not mark `filledByServer`: no
+ *   record can be created from the panel. A
  *   warning instead of an error when the table declares a `beforeSave` hook
  *   (or the column a `beforeSave` transform), which may be what fills it.
  * - `cms-duplicate-customization` — two `customizeTable` calls for one slug.
@@ -395,9 +396,9 @@ function checkCustomization(read: CustomizationRead, table: TableDescriptor): Cm
                     ? `and only the table's \`beforeSave\` hook could fill it: unless it does, creating a record from the panel fails.`
                     : `and nothing on the server fills it: creating a "${table.slug}" record from the panel always fails.`),
             fix: hooked
-                ? `If the hook fills it on create, say so: \`${field.key}: { …, filledByServer: true }\`. Otherwise let the form edit it.`
+                ? `If the hook fills it on create, say so on the column: \`.serverDefault()\` in its \`defineTable\`. Otherwise let the form edit it.`
                 : `Let the form edit it (drop ${describeOffForm(field.offForm)}), give the column a default in its \`defineTable\` (\`.default(…)\`), ` +
-                    `or fill it in a \`beforeSave\` hook and mark the field \`filledByServer: true\`.`
+                    `or fill it in a \`beforeSave\` hook and mark the column \`.serverDefault()\`.`
         });
     }
     return findings;

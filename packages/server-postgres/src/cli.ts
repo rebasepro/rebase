@@ -82,6 +82,7 @@ import { createApplyReportFilter } from "./schema/atlas-apply-report";
 import { nextStepAfterDbGenerate } from "./schema/generate-next-step";
 import { CommandStopped, ScratchDatabase } from "./cli-scratch-database";
 import { baselineVersionProblem, describeBaselinePlan, latestRecordedMigration, planBaseline } from "./schema/migrate-baseline";
+import { existingTables, provisionedWithoutHistoryProblem, pushOnMigratedDatabaseNote, tablesCreatedBy } from "./schema/migrate-path-guard";
 import { promptConfirm } from "./cli-prompt";
 import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
 import { branchNameIn, branchSourceIn, resolveBranchSwitches, unexpectedBranchArgs } from "./branch-argv";
@@ -318,6 +319,48 @@ function latestMigrationVersion(): string | null {
     if (!newest) return null;
     const match = /^(\d+)/.exec(newest);
     return match ? match[1] : newest.replace(/\.sql$/, "");
+}
+
+/**
+ * Stop `rebase db migrate` before Atlas runs when boot or `db push` has already
+ * set the database up and it records no migration — see
+ * `schema/migrate-path-guard.ts`. A database that cannot be read here is left
+ * to Atlas, whose failure has a banner of its own.
+ */
+async function refuseProvisionedWithoutHistory(databaseUrl: string): Promise<void> {
+    const files = listMigrationFiles();
+    if (files.length === 0) return;
+    let problem: string | null;
+    try {
+        const latestRecorded = await latestRecordedMigration(databaseUrl);
+        if (latestRecorded !== null) return;
+        const dir = path.resolve(process.cwd(), "drizzle", "migrations");
+        const created = files.flatMap(file => tablesCreatedBy(fs.readFileSync(path.join(dir, file), "utf8")));
+        const existing = await withAppClient(databaseUrl, client => existingTables(client, created));
+        problem = provisionedWithoutHistoryProblem({ latestRecorded, existing, newestVersion: latestMigrationVersion() });
+    } catch {
+        return;
+    }
+    if (!problem) return;
+    const [message, ...detail] = problem.split("\n");
+    outError(chalk.red(`  ✗ ${message}`));
+    for (const line of detail) {
+        outError(line.startsWith("  rebase ") ? `    ${chalk.bold.green(line.trim())}` : chalk.gray(line ? `    ${line}` : ""));
+    }
+    throw new CommandStopped("The database was provisioned without migrations.");
+}
+
+/** `rebase db push`'s one line on a database that records migrations. Never fatal. */
+async function noteMigratedDatabase(databaseUrl: string): Promise<void> {
+    let note: string | null;
+    try {
+        note = pushOnMigratedDatabaseNote(await latestRecordedMigration(databaseUrl));
+    } catch {
+        return;
+    }
+    if (!note) return;
+    outWarn(chalk.yellow(`  ⚠️  ${note}`));
+    outWarn("");
 }
 
 /**
@@ -759,6 +802,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 : "  Step 2/3: Pushing schema to database with Atlas..."));
             out("");
             const databaseUrl = process.env.DATABASE_URL;
+            if (databaseUrl) await noteMigratedDatabase(databaseUrl);
             // Skipped under --dry-run: this creates the auth schema and its
             // functions, which is a write. "Show me what would happen" that
             // changes something on the way is not a plan.
@@ -1093,6 +1137,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 for (const line of detail) outError(chalk.gray(`    ${line}`));
                 throw new CommandStopped("The baseline names no migration.");
             }
+            if (!baseline && databaseUrl) await refuseProvisionedWithoutHistory(databaseUrl);
             const baselinePlan = baseline
                 ? planBaseline(baseline, databaseUrl ? await latestRecordedMigration(databaseUrl) : null)
                 : null;

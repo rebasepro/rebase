@@ -57,7 +57,7 @@ export const DRIZZLE_REFUSALS = {
     /** `.references(() => …)`: a foreign key is a `rel.belongsTo`. */
     references: "A foreign key is a relation in Rebase: write `relations: { author: rel.belongsTo(() => users, { localKey: \"author_id\", onDelete: \"cascade\" }) }`. The relation's key is what `include` names.",
     /** `.$defaultFn()` / `.$default()`: a run-time default function. */
-    defaultFn: "Rebase's schema is data, not code: a default is `.default(value)` or `.default(sql`…`)`; the time is `.defaultNow()` or `.onCreateNow()`, the caller `.onCreateUser()`; anything else belongs in `hooks.beforeSave`.",
+    defaultFn: "Rebase's schema is data, not code: a default is `.default(value)` or `.default(sql`…`)`; the time is `.defaultNow()` or `.onCreateNow()`, the caller `.onCreateUser()`; anything else belongs in `hooks.beforeSave`, with `.serverDefault()` on the column it fills.",
     /** `.$onUpdate()` / `.$onUpdateFn()`: a run-time update function. */
     onUpdateFn: "Rebase's schema is data, not code: write `.onUpdateNow()` for the time, `.onUpdateUser()` for the caller; anything else belongs in `hooks.beforeSave`.",
     /** `.unique(name, { nulls })`: a named or NULLS NOT DISTINCT constraint. */
@@ -396,6 +396,20 @@ export class ColumnBuilder<TData, TKind extends BuilderKind = BuilderKind, F ext
      */
     dbDefault(): ColumnBuilder<TData, TKind, WithDefault<F>> {
         return this.with<TData, TKind, WithDefault<F>>({ default: { kind: "database" } });
+    }
+
+    /**
+     * The table's own server code fills this column when a create leaves it
+     * out: a `hooks.beforeSave` that derives it (a slug from the title), or
+     * the column's `.transform()`. A hook is code and cannot be read, so this
+     * says what it does: a create may omit the column (the SDK's insert type
+     * makes it optional), the panel's form lets a record be created without
+     * it, and the descriptor carries `default: { kind: "server" }`. No DDL
+     * default is written. A `NOT NULL` column the hook does not fill still
+     * fails on the database.
+     */
+    serverDefault(): ColumnBuilder<TData, TKind, WithDefault<F>> {
+        return this.with<TData, TKind, WithDefault<F>>({ default: { kind: "server" } });
     }
 
     /**

@@ -372,10 +372,11 @@ describe("Database migration E2E", () => {
     /**
      * The day-one path on a server of your own: boot (or `db push`) has made
      * the tables, `db generate` writes a baseline migration that creates them,
-     * and `db migrate` stops on `already exists`. The failed run must leave no
-     * revisions table outside `rebase` — on the managed database it left one in
-     * `public` that failed every later run, `--baseline` included — and the
-     * `--baseline` it names must then work.
+     * and `db migrate` stops before Atlas runs, naming the tables already there.
+     * The refused run must leave no revisions table outside `rebase` — on the
+     * managed database a failed one left one in `public` that failed every
+     * later run, `--baseline` included — and the `--baseline` it names must
+     * then work.
      */
     it("on a database boot provisioned, names --baseline, leaves nothing outside `rebase`, and the baseline works", async () => {
         const cliScript = resolveCliScript();
@@ -412,7 +413,8 @@ describe("Database migration E2E", () => {
 
             const failed = await run("db", "migrate");
             expect(failed.exitCode).toBe(1);
-            expect(failed.all).toContain("already exists");
+            expect(failed.all).toContain("records no migration as applied. Nothing was run.");
+            expect(failed.all).toContain("\"tasks\"");
             expect(failed.all).toContain(`rebase db migrate --baseline ${version}`);
             expect((await revisionTables()).filter(schema => schema !== "rebase")).toEqual([]);
 

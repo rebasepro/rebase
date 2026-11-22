@@ -632,14 +632,14 @@ export function formatBaselineRemedy(version: string | null, object?: string, fa
         `  applies it directly, so a database that has ever run either one is\n` +
         `  ahead of the migrations recorded on it.\n` +
         `\n` +
-        `  Record where it already is, then migrate normally:\n` +
+        `  Record where it already is, once; the same command then runs the\n` +
+        `  migrations after it, and every later ${chalk.bold("rebase db migrate")} is an ordinary one:\n` +
         `\n` +
         `    ${chalk.bold.green(`rebase db migrate --baseline ${versionToken}`)}\n` +
-        `    ${chalk.bold.green("rebase db migrate")}\n` +
         `\n` +
         `  The baseline is the version already applied — the numeric prefix of\n` +
-        `  the migration file describing what is in the database now. Migrations\n` +
-        `  after it run; it and everything before it are marked done.\n` +
+        `  the migration file describing what is in the database now. It and\n` +
+        `  everything before it are marked done.\n` +
         `\n` +
         onlyTheFailedOne +
         `  On a database nothing has ever booted against, none of this is needed.\n` +

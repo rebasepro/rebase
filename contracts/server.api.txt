@@ -603,7 +603,7 @@ type UserInvitationTemplateFunction
 type WelcomeEmailTemplateFunction
 
 ## @rebasepro/types
-class ColumnBuilder { $data, $default, $defaultFn, $flags, $kind, $onUpdate, $onUpdateFn, $type, access, array, brand, dbDefault, def, default, defaultNow, defaultRandom, describe, generatedAlwaysAs, generatedAlwaysAsIdentity, generatedByDefaultAsIdentity, multiple, notNull, onCreateNow, onCreateUser, onUpdateNow, onUpdateUser, oneOf, primaryKey, private, readOnly, references, transform, unique, userId, validate }
+class ColumnBuilder { $data, $default, $defaultFn, $flags, $kind, $onUpdate, $onUpdateFn, $type, access, array, brand, dbDefault, def, default, defaultNow, defaultRandom, describe, generatedAlwaysAs, generatedAlwaysAsIdentity, generatedByDefaultAsIdentity, multiple, notNull, onCreateNow, onCreateUser, onUpdateNow, onUpdateUser, oneOf, primaryKey, private, readOnly, references, serverDefault, transform, unique, userId, validate }
 class JsonField { $data, $kind, $required, brand, default, describe, onCreateNow, onCreateUser, onUpdateNow, onUpdateUser, oneOf, required, shape, transform, userId, validate }
 class ListLimitError { code, details, maxLimit, requestId, retryAfterSeconds, status }
 class RebaseApiError { code, details, requestId, retryAfterSeconds, status }

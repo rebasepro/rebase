@@ -4945,7 +4945,16 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // and catalog mutations (storage policies, webhooks, roles, DB crons)
         // propagate across peer replicas without restarting.
         // Best-effort: silently skipped on embedded PGlite or pooled-only URLs.
-        if (baasCatalogReady && defaultSqlAdmin?.listen) {
+        //
+        // Only for a process that answers from what the reload refreshes: a
+        // surface that reads the tables or the catalog, or the scheduler that
+        // runs the database's cron jobs. A functions-only process has neither,
+        // and the listener is a dedicated connection outside the pool, one per
+        // replica.
+        const readsLiveCatalog = surfaces.auth || surfaces.data || surfaces.storage || surfaces.admin
+            || surfaces.cron || surfaces.meta || surfaces.realtime || surfaces.mcp
+            || (cronJobsStore !== undefined && ownership.cronScheduler);
+        if (readsLiveCatalog && baasCatalogReady && defaultSqlAdmin?.listen) {
             const scheduleReload = () => {
                 if (schemaChangeDebounce) clearTimeout(schemaChangeDebounce);
                 schemaChangeDebounce = setTimeout(() => {

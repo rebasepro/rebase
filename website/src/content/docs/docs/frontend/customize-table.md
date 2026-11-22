@@ -45,7 +45,6 @@ export const postsCms = customizeTable<typeof posts>("posts", {
         title:   { multiline: true },
         content: { Field: CustomMarkdownEditor },
         orgId:   { hidden: true },
-        __order: { hidden: true, disabled: true },
     },
 
     entityActions: [
@@ -181,7 +180,7 @@ Every key is optional. A key you leave out keeps what the panel derived.
 | Key | Type | Effect |
 |---|---|---|
 | `columnField` | column key | The column the board's columns come from: a `col.enum([...])` or `.oneOf([...])` of strings. |
-| `orderField` | text column key | Where a card's position within its column is stored, as a fractional order key. Without it the order resets on every read. |
+| `orderField` | text column key | Where a card's position within its column is stored, as a fractional order key. Without it the order resets on every read. The column is hidden and disabled unless its `fields` entry says otherwise. |
 
 ### Columns and slots
 
@@ -294,7 +293,7 @@ changes.
 | `Preview` | `Component` | Replaces how the value is drawn outside the form. |
 | `Filter` | `Component` | Replaces the filter control for this field. |
 | `columnWidth` | `number` | The column width in the table, in pixels. |
-| `filledByServer` | `boolean` | A server hook fills it on create: the form lets a record be created without it. |
+| `filledByServer` | `boolean` | A server hook fills it on create: the form lets a record be created without it. A column marked `.serverDefault()` in its `defineTable` already is; set this only to override the table (`false` requires it again). |
 | `span` | `1 \| 2 \| 3 \| 4` | How many of the form grid's four columns it spans. |
 | `customProps` | `unknown` | Passed untouched to your `Field` and `Preview`. |
 | `filterOperators` | `WhereFilterOp[]` | Narrows the filter operators offered. `[]` turns filtering off for it. |

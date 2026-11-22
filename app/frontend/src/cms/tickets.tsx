@@ -228,10 +228,6 @@ export const ticketsCms = customizeTable<typeof tickets>("tickets", {
             name: "Updated at",
             readOnly: true,
             hidden: true
-        },
-        __order: {
-            disabled: true,
-            hidden: true
         }
     }
 });
