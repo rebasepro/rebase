@@ -15,12 +15,13 @@ import { AUTH_STATE, freshSession } from "../auth";
  * and never replaces it underneath the page. It has to be staged, and this is
  * the staging — the response the browser would get from a server that has moved
  * on. Reported from production as "Failed to fetch dynamically imported module:
- * .../RouterCollectionsStudioView-<hash>.js" on opening the schema view.
+ * .../RouterCollectionsStudioView-<hash>.js" on opening the schema view. That
+ * editor was removed (11-20); the SQL console is the lazy view staged now.
  */
 test.use({ storageState: AUTH_STATE });
 test.beforeEach(({ context }) => freshSession(context));
 
-const STUDIO_CHUNK = /CollectionsStudioView/;
+const STUDIO_CHUNK = /\/SQLEditor-[^/]*\.js/;
 
 test.describe("a tab left open across a deploy", () => {
 
@@ -42,7 +43,7 @@ test.describe("a tab left open across a deploy", () => {
             });
         });
 
-        await page.goto("/schema");
+        await page.goto("/sql");
 
         // Not the browser's wording, which names a filename and reads as a
         // broken build. The user is told what happened and what fixes it.
@@ -67,7 +68,7 @@ contentType: "text/html; charset=utf-8",
 body: indexHtml });
         });
 
-        await page.goto("/schema");
+        await page.goto("/sql");
         await expect(page.getByText("New version available")).toBeVisible({ timeout: 30000 });
 
         // The reload is only useful if the tab then picks up the current build.
