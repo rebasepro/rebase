@@ -43,7 +43,7 @@ import { EntityForm } from "../../src/form/EntityForm";
 import { col, defineTable } from "@rebasepro/types";
 import { compileTables } from "@rebasepro/common";
 import { collectionFromTable } from "../../src/tables/project_table";
-import { applyTableCustomization } from "../../src/tables/apply_customization";
+import { applyTableCustomization, type TableCollection } from "../../src/tables/apply_customization";
 import { customizeTable } from "../../src/tables/customize_table";
 import { rowOf, saving } from "../helpers/form_rows";
 
@@ -74,7 +74,8 @@ const requiredSlugCollection = applyTableCustomization(
 
 type Row = Record<string, unknown>;
 
-async function submit(collection: AdminCollection, values: Row, status: "new" | "existing") {
+/** Takes a hand-written collection or one compiled from a table, as the panel hands either to the form. */
+async function submit(collection: AdminCollection | TableCollection, values: Row, status: "new" | "existing") {
     const onSubmit = jest.fn(async (v: Row) => ({ id: "1", path: "posts", values: v }) as Entity<Row>);
     let ctx: FormContext<Row> | undefined;
     const Capture = ({ formContext }: EntityCustomViewParams<Row>) => {

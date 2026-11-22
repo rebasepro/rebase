@@ -1095,7 +1095,7 @@ interface RealtimeSocketTotals { bytesIn, bytesOut, closeCodes, closedBy, frames
 interface RebaseBackendAppConfig { context, crons, dockerfile, functions, port, registerDatabase, runtime, schema, tables, type }
 interface RebaseBundleEntrypoints { crons, functions, hooks, resources, schema, sql, static, storage, tables, uiConfig }
 interface RebaseBundleFunction { file, name, portable, requires }
-interface RebaseBundleManifest { app, build, bundleFormat, deps, entry, functions, hooks, kind, resources, runtime, schemaVersion, sqlFiles, storage, tables }
+interface RebaseBundleManifest { app, build, bundleFormat, deps, entry, functions, hooks, kind, resources, runtime, schemaVersion, sqlFiles, stock, storage, tables }
 interface RebaseBundleStatic { cleanUrls, cms, dir, frameAncestors, host, name, path, redirects, routes, spa }
 interface RebaseClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, data, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, rpc, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, storage, storageRegistry, ws }
 interface RebaseErrorInit { cause, code, details, requestId, retryAfterSeconds, status }

@@ -192,6 +192,9 @@ export default [
             // The standalone Studio SPA (`pnpm --filter @rebasepro/studio build:standalone`),
             // minified bundle output the runtime image serves at `/_studio`.
             "**/dist-standalone/**",
+            // `rebase build` output: the stock bundle's (check:stock-bundle) and
+            // any app's. Minified, vendored code, and in .gitignore.
+            "**/dist-bundle/**",
             "**/build/**",
             "**/.next/**",
             "**/.astro/**",
