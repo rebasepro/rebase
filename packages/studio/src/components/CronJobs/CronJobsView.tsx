@@ -104,6 +104,7 @@ disabled: "bg-surface-400"
 
 export function CronJobsView() {
     const [tab, setTab] = useState<"scheduler" | "zero-code">("scheduler");
+    const { t } = useTranslation();
     return (
         <div className="flex flex-col h-full w-full overflow-hidden">
             <Tabs
@@ -112,8 +113,8 @@ export function CronJobsView() {
                 variant="boxy"
                 className="border-b border-hairline px-4 bg-surface-sheet shrink-0"
             >
-                <Tab value="scheduler">Active Scheduler</Tab>
-                <Tab value="zero-code">Scheduled Jobs (DB)</Tab>
+                <Tab value="scheduler">{t("studio_cron_tab_scheduler")}</Tab>
+                <Tab value="zero-code">{t("studio_cron_tab_db")}</Tab>
             </Tabs>
             <div className="flex-1 min-h-0 overflow-hidden">
                 {tab === "scheduler" ? <CronSchedulerMonitorView /> : <DbCronJobsPanel />}

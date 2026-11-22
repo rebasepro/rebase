@@ -661,6 +661,7 @@ message: e instanceof Error ? e.message : String(e) });
 
 export const StorageView = () => {
     const [tab, setTab] = useState<"files" | "policies">("files");
+    const { t } = useTranslation();
     return (
         <div className="flex flex-col h-full w-full overflow-hidden">
             <Tabs
@@ -669,8 +670,8 @@ export const StorageView = () => {
                 variant="boxy"
                 className="border-b border-hairline px-4 bg-surface-sheet shrink-0"
             >
-                <Tab value="files">Files</Tab>
-                <Tab value="policies">Access Policies</Tab>
+                <Tab value="files">{t("studio_storage_tab_files")}</Tab>
+                <Tab value="policies">{t("studio_storage_tab_policies")}</Tab>
             </Tabs>
             <div className="flex-1 min-h-0 overflow-hidden">
                 {tab === "files" ? <StorageFilesBrowser /> : <StoragePoliciesPanel />}

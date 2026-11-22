@@ -1,7 +1,7 @@
 import type { AppView, HomePageSection, PluginGenericProps } from "@rebasepro/app";
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowRightIcon, Card, cls, Container, ExpandablePanel, SearchBar, StatusDot, Typography } from "@rebasepro/ui";
-import { IconForView, useApiConfig, useNavigationGroupLabel, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot } from "@rebasepro/app";
+import { IconForView, useApiConfig, useNavigationGroupLabel, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot, useTranslation } from "@rebasepro/app";
 import { useNavigate } from "react-router";
 import { useStudioBreadcrumbs, SchemaDriftBanner } from "@rebasepro/app";
 import { isRecord, useAdminFetch } from "../utils/adminFetch";
@@ -140,6 +140,7 @@ export function StudioHomePage({
     const registry = useRebaseRegistry();
     const apiConfig = useApiConfig();
     const apiUrl = absoluteApiUrl(apiConfig?.apiUrl);
+    const { t } = useTranslation();
 
     useEffect(() => {
         breadcrumbs.set({ breadcrumbs: [] });
@@ -274,13 +275,13 @@ export function StudioHomePage({
                             color="secondary"
                             className="py-1 mb-3 block"
                         >
-                            Overview
+                            {t("studio_home_overview")}
                         </Typography>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                             <Card className="p-4 flex flex-col justify-between gap-2.5">
                                 <div className="flex items-center justify-between">
-                                    <Typography variant="micro" color="secondary">BACKEND RUNTIME</Typography>
-                                    <StatusDot tone="ok" size="small">Online</StatusDot>
+                                    <Typography variant="micro" color="secondary">{t("studio_home_backend_runtime")}</Typography>
+                                    <StatusDot tone="ok" size="small">{t("studio_home_online")}</StatusDot>
                                 </div>
                                 <Typography variant="h5" className="font-semibold tracking-tight">
                                     REST · WS · MCP
@@ -292,26 +293,26 @@ export function StudioHomePage({
 
                             <Card className="p-4 flex flex-col justify-between gap-2.5">
                                 <div className="flex items-center justify-between">
-                                    <Typography variant="micro" color="secondary">POSTGRESQL SCHEMA</Typography>
+                                    <Typography variant="micro" color="secondary">{t("studio_home_postgres_schema")}</Typography>
                                     <Typography variant="mono" color="secondary" className="text-xs">public</Typography>
                                 </div>
                                 <Typography variant="h4" className="font-mono tabular-nums font-semibold">
                                     {tableCount > 0 ? tableCount : "—"}
                                     <span className="text-sm font-sans font-normal text-text-secondary dark:text-text-secondary-dark ml-1.5">
-                                        {tableCount === 1 ? "table" : "tables"}
+                                        {t("studio_home_tables_unit", { count: tableCount })}
                                     </span>
                                 </Typography>
                                 <Typography variant="mono" color="secondary" className="text-xs flex items-center gap-3">
-                                    <span>COLS <strong className="text-text-primary dark:text-text-primary-dark font-medium">{schemaStats ? schemaStats.columns : "—"}</strong></span>
-                                    <span>RELS <strong className="text-text-primary dark:text-text-primary-dark font-medium">{schemaStats ? schemaStats.relations : "—"}</strong></span>
+                                    <span>{t("studio_home_cols")} <strong className="text-text-primary dark:text-text-primary-dark font-medium">{schemaStats ? schemaStats.columns : "—"}</strong></span>
+                                    <span>{t("studio_home_rels")} <strong className="text-text-primary dark:text-text-primary-dark font-medium">{schemaStats ? schemaStats.relations : "—"}</strong></span>
                                 </Typography>
                             </Card>
 
                             <Card className="p-4 flex flex-col justify-between gap-2.5">
                                 <div className="flex items-center justify-between">
-                                    <Typography variant="micro" color="secondary">SECURITY &amp; RLS</Typography>
+                                    <Typography variant="micro" color="secondary">{t("studio_home_security_rls")}</Typography>
                                     <StatusDot tone={schemaStats && schemaStats.rlsProtected < schemaStats.tables ? "busy" : "ok"} size="small">
-                                        {schemaStats ? `${schemaStats.rlsProtected}/${schemaStats.tables} enforced` : "Active"}
+                                        {schemaStats ? t("studio_home_enforced", { protected: schemaStats.rlsProtected, total: schemaStats.tables }) : t("studio_api_keys_status_active")}
                                     </StatusDot>
                                 </div>
                                 <Typography variant="h4" className="font-mono tabular-nums font-semibold">
@@ -319,23 +320,23 @@ export function StudioHomePage({
                                         ? `${Math.round((schemaStats.rlsProtected / schemaStats.tables) * 100)}%`
                                         : "RLS"}
                                     <span className="text-sm font-sans font-normal text-text-secondary dark:text-text-secondary-dark ml-1.5">
-                                        protected
+                                        {t("studio_home_protected")}
                                     </span>
                                 </Typography>
                                 <Typography variant="mono" color="secondary" className="text-xs">
-                                    DEFAULT DENY · JWT + API KEY
+                                    {t("studio_home_default_deny")}
                                 </Typography>
                             </Card>
 
                             <Card className="p-4 flex flex-col justify-between gap-2.5">
                                 <div className="flex items-center justify-between">
-                                    <Typography variant="micro" color="secondary">STUDIO WORKBENCH</Typography>
-                                    <Typography variant="mono" color="secondary" className="text-xs">{filteredSections.length} groups</Typography>
+                                    <Typography variant="micro" color="secondary">{t("studio_home_workbench")}</Typography>
+                                    <Typography variant="mono" color="secondary" className="text-xs">{t("studio_home_groups", { count: filteredSections.length })}</Typography>
                                 </div>
                                 <Typography variant="h4" className="font-mono tabular-nums font-semibold">
                                     {totalToolsCount}
                                     <span className="text-sm font-sans font-normal text-text-secondary dark:text-text-secondary-dark ml-1.5">
-                                        tools
+                                        {t("studio_home_tools_unit")}
                                     </span>
                                 </Typography>
                                 <Typography variant="mono" color="secondary" className="text-xs truncate">

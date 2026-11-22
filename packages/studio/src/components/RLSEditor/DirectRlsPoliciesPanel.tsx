@@ -57,10 +57,10 @@ interface PgTableRls {
 const COMMANDS = ["ALL", "SELECT", "INSERT", "UPDATE", "DELETE"] as const;
 
 const POLICY_TEMPLATES = [
-    { label: "Public read", name: "public_read", command: "SELECT", using: "true", withCheck: "" },
-    { label: "Authenticated CRUD", name: "authenticated_all", command: "ALL", using: "rebase.uid() IS NOT NULL", withCheck: "rebase.uid() IS NOT NULL" },
-    { label: "Owner only (user_id)", name: "owner_all", command: "ALL", using: "user_id = rebase.uid()", withCheck: "user_id = rebase.uid()" },
-    { label: "Admin role", name: "admin_all", command: "ALL", using: "'admin' = ANY(string_to_array(rebase.roles(), ','))", withCheck: "'admin' = ANY(string_to_array(rebase.roles(), ','))" }
+    { labelKey: "studio_rls_direct_tpl_public_read", name: "public_read", command: "SELECT", using: "true", withCheck: "" },
+    { labelKey: "studio_rls_direct_tpl_authenticated", name: "authenticated_all", command: "ALL", using: "rebase.uid() IS NOT NULL", withCheck: "rebase.uid() IS NOT NULL" },
+    { labelKey: "studio_rls_direct_tpl_owner", name: "owner_all", command: "ALL", using: "user_id = rebase.uid()", withCheck: "user_id = rebase.uid()" },
+    { labelKey: "studio_rls_direct_tpl_admin", name: "admin_all", command: "ALL", using: "'admin' = ANY(string_to_array(rebase.roles(), ','))", withCheck: "'admin' = ANY(string_to_array(rebase.roles(), ','))" }
 ] as const;
 
 function parsePolicy(raw: unknown): PgPolicy | null {
@@ -118,11 +118,11 @@ export function DirectRlsPoliciesPanel() {
             setTables(list);
             setSelectedName((prev) => (prev && list.some((t) => t.name === prev) ? prev : (list[0]?.name ?? null)));
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Failed to load PostgreSQL tables.");
+            setError(err instanceof Error ? err.message : t("studio_rls_direct_load_failed"));
         } finally {
             setLoading(false);
         }
-    }, [requestJson]);
+    }, [requestJson, t]);
 
     useEffect(() => {
         void load();
@@ -137,10 +137,10 @@ export function DirectRlsPoliciesPanel() {
                 method: "PATCH",
                 body: { rlsEnabled: enabled }
             });
-            snackbar.open({ type: "success", message: `RLS ${enabled ? "enabled" : "disabled"} on "${selected.name}".` });
+            snackbar.open({ type: "success", message: t(enabled ? "studio_tables_rls_enabled_on" : "studio_tables_rls_disabled_on", { name: selected.name }) });
             await load();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to update RLS." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_rls_direct_update_failed") });
         }
     };
 
@@ -157,12 +157,12 @@ export function DirectRlsPoliciesPanel() {
                     ...(withCheckExpr.trim() ? { withCheck: withCheckExpr.trim() } : {})
                 }
             });
-            snackbar.open({ type: "success", message: `Policy "${policyName.trim()}" created live.` });
+            snackbar.open({ type: "success", message: t("studio_rls_direct_policy_created", { name: policyName.trim() }) });
             setDialogOpen(false);
             setPolicyName("");
             await load();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to create policy." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_rls_direct_policy_create_failed") });
         } finally {
             setSaving(false);
         }
@@ -174,10 +174,10 @@ export function DirectRlsPoliciesPanel() {
             await requestJson(`/admin/db/tables/${encodeURIComponent(selected.name)}/policies/${encodeURIComponent(name)}`, {
                 method: "DELETE"
             });
-            snackbar.open({ type: "success", message: `Policy "${name}" dropped.` });
+            snackbar.open({ type: "success", message: t("studio_rls_direct_policy_dropped", { name }) });
             await load();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to drop policy." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_rls_direct_policy_drop_failed") });
         }
     };
 
@@ -185,9 +185,9 @@ export function DirectRlsPoliciesPanel() {
         <div className="flex h-full w-full overflow-hidden bg-surface-card">
             <aside className={cls("w-64 shrink-0 border-r bg-surface-card flex flex-col", defaultBorderMixin)}>
                 <div className={cls("h-[42px] px-3 border-b bg-surface-sheet flex items-center justify-between shrink-0", defaultBorderMixin)}>
-                    <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">PostgreSQL Tables</Typography>
-                    <Tooltip title="Refresh">
-                        <IconButton size="small" aria-label="Refresh tables" onClick={() => void load()}>
+                    <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_rls_direct_tables_heading")}</Typography>
+                    <Tooltip title={t("refresh")}>
+                        <IconButton size="small" aria-label={t("studio_rls_direct_refresh_aria")} onClick={() => void load()}>
                             <RefreshCwIcon size={iconSize.smallest} />
                         </IconButton>
                     </Tooltip>
@@ -195,21 +195,21 @@ export function DirectRlsPoliciesPanel() {
                 <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
                     {loading ? (
                         <div className="flex justify-center py-8"><CircularProgress size="small" /></div>
-                    ) : tables.map((t) => (
+                    ) : tables.map((table) => (
                         <button
-                            key={t.name}
+                            key={table.name}
                             type="button"
-                            onClick={() => setSelectedName(t.name)}
+                            onClick={() => setSelectedName(table.name)}
                             className={cls(
                                 "w-full text-left px-2.5 h-8 rounded-lg flex items-center justify-between gap-2 text-[13px] transition-colors cursor-pointer",
-                                t.name === selectedName
+                                table.name === selectedName
                                     ? "bg-surface-active text-text-primary dark:text-text-primary-dark font-medium"
                                     : "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-hover hover:text-text-primary dark:hover:text-text-primary-dark"
                             )}
                         >
-                            <span className="font-mono truncate">{t.name}</span>
-                            <Chip size="small" colorScheme={t.rlsEnabled ? "greenLight" : "grayLight"}>
-                                {t.policies.length}
+                            <span className="font-mono truncate">{table.name}</span>
+                            <Chip size="small" colorScheme={table.rlsEnabled ? "greenLight" : "grayLight"}>
+                                {table.policies.length}
                             </Chip>
                         </button>
                     ))}
@@ -223,7 +223,7 @@ export function DirectRlsPoliciesPanel() {
                     <div className="p-5">
                         <Card className="p-8 text-center">
                             <Typography variant="body2" color="secondary">
-                                Select a table to manage its PostgreSQL Row Level Security policies directly.
+                                {t("studio_rls_direct_select_table")}
                             </Typography>
                         </Card>
                     </div>
@@ -239,14 +239,14 @@ export function DirectRlsPoliciesPanel() {
                             </div>
                             <Button size="small" color="primary" variant="filled" onClick={() => setDialogOpen(true)}>
                                 <PlusIcon size={iconSize.smallest} />
-                                New Policy
+                                {t("studio_new_policy")}
                             </Button>
                         </div>
 
                         <div className="flex-1 overflow-auto p-5 flex flex-col gap-4">
                         <Card className="p-4">
                             <BooleanSwitchWithLabel
-                                label="Row Level Security Enabled"
+                                label={t("studio_rls_direct_enabled_label")}
                                 value={selected.rlsEnabled}
                                 onValueChange={(v) => void handleToggleRls(v)}
                             />
@@ -255,11 +255,11 @@ export function DirectRlsPoliciesPanel() {
                         {selected.policies.length === 0 ? (
                             <Card className="p-8 text-center flex flex-col items-center gap-3">
                                 <Typography variant="body2" color="secondary">
-                                    No RLS policies on <span className="font-mono">{selected.name}</span> yet.
+                                    {t("studio_rls_direct_no_policies", { name: selected.name })}
                                 </Typography>
                                 <Button size="small" color="primary" variant="filled" onClick={() => setDialogOpen(true)}>
                                     <PlusIcon size={iconSize.small} />
-                                    Add First Policy
+                                    {t("studio_rls_direct_add_first_policy")}
                                 </Button>
                             </Card>
                         ) : (
@@ -267,10 +267,10 @@ export function DirectRlsPoliciesPanel() {
                                 <Table className="w-full">
                                     <TableHeader>
                                             <TableCell header>{t("studio_policy_name")}</TableCell>
-                                            <TableCell header>Command</TableCell>
+                                            <TableCell header>{t("studio_rls_direct_command")}</TableCell>
                                             <TableCell header>USING</TableCell>
                                             <TableCell header>WITH CHECK</TableCell>
-                                            <TableCell header className="text-right">Actions</TableCell>
+                                            <TableCell header className="text-right">{t("actions")}</TableCell>
                                         </TableHeader>
                                     <TableBody>
                                         {selected.policies.map((p) => (
@@ -282,7 +282,7 @@ export function DirectRlsPoliciesPanel() {
                                                 <TableCell className="text-right">
                                                     <IconButton
                                                         size="small"
-                                                        aria-label={`Drop policy ${p.name}`}
+                                                        aria-label={t("studio_rls_direct_drop_policy_aria", { name: p.name })}
                                                         onClick={() => void handleDropPolicy(p.name)}
                                                     >
                                                         <Trash2Icon size={iconSize.small} className={"text-red-500"} />
@@ -300,7 +300,7 @@ export function DirectRlsPoliciesPanel() {
             </main>
 
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen} maxWidth="md" fullWidth>
-                <DialogTitle>New RLS Policy on {selected?.name}</DialogTitle>
+                <DialogTitle>{t("studio_rls_direct_new_policy_title", { name: selected?.name ?? "" })}</DialogTitle>
                 <DialogContent className="flex flex-col gap-3">
                     <div className="flex items-center gap-1.5 flex-wrap">
                         {POLICY_TEMPLATES.map((tpl) => (
@@ -315,19 +315,19 @@ export function DirectRlsPoliciesPanel() {
                                     setWithCheckExpr(tpl.withCheck);
                                 }}
                             >
-                                {tpl.label}
+                                {t(tpl.labelKey)}
                             </Chip>
                         ))}
                     </div>
                     <TextField label={t("studio_policy_name")} value={policyName} onChange={(e) => setPolicyName(e.target.value)} placeholder="owner_all" />
-                    <Select label="Command" value={command} onValueChange={(v) => setCommand(String(v))}>
+                    <Select label={t("studio_rls_direct_command")} value={command} onValueChange={(v) => setCommand(String(v))}>
                         {COMMANDS.map((cmd) => <SelectItem key={cmd} value={cmd}>{cmd}</SelectItem>)}
                     </Select>
                     <TextField label={t("studio_policy_using_expr")} value={usingExpr} onChange={(e) => setUsingExpr(e.target.value)} placeholder="user_id = rebase.uid()" />
-                    <TextField label="WITH CHECK expression (optional)" value={withCheckExpr} onChange={(e) => setWithCheckExpr(e.target.value)} placeholder="user_id = rebase.uid()" />
+                    <TextField label={t("studio_rls_direct_with_check_label")} value={withCheckExpr} onChange={(e) => setWithCheckExpr(e.target.value)} placeholder="user_id = rebase.uid()" />
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="text" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                    <Button variant="text" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>
                     <Button variant="filled" disabled={saving || !policyName.trim()} onClick={() => void handleCreatePolicy()}>
                         {saving ? t("saving") : t("studio_rls_create_policy")}
                     </Button>
