@@ -379,7 +379,9 @@ function checkInstallAllowlistsAgree() {
         const pkg = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
         const pnpmList = [...(pkg.pnpm?.onlyBuiltDependencies ?? [])].sort();
-        const npmList = Object.keys(pkg.allowScripts ?? {}).sort();
+        // `false` is npm's "deny, and stop warning about it" (esbuild, fsevents:
+        // prebuilt binaries); only `true` lets a script run.
+        const npmList = Object.entries(pkg.allowScripts ?? {}).filter(([, allowed]) => allowed === true).map(([name]) => name).sort();
 
         for (const name of pnpmList) {
             if (npmList.includes(name) || NPM_NEEDS_NO_SCRIPT.has(name)) continue;
@@ -589,6 +591,7 @@ const SCAFFOLD_SCRIPTS = new Map([
     ["generate:sdk", "succeeds on a fresh scaffold — says what to run first when there are no tables"],
     ["skills:install", "succeeds on a fresh scaffold"],
     ["example", "needs a running server"],
+    ["seed", "needs a running server; inserts the preset's example rows once, and the blank preset's says there is nothing to seed"],
     ["deploy", "needs a linked cloud project"]
 ]);
 
