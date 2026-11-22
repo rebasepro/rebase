@@ -1,15 +1,15 @@
 ---
-sourceHash: 1e1ed4905f58d5fd
-title: Autorisation du stockage
-sidebar_label: Autorisation du stockage
-description: Déterminez qui peut lire, écrire, supprimer ou lister chaque objet de stockage avec storagePolicies et le hook storageAuthorize, ainsi que les portées de stockage requises pour une clé d'API.
+sourceHash: 31645b4c27077651
+title: Autorisation de stockage
+sidebar_label: Autorisation de stockage
+description: Déterminez qui peut lire, écrire, supprimer ou lister chaque objet de stockage avec storagePolicies et le hook storageAuthorize, ainsi que les portées de stockage requises pour une clé API.
 ---
 
-Les tables sont protégées par la sécurité au niveau des lignes (RLS) ; un bucket ne possède pas d'équivalent par objet, l'autorisation du stockage est donc gérée ici. La [Configuration du stockage](/docs/backend/storage/) traite des backends eux-mêmes.
+Les tables sont protégées par la sécurité au niveau des lignes (row-level security ou RLS) ; un bucket n'ayant pas d'équivalent par objet, l'autorisation du stockage est donc gérée ici. La [configuration du stockage](/docs/backend/storage/) couvre les backends eux-mêmes.
 
 ## Politiques
 
-La forme déclarative. Une liste de motifs de chemin, lus sans rien exécuter :
+La forme déclarative. Une liste de motifs de chemins, lus sans rien exécuter :
 
 ```ts
 storagePolicies: [
@@ -18,7 +18,7 @@ storagePolicies: [
 ]
 ```
 
-**Une clé correspondant à aucune politique est refusée**, à moins qu'un hook `storageAuthorize` ne l'autorise : le hook n'est sollicité que si aucune politique ne correspond à la clé pour cette opération, et aucun ne peut restreindre l'autre. Une politique qui a correspondu sans accorder l'accès est définitive. Chaque élargissement est une ligne explicite, et une erreur entraîne un refus plutôt qu'une autorisation.
+**Une clé ne correspondant à aucune politique est refusée**, sauf si un hook `storageAuthorize` l'autorise : le hook n'est sollicité que lorsqu'aucune politique n'a correspondu à la clé pour cette opération, et aucun des deux ne peut restreindre l'autre. Une politique qui a correspondu sans accorder l'accès est définitive. Chaque élargissement est une ligne explicite, et une erreur entraîne un refus plutôt qu'un accord.
 
 Les motifs correspondent **par segment, jamais par sous-chaîne** — `public/**` ne correspond pas à `publicity/secret.png` :
 
@@ -30,27 +30,52 @@ Les motifs correspondent **par segment, jamais par sous-chaîne** — `public/**
 
 `**` n'est valide qu'en tant que dernier segment. `:name` capture un segment et ne traverse jamais un `/` ; les captures sont transmises sous forme de `params` au prédicat.
 
-`allow` vaut `"public"` (quiconque est autorisé par la route), `"authenticated"` (tout appelant disposant d'un uid), ou un prédicat recevant les params capturés, l'utilisateur, l'opération et le bucket.
+`allow` peut valoir `"public"` (quiconque est autorisé par la route), `"authenticated"` (tout appelant disposant d'un uid), ou un prédicat recevant les paramètres capturés, l'utilisateur, l'opération et le bucket.
 
-Une politique s'exécute après l'authentification de la route, donc `"public"` seul n'ouvre pas un chemin aux appelants anonymes. Avec `requireAuth` activé, ils ne peuvent effectuer que des lectures de clés `public/`, ou toutes les lectures avec `storagePublicRead` ; `/upload`, `/list`, les suppressions et les téléversements avec reprise nécessitent toujours un appelant. Ailleurs, la réponse est `401`.
+Une politique s'exécute après l'authentification de la route, de sorte que `"public"` seul n'ouvre pas un chemin aux appelants anonymes. Avec `requireAuth` activé, ils ne peuvent effectuer que la lecture des clés sous `public/`, ou toutes les lectures avec `storagePublicRead` ; `/upload`, `/list`, les suppressions et les téléversements avec reprise (resumable uploads) nécessitent toujours un appelant. Ailleurs, la réponse est `401`.
 
-`operations` prend par défaut les quatre valeurs — `read`, `write`, `delete`, `list`.
+`operations` prend par défaut les quatre opérations — `read`, `write`, `delete`, `list`.
 
 Les politiques satisfont à elles seules la vérification de démarrage en production, et un motif mal formé fait échouer le démarrage plutôt que le premier téléversement.
 
+### Sous forme de données : `STORAGE_POLICIES`
+
+<span class="since-badge" data-since="0.35">Depuis 0.35</span>
+
+Le runtime managé ne peut pas lire de prédicat depuis votre code, et un projet utilisant le backend standard de Rebase Cloud n'a aucun code à lire. Les mêmes règles peuvent donc être définies sous forme de JSON dans la variable d'environnement `STORAGE_POLICIES`, les deux prédicats que presque toutes les applications écrivent étant nommés plutôt que codés :
+
+```bash
+STORAGE_POLICIES='[
+  { "path": "public/**", "operations": ["read"], "allow": "public" },
+  { "path": "users/:uid/**", "allow": "owner" },
+  { "path": "**", "allow": { "roles": ["admin"] } }
+]'
+```
+
+| `allow` | Accorde |
+|---|---|
+| `"public"` | quiconque est autorisé par la route |
+| `"authenticated"` | tout appelant authentifié |
+| `"owner"` | l'appelant authentifié dont l'uid correspond au segment `:uid` de la clé — le `path` doit en capturer un |
+| `{ "roles": [...] }` | un appelant authentifié possédant l'un de ces rôles |
+
+Elles se compilent en `storagePolicies`, de sorte que la correspondance, l'ordre et le repli sur `storageAuthorize` sont identiques à la forme en code : une clé qu'aucune règle ne couvre est soumise au hook si le projet en possède un, et refusée sinon. Une valeur qui n'est pas une liste valide bloque le démarrage en indiquant chaque problème ; Rebase Cloud refuse d'en enregistrer une invalide, et sa console permet de modifier la liste sous **File storage → Access rules**.
+
 ## Le hook
 
-`requireAuth` et `publicRead` sont des commutateurs *globaux* : ils déterminent si un appelant doit être connecté, et non ce à quoi il a le droit d'accéder. Sans hook d'autorisation, **tout utilisateur authentifié peut lire n'importe quelle clé dont il connaît le nom** — la seule chose séparant les fichiers de deux locataires (tenants) est l'impossibilité de deviner la clé, ce qui ne constitue pas un modèle de contrôle d'accès. Pire encore, ils peuvent d'abord exécuter `GET /storage/list?prefix=`, de sorte qu'il n'est même pas nécessaire de deviner les clés.
+<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
-:::caution[Le stockage ne démarrera pas en production sans l'un de ces éléments]
-Les tables sont protégées par la sécurité au niveau des lignes (RLS) ; ce n'est pas le cas du stockage. Il n'existe pas d'équivalent par objet dans le bucket, ce hook *est* donc le modèle — et `initializeRebaseBackend` **lève une exception au démarrage** sous `NODE_ENV=production` lorsque le stockage est configuré et qu'aucun de ces paramètres n'est défini :
+`requireAuth` et `publicRead` sont des commutateurs *globaux* : ils déterminent si un appelant doit être connecté, et non ce à quoi il a le droit d'accéder. Sans hook d'autorisation, **tout utilisateur authentifié peut lire n'importe quelle clé dont il connaît le nom** — la seule chose qui sépare les fichiers de deux locataires (tenants) est l'impossibilité de deviner la clé, ce qui ne constitue pas un modèle de contrôle d'accès. Pire encore, ils peuvent d'abord exécuter `GET /storage/list?prefix=`, de sorte que les clés n'ont même pas besoin d'être devinées.
+
+:::caution[Le stockage ne démarrera pas en production sans hook ni politique]
+Les tables sont protégées par la sécurité au niveau des lignes (RLS) ; ce n'est pas le cas du stockage. Il n'y a pas d'équivalent par objet dans le bucket, ce hook *est* donc le modèle — et `initializeRebaseBackend` **lève une exception au démarrage** sous `NODE_ENV=production` lorsque le stockage est configuré et qu'aucun de ces éléments n'est défini :
 
 - `storageAuthorize` — un hook, par objet. Recommandé.
 - `storagePolicies` — les règles déclarées ci-dessus.
-- `storagePublicRead: true` — le bucket est véritablement un CDN public en lecture seule.
-- `storageInsecureAllowAnyAuthenticated: true` — une application mono-tenant où chaque utilisateur connecté a accès à chaque fichier. Nommé ainsi pour inciter à y réfléchir à deux fois.
+- `storagePublicRead: true` — le bucket est réellement un CDN public en lecture seule.
+- `storageInsecureAllowAnyAuthenticated: true` — une application mono-tenant où chaque utilisateur connecté est digne de confiance pour chaque fichier. Nommé ainsi pour être lu à deux fois.
 
-En développement, un avertissement est journalisé à la place ; un projet peut donc comporter cette erreur et fonctionner parfaitement en local jusqu'à son déploiement. Un projet généré inclut déjà un hook dans `backend/storage.ts` — lisez-le avant de le remplacer, et notez qu'il modélise la *bibliothèque de contenu partagée* d'un CMS, ce qui n'a pas la même structure que des fichiers spécifiques à chaque utilisateur.
+En développement, un avertissement est consigné à la place, de sorte qu'un projet peut comporter cette erreur et fonctionner correctement en local jusqu'à son déploiement. Un projet généré (scaffolded) inclut déjà un hook dans `backend/storage.ts` — lisez-le avant de le remplacer, et notez qu'il modélise la *bibliothèque de contenu partagé* d'un CMS, ce qui n'a pas la même structure que des fichiers par utilisateur.
 :::
 
 `storageAuthorize` est l'analogue pour le stockage du `rls` d'une table, et s'exécute après l'authentification sur chaque route de stockage :
@@ -69,29 +94,29 @@ await initializeRebaseBackend({
 
 | Champ | Description |
 |-------|-------------|
-| `key` | Clé de l'objet, préfixe de bucket retiré et traversée nettoyée |
-| `bucket` | Bucket résolu (`"default"` si non spécifié) |
+| `key` | Clé de l'objet, préfixe de bucket retiré et traversée de chemin nettoyée |
+| `bucket` | Bucket résolu (`"default"` lorsqu'il n'est pas spécifié) |
 | `operation` | `"read"`, `"write"`, `"delete"` ou `"list"` |
 | `user` | `{ uid, email?, roles? }`, ou `null` lorsque la route autorise l'accès anonyme |
-| `storageId` | Le backend nommé, lorsque la requête en ciblait un — sa clé canonique (`storageId=%20media` devient `"media"`). Absent pour la source par défaut, quelle que soit la façon dont la requête l'a nommée (aucun paramètre, vide ou `(default)`) |
-| `data` | Accès en lecture approuvé, **contournant le RLS** — `data.table(slug).find(query)` / `.findById(id)`. La propriété réside dans une ligne et non dans un préfixe de clé, le hook a donc besoin d'un lecteur pour répondre à « qui possède cet objet ? ». Il contourne délibérément la sécurité au niveau des lignes : ce hook *est* la décision d'autorisation, et la prendre via un lecteur déjà restreint par les permissions de l'appelant lui-même serait une démarche circulaire. Conçu pour être en lecture seule. |
+| `storageId` | Le backend nommé, lorsque la requête en ciblait un — sa clé canonique (`storageId=%20media` devient `"media"`). Absent pour la source par défaut, quelle que soit la manière dont la requête l'a désignée (aucun paramètre, vide ou `(default)`) |
+| `data` | Accès en lecture de confiance, **contournant la RLS** — `data.table(slug).find(query)` / `.findById(id)`. La propriété résidant dans une ligne et non dans un préfixe de clé, le hook a besoin d'un lecteur pour répondre à la question « à qui appartient cet objet ? ». Il contourne délibérément la sécurité au niveau des lignes : ce hook *est* la décision d'autorisation, et la prendre par le biais d'un lecteur déjà restreint par les permissions de l'appelant lui-même serait une dépendance circulaire. En lecture seule par conception. |
 
-Renvoyez `false` pour refuser l'accès avec un **403**. Lever une exception refuse également — une recherche de propriété qui échoue n'ouvre pas l'accès par défaut.
+Renvoyez `false` pour refuser avec un code **403**. Lever une exception refuse également — une recherche de propriété qui échoue ne laisse pas l'accès ouvert.
 
 Bon à savoir :
 
-- **La route des métadonnées est l'endroit où l'accès en lecture est réellement décidé.** Elle génère le jeton de téléchargement à courte durée de vie et restreint au chemin auquel la route du fichier fait confiance, de sorte que le hook en contrôle l'accès à ce niveau. Deux lectures contournent le hook, par conception. L'une comportant un tel jeton : le hook l'a approuvé lors de l'émission du jeton, pour ce chemin et cette source uniquement ; ainsi, un hook qui refuserait désormais (une adhésion révoquée depuis) ne l'arrêtera pas avant l'expiration du jeton — `storageDownloadTokenTtl`, 300 secondes par défaut. Et la lecture d'une clé sous `public/` par un appelant sans identifiants : le préfixe déclare que tout le monde peut la lire, visiteurs anonymes et CDN inclus. La lecture par un appelant connecté fait toujours l'objet d'une vérification, mais pas celle d'un appelant anonyme ; un hook ne peut donc pas rendre privée une clé `public/` ; stockez plutôt le fichier en dehors de `public/`. Seules ces deux lectures le contournent : un utilisateur que votre adaptateur d'authentification appellerait par hasard `public` est vérifié comme n'importe qui d'autre.
-- **Un bucket, un nom.** Sur S3 et GCS, le `bucket` du hook est toujours `"default"`, même lorsqu'une requête nomme le bucket du fournisseur, qui accède aux mêmes objets.
-- **Un chemin est public lorsque la clé qu'il désigne l'est.** Le préfixe `public/` est testé sur la clé canonique servie par la route — après avoir retiré un segment initial de bucket `default/` et réduit `//`, `./` et un `/` initial — jamais sur l'URL telle qu'elle est écrite. `/api/storage/file/notes://public/x.txt` désigne la clé privée `notes:/public/x.txt`, et la clé `default/public/x.txt` (accessible via `/api/storage/file/default/default/public/x.txt`) se trouve dans un dossier nommé `default` ; aucune des deux n'est publique. Dans un hook, testez la `key` qui vous est fournie avec `isPublicStorageKey` de `@rebasepro/types` — `isPublicStoragePath` analyse un chemin ou une URL côté client, et traite ces deux cas comme publics.
-- **`list` est contrôlé sur le préfixe.** Le listage est le moyen de découvrir des clés dont personne ne vous a parlé.
-- **Les téléversements avec reprise (TUS) sont contrôlés lors de la création**, de sorte qu'un téléversement refusé ne laisse aucun fichier temporaire derrière lui.
-- L'omission du hook (et de `storagePolicies`) supprime toute vérification par objet, la production refusera donc de démarrer à moins que `storagePublicRead` ou `storageInsecureAllowAnyAuthenticated` ne soit défini.
+- **La route de métadonnées est l'endroit où l'accès en lecture est réellement décidé.** Elle génère le jeton de téléchargement à courte durée de vie et limité au chemin, auquel la route de fichier fait confiance ; le hook contrôle donc l'accès à ce niveau. Deux lectures ignorent le hook, par conception. Une lecture porteuse d'un tel jeton : le hook l'a approuvée lors de la création du jeton, pour ce chemin et cette source uniquement, de sorte qu'un hook qui refuserait désormais l'accès (une adhésion révoquée depuis) ne l'interrompt pas avant l'expiration du jeton — `storageDownloadTokenTtl`, 300 secondes par défaut. Et la lecture d'une clé sous `public/` par un appelant sans identifiants : le préfixe déclare que n'importe qui peut la lire, y compris les visiteurs anonymes et les CDN. La lecture par un appelant connecté est toujours soumise au hook, mais pas celle d'un appelant anonyme, de sorte qu'un hook ne peut pas rendre privée une clé sous `public/` ; stockez plutôt le fichier en dehors de `public/`. Seules ces deux lectures l'ignorent : un utilisateur que votre adaptateur d'authentification appellerait par hasard `public` est évalué comme n'importe qui d'autre.
+- **Un bucket, un nom.** Sur S3 et GCS, le `bucket` du hook est toujours `"default"`, y compris lorsqu'une requête nomme le bucket du fournisseur, qui cible les mêmes objets.
+- **Un chemin est public lorsque la clé qu'il désigne l'est.** Le préfixe `public/` est testé sur la clé canonique servie par la route — après suppression du segment initial de bucket `default/` et réduction de `//`, `./` et du `/` initial — jamais sur l'URL telle qu'écrite. `/api/storage/file/notes://public/x.txt` désigne la clé privée `notes:/public/x.txt`, et la clé `default/public/x.txt` (accessible via `/api/storage/file/default/default/public/x.txt`) se trouve dans un dossier nommé `default` ; aucune des deux n'est publique. Dans un hook, testez la `key` qui vous est fournie avec `isPublicStorageKey` de `@rebasepro/types` — `isPublicStoragePath` analyse un chemin ou une URL côté client, et considérerait les deux comme publics.
+- **`list` est restreint selon le préfixe.** Le listage permet de découvrir des clés dont personne ne vous a communiqué l'existence.
+- **Les téléversements avec reprise (TUS) sont contrôlés au moment de la création**, de sorte qu'un téléversement refusé ne laisse aucun fichier temporaire derrière lui.
+- Omettre le hook (ainsi que `storagePolicies` et `STORAGE_POLICIES`) supprime toute vérification par objet ; la production refusera donc de démarrer à moins que `storagePublicRead` ou `storageInsecureAllowAnyAuthenticated` ne soit défini.
 
-## Clés d'API et jetons
+## Clés API et jetons
 
-Une personne connectée détient toutes les portées de stockage, de sorte que le hook et les politiques ci-dessus tranchent pour elle. Une [clé d'API](/docs/backend/api-keys/) nécessite également la portée de stockage correspondant à l'opération, sur la source désignée par la requête : `storage:read` pour les téléchargements, les métadonnées et les listages, `storage:write` pour les téléversements, les dossiers et chaque étape d'un téléversement avec reprise, `storage:delete` pour les suppressions. La cible est l'identifiant de la source, et celui de la source par défaut est `(default)` : `storage:read:(default)`, `storage:write:avatars`. Sans cela, la réponse est `403 SCOPE_MISSING`. Avec celle-ci, le hook s'exécute quand même, sous l'identité représentée par la clé.
+Une personne connectée dispose de toutes les portées (scopes) de stockage ; le hook et les politiques ci-dessus décident donc pour elle. Une [clé API](/docs/backend/api-keys/) a également besoin de la portée de stockage pour l'opération, sur la source ciblée par la requête : `storage:read` pour les téléchargements, métadonnées et listages, `storage:write` pour les téléversements, dossiers et chaque étape d'un téléversement avec reprise, `storage:delete` pour les suppressions. La cible est l'identifiant de la source, et celui de la source par défaut est `(default)` : `storage:read:(default)`, `storage:write:avatars`. Sans cela, la réponse est `403 SCOPE_MISSING`. Avec celle-ci, le hook s'exécute tout de même, en agissant sous l'identité représentée par la clé.
 
-## Étapes suivantes
+## Prochaines étapes
 
 - **[Configuration du stockage](/docs/backend/storage/)** — backends, points de terminaison et limites
-- **[Clés d'API](/docs/backend/api-keys/)** — les portées associées à une clé
+- **[Clés API](/docs/backend/api-keys/)** — les portées associées à une clé

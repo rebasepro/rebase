@@ -1,20 +1,20 @@
 ---
-sourceHash: e70397bdea9251db
+sourceHash: e934bb43a5bf4916
 title: La tabla de usuarios
 sidebar_label: Tabla de usuarios
-description: "defineAuthTable declara la tabla donde auth almacena los usuarios: las columnas que necesita auth, una directiva de autolectura, columnas de privilegios solo para administradores y el modelo de acceso: roles, ámbitos de la aplicación, claves personales y los hooks del ciclo de vida del usuario."
+description: "defineAuthTable declara la tabla en la que auth almacena los usuarios: las columnas que auth necesita, una política de autolectura, columnas de privilegios solo para administradores y el modelo de acceso: roles, scopes de la aplicación, claves personales y los hooks del ciclo de vida del usuario."
 ---
 
 `defineAuthTable` declara la tabla que lee y escribe la autenticación. Es un
-`defineTable` con tres elementos añadidos:
+`defineTable` con tres cosas añadidas:
 
-- **Las columnas que necesita auth** se añaden cuando la tabla no las declara:
+- **Las columnas que auth necesita** se añaden cuando la tabla no las declara:
   el correo electrónico, el hash de la contraseña, la columna `roles`, el estado
   de verificación y los demás campos que utiliza el inicio de sesión.
-- **Las directivas en las que se basa auth** se añaden sin importar lo que indique
-  `rls`: un usuario autenticado lee su propia fila, y solo un administrador puede
-  escribir en las columnas de privilegios, de modo que nadie puede autoasignarse
-  un rol.
+- **Las políticas de las que depende auth** se añaden independientemente de lo
+  que indique `rls`: un usuario que ha iniciado sesión lee su propia fila, y solo
+  un administrador escribe en las columnas de privilegios, de modo que nadie pueda
+  asignarse un rol a sí mismo.
 - **Un bloque `auth`** declara el modelo de acceso y los hooks que se ejecutan
   cuando un administrador crea un usuario o restablece una contraseña.
 
@@ -43,13 +43,13 @@ export const users = defineAuthTable("users", {
 });
 ```
 
-Un proyecto tiene como máximo una tabla de usuarios. Se rechazará un segundo
-`defineAuthTable` al compilar el esquema; utilice `defineTable` en su lugar.
+Un proyecto tiene como máximo una tabla de usuarios. Se rechaza un segundo
+`defineAuthTable` al compilar el esquema; cámbielo por un `defineTable`.
 
-`rls` es obligatorio aquí al igual que en cualquier tabla. La autolectura
-inyectada y el control de escritura de administrador se añaden junto a sus
-reglas, por lo que `"admin-only"` es una postura válida: los administradores
-gestionan los usuarios y cada usuario sigue leyendo su propia fila.
+`rls` es obligatorio aquí al igual que en cada tabla. La autolectura inyectada y
+el control de escritura de administrador se añaden junto a sus reglas, por lo
+que `"admin-only"` es una postura válida: los administradores gestionan los
+usuarios y cada usuario sigue leyendo su propia fila.
 
 ## Las columnas
 
@@ -59,12 +59,12 @@ la clave o el nombre SQL de una columna de auth (`email`, `displayName`, `roles`
 `passwordHash`, `emailVerified`, `createdAt`, …) se considera esa columna.
 
 Los secretos del servidor nunca salen del servidor: el hash de la contraseña y el
-token de verificación son privados sin importar lo que diga la declaración, por
-lo que una lectura nunca los entrega y una escritura del cliente no puede
+token de verificación son privados independientemente de lo que diga la declaración,
+por lo que una lectura nunca los entrega y una escritura de cliente no puede
 establecerlos.
 
-Un usuario tiene un rol cuando su columna `roles` lo incluye. Declarar la columna
-como `col.text({ enum: [...] }).array()` la limita a los roles que especifique;
+Un usuario posee un rol cuando su columna `roles` lo incluye. Declarar la columna
+como `col.text({ enum: [...] }).array()` la restringe a los roles especificados;
 omitirla la mantiene abierta, ya que un rol existe tan pronto como se le asigna a
 un usuario.
 
@@ -72,20 +72,37 @@ Las reglas en otras tablas pueden hacer referencia a las columnas de la tabla de
 usuarios como de costumbre. Una regla en la propia tabla de usuarios también puede
 hacer referencia a cada columna de auth, esté declarada o no.
 
+## Sin una tabla de usuarios
+
+<span class="since-badge" data-since="0.35">Desde 0.35</span>
+
+Declarar una es opcional. Auth funciona de cualquier manera: sin `defineAuthTable`,
+mantiene sus usuarios en `rebase.users`, y las cuentas y roles se gestionan en
+**Users & Roles** de Studio. El panel de administración muestra Users como una
+tabla solo cuando el proyecto declara una, por lo que omitir el archivo lo mantiene
+fuera del panel de administración.
+
+Para declararla, comience desde el archivo del scaffold `backend/schema/users.ts`,
+o ejecute `rebase schema introspect --users` contra una base de datos que ya tenga
+`rebase.users`. Ambos coinciden con la tabla que crea auth (una clave `text` y cada
+columna de auth), por lo que `db push` no cambia nada en ella, y una migración
+desde `db generate` la crea con `IF NOT EXISTS`. Luego, agregue sus propias
+columnas.
+
 ## El bloque `auth`
 
 | Clave | Qué hace |
 |---|---|
-| `roles` | Los roles que un usuario puede tener, cada uno con un `name`, una `description` opcional y los `scopes` del plano de administración y de la aplicación que concede. `admin` está integrado y no se puede declarar. |
-| `scopes` | Los propios ámbitos (scopes) de la aplicación, por nombre `resource:action`, cada uno con una `label`, una `description` opcional y un `target` opcional. |
+| `roles` | Los roles que puede tener un usuario, cada uno con un `name`, una `description` opcional y los `scopes` del plano de administración y de la aplicación que otorga. `admin` está integrado y no se puede declarar. |
+| `scopes` | Los propios scopes de la aplicación, por nombre `resource:action`, cada uno con una `label`, una `description` opcional y un `target` opcional. |
 | `personalKeys` | `true` permite que cada usuario cree [claves API personales](/docs/backend/api-keys/#personal-keys). |
-| `onCreateUser` | Se ejecuta cuando un administrador crea un usuario a través de la API: devuelva los valores que se deben almacenar y, opcionalmente, una contraseña temporal para mostrarle al administrador. |
+| `onCreateUser` | Se ejecuta cuando un administrador crea un usuario a través de la API: devuelva los valores a almacenar y, opcionalmente, una contraseña temporal para mostrar al administrador. |
 | `onResetPassword` | Se ejecuta cuando un administrador restablece la contraseña de un usuario: devuelva una contraseña temporal o envíe su propio enlace de restablecimiento. |
 
-`roles`, `scopes` y `personalKeys` se entregan con el descriptor de la tabla.
-Los dos hooks permanecen en el servidor; el descriptor solo indica cuáles de
-ellos existen. [Roles y ámbitos](/docs/backend/roles-and-scopes/) explica qué
-concede cada ámbito y cómo las claves y tokens lo restringen.
+`roles`, `scopes` y `personalKeys` se sirven con el descriptor de la tabla.
+Los dos hooks permanecen en el servidor; el descriptor solo indica cuáles de ellos
+existen. [Roles y scopes](/docs/backend/roles-and-scopes/) cubre lo que otorga cada
+scope y cómo las claves y los tokens lo restringen.
 
 ### `onCreateUser` y `onResetPassword`
 
@@ -118,18 +135,18 @@ export const members = defineAuthTable("members", {
 });
 ```
 
-Una `temporaryPassword` devuelta por `onResetPassword` se convierte en la
-contraseña de la cuenta: Rebase calcula su hash, la guarda, cierra todas las
-sesiones activas del usuario y se la muestra al administrador para que se la
-transmita. No devuelva ninguna si el hook envía su propio enlace de
-restablecimiento; en ese caso, la contraseña permanece como está hasta que el
-usuario establezca una nueva, y sus sesiones se cerrarán de todos modos.
+Una `temporaryPassword` devuelta desde `onResetPassword` se convierte en la
+contraseña de la cuenta: Rebase genera su hash, la guarda, cierra todas las
+sesiones del usuario y se la muestra al administrador para que la transmita. No
+devuelva ninguna cuando el hook envíe su propio enlace de restablecimiento; la
+contraseña permanecerá como está hasta que el usuario establezca una nueva, y sus
+sesiones se cerrarán de todos modos.
 
 Ambos hooks reciben un contexto con:
 
 - `hashPassword(password)`: genera el hash con el algoritmo configurado;
 - `sendEmail(options)`: envía un correo electrónico, presente solo cuando el
-  correo electrónico está configurado. Se resuelve con lo reportado por el
+  correo electrónico está configurado. Se resuelve con lo que reportó el
   proveedor (`messageId`, `accepted`, `rejected`);
 - `emailConfigured`, `appName` y `resetPasswordUrl`.
 
@@ -139,12 +156,12 @@ El registro, el inicio de sesión con OAuth y la gestión de usuarios por parte 
 un administrador escriben directamente en la tabla de usuarios. Los
 [hooks](/docs/collections/callbacks/) de la tabla no se ejecutan para esas
 escrituras, por lo que un correo electrónico de bienvenida en `afterSave` nunca se
-disparará al registrarse. Colóquelo en los hooks del ciclo de vida de auth
+disparará durante el registro. Colóquelo en los hooks del ciclo de vida de auth
 (`beforeUserCreate`, `afterUserCreate`, `afterUserDelete`, …) configurados en el
 backend. Consulte [Autenticación](/docs/backend/authentication/).
 
 ## Próximos pasos
 
 - [Autenticación](/docs/backend/authentication/): métodos de inicio de sesión, tokens y los hooks de auth
-- [Roles y ámbitos](/docs/backend/roles-and-scopes/): declaración de roles y ámbitos de la aplicación
-- [Seguridad a nivel de fila](/docs/collections/security-rules/): las directivas adicionales a las inyectadas
+- [Roles y scopes](/docs/backend/roles-and-scopes/): declaración de roles y scopes de la aplicación
+- [Seguridad a nivel de fila](/docs/collections/security-rules/): las políticas junto a las inyectadas

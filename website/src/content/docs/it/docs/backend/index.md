@@ -1,36 +1,26 @@
 ---
-sourceHash: 3d3fc39a95926201
-title: Panoramica del Backend
+sourceHash: c9afeee7ed06431e
+title: Panoramica del backend
 sidebar_label: Backend
-description: Il backend di Rebase fornisce un server completo con API REST, autenticazione, storage, real-time via WebSocket e cronologia delle entità — il tutto inizializzato con una singola chiamata di funzione.
+description: Il backend di Rebase fornisce un server completo con API REST, autenticazione, storage, WebSocket in tempo reale e cronologia delle entità — tutto inizializzato con una singola chiamata di funzione.
 ---
 
 ## Panoramica
 
 Il backend di Rebase è un **server Node.js** basato su [Hono](https://hono.dev/) che fornisce:
 
-- **API REST** — Endpoint CRUD generati automaticamente per ciascuna tabella
-- **Autenticazione** — Token JWT, accesso tramite OAuth e OIDC, magic link, codici monouso, MFA, chiavi API, gestione di utenti/ruoli
-- **Storage** — Caricamento/download di file con filesystem locale o S3
-- **WebSocket** — Sincronizzazione dei dati in tempo reale tramite LISTEN/NOTIFY di PostgreSQL
-- **Cronologia delle Entità** — Traccia di controllo (audit trail) per ogni modifica ai dati
-- **Branching del Database** — Copie del database istantanee e isolate per sviluppo/staging/testing
-- **Cron Job** — Attività in background pianificate con dashboard di monitoraggio
+- **REST API** — Endpoint CRUD generati automaticamente per ciascuna tabella
+- **Authentication** — Token JWT, accesso OAuth e OIDC, magic link, codici monouso (OTP), MFA, chiavi API, gestione utenti/ruoli
+- **Storage** — Upload/download di file con filesystem locale o S3
+- **WebSocket** — Sincronizzazione dei dati in tempo reale tramite PostgreSQL LISTEN/NOTIFY
+- **Entity History** — Audit trail per ogni modifica ai dati
+- **Database Branching** — Copie del database istantanee e isolate per dev/staging/testing
+- **Cron Jobs** — Attività in background pianificate con dashboard di monitoraggio
 
 Tutto viene inizializzato con una singola funzione:
 
-:::note[Dove va posizionato]
-La chiamata sottostante è quella presente in un backend sottoposto a **eject**, in `backend/src/index.ts`. Nel
-**runtime gestito** tale file non esiste: il runtime esegue la chiamata, e
-lo si configura tramite variabili d'ambiente, le tabelle esportate da
-`backend/schema/index.ts`, le risorse dichiarate in `backend/resources.ts` (`database()`,
-`bucket()`), e due export che esso legge: `storageAuthorize` da
-`backend/storage.ts` e `hooks` da `backend/hooks.ts`. Ogni pagina in questa
-sezione indica quale dei due approcci si applica all'opzione documentata, menzionando
-quelle che non hanno una forma gestita. Esportando qualsiasi altra cosa da quei due moduli,
-il runtime mostrerà un avviso all'avvio anziché ignorarla silenziosamente; esportando
-un elemento sostituito da una dichiarazione di risorsa, l'avvio verrà bloccato indicandone il nome,
-insieme alla riga da inserire in `backend/resources.ts`.
+:::note[Dove va inserito questo]
+La chiamata sottostante è ciò che contiene un backend **ejected**, in `backend/src/index.ts`. Nel **runtime gestito** non esiste alcun file simile: è il runtime a effettuare la chiamata, e lo si configura tramite variabili d'ambiente, le tabelle esportate da `backend/schema/index.ts`, le risorse dichiarate in `backend/resources.ts` (`database()`, `bucket()`), e due esportazioni che esso legge: `storageAuthorize` da `backend/storage.ts` e `hooks` da `backend/hooks.ts`. Ciascuna pagina di questa sezione specifica quale delle due modalità si applica all'opzione documentata e indica quelle che non hanno una forma gestita. Se si esporta qualsiasi altra cosa da questi due moduli, il runtime mostrerà un avviso all'avvio anziché ignorarla silenziosamente; se si esporta un elemento sostituito da una dichiarazione di risorsa, l'avvio lo rifiuterà indicandone il nome, insieme alla riga da inserire in `backend/resources.ts`.
 :::
 
 ```typescript
@@ -55,283 +45,241 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
-Quella singola chiamata è
-una scorciatoia rispetto a passaggi pubblici: `installUnhandledRejectionHandler` impedisce a un
-rejection imprevisto di terminare il processo, `createRebaseBackend` crea il backend,
-`setDefaultBackend` lo imposta come istanza predefinita per l'API a livello di modulo, e
-`mount`, `attachRealtime` e `start` si occupano di servirlo. Per montare solo alcuni gruppi
-di route, posizionarli su percorsi differenti, delegare i timer a un altro processo o eseguire
-due backend in un unico processo, è possibile richiamare i passaggi manualmente. Consulta
-[Integrazione Server Personalizzata](/docs/backend/custom-server/).
+Quella singola chiamata è una scorciatoia rispetto a passaggi pubblici distinti: `installUnhandledRejectionHandler` evita che una rejection non gestita interrompa il processo, `createRebaseBackend` crea il backend, `setDefaultBackend` lo imposta come istanza a cui risponde l'API a livello di modulo, mentre `mount`, `attachRealtime` e `start` lo servono. Per montare solo alcuni gruppi di route, posizionarli su percorsi diversi, demandare i timer a un altro processo o eseguire due backend in un unico processo, è possibile richiamare i passaggi manualmente. Consulta [Custom Server Integration](/docs/backend/custom-server/).
 
 ## Dove risiede ciascuna opzione
 
-Quella chiamata rappresenta la configurazione da **eject** — quella scritta manualmente dopo `rebase
-eject`, o in un server personalizzato. Un progetto generato tramite scaffolding non la possiede: il
-runtime rilasciato avvia il progetto e ciascuna opzione viene definita tramite una variabile
-d'ambiente in `.env`, un export da `backend/storage.ts` o `backend/hooks.ts`,
-oppure una directory dichiarata dal bundle in `rebase.json`.
+Quella chiamata rappresenta la forma **ejected** — quella che scrivi manualmente dopo `rebase eject`, o all'interno di un server personalizzato. Un progetto generato tramite scaffolding non la possiede: è il runtime pubblicato ad avviare il progetto, e ciascuna opzione viene fornita come variabile d'ambiente in `.env`, come export da `backend/storage.ts` o `backend/hooks.ts`, o come directory dichiarata dal bundle in `rebase.json`.
 
-Entrambi i percorsi fanno capo allo stesso `RebaseBackendConfig`. Ecco la mappatura completa.
+Entrambi i percorsi confluiscono nella stessa `RebaseBackendConfig`. Ecco la mappa completa.
 
 | Opzione | Runtime gestito |
 |---|---|
-| `basePath` | `REBASE_BASE_PATH` (predefinito `/api`) |
-| `tables`, `schemaDir`, `defaultRls` | la directory `backend/schema/` (la chiave `tables` di `rebase.json`): le tabelle e il `defaultRls` esportati dal suo `index.ts` |
-| `rpc` | <span class="since-badge" data-since="0.35">Da 0.35</span> le dichiarazioni `defineRpc` esportate da `backend/schema/index.ts` — vedi [Funzioni SQL come RPC](/docs/backend/rpc/) |
+| `basePath` | `REBASE_BASE_PATH` (default `/api`) |
+| `tables`, `schemaDir`, `defaultRls` | la directory `backend/schema/` (la chiave `tables` di `rebase.json`): le tabelle e il `defaultRls` esportati dal relativo `index.ts` |
+| `rpc` | <span class="since-badge" data-since="0.35">Dalla 0.35</span> le dichiarazioni `defineRpc` esportate da `backend/schema/index.ts` — vedi [SQL functions as RPC](/docs/backend/rpc/) |
 | `functions`, `functionsDir` | `backend/functions/` |
 | `functionsTimeoutMs` | `REBASE_FUNCTIONS_TIMEOUT_MS` |
 | `crons`, `cronsDir` | `backend/crons/` |
 | `bootstrappers`, `database` | `DATABASE_URL`, più una dichiarazione `database("<key>")` in `backend/resources.ts` per ogni database oltre a quello predefinito |
-| `auth` | `JWT_SECRET`, le variabili `OAUTH_*`, e la tabella dichiarata da `backend/schema` con `defineAuthTable` |
+| `auth` | `JWT_SECRET`, le variabili `OAUTH_*` e la tabella dichiarata da `backend/schema` con `defineAuthTable` |
 | `storage` | le variabili `STORAGE_*`, più una dichiarazione `bucket("<key>")` in `backend/resources.ts` per ogni bucket oltre a quello predefinito |
 | `storageAuthorize` | `export const storageAuthorize` da `backend/storage.ts` |
+| `storagePolicies` | `STORAGE_POLICIES`, come regole JSON — vedi [Autorizzazione dello storage](/docs/backend/storage-authorization/#as-data-storage_policies) |
 | `storagePublicRead` | `STORAGE_PUBLIC_READ` |
 | `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |
 | `storageInsecureAllowAnyAuthenticated` | `STORAGE_ALLOW_ANY_AUTHENTICATED` |
 | `storageDownloadTokenTtl` | `STORAGE_DOWNLOAD_TOKEN_TTL` |
-| `hooks` | `export const hooks` da `backend/hooks.ts` — hook di tabella globali |
-| `history` | `REBASE_HISTORY` (attivo per impostazione predefinita) — solo in forma booleana |
-| `push` | `REBASE_PUSH`, con `REBASE_VAPID_*` per le chiavi — solo in forma booleana |
-| `enableSwagger` | `REBASE_ENABLE_SWAGGER`; se non impostato serve `/api/docs` al pubblico autorizzato per l'endpoint di schema, se `true` lo pubblica con la Swagger UI, se `false` lo mantiene protetto da restrizioni di amministrazione |
+| `hooks` | `export const hooks` da `backend/hooks.ts` — hook globali delle tabelle |
+| `history` | `REBASE_HISTORY` (attivo per impostazione predefinita) — solo forma booleana |
+| `push` | `REBASE_PUSH`, con `REBASE_VAPID_*` per le chiavi — solo forma booleana |
+| `enableSwagger` | `REBASE_ENABLE_SWAGGER`; se non impostato serve `/api/docs` al pubblico dell'endpoint dello schema, `true` lo pubblica con la Swagger UI, `false` lo mantiene protetto dietro il controllo admin |
 | `compression` | `REBASE_COMPRESSION` |
 | `maxBodySize` | `REBASE_MAX_BODY_SIZE` |
 | `logging` | `LOG_LEVEL` |
-| `liveSchema` | `REBASE_LIVE_SCHEMA_REPOSITORY` e le credenziali `REBASE_LIVE_SCHEMA_*` associate — solo nella variante con repository |
+| `liveSchema` | `REBASE_LIVE_SCHEMA_REPOSITORY` e le relative credenziali `REBASE_LIVE_SCHEMA_*` — solo forma repository |
 | `rlsAudit` | `REBASE_RLS_AUDIT` |
-| `provisionSchema`, `surfaces`, `ownership`, `functionsSelection`, `functionsUpstream` | `REBASE_ROLE` — vedi [Processi Separati](/docs/deployment/split-processes/) |
-| `corsHandled` | Il CORS viene installato dal runtime a partire da `CORS_ORIGINS` |
-| `schemaVersion`, `runtimeVersion` | la build include entrambi nel bundle |
+| `provisionSchema`, `surfaces`, `ownership`, `functionsSelection`, `functionsUpstream` | `REBASE_ROLE` — vedi [Split Processes](/docs/deployment/split-processes/) |
+| `corsHandled` | CORS viene installato dal runtime a partire da `CORS_ORIGINS` |
+| `schemaVersion`, `runtimeVersion` | la build inserisce entrambi nel bundle |
 | `app`, `server`, `provisioningDriverResult` | vengono creati dal runtime |
 
-### Opzioni senza un percorso gestito
+### Opzioni senza route gestita
 
-Queste non dispongono di una variabile d'ambiente né di un export di modulo. Sono accessibili
-soltanto tramite una chiamata manuale a `initializeRebaseBackend` — a seguito di `rebase eject`, o all'interno di un
-[server personalizzato](/docs/backend/custom-server/):
+Queste opzioni non dispongono di una variabile d'ambiente né di un export di modulo. Sono accessibili solo da una chiamata manuale a `initializeRebaseBackend` — tramite `rebase eject` o in un [server personalizzato](/docs/backend/custom-server/):
 
 `rateLimit` · `jobs` · `csrf` · `cronPersistence` ·
 `storagePolicies` · `storageTriggers` · `baas` · `schemaTables` ·
-`history` nel formato ad oggetto (`{ retention }`) ·
-`push` nel formato ad oggetto (`{ allowedHosts, sender, vapid }`)
+`history` nella sua forma a oggetto (`{ retention }`) ·
+`push` nella sua forma a oggetto (`{ allowedHosts, sender, vapid }`)
 
-`schemaEditor` viene forzatamente disabilitato in un bundle compilato: l'editor riscrive i file
-*sorgente* di `backend/schema`, mentre un bundle contiene l'output compilato.
+`schemaEditor` è disattivato forzatamente in un bundle compilato: l'editor riscrive i file *sorgente* in `backend/schema`, mentre un bundle contiene output compilato.
 
-## Cosa viene creato
+## Elementi creati
 
 Dopo l'inizializzazione, vengono montate queste route:
 
 | Percorso | Scopo |
 |------|---------|
 | `/api/auth/*` | Autenticazione (registrazione, login, refresh, OAuth, magic link, codici monouso, MFA) |
-| `/api/admin/*` | Utenti, ruoli, chiavi di servizio, cron, backup, log e schema, ciascuno protetto dal rispettivo [scope](/docs/backend/roles-and-scopes/) |
-| `/api/storage/*` | Caricamento, download e cancellazione di file |
+| `/api/admin/*` | Utenti, ruoli, chiavi di servizio, cron, backup, log e schema, ciascuno protetto dal proprio [scope](/docs/backend/roles-and-scopes/) |
+| `/api/storage/*` | Upload, download ed eliminazione di file |
 | `/api/data/:slug` | Operazioni CRUD per tabella (GET, POST, PATCH, DELETE) |
-| `/api/data/:slug/:id/history` | Cronologia delle modifiche all'entità (se abilitata) |
-| `/api/docs` | Specifica OpenAPI delle tabelle visibili al chiamante (pubblica con `enableSwagger: true`; riservata agli admin con `false`) |
+| `/api/data/:slug/:id/history` | Cronologia delle modifiche dell'entità (quando abilitata) |
+| `/api/docs` | Specifica OpenAPI delle tabelle visibili al chiamante (pubblica con `enableSwagger: true`; solo per admin con `false`) |
 | `/api/swagger` | Swagger UI (con `enableSwagger: true`, solo al di fuori dell'ambiente di produzione) |
-| `/api/schema/tables` | Le tabelle servite da questo backend, visibili in base ai permessi del chiamante — vedi [Endpoint](/docs/backend/endpoints/#schema) |
+| `/api/schema/tables` | Le tabelle servite da questo backend, come possono essere visualizzate dal chiamante — vedi [Endpoints](/docs/backend/endpoints/#schema) |
 | `/api/meta/contract` | La versione dello schema, il runtime e ogni tabella così come visti da un amministratore (richiede `schema:read`) |
-| `/api/meta/schema-version` | Una stringa di versione per lo schema in questione (non autenticata) |
-| `/api/rpc/:name` | <span class="since-badge" data-since="0.35">Da 0.35</span> Le funzioni SQL dichiarate con `defineRpc`, eseguite con l'identità del chiamante — vedi [Funzioni SQL come RPC](/docs/backend/rpc/) |
-| `/api/functions/*` | Route per funzioni personalizzate (quando `functions` o `functionsDir` è impostato) |
-| `/api/push/*` | Iscrizioni alle [notifiche push](/docs/backend/push-notifications/) (quando `push` è attivo) |
+| `/api/meta/schema-version` | Stringa di versione per tale schema (non autenticata) |
+| `/api/rpc/:name` | <span class="since-badge" data-since="0.35">Dalla 0.35</span> Le funzioni SQL dichiarate con `defineRpc`, richiamate con l'identità del chiamante — vedi [SQL functions as RPC](/docs/backend/rpc/) |
+| `/api/functions/*` | Route di funzioni personalizzate (quando `functions` o `functionsDir` è impostato) |
+| `/api/push/*` | Iscrizioni alle [notifiche push](/docs/backend/push-notifications/) (quando `push` è abilitato) |
 | `/api/admin/cron/*` | Gestione dei cron job (`cron:read` / `cron:write`, quando `crons` o `cronsDir` è impostato) |
-| WebSocket su upgrade | Sottoscrizioni in tempo reale, su `/` per un'API posizionata su `/api` |
+| WebSocket on upgrade | Sottoscrizioni in tempo reale, su `/` per un'API su `/api` |
 
 ---
 
 ## Il ciclo di vita dell'inizializzazione
 
-Quando si richiama `initializeRebaseBackend()`, il framework esegue una sequenza di boot a 5 fasi:
+Quando si invoca `initializeRebaseBackend()`, il framework avvia una sequenza di boot a 5 fasi in ordine sequenziale:
 
 ```
-[Inizio Boot]
+[Start Boot]
      │
      ▼
-1. Configurazione (l'adattatore di database, le opzioni di autenticazione e storage fornite)
+1. Configuration (the database adapter, the auth and storage options you passed)
      │
      ▼
-2. Caricamento dello Schema (importa backend/schema/index.ts, compila ogni tabella — qualsiasi errore impedisce l'avvio)
+2. Schema Loading (imports backend/schema/index.ts, compiles every table — a problem in any refuses the boot)
      │
      ▼
-3. Bootstrap del Database (crea schemi/auth/funzioni SQL helper, come consentito da `provision`)
+3. Database Bootstrapping (creates schemas/auth/helper SQL functions, as `provision` allows)
      │
      ▼
-4. Inizializzazione dei Servizi (istanze client di Auth, Storage S3/Locale, popolamento del cron store)
+4. Service Initialization (Auth, Storage S3/Local client instances, Cron store seeding)
      │
      ▼
-5. Montaggio Route & Caricamento Edge (controller Hono, funzioni personalizzate, associazione WebSocket)
+5. Route Mounting & Edge Loading (Hono controllers, custom functions, WebSocket binding)
      │
      ▼
-[Boot Completato]
+[Boot Complete]
 ```
 
 ---
 
-## Cosa accade se l'avvio fallisce
+## Cosa succede se l'avvio fallisce
 
-**Il boot fallisce in modo evidente.** Se il database non è raggiungibile, le credenziali sono
-errate, oppure lo schema non può essere compilato o applicato, `initializeRebaseBackend`
-solleva un errore, nulla viene servito e il processo termina con codice `1`. Non è prevista una modalità degradata
-né un server parziale: un container impossibilitato a raggiungere il proprio database si riavvia, e
-l'errore che ne ha causato l'arresto rimane come ultima riga nei log.
+**L'avvio fallisce in modo esplicito (loudly).** Se il database non è raggiungibile, le credenziali sono errate, o lo schema non può essere compilato o applicato, `initializeRebaseBackend` genera un'eccezione, non viene servito nulla e il processo termina con codice di uscita `1`. Non esistono modalità degradate né server parziali: un container che non riesce a raggiungere il proprio database si riavvia, e l'errore che ne ha causato l'arresto è l'ultima riga nei suoi log.
 
-Si tratta di un comportamento voluto. Un server che si avvia gestendo le richieste di accesso mentre ogni
-route `/api/data/*` fallisce è molto più difficile da diagnosticare rispetto a uno che non si avvia affatto —
-e un orchestratore può intervenire di fronte a un crash loop.
+È una scelta deliberata. Un server che si avvia rispondendo alle richieste di autenticazione mentre ogni route `/api/data/*` fallisce è molto più difficile da diagnosticare rispetto a uno che non si avvia affatto — e un orchestratore può intervenire tempestivamente di fronte a un crash loop.
 
-Prima della prima query, la fase di boot verifica la connessione e stampa la diagnosi: l'host
-e la porta non raggiungibili, il motivo segnalato dal driver (`ECONNREFUSED`,
-`password authentication failed for user "app"`), e la relativa soluzione. Consulta
-la sezione [Risoluzione dei Problemi](/docs/troubleshooting/) per l'elenco dettagliato dei singoli errori.
+Prima della prima query, la fase di boot verifica la connessione e stampa la diagnosi: l'host e la porta non raggiungibili, la motivazione fornita dal driver stesso (`ECONNREFUSED`, `password authentication failed for user "app"`) e la soluzione. Consulta [Troubleshooting](/docs/troubleshooting/) per l'elenco dettagliato degli errori.
 
-### Una volta avviato: `/livez` e `/health`
+### Una volta in esecuzione: `/livez` e `/health`
 
 Due probe che rispondono a due domande diverse.
 
-| Percorso | Interroga il database | Risponde |
+| Percorso | Interroga il database | Risposta |
 | --- | --- | --- |
-| `/livez` | No | `200 {"status":"ok"}` finché il processo è in esecuzione. Da utilizzare per una liveness probe. |
-| `/health` | Sì, ogni origine dati | `200 {"status":"ok"}` quando ogni origine dati configurata risponde; `503 {"status":"degraded"}` quando una di esse non risponde. Da utilizzare per una readiness probe. |
+| `/livez` | No | `200 {"status":"ok"}` finché il processo è in esecuzione. Da utilizzare come liveness probe. |
+| `/health` | Sì, ogni origine dati | `200 {"status":"ok"}` quando ogni origine dati configurata risponde; `503 {"status":"degraded"}` quando una di esse non lo fa. Da utilizzare come readiness probe. |
 
-Impostare una liveness probe su `/health` è un errore da evitare: un'interruzione temporanea del database
-porterebbe l'orchestratore a terminare un processo altrimenti sano, trasformando un breve disservizio
-in un ciclo continuo di riavvii.
+Configurare un liveness probe su `/health` è un errore che vale la pena segnalare: un'interruzione momentanea del database indurrebbe l'orchestratore a terminare un processo altrimenti sano, trasformando un breve disservizio in un restart loop.
 
-`/health` non richiede autenticazione, pertanto restituisce solo l'esito complessivo e non la causa —
-al di fuori dell'ambiente di sviluppo si limita a indicare quale origine dati risulta degradata. Il testo
-dell'errore del driver riporta host, porta, nome del database e ruolo, ed è destinato ai log. Inoltre,
-`/health` viene servito anche sotto `basePath` (`/api/health`);
-`/livez` no.
+`/health` non richiede autenticazione, pertanto pubblica l'esito finale e non la causa — al di fuori dell'ambiente di sviluppo si limita a indicare quale origine dati è degradata e nient'altro. Il testo dell'errore restituito dal driver cita host, porta, nome del database e ruolo, e tale informazione viene registrata nei log. Inoltre, `/health` viene servito anche sotto `basePath` (`/api/health`), mentre `/livez` no.
 
-Entrambe le probe appartengono al runtime gestito. Una versione da eject in `backend/src/index.ts` serve
-`/health` e `/api/health` direttamente, verificando solo il database predefinito, e non include
-alcun `/livez` finché non viene aggiunto manualmente.
+Entrambi i probe appartengono al runtime gestito. Una versione ejected in `backend/src/index.ts` serve autonomamente `/health` e `/api/health`, verificando unicamente il database predefinito, e non dispone di `/livez` a meno che non venga aggiunto manualmente.
 
 ---
 
-## Riferimento della Configurazione
+## Riferimento della configurazione
 
-<span class="since-badge" data-since="0.35">Da 0.35</span> L'opzione `rpc` indicata di seguito.
+<span class="since-badge" data-since="0.35">Dalla 0.35</span> L'opzione `rpc` sottostante.
 
 ```typescript
 interface RebaseBackendConfig {
-    // Framework HTTP
-    app: Hono;               // Istanza dell'applicazione Hono
-    server: Server;           // Server HTTP Node.js (per l'aggancio del WebSocket)
-    basePath?: string;        // Prefisso delle route (predefinito: "/api")
+    // HTTP framework
+    app: Hono;               // Hono application instance
+    server: Server;           // Node.js HTTP server (for WebSocket attachment)
+    basePath?: string;        // Route prefix (default: "/api")
 
-    // Tabelle
-    tables?: (AnyTableDef | AnyViewDef)[]; // Risultati di defineTable / defineAuthTable / defineView
-    defaultRls?: DefaultRls;  // Ciò che le tabelle `rls: "inherit"` assumono, quando si passa `tables`
-    schemaDir?: string;       // La directory backend/schema: caricata quando `tables` è assente, e su cui scrive lo schema editor
-    hooks?: TableHooks;       // Hook di tabella globali, eseguiti per ogni tabella
+    // Tables
+    tables?: (AnyTableDef | AnyViewDef)[]; // defineTable / defineAuthTable / defineView results
+    defaultRls?: DefaultRls;  // What `rls: "inherit"` tables take, when you pass `tables`
+    schemaDir?: string;       // The backend/schema directory: loaded when `tables` is absent, and what the schema editor writes
+    hooks?: TableHooks;       // Global table hooks, run for every table
 
-    // Adattatore database (PostgreSQL, SQLite, ecc.)
+    // Database adapter (PostgreSQL, SQLite, etc.)
     database?: DatabaseAdapter;
 
-    // Configurazione dell'autenticazione o adattatore personalizzato
+    // Authentication configuration or custom adapter
     auth?: RebaseAuthConfig | AuthAdapter;
 
-    // Storage file
+    // File storage
     storage?: BackendStorageConfig | Record<string, BackendStorageConfig>;
 
-    // Cronologia delle entità
+    // Entity history
     history?: boolean | HistoryConfig;
 
     // OpenAPI/Swagger
     enableSwagger?: boolean;
 
-    // Funzioni SQL servite su /api/rpc/<name> (defineRpc). Lette dall'indice
-    // di schemaDir quando sono presenti le tabelle; altrimenti passate come valori.
+    // SQL functions served at /api/rpc/<name> (defineRpc). Read from the
+    // schemaDir index when the tables are; pass them as values otherwise.
     rpc?: AnyRpcDef[];
 
-    // Endpoint API personalizzati: valori, o una directory di file (non entrambi)
+    // Custom API endpoints: values, or a directory of files (not both)
     functions?: Record<string, FunctionApp>;  // { "send-invoice": app } → /api/functions/send-invoice
-    functionsDir?: string;    // Caricamento automatico di route Hono da una directory
+    functionsDir?: string;    // Auto-load Hono routes from a directory
 
-    // Attività pianificate: valori, o una directory di file (non entrambi)
+    // Scheduled tasks: values, or a directory of files (not both)
     crons?: Record<string, CronJobDefinition>; // { "nightly-report": defineCron(…) }
-    cronsDir?: string;         // Caricamento automatico di cron job da una directory
-    cronPersistence?: boolean; // Scrive i log di esecuzione in rebase.cron_logs (predefinito: true)
+    cronsDir?: string;         // Auto-load cron jobs from a directory
+    cronPersistence?: boolean; // Write run logs to rebase.cron_logs (default: true)
 
-    // Comportamento HTTP
-    compression?: boolean;     // gzip/deflate per le risposte API (predefinito: true)
-    maxBodySize?: number;      // Dimensione massima del corpo della richiesta in byte (predefinito: 10MB; 0 disabilita)
+    // HTTP behaviour
+    compression?: boolean;     // gzip/deflate for API responses (default: true)
+    maxBodySize?: number;      // Request-body ceiling in bytes (default: 10MB; 0 disables)
     csrf?: { origin: string | string[] | ((origin: string) => boolean) };
 
-    // Modifica dello schema
-    schemaEditor?: boolean;   // Forza l'attivazione o la disattivazione delle route dello schema-editor
+    // Schema editing
+    schemaEditor?: boolean;   // Force the schema-editor routes on or off
 
     // Logging
     logging?: { level?: "error" | "warn" | "info" | "debug" };
 }
 ```
 
-Cinque di queste opzioni possono passare inosservate ma modificano comportamenti altrimenti
-visibili solo a runtime:
+Cinque di queste opzioni possono passare facilmente inosservate e modificano comportamenti altrimenti solo osservabili:
 
-| Chiave | Predefinito | Descrizione |
+| Chiave | Valore predefinito | Cosa fa |
 |---|---|---|
-| `compression` | `true` | gzip/deflate sulle risposte API, negoziato tramite `Accept-Encoding`. I corpi già compressi, in streaming o con `no-transform` non vengono modificati, così come quelli inferiori a 1 KB (dove gzip comporterebbe un overhead maggiore del risparmio), per cui è sicuro lasciarlo attivo — un elenco JSON voluminoso si riduce tipicamente di circa 20 volte. Impostare su `false` quando proxy intermedi come nginx, Cloudflare o altri applicano già la compressione, per evitare un doppio carico. Variabile d'ambiente: `REBASE_COMPRESSION`. |
-| `maxBodySize` | `10485760` (10MB) | Limite per il corpo delle richieste sulle route API; `0` lo disabilita. I caricamenti di file nello storage utilizzano il valore `maxFileSize` (50MB) della configurazione dello storage, che ha la precedenza per tali route. Variabile d'ambiente: `REBASE_MAX_BODY_SIZE`. |
-| `csrf` | disabilitato | **Opzionale (opt-in).** Un'API BaaS viene chiamata da app mobile, SPA su domini differenti e strumenti da riga di comando, nessuno dei quali invia un header `Origin` compatibile con un elenco prefissato — motivo per cui non è abilitato di default. È possibile attivarlo specificando le origini utilizzate dai client basati su browser. Non esiste una forma via variabile d'ambiente: richiede l'eject per essere configurato. |
-| `cronPersistence` | `true` | Determina se i log di esecuzione devono essere registrati in `rebase.cron_logs`. Con `false`, i job continuano a essere eseguiti e la cronologia viene mantenuta solo in memoria, venendo persa nel pannello di Studio a ogni riavvio. |
-| `schemaEditor` | attivo fuori dalla produzione, quando `schemaDir` è impostato | Forza l'attivazione o la disattivazione delle route dello schema editor. L'editor riscrive i *file sorgente* in `backend/schema`, necessitando di conseguenza di una directory accessibile in scrittura — cosa che non è presente in un bundle compilato, motivo per cui non è mai disponibile in produzione. |
+| `compression` | `true` | gzip/deflate sulle risposte API, negoziato tramite `Accept-Encoding`. I corpi già compressi, in streaming e con intestazione `no-transform` vengono ignorati, così come i corpi inferiori a 1 KB (gzip costa più di quanto risparmi in questi casi), quindi è sicuro lasciarlo attivo — un payload JSON di grandi dimensioni si riduce tipicamente di circa 20 volte. Impostalo a `false` se nginx, Cloudflare o un altro proxy a monte esegue già la compressione, per evitare un doppio overhead. Variabile d'ambiente: `REBASE_COMPRESSION`. |
+| `maxBodySize` | `10485760` (10MB) | Limite massimo per il corpo delle richieste sulle route API; `0` lo disabilita. I caricamenti nello storage utilizzano il valore `maxFileSize` (50MB) proprio della configurazione di storage, che ha la precedenza per tali route. Variabile d'ambiente: `REBASE_MAX_BODY_SIZE`. |
+| `csrf` | off | **Opt-in.** Un'API BaaS viene chiamata da app mobili, SPA su altri domini e strumenti CLI, nessuno dei quali invia un'intestazione `Origin` accettabile da un elenco fisso — pertanto questa opzione non è attiva per impostazione predefinita. Abilitala specificando le origini utilizzate dai tuoi client browser. Nessuna forma tramite variabile d'ambiente: effettua l'eject per configurarla. |
+| `cronPersistence` | `true` | Determina se i log di esecuzione vengono salvati in `rebase.cron_logs`. Con `false`, i job continuano a essere eseguiti ma la cronologia rimane solo in memoria, venendo quindi persa dal pannello di Studio al riavvio. |
+| `schemaEditor` | attivo fuori dalla produzione, quando `schemaDir` è impostato | Forza l'attivazione o la disattivazione delle route dell'editor di schema. L'editor riscrive i *file sorgente* di `backend/schema`, pertanto necessita di una directory su cui scrivere — e un bundle compilato non ne possiede alcuna, motivo per cui non è mai presente in fase di deployment. |
 
-Il resto di `RebaseBackendConfig` è documentato nella rispettiva pagina dedicata (`auth`,
-`storage`, `jobs`, `hooks`, `liveSchema`, `rlsAudit`, `schemaTables`) oppure contrassegnato con `@internal`:
-`bootstrappers`, `provisioningDriverResult`, `provisionSchema`, `corsHandled`,
-`functionsSelection`, `functionsUpstream` e `runtimeVersion` vengono popolati da
-`bootFromBundle` a partire dall'ambiente; passarli manualmente rischia di creare
-incongruenze con il runtime rispetto alla natura del processo in esecuzione.
+Il resto di `RebaseBackendConfig` è documentato nella rispettiva pagina dedicata (`auth`, `storage`, `jobs`, `hooks`, `liveSchema`, `rlsAudit`, `schemaTables`) o contrassegnato come `@internal`: `bootstrappers`, `provisioningDriverResult`, `provisionSchema`, `corsHandled`, `functionsSelection`, `functionsUpstream` e `runtimeVersion` vengono compilati da `bootFromBundle` a partire dall'ambiente, e passarli manualmente rischia di generare discrepanze con il runtime su quale sia il ruolo del processo.
 
-## L'istanza del Backend
+## L'istanza del backend
 
-`initializeRebaseBackend` restituisce l'istanza del backend creata, già montata e
-avviata. Il suo tipo è `RebaseBackendInstance`, che corrisponde a `RebaseBackend`, il
-tipo restituito da `createRebaseBackend`:
+`initializeRebaseBackend` restituisce il backend appena creato, già montato e avviato. Il suo tipo è `RebaseBackendInstance`, che corrisponde a `RebaseBackend`, il tipo restituito da `createRebaseBackend`:
 
 ```typescript
 const instance = await initializeRebaseBackend(config);
 
-// Accesso ai servizi interni
-instance.driver              // Driver dati predefinito
-instance.driverRegistry      // Tutti i driver (per scenari multi-database)
-instance.realtimeService     // Servizio realtime predefinito
-instance.auth?.userService       // Gestione utenti
-instance.storageController   // Storage predefinito
-instance.storageRegistry     // Tutti i backend di storage
-instance.getTableDescriptors() // Le tabelle compilate, nel formato servito da GET /api/schema/tables
-instance.history?.historyService // Cronologia delle entità
-instance.cronScheduler       // Scheduler dei cron job (quando crons o cronsDir è impostato)
-instance.jobQueue            // Coda di job durevole (quando jobs è abilitato)
-instance.setTableHooks(slug, hooks) // Sostituisce gli hook di una tabella
-instance.shutdown()          // Arresta e svuota le connessioni; chiude anche il server associato
+// Internal service access
+instance.driver              // Default data driver
+instance.driverRegistry      // All drivers (for multi-database)
+instance.realtimeService     // Default realtime service
+instance.auth?.userService       // User management
+instance.storageController   // Default storage
+instance.storageRegistry     // All storage backends
+instance.getTableDescriptors() // The compiled tables, as GET /api/schema/tables serves them
+instance.history?.historyService // Entity history
+instance.cronScheduler       // Cron job scheduler (when crons or cronsDir is set)
+instance.jobQueue            // Durable job queue (when jobs are enabled)
+instance.setTableHooks(slug, hooks) // Replace a table's hooks
+instance.shutdown()          // Drain and stop; also closes the server it was given
 ```
 
-Contiene inoltre
-`rebase`, il client in-process, `fetch(request)`, `routes`, i gruppi di route
-come sotto-applicazioni Hono, `services`, le relative chiavi JWT, il modello di accesso, lo store delle chiavi API e
-i limitatori di frequenza, oltre a `verifyCredential(token)`; consulta
-[Integrazione Server Personalizzata](/docs/backend/custom-server/).
+Include inoltre `rebase`, il client in-process, `fetch(request)`, `routes`, i gruppi di route come sotto-applicazioni Hono, `services`, le relative chiavi JWT, modello di accesso, archivio delle chiavi API e rate limiter, nonché `verifyCredential(token)`; vedi [Custom Server Integration](/docs/backend/custom-server/).
 
-> **Nota:** Sebbene l'`instance` esponga questi servizi interni, il codice dell'applicazione (come le funzioni personalizzate e i cron job) dovrebbe utilizzare il singleton `rebase` di `@rebasepro/server` per interagire con l'API del backend. All'interno di una richiesta, di un'esecuzione cron o di un job, `rebase` corrisponde al backend che lo sta gestendo; altrove fa riferimento all'istanza di processo predefinita, impostata da `initializeRebaseBackend` al proprio backend.
+> **Nota:** Sebbene l'`instance` esponga questi servizi interni, il codice applicativo (come funzioni personalizzate e cron job) dovrebbe utilizzare il singleton `rebase` di `@rebasepro/server` per interagire con l'API del backend. All'interno di una richiesta, dell'esecuzione di un cron o di un job, `rebase` rappresenta il backend che lo sta servendo; altrove rappresenta l'impostazione predefinita del processo, che `initializeRebaseBackend` assegna al proprio backend.
 
 ## API REST
 
-L'API REST viene generata a partire dalle tabelle. Ciascuna tabella ottiene i seguenti endpoint:
+L'API REST viene generata a partire dalle tue tabelle. Ciascuna tabella riceve questi endpoint:
 
 | Metodo | Percorso | Descrizione |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | Elenco delle entità — filtraggio, ordinamento, paginazione e ricerca avvengono tramite parametri di query |
-| `GET` | `/api/data/:slug/count` | Numero di righe corrispondenti alla medesima query |
+| `GET` | `/api/data/:slug` | Elenca le entità — filtri, ordinamento, paginazione e ricerca sono parametri di query |
+| `GET` | `/api/data/:slug/count` | Quante righe corrispondono alla medesima query |
 | `GET` | `/api/data/:slug/aggregate` | `count`/`sum`/`avg`/`min`/`max`, opzionalmente raggruppati |
 | `GET` | `/api/data/:slug/:id` | Recupera una singola entità |
 | `POST` | `/api/data/:slug` | Crea una nuova entità |
-| `PATCH` | `/api/data/:slug/:id` | Aggiorna i campi forniti |
+| `PATCH` | `/api/data/:slug/:id` | Aggiorna i campi inviati |
 | `DELETE` | `/api/data/:slug/:id` | Elimina un record |
 | `POST` | `/api/data/:slug/bulk` | Crea più righe in una singola transazione |
 | `PATCH` | `/api/data/:slug/bulk` | Aggiorna più righe in una singola transazione |
@@ -339,29 +287,23 @@ L'API REST viene generata a partire dalle tabelle. Ciascuna tabella ottiene i se
 
 ### Parametri di query
 
-Il riferimento esaustivo non si trova in questa pagina. La guida all'[API
-REST](/docs/backend/api/) illustra entrambi i formati di query supportati dal server — la
-sintassi in stile PostgREST `?column=op.value` e il formato JSON `?where=` — insieme a
-`orderBy`, `limit`/`offset`, `include`, `fields`, `searchString` e ricerca vettoriale.
-La pagina [Endpoint](/docs/backend/endpoints/) elenca tutte le route montate dal
-server, comprese quelle generate.
+Esiste una guida di riferimento dedicata a essi e non è questa pagina. [REST API](/docs/backend/api/) documenta entrambi i dialetti di query accettati dal server — il formato in stile PostgREST `?column=op.value` e il formato JSON `?where=` — insieme a `orderBy`, `limit`/`offset`, `include`, `fields`, `searchString` e la ricerca vettoriale. [Endpoints](/docs/backend/endpoints/) rappresenta l'indice di ogni route montata dal server, comprese quelle generate.
 
-Un parametro non riservato dal server viene interpretato come un filtro applicato alla colonna con
-quel nome; di conseguenza, un parametro inesistente non produce un errore: semplicemente non corrisponderà ad alcun record.
+Un parametro non riservato dal server viene interpretato come filtro sulla colonna con quel nome, perciò un parametro inesistente non genera errori: semplicemente non corrisponderà a nulla in modo silente.
 
 ## WebSocket
 
-Il server WebSocket si aggancia allo stesso server HTTP e offre sottoscrizioni in tempo reale. Risponde alle richieste di upgrade su un unico percorso, `/` per un'API posizionata su `/api`, a cui l'SDK si connette, lasciando ogni altro percorso ai propri listener di `upgrade`:
+Il server WebSocket si aggancia allo stesso server HTTP e fornisce sottoscrizioni in tempo reale. Risponde alle richieste di upgrade su un unico percorso, `/` per un'API su `/api`, al quale si collega l'SDK, lasciando qualsiasi altro percorso ai tuoi listener di `upgrade` personalizzati:
 
-- Sottoscrizione alle **modifiche delle tabelle** — ricevi notifiche quando una riga in una tabella viene creata, aggiornata o eliminata
-- Sottoscrizione alle **modifiche delle singole righe** — ricevi notifiche quando una specifica riga cambia
+- Iscrizione alle **modifiche delle tabelle** — ricevi notifiche quando qualsiasi riga di una tabella viene creata, aggiornata o eliminata
+- Iscrizione alle **modifiche delle righe** — ricevi notifiche quando una riga specifica subisce modifiche
 - Gestione automatica della **riconnessione** nell'SDK tipizzato
 
-Il backend utilizza internamente il meccanismo `LISTEN/NOTIFY` di PostgreSQL. Per le distribuzioni multi-istanza, è possibile specificare una `connectionString` nel proprio `PostgresBootstrapper` per abilitare la trasmissione tra istanze diverse.
+Il backend utilizza internamente il meccanismo `LISTEN/NOTIFY` di PostgreSQL. Per i deployment multi-istanza, fornisci una `connectionString` nel tuo `PostgresBootstrapper` per abilitare il broadcasting tra le diverse istanze.
 
-## Gestione degli Errori
+## Gestione degli errori
 
-Qualsiasi errore — su qualsiasi route e in qualunque sottosistema — viene restituito all'interno di una struttura uniforme:
+Ogni errore — proveniente da qualsiasi route, in qualunque sottosistema — viene restituito all'interno di un unico envelope standard:
 
 ```json
 {
@@ -373,30 +315,16 @@ Qualsiasi errore — su qualsiasi route e in qualunque sottosistema — viene re
 }
 ```
 
-| Campo | Sempre presente | Significato |
+| Campo | Sempre presente | Cos'è |
 |-------|:--------------:|------------|
-| `message` | sì | Pensato per un utente che legge la console. Indica il problema riscontrato, non la regola. |
-| `code` | sì | In formato `SCREAMING_SNAKE_CASE` e stabile. È il campo su cui basare la logica condizionale. |
-| `details` | no | Payload strutturato presente quando il rifiuto riguarda elementi specifici — un elenco di percorsi errati, un insieme di campi non riconosciuti. |
-| `requestId` | no | Presente se la richiesta ne conteneva uno o se ne è stato assegnato uno; replica `X-Request-ID`. Utile da includere nelle segnalazioni di bug. |
+| `message` | sì | Scritto per un operatore umano che legge una console. Indica l'ostacolo riscontrato, non la regola violata. |
+| `code` | sì | `SCREAMING_SNAKE_CASE` e stabile. Questo è il campo da utilizzare per la logica di branching. |
+| `details` | no | Payload strutturato presente quando il rifiuto riguarda un elemento specifico — un elenco di percorsi errati, un insieme di campi sconosciuti. |
+| `requestId` | no | Presente quando la richiesta ne conteneva uno o ne è stato assegnato uno; replica l'intestazione `X-Request-ID`. Da citare nelle segnalazioni di bug. |
 
-Lo status code HTTP si trova nella risposta, non nel corpo. È consigliabile gestire la logica basandosi su `code` anziché su
-`message` — i messaggi sono pensati per la lettura umana e possono variare nel tempo.
+Lo stato HTTP si trova sulla risposta, non all'interno del corpo. Gestisci le diramazioni logiche in base a `code`, non a `message` — i messaggi sono scritti per gli utenti e possono variare.
 
-L'SDK tipizzato converte ciascuno di questi errori in un `RebaseApiError` contenente
-`status`, `code` e `details` — inclusi i fallimenti che non hanno mai raggiunto il
-server. Una connessione rifiutata, un errore DNS, problemi di CORS o una richiesta annullata vengono restituiti con
-`status: 0`, `code: "NETWORK_ERROR"`, con l'errore effettivo del runtime riportato su `cause`,
-anziché con l'eccezione generica generata da `fetch`. Una risposta priva di
-struttura envelope — come un 413 generato da un proxy o un 502 da un load balancer — riceve comunque un `code` derivato dal suo
-stato HTTP (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), e un
-client configurato fuori dal browser privo di `baseUrl` fallisce con
-`BASE_URL_REQUIRED` anziché con un errore di rete generico.
-Una lettura che riceve una risposta di successo priva del formato atteso — un codice `204`, un body vuoto, una pagina senza l'elenco `data` —
-fallisce con `UNEXPECTED_RESPONSE` invece di risolversi come "nessuna riga trovata", mentre
-operazioni come `createMany`, `updateMany`, `deleteMany` o `batch` eseguite passando un valore diverso da un array
-falliscono con `INVALID_BULK_BODY`, lo stesso codice utilizzato dal server per questo errore.
-In questo modo il codice applicativo deve intercettare un'unica classe di eccezione:
+L'SDK tipizzato trasforma ognuno di questi errori in un `RebaseApiError` contenente `status`, `code` e `details` — inclusi i fallimenti che non hanno mai raggiunto il server. Una connessione rifiutata, un errore DNS, CORS o una richiesta interrotta arrivano come `status: 0`, `code: "NETWORK_ERROR"`, con l'errore del runtime associato a `cause`, anziché con qualsiasi errore casuale con cui `fetch` avrebbe rifiutato la promessa. Una risposta priva di envelope — un errore 413 generato da un proxy, un 502 da un load balancer — ottiene comunque un `code` derivato dal proprio stato (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), e un client inizializzato all'esterno del browser senza `baseUrl` fallisce con `BASE_URL_REQUIRED` anziché con un errore di rete. Una lettura che ha esito positivo ma senza la struttura prevista — un `204`, un body vuoto, una pagina senza l'elenco `data` — fallisce con `UNEXPECTED_RESPONSE` invece di risolversi come "nessuna riga", e i metodi `createMany`, `updateMany`, `deleteMany` o `batch` a cui viene passato qualcosa di diverso da un array falliscono con `INVALID_BULK_BODY`, lo stesso codice utilizzato dal server per questo errore. Di conseguenza, il codice applicativo intercetta una sola classe:
 
 ```typescript
 async function setPrice(id: string, price: number) {
@@ -409,14 +337,14 @@ async function setPrice(id: string, price: number) {
 }
 ```
 
-## Passaggi Successivi
+## Prossimi passi
 
 - **[Autenticazione](/docs/backend/authentication)** — JWT, provider OAuth e OIDC, MFA, chiavi API, gestione utenti
-- **[Storage](/docs/backend/storage)** — Archiviazione di file su storage locale e S3
-- **[Hook di Tabella](/docs/collections/callbacks)** — Hook del ciclo di vita e API `context.data`
-- **[Cronologia delle Entità](/docs/backend/history)** — Traccia di controllo (audit trail)
-- **[Funzioni Personalizzate](/docs/backend/custom-functions)** — Aggiunta di endpoint API personalizzati
-- **[Funzioni SQL come RPC](/docs/backend/rpc)** — Chiamata a una funzione Postgres su `/api/rpc/<name>`, con l'identità del chiamante
-- **[Cron Job](/docs/backend/cron-jobs)** — Attività in background pianificate
-- **[Branching del Database](/docs/backend/branching)** — Copie istantanee del database per dev/staging
-- **[Deployment](/docs/getting-started/deployment)** — Portare il backend in produzione
+- **[Storage](/docs/backend/storage)** — Archiviazione file locale e su S3
+- **[Hook di tabella](/docs/collections/callbacks)** — Hook del ciclo di vita e API `context.data`
+- **[Cronologia delle entità](/docs/backend/history)** — Audit trail
+- **[Funzioni personalizzate](/docs/backend/custom-functions)** — Aggiunta di endpoint API personalizzati
+- **[SQL functions as RPC](/docs/backend/rpc)** — Esecuzione di una funzione Postgres su `/api/rpc/<name>`, con l'identità del chiamante
+- **[Cron Jobs](/docs/backend/cron-jobs)** — Attività pianificate in background
+- **[Database Branching](/docs/backend/branching)** — Copie istantanee del database per dev/staging
+- **[Deployment](/docs/getting-started/deployment)** — Distribuzione del backend in produzione

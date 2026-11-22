@@ -1,5 +1,5 @@
 ---
-sourceHash: 240e1a646da099f3
+sourceHash: 27ca2cec149d653e
 title: Introduction
 sidebar_label: Introduction
 description: Rebase est le backend open source pour Postgres, doté d'un panneau d'administration pour votre équipe, conçu avec React et TypeScript. Définissez votre schéma en TypeScript, et Rebase génère une interface CRUD complète, une API REST, l'authentification, le stockage et la synchronisation en temps réel — propulsé par PostgreSQL.
@@ -11,29 +11,29 @@ import { AdminDemoCarousel } from "../../../../components/demos/AdminDemoCarouse
 
 ## Qu'est-ce que Rebase ?
 
-Rebase est le **backend open source pour PostgreSQL**, doté d'un **panneau d'administration** pour votre équipe, conçu avec React et TypeScript. Il vous offre tout ce dont vous avez besoin pour concevoir une application prête pour la production sur **PostgreSQL** :
+Rebase est le **backend open source pour PostgreSQL**, doté d'un **panneau d'administration** pour votre équipe, conçu avec React et TypeScript. Il vous offre tout ce dont vous avez besoin pour créer une application prête pour la production sur **PostgreSQL** :
 
-- **Schema as Code** — Déclarez vos tables Postgres en TypeScript, chacune avec une politique de sécurité au niveau des lignes (RLS) obligatoire. Rebase génère les tables et leurs règles, les points de terminaison d'API REST, un SDK typé et une interface CRUD complète à partir de cette unique source de vérité.
-- **Panneau d'administration instantané** — Une interface React élégante et rapide avec des vues en feuille de calcul, des listes, des formulaires, des tableaux Kanban, de l'édition en ligne et une synchronisation en temps réel.
-- **Backend intégré** — Authentification (mots de passe, liens magiques, codes à usage unique, MFA, clés d'API et douze fournisseurs OAuth/OIDC), stockage de fichiers (local, S3 ou GCS), Row Level Security, historique des entités et temps réel via WebSocket — le tout intégré nativement.
+- **Schéma as Code** — Déclarez vos tables Postgres en TypeScript, chacune avec une posture de sécurité au niveau des lignes (RLS) obligatoire. Rebase génère les tables et leurs politiques, les points de terminaison de l'API REST, un SDK typé et une interface CRUD complète à partir de cette unique source de vérité.
+- **Panneau d'administration instantané** — Un panneau basé sur React, élégant et rapide, avec des vues en tableau type tableur, des listes, des formulaires, des tableaux Kanban, l'édition en ligne et la synchronisation en temps réel.
+- **Backend intégré** — Authentification (mots de passe, liens magiques, codes à usage unique, MFA, clés API et douze fournisseurs OAuth/OIDC), stockage de fichiers (local, S3 ou GCS), Row Level Security, historique des entités et temps réel par WebSocket — le tout intégré nativement.
 - **Radicalement extensible** — Si vous pouvez le concevoir en React, vous pouvez l'ajouter à Rebase. Champs personnalisés, vues personnalisées, plugins et accès complet aux hooks internes.
 
 :::tip
-Rebase s'utilise des deux manières, sans changer votre code. **Auto-hébergez-le** — vous êtes propriétaire des données, du code et de la machine sur laquelle il s'exécute. Ou déployez le même projet sur **Rebase Cloud** ([app.rebase.pro](https://app.rebase.pro)), qui est exactement le même Rebase opéré pour vous ; le service est aujourd'hui actif avec de véritables clients et ouvre progressivement ses accès par vagues pendant sa bêta privée. Voyez-le comme une alternative open source à Supabase ou Retool où *vous* décidez de qui l'exploite.
+Rebase fonctionne de l'une ou l'autre manière, et votre code ne change pas entre les deux. **Auto-hébergez-le** — vous possédez les données, le code et la machine sur laquelle il tourne. Ou déployez le même projet sur **Rebase Cloud** ([app.rebase.pro](https://app.rebase.pro)), qui est le même Rebase opéré pour vous ; il est déjà actif avec de vrais locataires et s'ouvre par vagues pendant sa bêta privée. Voyez-le comme une alternative open source à Supabase ou Retool où *vous* décidez de qui l'administre.
 :::
 
-## Choisissez votre voie
+## Choisissez votre approche
 
-Rebase réunit un backend et un panneau d'administration qui partagent un même serveur. Démarrez selon vos besoins :
+Rebase est un backend et un panneau d'administration qui partagent un même serveur. Commencez par ce qui vous intéresse :
 
 | Je souhaite… | Commencer ici | Ce que vous obtenez |
 |---|---|---|
-| **Un backend et un panneau d'administration** | [Démarrage rapide](/docs/getting-started/quickstart/) | Des tables en TypeScript, une interface CRUD générée, une API REST, l'authentification, le stockage et le temps réel |
-| **Uniquement l'API, sur ma propre base de données** | [Backend uniquement](/docs/getting-started/headless/) | Une API REST headless et un SDK sur votre base PostgreSQL existante — sans panneau d'administration, sans fichiers de table |
+| **Un backend et un panneau d'administration** | [Guide de démarrage rapide](/docs/getting-started/quickstart/) | Des tables en TypeScript, une interface CRUD générée, une API REST, l'auth, le stockage et le temps réel |
+| **Uniquement l'API, sur ma propre base de données** | [Backend uniquement](/docs/getting-started/headless/) | Une API REST headless et un SDK sur votre PostgreSQL existant — sans panneau d'administration ni fichiers de tables |
 
-Aucun de ces choix n'est irréversible : un projet headless peut intégrer un panneau d'administration en lui ajoutant un frontend, qui affichera chaque table fournie par le backend, et chacun peut déclarer ses tables dans `backend/schema/` dès qu'il souhaite les gérer sous forme de code.
+Aucune des options n'est définitive : un projet headless peut intégrer un panneau d'administration en ajoutant un frontend, qui affiche chaque table servie par le backend, et chacun peut définir ses tables dans `backend/schema/` lorsqu'il souhaite les gérer sous forme de code.
 
-## Comment ça fonctionne
+## Comment ça marche
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -65,52 +65,52 @@ pnpm dlx @rebasepro/cli init my-app
 cd my-app
 ```
 
-`init` génère un fichier `.env` prêt à l'emploi — aucune modification requise. Ensuite :
+`init` génère un fichier `.env` prêt à l'emploi — aucune modification n'est nécessaire. Ensuite :
 
 ```bash
 pnpm install
 pnpm run dev
 ```
 
-C'est tout ce qu'il faut pour la première exécution. Il n'y a aucune base de données à installer ni d'étape de schéma : en l'absence de `DATABASE_URL` définie, `rebase dev` lance une instance PostgreSQL gérée (PGlite) dans le répertoire du projet, génère le schéma à partir de vos tables et crée les tables au démarrage.
+C'est tout ce qu'il faut pour la première exécution. Il n'y a aucune base de données à installer ni aucune étape de schéma : si aucun `DATABASE_URL` n'est configuré, `rebase dev` démarre un PostgreSQL géré (PGlite) dans le répertoire du projet, génère le schéma à partir de vos tables et crée les tables au démarrage.
 
-**Consultez les URL affichées dans la sortie.** `rebase dev` sélectionne un port libre par projet plutôt qu'un port fixe ; ceux-ci diffèrent donc d'un projet et d'une machine à l'autre. Le premier compte que vous enregistrez devient l'administrateur — sur votre machine. Un déploiement en production définit plutôt son administrateur via `REBASE_ADMIN_EMAIL` et `REBASE_ADMIN_PASSWORD` (voir [Configuration](/docs/getting-started/configuration/)).
+**Consultez les URL dans la sortie de commande.** `rebase dev` choisit un port libre par projet plutôt que des ports fixes, ils diffèrent donc selon les projets et les machines. Le premier compte que vous enregistrez devient l'administrateur — sur votre machine. Un déploiement en production définit plutôt son administrateur via `REBASE_ADMIN_EMAIL` et `REBASE_ADMIN_PASSWORD` (voir [Configuration](/docs/getting-started/configuration/)).
 
-Pour utiliser votre propre base Postgres à la place, décommentez `DATABASE_URL` dans le fichier `.env` et réexécutez `pnpm run dev`.
+Pour utiliser votre propre base Postgres à la place, décommentez `DATABASE_URL` dans le fichier `.env` et relancez `pnpm run dev`.
 
-→ Suivez le [Guide de démarrage rapide](/docs/getting-started/quickstart) complet pour un parcours pas-à-pas détaillé, incluant la connexion à votre propre base de données.
+→ Suivez le [Guide de démarrage rapide](/docs/getting-started/quickstart) complet pour un pas-à-pas détaillé, y compris la méthode pour connecter votre propre base de données.
 
 ## Fonctionnalités principales
 
 | Fonctionnalité | Description |
 |---------|-------------|
-| **Vues tableur** | Tableau virtualisé et rapide avec édition en ligne, filtrage, tri et recherche textuelle |
-| **Vue liste** | Vue verticale sobre et responsive pour n'importe quelle table |
-| **Tableau Kanban** | Vue en tableau avec glisser-déposer groupée par n'importe quelle colonne de type enum |
+| **Vues type tableur** | Tableau virtualisé et rapide avec édition en ligne, filtrage, tri et recherche textuelle |
+| **Vue Liste** | Vue en liste verticale, claire et responsive pour n'importe quelle table |
+| **Tableau Kanban** | Vue en tableau avec glisser-déposer, groupée par n'importe quelle colonne d'énumération (enum) |
 | **Relations** | Un-à-un, un-à-plusieurs, plusieurs-à-plusieurs avec tables de jonction et jointures multi-niveaux |
-| **Row Level Security** | Politiques RLS Postgres compilées à partir de la directive `rls` obligatoire pour chaque table |
-| **Authentification** | JWT + jetons de rafraîchissement, douze fournisseurs OAuth/OIDC, liens magiques, codes à usage unique, MFA TOTP, clés d'API restreintes, contrôle d'accès basé sur les rôles (RBAC) |
-| **Stockage de fichiers** | Système de fichiers local, compatible S3 ou Google Cloud Storage, avec champs de téléversement et explorateur |
-| **Synchronisation en temps réel** | Mises à jour en direct via WebSocket pour l'ensemble des clients connectés |
+| **Row Level Security** | Politiques RLS Postgres compilées à partir de la déclaration `rls` que chaque table doit définir |
+| **Authentification** | JWT + jetons de rafraîchissement, douze fournisseurs OAuth/OIDC, liens magiques, codes à usage unique, MFA TOTP, clés API restreintes, contrôle d'accès basé sur les rôles |
+| **Stockage de fichiers** | Système de fichiers local, compatible S3 ou Google Cloud Storage, avec champs d'upload et explorateur |
+| **Synchronisation temps réel** | Mises à jour en direct via WebSocket sur tous les clients connectés |
 | **Historique des entités** | Piste d'audit complète pour chaque création, modification et suppression |
-| **API REST** | Endpoints CRUD générés automatiquement pour chaque table |
-| **Import / Export de données** | Import CSV, JSON et Excel avec mappage de champs ; export CSV/JSON |
-| **SDK typé** | SDK JavaScript sécurisé au niveau des types pour vos applications frontend |
-| **Système de plugins** | Étendez chaque composant de l'interface — barre d'outils, formulaires, champs, page d'accueil |
-| **Enrichissement de données par IA** | Autocomplétion alimentée par LLM pour les champs de texte |
-| **Tâches planifiées (Cron)** | Tâches de fond planifiées avec surveillance, journalisation et tableau de bord Studio |
-| **Fonctions personnalisées** | Routes Hono basées sur des fichiers montées automatiquement avec middleware d'authentification et accès à la base de données |
+| **API REST** | Points de terminaison CRUD générés automatiquement pour chaque table |
+| **Import/Export de données** | Import CSV, JSON et Excel avec mappage de champs ; export CSV/JSON |
+| **SDK typé** | SDK JavaScript sécurisé au niveau des types (type-safe) pour vos applications frontend |
+| **Système de plugins** | Étendez chaque partie de l'interface — barre d'outils, formulaires, champs, page d'accueil |
+| **Enrichissement de données par IA** | Autocomplétion assistée par LLM pour les champs textuels |
+| **Tâches Cron** | Tâches de fond planifiées avec surveillance, journalisation et tableau de bord Studio |
+| **Fonctions personnalisées** | Routes Hono basées sur des fichiers avec accès à la base de données, publiques par défaut : le jeton de l'appelant est lu lorsqu'il est transmis, et `requireAuth` protège une route |
 | **Service d'e-mails** | SMTP intégré pour la réinitialisation de mot de passe, la vérification et les e-mails transactionnels |
 | **Branching de base de données** | Copies isolées instantanées de votre base de données pour le dev, le staging ou les tests |
-| **Webhooks** | Notifications sortantes signées par HMAC sur INSERT, UPDATE, DELETE |
-| **Canaux de diffusion (Broadcast)** | Canaux WebSocket pour la messagerie en temps réel entre clients connectés |
-| **Suivi de présence** | Suivi des utilisateurs en ligne et synchronisation de l'état partagé entre les participants |
+| **Webhooks** | Notifications sortantes signées par HMAC lors des événements INSERT, UPDATE, DELETE |
+| **Canaux de diffusion** | Canaux WebSocket pour la messagerie en temps réel entre clients connectés |
+| **Suivi de présence** | Suivez les utilisateurs en ligne et synchronisez l'état partagé entre les participants |
 
-## Prochaines étapes
+## Étapes suivantes
 
-- **[Démarrage rapide](/docs/getting-started/quickstart)** — Lancez-vous en 2 minutes
-- **[Backend uniquement](/docs/getting-started/headless/)** — L'API headless sur une base de données existante
-- **[Structure du projet](/docs/getting-started/project-structure)** — Comprenez le code généré et les concepts clés utilisés dans la suite de la documentation
+- **[Démarrage rapide](/docs/getting-started/quickstart)** — Soyez opérationnel en 2 minutes
+- **[Backend uniquement](/docs/getting-started/headless/)** — L'API headless sur une base de données que vous possédez déjà
+- **[Structure du projet](/docs/getting-started/project-structure)** — Comprenez le code généré ainsi que les termes employés dans la suite de cette documentation
 - **[Tables](/docs/schema/)** — Définissez votre schéma de données
-- **[Backend](/docs/backend)** — Configurez l'authentification, le stockage et l'API
-- **[Architecture](/docs/architecture)** — Découvrez comment l'ensemble s'articule
+- **[Backend](/docs/backend)** — Configurez l'auth, le stockage et l'API
+- **[Architecture](/docs/architecture)** — Comprenez comment tous les éléments s'articulent

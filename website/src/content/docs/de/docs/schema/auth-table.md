@@ -1,21 +1,15 @@
 ---
-sourceHash: e70397bdea9251db
+sourceHash: e934bb43a5bf4916
 title: Die Benutzertabelle
 sidebar_label: Benutzertabelle
-description: "defineAuthTable deklariert die Tabelle, in der Auth Benutzer speichert: die Spalten, die Auth benötigt, eine Richtlinie zum Selbstlesen, Berechtigungsspalten nur für Admins und das Zugriffsmodell – Rollen, App-Scopes, persönliche Schlüssel und die Benutzer-Lifecycle-Hooks."
+description: "defineAuthTable deklariert die Tabelle, in der die Authentifizierung Benutzer speichert: die Spalten, die Auth benötigt, eine Self-Read-Policy, Admin-exklusive Berechtigungsspalten und das Zugriffsmodell – Rollen, App-Scopes, persönliche Schlüssel und die Benutzer-Lifecycle-Hooks."
 ---
 
-`defineAuthTable` deklariert die Tabelle, die die Authentifizierung liest und beschreibt. Es
-handelt sich um ein `defineTable` mit drei Ergänzungen:
+`defineAuthTable` deklariert die Tabelle, die von der Authentifizierung gelesen und beschrieben wird. Es handelt sich um ein `defineTable`, das um drei Dinge erweitert wurde:
 
-- **Die Spalten, die Auth benötigt**, werden hinzugefügt, wenn die Tabelle sie nicht deklariert:
-  die E-Mail, der Passwort-Hash, die `roles`-Spalte, der Verifizierungsstatus und
-  die weiteren Felder, die für die Anmeldung verwendet werden.
-- **Richtlinien, auf die sich Auth verlässt**, werden unabhängig von `rls` hinzugefügt: Ein angemeldeter
-  Benutzer liest seine eigene Zeile, und nur ein Admin beschreibt die Berechtigungsspalten, sodass sich niemand
-  selbst eine Rolle zuweisen kann.
-- **Ein `auth`-Block** deklariert das Zugriffsmodell und die Hooks, die ausgeführt werden, wenn ein
-  Admin einen Benutzer erstellt oder ein Passwort zurücksetzt.
+- **Die von Auth benötigten Spalten** werden hinzugefügt, wenn die Tabelle sie nicht deklariert: die E-Mail, der Passwort-Hash, die Spalte `roles`, der Verifizierungsstatus und die weiteren Felder, die für die Anmeldung verwendet werden.
+- **Policies, auf die sich Auth stützt**, werden unabhängig davon hinzugefügt, was `rls` festlegt: Ein angemeldeter Benutzer liest seine eigene Zeile und nur ein Admin beschreibt die Berechtigungsspalten, sodass sich niemand selbst eine Rolle zuweisen kann.
+- **Ein `auth`-Block** deklariert das Zugriffsmodell und die Hooks, die ausgeführt werden, wenn ein Admin einen Benutzer erstellt oder ein Passwort zurücksetzt.
 
 ```ts
 // backend/schema/users.ts
@@ -42,44 +36,39 @@ export const users = defineAuthTable("users", {
 });
 ```
 
-Ein Projekt hat höchstens eine Benutzertabelle. Ein zweites `defineAuthTable` wird bei
-der Kompilierung des Schemas abgelehnt; machen Sie daraus ein `defineTable`.
+Ein Projekt hat höchstens eine Benutzertabelle. Ein zweites `defineAuthTable` wird abgelehnt, wenn das Schema kompiliert wird; verwenden Sie stattdessen `defineTable`.
 
-`rls` ist hier wie bei jeder Tabelle erforderlich. Das injizierte Selbstlesen und die
-Schreibbeschränkung für Admins werden zusätzlich zu Ihren Regeln hinzugefügt, sodass `"admin-only"` eine gültige Konfiguration ist:
-Admins verwalten Benutzer, und jeder Benutzer kann weiterhin seine eigene Zeile lesen.
+`rls` ist hier wie bei jeder Tabelle erforderlich. Das injizierte Self-Read und das Admin-Schreib-Gate werden neben Ihren Regeln hinzugefügt, sodass `"admin-only"` eine gültige Konfiguration ist: Admins verwalten Benutzer, und jeder Benutzer kann weiterhin seine eigene Zeile lesen.
 
 ## Die Spalten
 
-Deklarieren Sie die Spalten, die Ihre App liest oder darstellt, mit den Modifikatoren, die Sie wünschen;
-Auth fügt diejenigen hinzu, die es benötigt und die Sie weggelassen haben. Eine deklarierte Spalte mit dem
-Schlüssel oder SQL-Namen einer Auth-Spalte (`email`, `displayName`, `roles`, `passwordHash`,
-`emailVerified`, `createdAt`, …) ist genau diese Spalte.
+Deklarieren Sie die Spalten, die Ihre App liest oder darstellt, mit den gewünschten Modifikatoren; Auth fügt diejenigen hinzu, die es benötigt und die Sie weggelassen haben. Eine deklarierte Spalte mit dem Schlüssel oder SQL-Namen einer Auth-Spalte (`email`, `displayName`, `roles`, `passwordHash`, `emailVerified`, `createdAt`, …) entspricht dieser Spalte.
 
-Die Geheimnisse des Servers verlassen niemals den Server: Der Passwort-Hash und das
-Verifizierungstoken sind unabhängig von der Deklaration privat, sodass ein Lesevorgang
-sie niemals ausliefert und ein clientseitiger Schreibvorgang sie nicht setzen kann.
+Die Secrets des Servers verlassen niemals den Server: Der Passwort-Hash und das Verifizierungs-Token sind privat, unabhängig von der Deklaration, sodass ein Lesezugriff sie niemals ausliefert und ein Client-Schreibzugriff sie nicht setzen kann.
 
-Ein Benutzer besitzt eine Rolle, wenn diese in seiner `roles`-Spalte aufgeführt ist. Wenn die Spalte als
-`col.text({ enum: [...] }).array()` deklariert wird, ist sie auf die von Ihnen benannten Rollen beschränkt;
-lassen Sie dies weg, bleibt sie offen, da eine Rolle existiert, sobald sie einem Benutzer zugewiesen wird.
+Ein Benutzer besitzt eine Rolle, wenn seine Spalte `roles` diese auflistet. Wenn Sie die Spalte als `col.text({ enum: [...] }).array()` deklarieren, wird sie auf die von Ihnen genannten Rollen beschränkt; lassen Sie dies weg, bleibt sie offen, da eine Rolle existiert, sobald sie einem Benutzer zugewiesen wird.
 
-Regeln für andere Tabellen können wie gewohnt auf die Spalten der Benutzertabelle verweisen. Eine Regel für
-die Benutzertabelle selbst kann ebenfalls jede Auth-Spalte benennen, unabhängig davon, ob sie deklariert ist oder nicht.
+Regeln für andere Tabellen können wie gewohnt Spalten der Benutzertabelle referenzieren. Eine Regel für die Benutzertabelle selbst kann ebenfalls jede Auth-Spalte referenzieren, unabhängig davon, ob sie deklariert ist oder nicht.
+
+## Ohne eine Benutzertabelle
+
+<span class="since-badge" data-since="0.35">Seit 0.35</span>
+
+Die Deklaration einer solchen Tabelle ist optional. Auth funktioniert in beiden Fällen: Ohne `defineAuthTable` werden die Benutzer in `rebase.users` gespeichert, und Konten sowie Rollen werden im Studio unter **Users & Roles** verwaltet. Das Admin-Panel zeigt Benutzer nur dann als Tabelle an, wenn das Projekt eine deklariert; das Weglassen der Datei hält sie also aus dem Admin-Panel heraus.
+
+Um sie zu deklarieren, beginnen Sie mit der Datei `backend/schema/users.ts` des Scaffolds oder führen Sie `rebase schema introspect --users` für eine Datenbank aus, die `rebase.users` bereits enthält. Beide stimmen mit der Tabelle überein, die Auth erstellt (ein `text`-Schlüssel und jede Auth-Spalte), sodass `db push` daran nichts ändert und eine Migration von `db generate` sie mit `IF NOT EXISTS` erstellt. Fügen Sie anschließend Ihre eigenen Spalten hinzu.
 
 ## Der `auth`-Block
 
-| Schlüssel | Beschreibung |
+| Schlüssel | Funktion |
 |---|---|
 | `roles` | Die Rollen, die ein Benutzer innehaben kann, jeweils mit einem `name`, einer optionalen `description` und den Admin-Ebenen- und App-`scopes`, die sie gewährt. `admin` ist integriert und kann nicht deklariert werden. |
 | `scopes` | Die anwendungseigenen Scopes nach `resource:action`-Name, jeweils mit einem `label`, einer optionalen `description` und einem optionalen `target`. |
-| `personalKeys` | `true` ermöglicht es jedem Benutzer, [persönliche API-Schlüssel](/docs/backend/api-keys/#personal-keys) zu erstellen. |
+| `personalKeys` | `true` erlaubt es jedem Benutzer, [persönliche API-Schlüssel](/docs/backend/api-keys/#personal-keys) zu erstellen. |
 | `onCreateUser` | Wird ausgeführt, wenn ein Admin einen Benutzer über die API erstellt: Gibt die zu speichernden Werte und optional ein temporäres Passwort zurück, das dem Admin angezeigt wird. |
 | `onResetPassword` | Wird ausgeführt, wenn ein Admin das Passwort eines Benutzers zurücksetzt: Gibt ein temporäres Passwort zurück oder sendet einen eigenen Reset-Link. |
 
-`roles`, `scopes` und `personalKeys` werden mit dem Deskriptor der Tabelle bereitgestellt.
-Die beiden Hooks verbleiben auf dem Server; der Deskriptor gibt lediglich an, welche davon existieren. [Rollen und Scopes](/docs/backend/roles-and-scopes/)
-beschreibt, was die einzelnen Scopes gewähren und wie Schlüssel und Tokens diese einschränken.
+`roles`, `scopes` und `personalKeys` werden mit dem Deskriptor der Tabelle bereitgestellt. Die beiden Hooks verbleiben auf dem Server; der Deskriptor gibt lediglich an, welche davon existieren. [Rollen und Scopes](/docs/backend/roles-and-scopes/) beschreibt, was jeder Scope gewährt und wie Schlüssel und Tokens ihn einschränken.
 
 ### `onCreateUser` und `onResetPassword`
 
@@ -112,30 +101,20 @@ export const members = defineAuthTable("members", {
 });
 ```
 
-Ein von `onResetPassword` zurückgegebenes `temporaryPassword` wird zum Passwort
-des Kontos: Rebase hasht es, speichert es, meldet den Benutzer von jeder Sitzung ab und
-zeigt es dem Admin zur Weitergabe an. Geben Sie keines zurück, wenn der Hook seinen eigenen
-Reset-Link sendet; das Passwort bleibt dann unverändert, bis der Benutzer ein neues festlegt, und
-die Sitzungen werden dennoch beendet.
+Ein von `onResetPassword` zurückgegebenes `temporaryPassword` wird zum Passwort des Kontos: Rebase hasht es, speichert es, meldet den Benutzer von allen Sitzungen ab und zeigt es dem Admin zur Weitergabe an. Geben Sie keines zurück, wenn der Hook einen eigenen Reset-Link versendet; das Passwort bleibt dann unverändert, bis der Benutzer ein neues festlegt, und die Sitzungen werden dennoch beendet.
 
 Beide Hooks erhalten einen Kontext mit:
 
 - `hashPassword(password)`: Hashen mit dem konfigurierten Algorithmus;
-- `sendEmail(options)`: Eine E-Mail senden; nur vorhanden, wenn E-Mail konfiguriert ist.
-  Löst mit den Rückmeldungen des Anbieters auf (`messageId`, `accepted`,
-  `rejected`);
+- `sendEmail(options)`: Versenden einer E-Mail, nur vorhanden, wenn E-Mail konfiguriert ist. Löst mit den Rückmeldungen des Providers auf (`messageId`, `accepted`, `rejected`);
 - `emailConfigured`, `appName` und `resetPasswordUrl`.
 
 ## Was bei Auth-Schreibvorgängen nicht ausgeführt wird
 
-Registrierung, OAuth-Anmeldung und die Benutzerverwaltung durch Admins schreiben die Benutzertabelle
-direkt. Die [Hooks](/docs/collections/callbacks/) der Tabelle werden bei diesen Schreibvorgängen
-nicht ausgeführt, sodass eine Willkommens-E-Mail in `afterSave` bei der Registrierung niemals ausgelöst wird.
-Platzieren Sie diese stattdessen in den im Backend konfigurierten Auth-Lifecycle-Hooks (`beforeUserCreate`,
-`afterUserCreate`, `afterUserDelete`, …). Siehe [Authentifizierung](/docs/backend/authentication/).
+Registrierung, OAuth-Anmeldung und die Benutzerverwaltung durch Admins schreiben direkt in die Benutzertabelle. Die [Hooks](/docs/collections/callbacks/) der Tabelle werden bei diesen Schreibvorgängen nicht ausgeführt, sodass eine Willkommens-E-Mail in `afterSave` bei der Registrierung niemals ausgelöst wird. Platzieren Sie diese stattdessen in den Auth-Lifecycle-Hooks (`beforeUserCreate`, `afterUserCreate`, `afterUserDelete`, …), die im Backend konfiguriert sind. Siehe [Authentifizierung](/docs/backend/authentication/).
 
 ## Nächste Schritte
 
 - [Authentifizierung](/docs/backend/authentication/): Anmeldemethoden, Tokens und die Auth-Hooks
-- [Rollen und Scopes](/docs/backend/roles-and-scopes/): Deklarieren von Rollen und App-Scopes
-- [Row-Level Security](/docs/collections/security-rules/): Richtlinien neben den injizierten
+- [Rollen und Scopes](/docs/backend/roles-and-scopes/): Rollen und App-Scopes deklarieren
+- [Row-Level-Security](/docs/collections/security-rules/): Die Policies neben den injizierten Regeln

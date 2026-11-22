@@ -1,21 +1,21 @@
 ---
-sourceHash: e70397bdea9251db
+sourceHash: e934bb43a5bf4916
 title: A tabela de usuários
 sidebar_label: Tabela de usuários
-description: "defineAuthTable declara a tabela na qual a autenticação armazena os usuários: as colunas de que a autenticação precisa, uma política de auto-leitura, colunas de privilégio exclusivas para administradores e o modelo de acesso — roles, escopos de aplicativo, chaves pessoais e os hooks de ciclo de vida do usuário."
+description: "O defineAuthTable declara a tabela na qual a autenticação armazena os usuários: as colunas de que a autenticação precisa, uma política de auto-leitura, colunas de privilégio exclusivas para admin e o modelo de acesso — roles, escopos da aplicação, chaves pessoais e os hooks do ciclo de vida do usuário."
 ---
 
 `defineAuthTable` declara a tabela que a autenticação lê e escreve. É um
-`defineTable` com três adições:
+`defineTable` com três coisas adicionadas:
 
 - **As colunas de que a autenticação precisa** são adicionadas quando a tabela não as declara:
-  o e-mail, o hash da senha, a coluna `roles`, o estado de verificação e
-  os outros campos utilizados pelo login.
-- **As políticas das quais a autenticação depende** são adicionadas independentemente do que o `rls` disser: um usuário autenticado
-  lê sua própria linha, e apenas um administrador grava nas colunas de privilégio, para que ninguém
+  o e-mail, o hash da senha, a coluna `roles`, o estado de verificação e os
+  outros campos que o login utiliza.
+- **As políticas das quais a autenticação depende** são adicionadas independentemente do que o `rls` defina: um usuário autenticado
+  lê a sua própria linha, e apenas um admin escreve nas colunas de privilégio, para que ninguém
   possa conceder uma role a si mesmo.
-- **Um bloco `auth`** declara o modelo de acesso e os hooks executados quando um
-  administrador cria um usuário ou redefine uma senha.
+- **Um bloco `auth`** declara o modelo de acesso e os hooks que são executados quando um
+  admin cria um usuário ou redefine uma senha.
 
 ```ts
 // backend/schema/users.ts
@@ -42,16 +42,16 @@ export const users = defineAuthTable("users", {
 });
 ```
 
-Um projeto tem no máximo uma tabela de usuários. Um segundo `defineAuthTable` é recusado
-quando o schema é compilado; torne-o um `defineTable`.
+Um projeto tem, no máximo, uma tabela de usuários. Um segundo `defineAuthTable` é recusado
+quando o schema é compilado; transforme-o em um `defineTable`.
 
-O `rls` é obrigatório aqui como em qualquer tabela. A auto-leitura injetada e a barreira
-de escrita para administradores são adicionadas junto às suas regras, portanto `"admin-only"` é uma postura válida:
-administradores gerenciam usuários, e cada usuário ainda lê sua própria linha.
+`rls` é obrigatório aqui como em qualquer tabela. A auto-leitura injetada e o controle de
+escrita de admin são adicionados juntamente com as suas regras, de modo que `"admin-only"` é uma postura válida:
+administradores gerenciam usuários, e cada usuário ainda lê a sua própria linha.
 
 ## As colunas
 
-Declare as colunas que seu aplicativo lê ou apresenta, com os modificadores que desejar;
+Declare as colunas que a sua aplicação lê ou exibe, com os modificadores que desejar;
 a autenticação adiciona aquelas de que precisa e que você omitiu. Uma coluna declarada com a
 chave ou o nome SQL de uma coluna de autenticação (`email`, `displayName`, `roles`, `passwordHash`,
 `emailVerified`, `createdAt`, …) é essa coluna.
@@ -60,22 +60,37 @@ Os segredos do servidor nunca saem do servidor: o hash da senha e o
 token de verificação são privados, independentemente do que a declaração diga, portanto uma leitura nunca
 os retorna e uma escrita do cliente não pode defini-los.
 
-Um usuário possui uma role quando sua coluna `roles` a lista. Declarar a coluna como
-`col.text({ enum: [...] }).array()` a restringe às roles especificadas; omitir
-isso a mantém aberta, visto que uma role passa a existir assim que é atribuída a um usuário.
+Um usuário possui uma role quando a sua coluna `roles` a lista. Declarar a coluna como
+`col.text({ enum: [...] }).array()` a restringe às roles nomeadas; omiti-la
+a mantém aberta, já que uma role passa a existir assim que é atribuída a um usuário.
 
-Regras em outras tabelas podem referenciar as colunas da tabela de usuários normalmente. Uma regra na
+Regras em outras tabelas podem referenciar as colunas da tabela de usuários como de costume. Uma regra na
 própria tabela de usuários também pode referenciar todas as colunas de autenticação, declaradas ou não.
+
+## Sem uma tabela de usuários
+
+<span class="since-badge" data-since="0.35">Desde 0.35</span>
+
+Declarar uma é opcional. A autenticação funciona de qualquer forma: sem nenhum `defineAuthTable`,
+ela mantém os seus usuários em `rebase.users`, e as contas e roles são gerenciadas no
+Studio em **Users & Roles**. O painel de administração exibe Users como uma tabela apenas quando o
+projeto declara uma; portanto, omitir o arquivo a mantém fora do painel de administração.
+
+Para declará-la, comece a partir do arquivo do scaffold `backend/schema/users.ts`, ou execute
+`rebase schema introspect --users` em um banco de dados que já possua
+`rebase.users`. Ambos correspondem à tabela criada pela autenticação (uma chave `text` e todas as
+colunas de autenticação), portanto o `db push` não altera nada nela, e uma migration gerada por
+`db generate` a cria com `IF NOT EXISTS`. Depois, adicione as suas próprias colunas.
 
 ## O bloco `auth`
 
 | Chave | O que faz |
 |---|---|
-| `roles` | As roles que um usuário pode ter, cada uma com um `name`, uma `description` opcional e os `scopes` de aplicativo e de plano de administração concedidos. O `admin` é integrado e não pode ser declarado. |
-| `scopes` | Os escopos do próprio aplicativo, pelo nome `resource:action`, cada um com um `label`, uma `description` opcional e um `target` opcional. |
+| `roles` | As roles que um usuário pode possuir, cada uma com um `name`, uma `description` opcional e os `scopes` do painel de administração e da aplicação que ela concede. `admin` é integrada e não pode ser declarada. |
+| `scopes` | Os escopos da própria aplicação, por nome `resource:action`, cada um com um `label`, uma `description` opcional e um `target` opcional. |
 | `personalKeys` | `true` permite que cada usuário crie [chaves de API pessoais](/docs/backend/api-keys/#personal-keys). |
-| `onCreateUser` | Executado quando um administrador cria um usuário por meio da API: retorne os valores a serem armazenados e, opcionalmente, uma senha temporária para exibir ao administrador. |
-| `onResetPassword` | Executado quando um administrador redefine a senha de um usuário: retorne uma senha temporária ou envie seu próprio link de redefinição. |
+| `onCreateUser` | Executado quando um admin cria um usuário por meio da API: retorne os valores a serem armazenados e, opcionalmente, uma senha temporária para exibir ao admin. |
+| `onResetPassword` | Executado quando um admin redefine a senha de um usuário: retorne uma senha temporária ou envie o seu próprio link de redefinição. |
 
 `roles`, `scopes` e `personalKeys` são disponibilizados com o descritor da tabela.
 Os dois hooks permanecem no servidor; o descritor apenas informa quais deles existem. [Roles e escopos](/docs/backend/roles-and-scopes/)
@@ -112,30 +127,30 @@ export const members = defineAuthTable("members", {
 });
 ```
 
-Uma `temporaryPassword` retornada de `onResetPassword` torna-se a senha da
-conta: o Rebase calcula o hash, salva-o, encerra todas as sessões do usuário e
-exibe a senha ao administrador para repasse. Não retorne nenhuma senha quando o hook enviar seu próprio link
-de redefinição; a senha permanecerá como está até que o usuário defina uma nova, e suas
-sessões ainda serão encerradas.
+Uma `temporaryPassword` retornada de `onResetPassword` se torna a senha da
+conta: o Rebase gera o hash, salva, encerra todas as sessões do usuário e
+a exibe para que o admin a repasse. Não retorne nenhuma se o hook enviar o seu próprio link de
+redefinição; a senha então permanecerá como está até que o usuário defina uma nova, e as suas
+sessões ainda assim serão encerradas.
 
 Ambos os hooks recebem um contexto com:
 
-- `hashPassword(password)`: calcula o hash com o algoritmo configurado;
-- `sendEmail(options)`: envia um e-mail, presente apenas quando o e-mail estiver configurado.
-  Retorna o que o provedor reportou (`messageId`, `accepted`,
+- `hashPassword(password)`: gera o hash com o algoritmo configurado;
+- `sendEmail(options)`: envia um e-mail, presente apenas quando o e-mail está configurado.
+  Resolve com o que o provedor reportou (`messageId`, `accepted`,
   `rejected`);
 - `emailConfigured`, `appName` e `resetPasswordUrl`.
 
-## O que não é executado em operações de escrita da autenticação
+## O que não é executado para escritas de autenticação
 
-O cadastro, o login via OAuth e o gerenciamento de usuários por administradores escrevem na tabela de usuários
+O cadastro, o login via OAuth e o gerenciamento de usuários feito por um admin escrevem na tabela de usuários
 diretamente. Os [hooks](/docs/collections/callbacks/) da tabela não são executados para essas
-operações de escrita, portanto um e-mail de boas-vindas em `afterSave` nunca é disparado no cadastro. Configure-o
-nos hooks de ciclo de vida de autenticação (`beforeUserCreate`, `afterUserCreate`, `afterUserDelete`,
+escritas, portanto um e-mail de boas-vindas em `afterSave` nunca será disparado no cadastro. Coloque-o nos
+hooks do ciclo de vida da autenticação (`beforeUserCreate`, `afterUserCreate`, `afterUserDelete`,
 …) configurados no backend. Consulte [Autenticação](/docs/backend/authentication/).
 
 ## Próximos passos
 
 - [Autenticação](/docs/backend/authentication/): métodos de login, tokens e os hooks de autenticação
-- [Roles e escopos](/docs/backend/roles-and-scopes/): declaração de roles e escopos de aplicativo
-- [Segurança em nível de linha](/docs/collections/security-rules/): as políticas em conjunto com as injetadas
+- [Roles e escopos](/docs/backend/roles-and-scopes/): declaração de roles e escopos da aplicação
+- [Segurança em nível de linha](/docs/collections/security-rules/): as políticas além das injetadas

@@ -1,8 +1,8 @@
 ---
-sourceHash: 240e1a646da099f3
+sourceHash: 27ca2cec149d653e
 title: Einführung
 sidebar_label: Einführung
-description: Rebase ist das Open-Source-Backend für Postgres mit einem Admin-Panel für Ihr Team, entwickelt mit React und TypeScript. Definieren Sie Ihr Schema in TypeScript, und Rebase generiert eine vollständige CRUD-Benutzeroberfläche, eine REST-API, Authentifizierung, Speicher und Echtzeitsynchronisierung – powered by PostgreSQL.
+description: Rebase ist das Open-Source-Backend für Postgres mit einem Admin-Panel für Ihr Team, entwickelt mit React und TypeScript. Definieren Sie Ihr Schema in TypeScript, und Rebase generiert eine vollständige CRUD-UI, REST-API, Authentifizierung, Storage und Echtzeit-Synchronisierung – powered by PostgreSQL.
 ---
 
 import { AdminDemoCarousel } from "../../../../components/demos/AdminDemoCarousel";
@@ -11,32 +11,29 @@ import { AdminDemoCarousel } from "../../../../components/demos/AdminDemoCarouse
 
 ## Was ist Rebase?
 
-Rebase ist das **Open-Source-Backend für PostgreSQL** mit einem **Admin-Panel** für Ihr Team, entwickelt mit React und TypeScript. Es bietet Ihnen alles, was Sie zum Erstellen einer produktionsreifen Anwendung auf Basis von **PostgreSQL** benötigen:
+Rebase ist das **Open-Source-Backend für PostgreSQL** mit einem **Admin-Panel** für Ihr Team, entwickelt mit React und TypeScript. Es bietet Ihnen alles, was Sie benötigen, um eine produktionsreife Anwendung auf **PostgreSQL** aufzubauen:
 
-- **Schema as Code** — Deklarieren Sie Ihre Postgres-Tabellen in TypeScript, jeweils mit einer erforderlichen Richtlinie für Row Level Security. Rebase generiert aus dieser einzigen Source of Truth die Tabellen und deren Richtlinien, REST-API-Endpunkte, ein typisiertes SDK und eine vollständige CRUD-Benutzeroberfläche.
-- **Sofort einsatzbereites Admin-Panel** — Ein ansprechendes, schnelles React-basiertes Panel mit Tabellenkalkulationsansichten, Listen, Formularen, Kanban-Boards, Inline-Bearbeitung und Echtzeitsynchronisierung.
-- **Integriertes Backend** — Authentifizierung (Passwörter, Magic Links, Einmal-Codes, MFA, API-Schlüssel und zwölf OAuth/OIDC-Anbieter), Dateispeicher (lokal, S3 oder GCS), Row Level Security, Entitätshistorie und WebSocket-Echtzeit – alles von Haus aus integriert.
-- **Radikal erweiterbar** — Was Sie in React erstellen können, können Sie auch zu Rebase hinzufügen. Eigene Felder, benutzerdefinierte Ansichten, Plugins und vollständiger Zugriff auf interne Hooks.
+- **Schema as Code** — Deklarieren Sie Ihre Postgres-Tabellen in TypeScript, jeweils mit einer erforderlichen Row-Level-Security-Richtlinie. Rebase generiert die Tabellen und deren Richtlinien, REST-API-Endpunkte, ein typisiertes SDK und eine vollständige CRUD-UI aus dieser zentralen Source of Truth.
+- **Instant-Admin-Panel** — Ein ansprechendes, schnelles React-basiertes Panel mit Spreadsheet-Tabellen, Listen, Formularen, Kanban-Boards, Inline-Bearbeitung und Echtzeit-Synchronisierung.
+- **Integriertes Backend** — Authentifizierung (Passwörter, Magic Links, Einmal-Codes, MFA, API-Schlüssel und zwölf OAuth/OIDC-Anbieter), Dateispeicher (lokal, S3 oder GCS), Row-Level-Security, Entitätshistorie und WebSocket-Echtzeit – alles von Haus aus integriert.
+- **Radikal erweiterbar** — Wenn Sie es in React bauen können, können Sie es zu Rebase hinzufügen. Benutzerdefinierte Felder, individuelle Ansichten, Plugins und voller Zugriff auf interne Hooks.
 
 :::tip
-Rebase funktioniert auf beide Arten, und Ihr Code ändert sich dabei nicht. **Self-Hosting** — Sie besitzen die Daten, den Code und die Maschine, auf der es läuft. Oder deployen Sie dasselbe Projekt in der **Rebase Cloud** ([app.rebase.pro](https://app.rebase.pro)), was dasselbe Rebase ist, das für Sie betrieben wird; es ist bereits heute mit echten Mandanten live und wird während der privaten Beta schrittweise geöffnet. Betrachten Sie es als Open-Source-Alternative zu Supabase oder Retool, bei der *Sie* entscheiden, wer es betreibt.
+Rebase funktioniert auf beide Arten, und Ihr Code ändert sich dabei nicht. **Hosten Sie es selbst** – Sie besitzen die Daten, den Code und die Maschine, auf der es läuft. Oder deployen Sie dasselbe Projekt in der **Rebase Cloud** ([app.rebase.pro](https://app.rebase.pro)), was dasselbe Rebase ist, das für Sie betrieben wird; sie ist bereits heute mit echten Mandanten live und wird während der privaten Beta schrittweise geöffnet. Betrachten Sie es als Open-Source-Alternative zu Supabase oder Retool, bei der *Sie* entscheiden, wer es betreibt.
 :::
 
 ## Wählen Sie Ihren Weg
 
-Rebase ist ein Backend und ein Admin-Panel, die sich einen Server teilen. Beginnen Sie mit dem Teil, den
-Sie suchen:
+Rebase ist ein Backend und ein Admin-Panel, die sich einen Server teilen. Starten Sie mit dem, weswegen Sie hier sind:
 
-| Ich möchte… | Hier starten | Was Sie erhalten |
+| Ich möchte… | Hier starten | Was Sie bekommen |
 |---|---|---|
-| **Ein Backend und ein Admin-Panel** | [Schnellstart](/docs/getting-started/quickstart/) | Tabellen in TypeScript, eine generierte CRUD-UI, eine REST-API, Authentifizierung, Speicher und Echtzeit |
-| **Nur die API über meiner eigenen Datenbank** | [Nur Backend](/docs/getting-started/headless/) | Eine Headless-REST-API und ein SDK über Ihrem bestehenden PostgreSQL — ohne Admin-Panel, ohne Tabellendateien |
+| **Ein Backend und ein Admin-Panel** | [Quickstart](/docs/getting-started/quickstart/) | Tabellen in TypeScript, eine generierte CRUD-UI, eine REST-API, Authentifizierung, Storage und Echtzeit |
+| **Nur die API über meiner eigenen Datenbank** | [Backend only](/docs/getting-started/headless/) | Eine Headless-REST-API und ein SDK über Ihrem bestehenden PostgreSQL – kein Admin-Panel, keine Tabellendateien |
 
-Keine der beiden Optionen ist eine Einbahnstraße: Ein Headless-Projekt kann durch Hinzufügen eines
-Frontends um ein Admin-Panel erweitert werden, welches jede vom Backend bereitgestellte Tabelle rendert, und beide Varianten können ihre
-Tabellen in `backend/schema/` festhalten, wenn sie als Code definiert werden sollen.
+Keiner der Wege ist eine Einbahnstraße: Ein Headless-Projekt kann durch Hinzufügen eines Frontends zu einem Admin-Panel ausgebaut werden, das jede Tabelle rendert, die das Backend bereitstellt. Und beide können ihre Tabellen in `backend/schema/` festhalten, wenn sie als Code vorliegen sollen.
 
-## Funktionsweise
+## Wie es funktioniert
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -68,61 +65,52 @@ pnpm dlx @rebasepro/cli init my-app
 cd my-app
 ```
 
-`init` generiert eine sofort einsatzbereite `.env` für Sie — kein Bearbeiten erforderlich. Danach:
+`init` generiert eine sofort einsatzbereite `.env` für Sie – keine Bearbeitung erforderlich. Danach:
 
 ```bash
 pnpm install
 pnpm run dev
 ```
 
-Das ist schon der gesamte erste Start. Es muss keine Datenbank installiert und kein Schemaschritt ausgeführt werden:
-Wenn keine `DATABASE_URL` gesetzt ist, startet `rebase dev` ein verwaltetes PostgreSQL (PGlite) im
-Projektverzeichnis, generiert das Schema aus Ihren Tabellen und erstellt
-die Tabellen beim Systemstart.
+Das ist schon der gesamte erste Start. Es muss keine Datenbank installiert und kein Schema-Schritt ausgeführt werden: Wenn keine `DATABASE_URL` gesetzt ist, startet `rebase dev` ein verwaltetes PostgreSQL (PGlite) im Projektverzeichnis, generiert das Schema aus Ihren Tabellen und erstellt die Tabellen beim Start.
 
-**Lesen Sie die URLs aus der Ausgabe ab.** `rebase dev` wählt pro Projekt einen freien Port
-statt fester Ports, sodass sie sich zwischen Projekten und Maschinen unterscheiden.
-Das erste Konto, das Sie registrieren, wird zum Admin — auf Ihrer Maschine. Bei einem
-Produktions-Deployment wird der Admin stattdessen über `REBASE_ADMIN_EMAIL` und
-`REBASE_ADMIN_PASSWORD` festgelegt (siehe [Konfiguration](/docs/getting-started/configuration/)).
+**Entnehmen Sie die URLs der Ausgabe.** `rebase dev` wählt für jedes Projekt einen freien Port anstelle fester Ports, sodass sie sich zwischen Projekten und Maschinen unterscheiden. Das erste Konto, das Sie registrieren, wird zum Admin – auf Ihrem Rechner. Ein Produktions-Deployment benennt seinen Admin stattdessen über `REBASE_ADMIN_EMAIL` und `REBASE_ADMIN_PASSWORD` (siehe [Konfiguration](/docs/getting-started/configuration/)).
 
-Um stattdessen Ihr eigenes Postgres zu verwenden, heben Sie die Auskommentierung von `DATABASE_URL` in der `.env` auf und führen Sie
-`pnpm run dev` erneut aus.
+Um stattdessen Ihr eigenes Postgres zu verwenden, heben Sie die Auskommentierung von `DATABASE_URL` in der `.env` auf und führen Sie `pnpm run dev` erneut aus.
 
-→ Folgen Sie der vollständigen [Schnellstartanleitung](/docs/getting-started/quickstart) für eine komplette Übersicht, einschließlich des Verbindens Ihrer eigenen Datenbank.
+→ Folgen Sie der vollständigen [Quickstart-Anleitung](/docs/getting-started/quickstart) für eine umfassende Einführung, einschließlich der Anbindung Ihrer eigenen Datenbank.
 
 ## Kernfunktionen
 
 | Funktion | Beschreibung |
 |---------|-------------|
-| **Tabellenkalkulationsansichten** | Schnelle, virtualisierte Tabelle mit Inline-Bearbeitung, Filterung, Sortierung und Textsuche |
+| **Spreadsheet-Ansichten** | Schnelle, virtualisierte Tabelle mit Inline-Bearbeitung, Filterung, Sortierung und Textsuche |
 | **Listenansicht** | Übersichtliche, responsive vertikale Listenansicht für jede Tabelle |
-| **Kanban-Board** | Drag-and-Drop-Boardansicht, gruppiert nach einer beliebigen Enum-Spalte |
-| **Relationen** | Eins-zu-Eins, Eins-zu-Viele, Viele-zu-Viele mit Verknüpfungstabellen und Multi-Hop-Joins |
-| **Row Level Security** | Postgres-RLS-Richtlinien, kompiliert aus dem `rls`, das jede Tabelle deklarieren muss |
-| **Authentifizierung** | JWT + Refresh-Token, zwölf OAuth/OIDC-Anbieter, Magic Links, Einmal-Codes, TOTP MFA, scoped API-Schlüssel, rollenbasierte Zugriffskontrolle |
-| **Dateispeicher** | Lokales Dateisystem, S3-kompatibel oder Google Cloud Storage, mit Upload-Feldern und Dateibrowser |
-| **Echtzeitsynchronisierung** | WebSocket-gestützte Live-Updates über alle verbundenen Clients hinweg |
-| **Entitätshistorie** | Vollständiges Audit-Protokoll für jede Erstellung, Aktualisierung und Löschung |
+| **Kanban-Board** | Drag-and-Drop-Boardansicht, gruppiert nach beliebigen Enum-Spalten |
+| **Relationen** | 1:1-, 1:n- und n:m-Beziehungen mit Junction-Tabellen und Multi-Hop-Joins |
+| **Row-Level-Security** | Postgres-RLS-Policies, kompiliert aus der `rls`, die jede Tabelle deklarieren muss |
+| **Authentifizierung** | JWT + Refresh-Tokens, zwölf OAuth/OIDC-Anbieter, Magic Links, Einmal-Codes, TOTP-MFA, berechtigte API-Schlüssel, rollenbasierte Zugriffskontrolle |
+| **Dateispeicher** | Lokales Dateisystem, S3-kompatibler Speicher oder Google Cloud Storage, mit Upload-Feldern und Dateibrowser |
+| **Echtzeit-Synchronisierung** | WebSocket-gestützte Live-Updates für alle verbundenen Clients |
+| **Entitätshistorie** | Vollständiger Audit-Trail für jeden Erstell-, Aktualisierungs- und Löschvorgang |
 | **REST-API** | Automatisch generierte CRUD-Endpunkte für jede Tabelle |
-| **Datenimport/-export** | CSV-, JSON- und Excel-Import mit Feld-Mapping; CSV/JSON-Export |
-| **Typisiertes SDK** | Typsicheres JavaScript-SDK für Ihre Frontend-Anwendungen |
-| **Plugin-System** | Erweitern Sie jeden Teil der Benutzeroberfläche — Toolbar, Formulare, Felder, Startseite |
+| **Datenimport/-export** | CSV-, JSON- und Excel-Import mit Feld-Mapping; CSV-/JSON-Export |
+| **Typisiertes SDK** | Typsicheres JavaScript-SDK für Ihre Frontend-Apps |
+| **Plugin-System** | Erweitern Sie jeden Bereich der Benutzeroberfläche – Toolbar, Formulare, Felder, Startseite |
 | **KI-Datenoptimierung** | LLM-gestützte Autovervollständigung für Textfelder |
-| **Cron-Jobs** | Geplante Hintergrundaufgaben mit Überwachung, Protokollierung und Studio-Dashboard |
-| **Eigene Funktionen** | Dateibasierte Hono-Routen, die automatisch mit Authentifizierungs-Middleware und DB-Zugriff eingebunden werden |
-| **E-Mail-Dienst** | Integriertes SMTP für Passwortzurücksetzung, Verifizierung und transaktionale E-Mails |
-| **Datenbank-Branching** | Sofortige isolierte Kopien Ihrer Datenbank für Entwicklung, Staging oder Tests |
+| **Cron-Jobs** | Geplante Hintergrundaufgaben mit Monitoring, Logging und Studio-Dashboard |
+| **Benutzerdefinierte Funktionen** | Dateibasierte Hono-Routen mit DB-Zugriff, standardmäßig öffentlich: Das Token des Aufrufers wird ausgelesen, wenn es übergeben wird, und `requireAuth` schützt eine Route |
+| **E-Mail-Dienst** | Integriertes SMTP für Passwort-Resets, Verifizierung und transaktionale E-Mails |
+| **Datenbank-Branching** | Sofortige, isolierte Kopien Ihrer Datenbank für Entwicklung, Staging oder Tests |
 | **Webhooks** | HMAC-signierte ausgehende Benachrichtigungen bei INSERT, UPDATE, DELETE |
-| **Broadcast-Kanäle** | WebSocket-Kanäle für Echtzeitnachrichten zwischen verbundenen Clients |
-| **Präsenzerkennung** | Online-Benutzer erfassen und gemeinsamen Status über Teilnehmer hinweg synchronisieren |
+| **Broadcast-Kanäle** | WebSocket-Kanäle für Echtzeit-Messaging zwischen verbundenen Clients |
+| **Präsenz-Tracking** | Erfassen von Online-Benutzern und Synchronisieren geteilter Zustände unter Teilnehmern |
 
 ## Nächste Schritte
 
-- **[Schnellstart](/docs/getting-started/quickstart)** — In 2 Minuten startklar
-- **[Nur Backend](/docs/getting-started/headless/)** — Die Headless-API über einer bereits vorhandenen Datenbank
-- **[Projektstruktur](/docs/getting-started/project-structure)** — Verstehen Sie den generierten Code
-  und die Begriffe, die auf den restlichen Seiten vorausgesetzt werden
+- **[Quickstart](/docs/getting-started/quickstart)** — In 2 Minuten startklar
+- **[Backend only](/docs/getting-started/headless/)** — Die Headless-API über eine Datenbank, die Sie bereits besitzen
+- **[Projektstruktur](/docs/getting-started/project-structure)** — Verstehen Sie den generierten Code und die Begriffe, die auf den restlichen Seiten vorausgesetzt werden
 - **[Tabellen](/docs/schema/)** — Definieren Sie Ihr Datenschema
-- **[Backend](/docs/backend)** — Konfigurieren Sie Authentifizierung, Speicher und die API
-- **[Architektur](/docs/architecture)** — Verstehen Sie, wie alles zusammenhängt
+- **[Backend](/docs/backend)** — Konfigurieren Sie Authentifizierung, Storage und die API
+- **[Architektur](/docs/architecture)** — Verstehen Sie das Zusammenspiel der Komponenten
