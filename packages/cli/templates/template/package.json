@@ -47,6 +47,7 @@
     },
     "allowScripts": {
         "@ariga/atlas": true,
-        "esbuild": false
+        "esbuild": false,
+        "fsevents": false
     }
 }
