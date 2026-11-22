@@ -1,4 +1,5 @@
 ---
+import { offerKey } from "../../data/cloud-offer";
 const { lang, t } = Astro.props;
 
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
@@ -370,7 +371,7 @@ import ChapterRule from "../ChapterRule.astro";
                             </div>
                             <div>
                                 <h3 class="text-lg mb-1 text-tone-max">{t('agencies.features.f5.title')}</h3>
-                                <p class="text-sm text-tone-400">{t('agencies.features.f5.desc')}</p>
+                                <p class="text-sm text-tone-400">{t(offerKey('agencies.features.f5.desc'))}</p>
                             </div>
                         </div>
                     </div>

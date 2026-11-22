@@ -1,0 +1,907 @@
+{
+  "schemaVersion": 1,
+  "currency": "EUR",
+  "vat": "excluded",
+  "platformFeeEur": 8,
+  "included": {
+    "filesGb": 10,
+    "requestsPerMonth": 1000000
+  },
+  "overage": {
+    "filesEurPerGb": 0.03,
+    "requestsEurPerMillion": 1.5
+  },
+  "sleep": {
+    "platformFeeEur": 4,
+    "hoursInMonth": 730
+  },
+  "regions": {
+    "europe-west1": {
+      "id": "europe-west1",
+      "provider": "gcp",
+      "app": [
+        {
+          "cpu": "100m",
+          "memory": "384Mi",
+          "monthlyEur": 8.66
+        },
+        {
+          "cpu": "100m",
+          "memory": "512Mi",
+          "monthlyEur": 9.51
+        },
+        {
+          "cpu": "250m",
+          "memory": "384Mi",
+          "monthlyEur": 17.86
+        },
+        {
+          "cpu": "250m",
+          "memory": "512Mi",
+          "monthlyEur": 18.71
+        },
+        {
+          "cpu": "250m",
+          "memory": "1Gi",
+          "monthlyEur": 22.09
+        },
+        {
+          "cpu": "500m",
+          "memory": "512Mi",
+          "monthlyEur": 34.03
+        },
+        {
+          "cpu": "500m",
+          "memory": "1Gi",
+          "monthlyEur": 37.41
+        },
+        {
+          "cpu": "500m",
+          "memory": "2Gi",
+          "monthlyEur": 44.17
+        },
+        {
+          "cpu": "500m",
+          "memory": "3Gi",
+          "monthlyEur": 50.93
+        },
+        {
+          "cpu": "1",
+          "memory": "1Gi",
+          "monthlyEur": 68.06
+        },
+        {
+          "cpu": "1",
+          "memory": "2Gi",
+          "monthlyEur": 74.82
+        },
+        {
+          "cpu": "1",
+          "memory": "3Gi",
+          "monthlyEur": 81.58
+        },
+        {
+          "cpu": "1",
+          "memory": "4Gi",
+          "monthlyEur": 88.33
+        },
+        {
+          "cpu": "1",
+          "memory": "6Gi",
+          "monthlyEur": 101.85
+        },
+        {
+          "cpu": "2",
+          "memory": "2Gi",
+          "monthlyEur": 136.12
+        },
+        {
+          "cpu": "2",
+          "memory": "3Gi",
+          "monthlyEur": 142.88
+        },
+        {
+          "cpu": "2",
+          "memory": "4Gi",
+          "monthlyEur": 149.63
+        },
+        {
+          "cpu": "2",
+          "memory": "6Gi",
+          "monthlyEur": 163.15
+        },
+        {
+          "cpu": "2",
+          "memory": "8Gi",
+          "monthlyEur": 176.67
+        },
+        {
+          "cpu": "2",
+          "memory": "12Gi",
+          "monthlyEur": 203.7
+        },
+        {
+          "cpu": "4",
+          "memory": "4Gi",
+          "monthlyEur": 272.23
+        },
+        {
+          "cpu": "4",
+          "memory": "6Gi",
+          "monthlyEur": 285.75
+        },
+        {
+          "cpu": "4",
+          "memory": "8Gi",
+          "monthlyEur": 299.27
+        },
+        {
+          "cpu": "4",
+          "memory": "12Gi",
+          "monthlyEur": 326.3
+        },
+        {
+          "cpu": "4",
+          "memory": "16Gi",
+          "monthlyEur": 353.33
+        },
+        {
+          "cpu": "4",
+          "memory": "24Gi",
+          "monthlyEur": 407.4
+        }
+      ],
+      "database": [
+        {
+          "cpu": "100m",
+          "memory": "512Mi",
+          "monthlyEur": 13.66
+        },
+        {
+          "cpu": "160m",
+          "memory": "512Mi",
+          "monthlyEur": 18.63
+        },
+        {
+          "cpu": "250m",
+          "memory": "512Mi",
+          "monthlyEur": 26.08
+        },
+        {
+          "cpu": "500m",
+          "memory": "512Mi",
+          "monthlyEur": 46.78
+        },
+        {
+          "cpu": "160m",
+          "memory": "1Gi",
+          "monthlyEur": 24
+        },
+        {
+          "cpu": "250m",
+          "memory": "1Gi",
+          "monthlyEur": 31.45
+        },
+        {
+          "cpu": "500m",
+          "memory": "1Gi",
+          "monthlyEur": 52.15
+        },
+        {
+          "cpu": "1",
+          "memory": "1Gi",
+          "monthlyEur": 93.55
+        },
+        {
+          "cpu": "500m",
+          "memory": "2Gi",
+          "monthlyEur": 62.9
+        },
+        {
+          "cpu": "1",
+          "memory": "2Gi",
+          "monthlyEur": 104.3
+        },
+        {
+          "cpu": "2",
+          "memory": "2Gi",
+          "monthlyEur": 187.1
+        },
+        {
+          "cpu": "1",
+          "memory": "4Gi",
+          "monthlyEur": 125.81
+        },
+        {
+          "cpu": "2",
+          "memory": "4Gi",
+          "monthlyEur": 208.61
+        },
+        {
+          "cpu": "4",
+          "memory": "4Gi",
+          "monthlyEur": 374.21
+        },
+        {
+          "cpu": "2",
+          "memory": "8Gi",
+          "monthlyEur": 251.62
+        },
+        {
+          "cpu": "4",
+          "memory": "8Gi",
+          "monthlyEur": 417.22
+        },
+        {
+          "cpu": "4",
+          "memory": "16Gi",
+          "monthlyEur": 503.23
+        }
+      ],
+      "diskEurPerGib": 0.2708,
+      "defaults": {
+        "app": {
+          "cpu": "100m",
+          "memory": "384Mi"
+        },
+        "database": {
+          "cpu": "160m",
+          "memory": "1Gi"
+        },
+        "diskGi": 10
+      },
+      "examples": {
+        "default": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "160m",
+            "memory": "1Gi"
+          },
+          "diskGi": 10,
+          "filesGb": 0,
+          "monthlyEur": 43.37
+        },
+        "smallest": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "100m",
+            "memory": "512Mi"
+          },
+          "diskGi": 10,
+          "filesGb": 0,
+          "monthlyEur": 33.03
+        },
+        "production": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "160m",
+            "memory": "1Gi"
+          },
+          "diskGi": 20,
+          "filesGb": 20,
+          "monthlyEur": 46.38
+        },
+        "sleeping": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "100m",
+            "memory": "512Mi"
+          },
+          "diskGi": 10,
+          "asleepMonthlyEur": 6.71,
+          "awakeHourEur": 0.0361,
+          "awakeHours": 36.5,
+          "monthlyEur": 8.03,
+          "alwaysOnMonthlyEur": 33.03
+        }
+      }
+    },
+    "fsn1": {
+      "id": "fsn1",
+      "provider": "hetzner",
+      "app": [
+        {
+          "cpu": "100m",
+          "memory": "384Mi",
+          "monthlyEur": 1.69
+        },
+        {
+          "cpu": "100m",
+          "memory": "512Mi",
+          "monthlyEur": 1.96
+        },
+        {
+          "cpu": "250m",
+          "memory": "384Mi",
+          "monthlyEur": 3.01
+        },
+        {
+          "cpu": "250m",
+          "memory": "512Mi",
+          "monthlyEur": 3.28
+        },
+        {
+          "cpu": "250m",
+          "memory": "1Gi",
+          "monthlyEur": 4.35
+        },
+        {
+          "cpu": "500m",
+          "memory": "512Mi",
+          "monthlyEur": 5.48
+        },
+        {
+          "cpu": "500m",
+          "memory": "1Gi",
+          "monthlyEur": 6.55
+        },
+        {
+          "cpu": "500m",
+          "memory": "2Gi",
+          "monthlyEur": 8.7
+        },
+        {
+          "cpu": "500m",
+          "memory": "3Gi",
+          "monthlyEur": 10.85
+        },
+        {
+          "cpu": "1",
+          "memory": "1Gi",
+          "monthlyEur": 10.95
+        },
+        {
+          "cpu": "1",
+          "memory": "2Gi",
+          "monthlyEur": 13.1
+        },
+        {
+          "cpu": "1",
+          "memory": "3Gi",
+          "monthlyEur": 15.25
+        },
+        {
+          "cpu": "1",
+          "memory": "4Gi",
+          "monthlyEur": 17.4
+        },
+        {
+          "cpu": "2",
+          "memory": "2Gi",
+          "monthlyEur": 21.9
+        },
+        {
+          "cpu": "2",
+          "memory": "3Gi",
+          "monthlyEur": 24.05
+        },
+        {
+          "cpu": "2",
+          "memory": "4Gi",
+          "monthlyEur": 26.2
+        }
+      ],
+      "database": [
+        {
+          "cpu": "50m",
+          "memory": "512Mi",
+          "monthlyEur": 5.37
+        },
+        {
+          "cpu": "100m",
+          "memory": "512Mi",
+          "monthlyEur": 7.5
+        },
+        {
+          "cpu": "160m",
+          "memory": "512Mi",
+          "monthlyEur": 10.06
+        },
+        {
+          "cpu": "250m",
+          "memory": "512Mi",
+          "monthlyEur": 13.91
+        },
+        {
+          "cpu": "500m",
+          "memory": "512Mi",
+          "monthlyEur": 24.58
+        },
+        {
+          "cpu": "1",
+          "memory": "512Mi",
+          "monthlyEur": 45.93
+        },
+        {
+          "cpu": "2",
+          "memory": "512Mi",
+          "monthlyEur": 88.63
+        },
+        {
+          "cpu": "50m",
+          "memory": "1Gi",
+          "monthlyEur": 8.59
+        },
+        {
+          "cpu": "100m",
+          "memory": "1Gi",
+          "monthlyEur": 10.72
+        },
+        {
+          "cpu": "160m",
+          "memory": "1Gi",
+          "monthlyEur": 13.28
+        },
+        {
+          "cpu": "250m",
+          "memory": "1Gi",
+          "monthlyEur": 17.13
+        },
+        {
+          "cpu": "500m",
+          "memory": "1Gi",
+          "monthlyEur": 27.8
+        },
+        {
+          "cpu": "1",
+          "memory": "1Gi",
+          "monthlyEur": 49.15
+        },
+        {
+          "cpu": "2",
+          "memory": "1Gi",
+          "monthlyEur": 91.85
+        },
+        {
+          "cpu": "50m",
+          "memory": "2Gi",
+          "monthlyEur": 15.04
+        },
+        {
+          "cpu": "100m",
+          "memory": "2Gi",
+          "monthlyEur": 17.17
+        },
+        {
+          "cpu": "160m",
+          "memory": "2Gi",
+          "monthlyEur": 19.73
+        },
+        {
+          "cpu": "250m",
+          "memory": "2Gi",
+          "monthlyEur": 23.58
+        },
+        {
+          "cpu": "500m",
+          "memory": "2Gi",
+          "monthlyEur": 34.25
+        },
+        {
+          "cpu": "1",
+          "memory": "2Gi",
+          "monthlyEur": 55.6
+        },
+        {
+          "cpu": "2",
+          "memory": "2Gi",
+          "monthlyEur": 98.3
+        },
+        {
+          "cpu": "50m",
+          "memory": "4Gi",
+          "monthlyEur": 27.94
+        },
+        {
+          "cpu": "100m",
+          "memory": "4Gi",
+          "monthlyEur": 30.07
+        },
+        {
+          "cpu": "160m",
+          "memory": "4Gi",
+          "monthlyEur": 32.63
+        },
+        {
+          "cpu": "250m",
+          "memory": "4Gi",
+          "monthlyEur": 36.48
+        },
+        {
+          "cpu": "500m",
+          "memory": "4Gi",
+          "monthlyEur": 47.15
+        },
+        {
+          "cpu": "1",
+          "memory": "4Gi",
+          "monthlyEur": 68.5
+        },
+        {
+          "cpu": "2",
+          "memory": "4Gi",
+          "monthlyEur": 111.2
+        }
+      ],
+      "diskEurPerGib": 0.131,
+      "defaults": {
+        "app": {
+          "cpu": "100m",
+          "memory": "384Mi"
+        },
+        "database": {
+          "cpu": "160m",
+          "memory": "1Gi"
+        },
+        "diskGi": 10
+      },
+      "examples": {
+        "default": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "160m",
+            "memory": "1Gi"
+          },
+          "diskGi": 10,
+          "filesGb": 0,
+          "monthlyEur": 24.28
+        },
+        "smallest": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "50m",
+            "memory": "512Mi"
+          },
+          "diskGi": 10,
+          "filesGb": 0,
+          "monthlyEur": 16.37
+        },
+        "production": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "160m",
+            "memory": "1Gi"
+          },
+          "diskGi": 20,
+          "filesGb": 20,
+          "monthlyEur": 25.89
+        },
+        "sleeping": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "50m",
+            "memory": "512Mi"
+          },
+          "diskGi": 10,
+          "asleepMonthlyEur": 5.31,
+          "awakeHourEur": 0.0152,
+          "awakeHours": 36.5,
+          "monthlyEur": 5.86,
+          "alwaysOnMonthlyEur": 16.37
+        }
+      }
+    },
+    "hel1": {
+      "id": "hel1",
+      "provider": "hetzner",
+      "app": [
+        {
+          "cpu": "100m",
+          "memory": "384Mi",
+          "monthlyEur": 1.69
+        },
+        {
+          "cpu": "100m",
+          "memory": "512Mi",
+          "monthlyEur": 1.96
+        },
+        {
+          "cpu": "250m",
+          "memory": "384Mi",
+          "monthlyEur": 3.01
+        },
+        {
+          "cpu": "250m",
+          "memory": "512Mi",
+          "monthlyEur": 3.28
+        },
+        {
+          "cpu": "250m",
+          "memory": "1Gi",
+          "monthlyEur": 4.35
+        },
+        {
+          "cpu": "500m",
+          "memory": "512Mi",
+          "monthlyEur": 5.48
+        },
+        {
+          "cpu": "500m",
+          "memory": "1Gi",
+          "monthlyEur": 6.55
+        },
+        {
+          "cpu": "500m",
+          "memory": "2Gi",
+          "monthlyEur": 8.7
+        },
+        {
+          "cpu": "500m",
+          "memory": "3Gi",
+          "monthlyEur": 10.85
+        },
+        {
+          "cpu": "1",
+          "memory": "1Gi",
+          "monthlyEur": 10.95
+        },
+        {
+          "cpu": "1",
+          "memory": "2Gi",
+          "monthlyEur": 13.1
+        },
+        {
+          "cpu": "1",
+          "memory": "3Gi",
+          "monthlyEur": 15.25
+        },
+        {
+          "cpu": "1",
+          "memory": "4Gi",
+          "monthlyEur": 17.4
+        },
+        {
+          "cpu": "2",
+          "memory": "2Gi",
+          "monthlyEur": 21.9
+        },
+        {
+          "cpu": "2",
+          "memory": "3Gi",
+          "monthlyEur": 24.05
+        },
+        {
+          "cpu": "2",
+          "memory": "4Gi",
+          "monthlyEur": 26.2
+        }
+      ],
+      "database": [
+        {
+          "cpu": "50m",
+          "memory": "512Mi",
+          "monthlyEur": 5.37
+        },
+        {
+          "cpu": "100m",
+          "memory": "512Mi",
+          "monthlyEur": 7.5
+        },
+        {
+          "cpu": "160m",
+          "memory": "512Mi",
+          "monthlyEur": 10.06
+        },
+        {
+          "cpu": "250m",
+          "memory": "512Mi",
+          "monthlyEur": 13.91
+        },
+        {
+          "cpu": "500m",
+          "memory": "512Mi",
+          "monthlyEur": 24.58
+        },
+        {
+          "cpu": "1",
+          "memory": "512Mi",
+          "monthlyEur": 45.93
+        },
+        {
+          "cpu": "2",
+          "memory": "512Mi",
+          "monthlyEur": 88.63
+        },
+        {
+          "cpu": "50m",
+          "memory": "1Gi",
+          "monthlyEur": 8.59
+        },
+        {
+          "cpu": "100m",
+          "memory": "1Gi",
+          "monthlyEur": 10.72
+        },
+        {
+          "cpu": "160m",
+          "memory": "1Gi",
+          "monthlyEur": 13.28
+        },
+        {
+          "cpu": "250m",
+          "memory": "1Gi",
+          "monthlyEur": 17.13
+        },
+        {
+          "cpu": "500m",
+          "memory": "1Gi",
+          "monthlyEur": 27.8
+        },
+        {
+          "cpu": "1",
+          "memory": "1Gi",
+          "monthlyEur": 49.15
+        },
+        {
+          "cpu": "2",
+          "memory": "1Gi",
+          "monthlyEur": 91.85
+        },
+        {
+          "cpu": "50m",
+          "memory": "2Gi",
+          "monthlyEur": 15.04
+        },
+        {
+          "cpu": "100m",
+          "memory": "2Gi",
+          "monthlyEur": 17.17
+        },
+        {
+          "cpu": "160m",
+          "memory": "2Gi",
+          "monthlyEur": 19.73
+        },
+        {
+          "cpu": "250m",
+          "memory": "2Gi",
+          "monthlyEur": 23.58
+        },
+        {
+          "cpu": "500m",
+          "memory": "2Gi",
+          "monthlyEur": 34.25
+        },
+        {
+          "cpu": "1",
+          "memory": "2Gi",
+          "monthlyEur": 55.6
+        },
+        {
+          "cpu": "2",
+          "memory": "2Gi",
+          "monthlyEur": 98.3
+        },
+        {
+          "cpu": "50m",
+          "memory": "4Gi",
+          "monthlyEur": 27.94
+        },
+        {
+          "cpu": "100m",
+          "memory": "4Gi",
+          "monthlyEur": 30.07
+        },
+        {
+          "cpu": "160m",
+          "memory": "4Gi",
+          "monthlyEur": 32.63
+        },
+        {
+          "cpu": "250m",
+          "memory": "4Gi",
+          "monthlyEur": 36.48
+        },
+        {
+          "cpu": "500m",
+          "memory": "4Gi",
+          "monthlyEur": 47.15
+        },
+        {
+          "cpu": "1",
+          "memory": "4Gi",
+          "monthlyEur": 68.5
+        },
+        {
+          "cpu": "2",
+          "memory": "4Gi",
+          "monthlyEur": 111.2
+        }
+      ],
+      "diskEurPerGib": 0.131,
+      "defaults": {
+        "app": {
+          "cpu": "100m",
+          "memory": "384Mi"
+        },
+        "database": {
+          "cpu": "160m",
+          "memory": "1Gi"
+        },
+        "diskGi": 10
+      },
+      "examples": {
+        "default": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "160m",
+            "memory": "1Gi"
+          },
+          "diskGi": 10,
+          "filesGb": 0,
+          "monthlyEur": 24.28
+        },
+        "smallest": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "50m",
+            "memory": "512Mi"
+          },
+          "diskGi": 10,
+          "filesGb": 0,
+          "monthlyEur": 16.37
+        },
+        "production": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "160m",
+            "memory": "1Gi"
+          },
+          "diskGi": 20,
+          "filesGb": 20,
+          "monthlyEur": 25.89
+        },
+        "sleeping": {
+          "app": {
+            "cpu": "100m",
+            "memory": "384Mi"
+          },
+          "database": {
+            "cpu": "50m",
+            "memory": "512Mi"
+          },
+          "diskGi": 10,
+          "asleepMonthlyEur": 5.31,
+          "awakeHourEur": 0.0152,
+          "awakeHours": 36.5,
+          "monthlyEur": 5.86,
+          "alwaysOnMonthlyEur": 16.37
+        }
+      }
+    }
+  },
+  "contentHash": "4801c6694147532735f19847fd29e3e20cb67768880b53d5688207765d3cf938"
+}

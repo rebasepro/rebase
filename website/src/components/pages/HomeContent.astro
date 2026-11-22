@@ -1,4 +1,5 @@
 ---
+import { CLOUD_FLAGS, offerKey } from "../../data/cloud-offer";
 import HeroBackdrop from "../HeroBackdrop.astro";
 import ClientLogos from "../ClientLogos.astro";
 import PolicyPathsFigure from "../PolicyPathsFigure.astro";
@@ -669,17 +670,19 @@ const SELFHOST_COMMAND = "docker compose up -d";
                     <div class="py-10 md:pl-8 border-t md:border-t-0 border-tone-max/10">
                         <h3 class="text-base flex items-center gap-3">
                             {t("cta.lane.cloud.title")}
+                            {!CLOUD_FLAGS.selfServe && (
                             <span class="rounded-md bg-tone-max/10 px-2 py-1 font-mono text-3xs uppercase tracking-[0.1em] text-tone-300">
                                 {t("cta.lane.cloud.badge")}
                             </span>
+                            )}
                         </h3>
-                        <p class="mt-3 text-sm text-page-copy leading-relaxed">{t("cta.lane.cloud.desc")}</p>
-                        {/* Cloud is not open yet, so the lane's link asks for an
-                            address rather than sending a reader to a price list
-                            for something they cannot buy. The form is in the
-                            footer of every page (Layout renders it). */}
-                        <a href="#footer-waitlist" class="accent-link mt-5">
-                            {t("cta.lane.cloud.link")} <ArrowRight size={14} />
+                        <p class="mt-3 text-sm text-page-copy leading-relaxed">{t(offerKey("cta.lane.cloud.desc"))}</p>
+                        {/* While Cloud is in private beta the lane's link asks for an
+                            address (the footer form, which Layout renders on every
+                            page); once self-serve is open (CLOUD_FLAGS.selfServe) it
+                            goes to the prices, where the sign-up is. */}
+                        <a href={CLOUD_FLAGS.selfServe ? translatePath("/pricing") : "#footer-waitlist"} class="accent-link mt-5">
+                            {t(offerKey("cta.lane.cloud.link"))} <ArrowRight size={14} />
                         </a>
                     </div>
                 </div>
