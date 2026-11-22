@@ -1,24 +1,23 @@
 ---
-sourceHash: f200faa50e488acd
+sourceHash: cd3015585fe4e355
 title: Backup e ripristino
 sidebar_label: Backup
-description: Crea, pianifica, elenca e ripristina backup del database con pg_dump — cosa contiene un backup, il file dei ruoli che lo accompagna, e l'unica cosa che non copre, i tuoi file caricati.
+description: Esegui, pianifica, elenca e ripristina i backup del database con pg_dump — cosa contiene un backup, il file dei ruoli associato e l'unico elemento non coperto, ovvero i file caricati.
 ---
 
 ## Panoramica
 
-Rebase esegue il backup di un database Postgres con `pg_dump` e lo ripristina
-con `pg_restore`. Puoi creare un backup manualmente, pianificarne uno con un
-cron job, elencare quelli disponibili dalla CLI o dal pannello **Backups** di
-Studio, e ripristinare in un database nuovo senza toccare quello attivo.
+Rebase esegue il backup di un database Postgres con `pg_dump` e lo ripristina con
+`pg_restore`. È possibile creare un backup manualmente, pianificarne uno con un cron job,
+elencare i backup disponibili dalla CLI o dal pannello **Backups** di Studio e ripristinarli
+in un nuovo database senza toccare quello in produzione.
 
 :::caution[Questo non esegue il backup dei tuoi file]
-Un backup contiene solo il **database**, nient'altro. I file caricati vivono
-nel tuo [backend di storage](/docs/backend/storage/) — un bucket S3 o GCS,
-oppure la cartella in `STORAGE_PATH` — non in Postgres, quindi un database
-ripristinato punta a file che solo quel backend possiede. Esegui il backup
-del bucket (versioning o replica) o della cartella di upload separatamente,
-con una pianificazione propria.
+Un backup contiene solo il **database** e nient'altro. I file caricati risiedono nel tuo
+[backend di storage](/docs/backend/storage/) — un bucket S3 o GCS, oppure la
+directory configurata in `STORAGE_PATH` — non in Postgres, quindi un database ripristinato punta solo ai file presenti in quel backend.
+Esegui il backup del bucket (tramite versionamento o replica) o della directory dei caricamenti
+separatamente, con una propria pianificazione.
 :::
 
 ## Avvio rapido
@@ -38,88 +37,86 @@ rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
   --create-db --target-db app_restored
 ```
 
-Il database è quello che risolve ogni altro [comando `rebase db`](/docs/cli/database/),
+Il database è quello risolto da ogni altro [comando `rebase db`](/docs/cli/database/),
 nello stesso ordine: `--database-url`, `DATABASE_URL` nella shell, il
-[branch](/docs/backend/branching/) su cui è posizionato il checkout, `DATABASE_URL`
-in `.env`, Postgres in Docker (`--docker`, o l'ultimo `rebase dev --docker`),
-poi il database di sviluppo gestito, che `restore` rifiuta.
+[branch](/docs/backend/branching/) attualmente selezionato nel checkout, `DATABASE_URL`
+in `.env`, Postgres su Docker (`--docker`, o l'ultimo `rebase dev --docker`),
+e infine il database di sviluppo gestito, che `restore` rifiuta.
 
-Un `--out` relativo, il
-valore predefinito `./backups` e un percorso di dump passato a `rebase db restore` si
-risolvono tutti rispetto alla directory da cui esegui `rebase`, normalmente la radice del
-progetto, così `rebase db backup` e `rebase db backups list` si incontrano nello stesso
-posto. Un `BACKUP_DESTINATION` relativo si risolve rispetto alla directory del backend,
-dove lo legge anche il server. Tutti e tre i comandi rifiutano un'opzione che non
-accettano prima di eseguire qualsiasi cosa, e nominano quella che probabilmente intendevi.
-La password arriva a `pg_dump`, `pg_dumpall` e `pg_restore` in `PGPASSWORD`, mai sulla loro
-riga di comando, così nessun messaggio di errore né elenco dei processi la mostra.
+Un'opzione `--out`
+relativa, il valore predefinito `./backups` e il percorso di un dump passato a `rebase db restore`
+vengono tutti risolti rispetto alla directory da cui si esegue `rebase`, normalmente la radice del
+progetto, in modo che `rebase db backup` e `rebase db backups list` convergano nella stessa posizione. Un valore
+relativo di `BACKUP_DESTINATION` viene risolto rispetto alla directory del backend, dove
+viene letto anche dal server. Tutti e tre i comandi rifiutano qualsiasi opzione non supportata
+prima di eseguire qualsiasi operazione, indicando quella che probabilmente si intendeva specificare. La password viene
+passata a `pg_dump`, `pg_dumpall` e `pg_restore` tramite `PGPASSWORD`, mai tramite riga di comando,
+in modo da non comparire in alcun messaggio di errore o elenco dei processi.
 
 ## Cos'è un backup
 
-`rebase db backup` esegue `pg_dump` in formato personalizzato (`-Fc`), che è
-compresso e può essere ripristinato selettivamente. I file vengono nominati
-`rebase-<db>-<YYYYMMDD>T<HHMMSS>Z.dump`; il timestamp UTC nel nome è ciò su
-cui si basano l'ordinamento e la retention.
+`rebase db backup` esegue `pg_dump` nel formato personalizzato (`-Fc`), che è compresso
+e può essere ripristinato in modo selettivo. I file vengono denominati
+`rebase-<db>-<YYYYMMDD>T<HHMMSS>Z.dump`; il timestamp UTC nel nome è ciò in base al quale
+vengono ordinati i backup per l'elenco e la retention.
 
 | Opzione | Descrizione |
 | --- | --- |
-| `--out`, `-o` | Un percorso locale, o un URL `s3://bucket/prefix` / `gs://bucket/prefix`. Il valore predefinito è `$BACKUP_DESTINATION`, poi `./backups` nella directory da cui esegui `rebase`. |
+| `--out`, `-o` | Un percorso locale o un URL `s3://bucket/prefix` / `gs://bucket/prefix`. Il valore predefinito è `$BACKUP_DESTINATION`, quindi `./backups` nella directory da cui viene eseguito `rebase`. |
 | `--exclude-schema <s>` | Esclude uno schema dal dump (ripetibile). Un pattern che corrisponde a `rebase` viene rifiutato — vedi sotto. |
-| `--no-owner` | Omette i comandi di proprietà, per ripristinare come un ruolo diverso. |
-| `--enable-row-security` | Esegue il dump come soggetto admin invece di fallire sulla row-level security. **Può produrre un dump parziale** — vedi [Row-level security](#row-level-security-e-il-dump-silenziosamente-incompleto). |
-| `--row-security-role <r>` | Il ruolo con cui leggere con il flag sopra. Il valore predefinito è `admin`. |
+| `--no-owner` | Omette i comandi di assegnazione della proprietà (ownership), utile per il ripristino con un ruolo differente. |
+| `--enable-row-security` | Esegue il dump impersonando un soggetto admin invece di fallire a causa della row-level security. **Può produrre un dump parziale** — vedi [Row-level security](#row-level-security-e-il-dump-parziale-non-segnalato-row-level-security-and-the-dump-that-is-silently-short). |
+| `--row-security-role <r>` | Il ruolo da utilizzare per la lettura con il flag precedente. Il valore predefinito è `admin`. |
 
-Un dump viene validato prima che il comando segnali il successo:
-`pg_restore --list` deve riuscire a leggere l'intero archivio.
+Un dump viene convalidato prima che il comando segnali il completamento con successo: `pg_restore --list`
+deve essere in grado di leggere l'intero archivio.
 
-Per le destinazioni `s3://` la CLI costruisce il proprio client di storage
-dalle stesse variabili `S3_*` usate dal tuo backend (`S3_ACCESS_KEY_ID`,
-`S3_SECRET_ACCESS_KEY`, `S3_REGION`, `S3_ENDPOINT`, `S3_FORCE_PATH_STYLE`).
+Per le destinazioni `s3://`, la CLI crea il proprio client di storage utilizzando le stesse
+variabili `S3_*` utilizzate dal backend (`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
+`S3_REGION`, `S3_ENDPOINT`, `S3_FORCE_PATH_STYLE`).
 
 ### Il file dei ruoli
 
-Ogni backup scrive un secondo file accanto al dump:
+Ogni backup genera un secondo file accanto al dump:
 `rebase-<db>-<…>Z.globals.sql`, prodotto da
-`pg_dumpall --globals-only --no-role-passwords`. Un `pg_dump` per singolo
-database non può includere i ruoli a livello di cluster, e i grant e le
-policy di row-level security del dump ne nominano uno — `rebase_user`.
-Ripristinato in un nuovo Postgres senza di esso, il primo `GRANT` verso quel
-ruolo fallisce e il ripristino si interrompe.
+`pg_dumpall --globals-only --no-role-passwords`. Un'esecuzione di `pg_dump` specifica per database
+non può includere i ruoli a livello di cluster, e i permessi (grants) e le policy di row-level security
+del dump ne menzionano uno: `rebase_user`. Se ripristinato in un nuovo Postgres privo di questo ruolo,
+il primo comando `GRANT` verso tale ruolo fallirà e il ripristino si bloccherà.
 
-Mantieni i due file insieme. La CLI li carica e li ripristina come coppia, un backup
-pianificato li pota come uno solo, e `rebase db restore` cerca il `.globals.sql` nella stessa cartella o
-prefisso del `.dump`. I ruoli vengono ricreati **senza password**;
-impostale di nuovo dopo un ripristino in un nuovo cluster. `PG_DUMPALL_PATH`
-indica un binario `pg_dumpall` specifico.
+Conserva i due file insieme. La CLI li carica e li ripristina in coppia, un
+backup pianificato li elimina congiuntamente e `rebase db restore` cerca il file `.globals.sql` nella stessa
+directory o prefisso del file `.dump`. I ruoli vengono ricreati **senza password**;
+impostale nuovamente dopo un ripristino in un nuovo cluster. `PG_DUMPALL_PATH` consente di puntare a un
+binario specifico di `pg_dumpall`.
 
 ### Cosa contiene
 
-Tutto il database, incluso lo schema `rebase`. Quello schema contiene ogni
-account utente e il resto dell'autenticazione, le chiavi API, la cronologia
-dei record, la coda dei job, i log dei cron, e le funzioni richiamate dalle
-tue policy RLS e dai trigger di change-capture. Un dump senza di esso non ha
-utenti, e non può essere ripristinato in un database vuoto: le tabelle che
-contiene hanno policy che richiamano funzioni che non contiene.
+Tutto il database, compreso lo schema `rebase`. Tale schema contiene ogni
+account utente e il resto dell'autenticazione, le chiavi API, la cronologia dei record, la coda dei job,
+i log dei cron e le funzioni richiamate dalle policy RLS e dai trigger di change-capture.
+Un dump privo di questo schema non contiene utenti e non può essere ripristinato affatto in un
+database vuoto: le tabelle che contiene hanno infatti policy che richiamano funzioni
+non presenti.
 
-Per questo
-`rebase db backup` rifiuta un `--exclude-schema` che corrisponde a `rebase`, secondo le
-regole dei pattern di pg_dump stesso (`reb*` e `*` compresi), prima di eseguire qualsiasi
-cosa. Quelle regole lasciano passare la sintassi delle espressioni regolari fuori dalle
-virgolette doppie, quindi vengono rifiutati anche `[r]ebase` e `audit|rebase`, e ogni
-pattern viene verificato dal server prima che `pg_dump` venga eseguito, con lo stesso
-motore di espressioni regolari che usa la query di `pg_dump` stesso.
+Pertanto,
+`rebase db backup` rifiuta un'opzione `--exclude-schema` corrispondente a `rebase`, in base alle
+regole di pattern matching di pg_dump (inclusi `reb*` e `*`), prima di eseguire qualsiasi operazione.
+Queste regole interpretano la sintassi delle espressioni regolari al di fuori dei doppi apici, quindi
+vengono rifiutati anche pattern come `[r]ebase` e `audit|rebase`, e il server viene interrogato su
+ciascun pattern prima dell'esecuzione di `pg_dump`, sfruttando lo stesso motore di espressioni regolari
+usato dalla query interna di `pg_dump`.
 
-Poiché contiene ogni password
-e hash di chiave, un dump locale e il suo `.globals.sql` vengono creati leggibili solo dal
-proprietario (0600), prima che `pg_dump` vi scriva; lo sono anche i file locali di un
-backup pianificato.
+Poiché contiene
+tutte le password e gli hash delle chiavi, un dump locale e il rispettivo file `.globals.sql` vengono creati
+leggibili esclusivamente dal proprietario (permessi 0600), prima ancora che `pg_dump` vi scriva; lo
+stesso vale per i file locali di un backup pianificato.
 
 ## Backup pianificati
 
-Un backup pianificato è un [cron job](/docs/backend/cron-jobs/) che esegue il
-dump del database, carica il risultato su `BACKUP_DESTINATION` e pota i
-backup vecchi. Inserisci un file in `backend/crons/` che esporti come
-default:
+Un backup pianificato è un [cron job](/docs/backend/cron-jobs/) che esegue il dump del
+database, carica il risultato in `BACKUP_DESTINATION` ed elimina i vecchi backup.
+Basta inserire un file in `backend/crons/` che ne esporti uno come default export:
 
 ```ts
 // backend/crons/backup.ts
@@ -147,41 +144,40 @@ export default resolved.config
     });
 ```
 
-Il controller di storage viene passato invece di essere preso dal contesto
-del job, perché `rebase.storage` nel contesto è l'API di storage lato
-client, non un controller per il bucket dei backup.
+Il controller di storage viene passato esplicitamente anziché ricavato dal contesto del job,
+poiché `rebase.storage` del contesto rappresenta l'API di storage lato client e non un
+controller per il bucket di backup.
 
-Un backup non è soggetto ai limiti di caricamento del controller. `maxFileSize` (50 MB se non
-impostato) e `allowedMimeTypes` valgono per ciò che caricano gli utenti, quindi un dump di qualsiasi
-dimensione viene caricato, e lo stesso vale per uno scritto tramite il controller che serve i file
-della tua app.
+Un backup non è vincolato ai limiti di upload del controller. `maxFileSize` (50 MB
+se non diversamente configurato) e `allowedMimeTypes` si applicano a ciò che gli utenti caricano, consentendo
+l'upload di un dump di qualsiasi dimensione, anche se scritto tramite il controller che gestisce i file
+della tua applicazione.
 
 | Variabile | Significato |
 | --- | --- |
-| `BACKUP_SCHEDULE` | Espressione cron, ad es. `0 3 * * *` per le 03:00 ogni giorno. Non impostata disattiva i backup pianificati. |
+| `BACKUP_SCHEDULE` | Espressione cron, ad es. `0 3 * * *` per le 03:00 ogni giorno. Se non impostata, disattiva i backup pianificati. |
 | `BACKUP_DESTINATION` | Un percorso locale, o `s3://bucket/prefix` / `gs://bucket/prefix`. |
-| `BACKUP_RETENTION_DAYS` | Elimina i backup più vecchi di questo numero di giorni. Non impostata o `0` mantiene tutto. |
-| `BACKUP_KEEP_MINIMUM` | Mantiene sempre almeno questo numero di backup recenti, per quanto vecchi — così un'interruzione prolungata non elimina tutto. |
+| `BACKUP_RETENTION_DAYS` | Elimina i backup più vecchi di questo numero di giorni. Se non impostata o impostata su `0`, conserva tutto. |
+| `BACKUP_KEEP_MINIMUM` | Conserva sempre almeno questo numero di backup recenti, indipendentemente dalla loro età — in modo che un lungo periodo di inattività non elimini ogni archivio. |
 
-Ogni nuovo dump viene validato **prima** che qualcosa venga potato, quindi un
-dump corrotto non può mai essere il motivo per cui il tuo ultimo backup
-valido è stato eliminato. La potatura tocca solo i file il cui nome
-corrisponde al pattern dei backup; qualsiasi altra cosa che condivide il
-bucket o il prefisso resta intatta.
+Ogni nuovo dump viene convalidato **prima** che qualsiasi file venga eliminato, impedendo così che un
+dump corrotto possa essere il motivo dell'eliminazione dell'ultimo backup valido. La procedura di pulizia
+interessa esclusivamente i file i cui nomi corrispondono al pattern dei backup; qualsiasi altro file che
+condivide il bucket o il prefisso rimane intatto.
 
-Il cron esegue `pg_dump` all'interno del processo server. L'immagine di
-runtime ufficiale (`rebasepro/server`, vedi
-[Self-hosting](/docs/deployment/self-hosting/)) include a questo scopo gli
-strumenti client di PostgreSQL 18. Ovunque altrove — un VPS,
-una tua immagine — installa tu stesso gli strumenti client (vedi la sezione
-successiva).
+Il cron esegue `pg_dump` all'interno del processo del server. L'immagine di runtime
+ufficiale (`rebasepro/server`, vedi [Self-hosting](/docs/deployment/self-hosting/))
+include già i client tool di PostgreSQL 18.
+In qualsiasi altro contesto — un VPS, una propria immagine personalizzata —
+è necessario installare i client tool manualmente (vedi la sezione successiva).
 
 ## Compatibilità delle versioni
 
-`pg_dump` e `pg_restore` devono avere la **stessa versione major del server,
-o una più recente**. `rebase db backup` e `rebase db restore` verificano la versione major del
-client rispetto al `server_version_num` del server attivo prima di eseguire il dump o il ripristino, e si interrompono
-con il rimedio se non corrispondono, o se il binario è assente:
+`pg_dump` e `pg_restore` devono appartenere alla **stessa versione major del server o a una più
+recente**. `rebase db backup` e `rebase db restore` controllano la versione major del client
+rispetto al valore di `server_version_num` del server attivo prima di eseguire il dump o il ripristino, e si
+bloccano indicando la soluzione se le versioni non sono compatibili, oppure se
+il binario non è presente:
 
 ```
 ✗ Client tool is Postgres 15 but the server is Postgres 16. pg_dump/pg_restore
@@ -189,42 +185,38 @@ con il rimedio se non corrispondono, o se il binario è assente:
   client tools.
 ```
 
-Installali con `brew install libpq` o
-`apt-get install postgresql-client-18` (dal repository apt di PostgreSQL,
-dove quello di Debian è più vecchio), oppure indica un binario specifico con
-`PG_DUMP_PATH`, `PG_RESTORE_PATH` e `PG_DUMPALL_PATH`.
-`restore --clean` esegue anche `psql`, che viene fornito con essi; `PSQL_PATH` ne indica
-un altro.
+È possibile installarli con `brew install libpq` o `apt-get install postgresql-client-18`
+(dal repository apt di PostgreSQL, poiché quello nativo di Debian potrebbe essere più datato), oppure puntare a un
+binario specifico tramite `PG_DUMP_PATH`, `PG_RESTORE_PATH` e `PG_DUMPALL_PATH`.
+Anche `restore --clean` esegue `psql`, incluso in questi strumenti; `PSQL_PATH` consente di
+indicarne un altro.
 
-## Row-level security, e il dump silenziosamente incompleto
+## Row-level security e il dump parziale non segnalato {#row-level-security-and-the-dump-that-is-silently-short}
 
-Su un Postgres gestito — Cloud SQL, RDS e gli altri — non esiste un
-superuser da concedere, quindi il ruolo con cui ti connetti di solito non
-possiede nessuna delle tue tabelle e non ha `BYPASSRLS`. La row-level
-security si applica anche a lui, e `pg_dump` si rifiuta:
+Su un'istanza Postgres gestita — Cloud SQL, RDS e simili — non è disponibile un superuser,
+quindi il ruolo a cui ci si connette solitamente non è proprietario delle tabelle e non possiede
+il privilegio `BYPASSRLS`. La row-level security si applica quindi a tale ruolo e `pg_dump` rifiuta l'operazione:
 
 ```
 pg_dump: error: query failed: ERROR: query would be affected by row-level
 security policy for table "company_leads"
 ```
 
-Quel rifiuto è l'esito sicuro. Aggiungere `--enable-row-security` a `pg_dump`
-manualmente è quello pericoloso: ha successo, esce con 0, e il dump contiene
-silenziosamente solo le righe che le policy del ruolo che esegue il dump
-ammettono. Due vie d'uscita reali:
+Questo rifiuto rappresenta il comportamento sicuro. Aggiungere manualmente `--enable-row-security` a `pg_dump`
+è invece rischioso: il comando ha successo, restituisce codice 0 e il dump conterrà silenziosamente
+solo le righe ammesse dalle policy del ruolo utilizzato per il dump. Le due soluzioni corrette sono:
 
-1. **Concedi al ruolo che esegue il dump `BYPASSRLS`, oppure rendilo
-   proprietario delle tabelle.** Il dump contiene allora ogni riga.
+1. **Concedere al ruolo di backup `BYPASSRLS`, o renderlo proprietario delle tabelle.** In questo
+   modo il dump conterrà tutte le righe.
 
    ```sql
    ALTER ROLE my_backup_role BYPASSRLS;
    ```
 
 2. **`rebase db backup --enable-row-security`.** Rebase imposta `app.uid` e
-   `app.user_roles` in modo che la policy generata `admin_full_access` ammetta
-   il dump, e stampa un avviso che indica cosa hai scambiato: una tabella le
-   cui policy non includono alcuna regola admin risulta incompleta, e nulla lo
-   segnala.
+   `app.user_roles` in modo che la policy generata `admin_full_access` consenta l'esecuzione
+   del dump, e stampa un avviso per spiegare il compromesso: una tabella le cui
+   policy non includono alcuna regola admin verrà esportata priva di righe, senza che nulla segnali l'anomalia.
 
 ## Ripristino
 
@@ -232,125 +224,121 @@ ammettono. Due vie d'uscita reali:
 rebase db restore <backup> [--target-db <name>] [--create-db] [--clean] [--yes]
 ```
 
-`restore` esegue `pg_restore`, ed è un'operazione distruttiva, quindi non è
-mai automatica: senza `--yes` richiede una conferma interattiva `yes`, e in
-una shell non interattiva si interrompe e dice di passare `--yes`. `<backup>` è un
-`.dump` locale o una chiave `s3://…` / `gs://…`, scaricata per prima.
+`restore` esegue `pg_restore` ed è un'operazione distruttiva, quindi non avviene mai in modo automatico:
+senza `--yes` richiede una conferma interattiva digitando `yes`, mentre in una shell
+non interattiva si interrompe avvisando di passare il flag `--yes`. `<backup>` è un percorso a un file `.dump` locale oppure una chiave `s3://…` / `gs://…`,
+che verrà preventivamente scaricata.
 
 In un database
-che contiene già ciò che il backup crea, richiede `--clean`: senza di esso, si rifiuta
-prima di eseguire qualsiasi cosa, nominando gli schemi e le tabelle d'intralcio, e dice di
-passare `--clean` oppure di ripristinare in un nuovo database con
-`--create-db --target-db <name>`. Rifiuta il database di sviluppo gestito,
-che non può accettare i dati COPY di un dump; ripristina invece in Postgres in Docker con
-`--docker`.
+che contiene già gli elementi creati dal backup, è necessario specificare `--clean`: senza di esso,
+il comando si rifiuta di procedere prima di eseguire qualsiasi operazione, elencando gli schemi e le tabelle in conflitto, e
+suggerisce di usare `--clean` o di ripristinare in un nuovo database tramite
+`--create-db --target-db <name>`. Il comando rifiuta il
+database di sviluppo gestito, che non può elaborare i dati COPY di un dump; esegui il ripristino
+su Postgres in Docker con `--docker`.
 
 Con `--clean`,
-il ripristino sostituisce ciò che il backup contiene in un'unica transazione. Elimina per
-intero ogni schema che il backup crea (`rebase`, per esempio), e ogni tabella che il
-backup crea in uno schema che non crea (`public`), con `CASCADE`, poi ripristina il dump
-nella stessa transazione. Prima di chiedere conferma, nomina ciò che questo elimina e che
-il backup non contiene, come `rebase.atlas_schema_revisions` da `rebase db migrate`,
-una funzione, un tipo o una sequenza in uno schema sostituito, o una vista o una chiave
-esterna altrove che fa riferimento a una delle tabelle del
-backup. Un ripristino che si ferma in un punto qualsiasi viene annullato, e dice che il
-database contiene ciò che conteneva prima. Esegue il dump tramite `psql`, che viene
-fornito con `pg_restore` (`PSQL_PATH` ne indica un altro), e attende al massimo
-15 secondi per un lock, che un `rebase dev` in esecuzione può detenere.
-`--continue-on-error` esegue ancora il `--clean` di pg_restore.
+il ripristino sostituisce ciò che è contenuto nel backup all'interno di una singola transazione. Rimuove con `CASCADE`
+ciascuno schema creato integralmente dal backup (ad esempio `rebase`), e ogni tabella creata dal backup
+in uno schema non gestito interamente (come `public`), per poi ripristinare il
+dump nella stessa transazione. Prima di chiedere conferma, segnala tutto ciò che verrà eliminato e che non
+è contenuto nel backup, come ad esempio `rebase.atlas_schema_revisions` generato da
+`rebase db migrate`, una funzione, un tipo o una sequenza in uno schema sostituito, oppure una
+vista o foreign key altrove che fa riferimento a una delle tabelle del backup. Un ripristino che si interrompe in qualsiasi momento viene annullato con un rollback, lasciando
+il database esattamente nello stato in cui si trovava in precedenza. Il dump viene eseguito tramite `psql`,
+incluso insieme a `pg_restore` (`PSQL_PATH` consente di specificarne un altro), e attende al massimo
+15 secondi per acquisire un lock, che un'istanza di `rebase dev` in esecuzione potrebbe trattenere.
+`--continue-on-error` continua a eseguire il flag `--clean` nativo di pg_restore.
 
-Prima di ripristinare, ricrea i ruoli del cluster a partire dal
-`.globals.sql` del backup — un ruolo già esistente viene saltato, non è un
-errore — in modo che i grant e le policy del dump si applichino. Si ferma poi
-al primo errore (`--exit-on-error`, oppure `ON_ERROR_STOP` con `--clean`): un ripristino che registrasse un `GRANT` fallito e
-continuasse segnalerebbe successo con la row-level security non applicata.
-Senza un `.globals.sql` accanto al backup avvisa che alcuni ruoli potrebbero
-mancare.
+Prima di ripristinare, vengono ricreati i ruoli del cluster a partire dal file
+`.globals.sql` del backup — un ruolo già esistente viene ignorato senza generare errori — in modo che i permessi
+e le policy del dump possano essere applicati correttamente. Il ripristino si arresta poi al primo errore (`--exit-on-error`,
+o `ON_ERROR_STOP` in modalità `--clean`): un'operazione di ripristino che
+registrasse un errore su un `GRANT` proseguendo comunque segnalerebbe un successo lasciando però
+la row-level security non applicata. In assenza di un file `.globals.sql` accanto al backup, viene mostrato un avviso
+che segnala la possibile mancanza di ruoli.
 
 | Opzione | Descrizione |
 | --- | --- |
-| `--target-db <name>` | Ripristina in questo database invece di quello in `DATABASE_URL`. |
+| `--target-db <name>` | Esegue il ripristino in questo database invece di quello configurato in `DATABASE_URL`. |
 | `--create-db` | Crea prima il database di destinazione se non esiste. |
-| `--clean` | Sostituisce ciò che il backup contiene, in un'unica transazione con il ripristino: i suoi schemi per intero, e le sue tabelle altrove. Dice prima che cosa questo elimina oltre il backup. |
-| `--no-owner` | Ignora la proprietà registrata nel dump. |
-| `--continue-on-error` | Registra gli errori e continua oltre di essi. **Può lasciare la RLS non applicata**; usalo solo quando sai perché. |
-| `--yes`, `-y` | Salta la conferma. |
+| `--clean` | Sostituisce il contenuto del backup in un'unica transazione con il ripristino: i suoi schemi per intero e le sue tabelle altrove. Mostra prima cosa verrà eliminato oltre al contenuto del backup. |
+| `--no-owner` | Ignora le informazioni di proprietà registrate nel dump. |
+| `--continue-on-error` | Registra gli errori e prosegue. **Può lasciare la RLS non applicata**; usalo solo se sei pienamente consapevole del motivo. |
+| `--yes`, `-y` | Salta la richiesta di conferma. |
 
-La procedura sicura è ripristinare accanto al database attivo, verificarlo, e
-solo dopo spostare l'app:
+La procedura più sicura consiste nell'eseguire il ripristino accanto al database attivo, verificarlo e solo
+successivamente migrare l'applicazione:
 
 1. `rebase db restore <backup> --create-db --target-db app_restored`
-2. Punta un processo di prova (o `psql`) su `app_restored` e verifica i
-   conteggi delle righe, un accesso, e le tabelle a cui tieni più.
-3. Ripunta `DATABASE_URL` su di esso, oppure rinomina i database, durante una
-   breve finestra di manutenzione.
-4. Ripristina i tuoi file caricati dal loro backup proprio, allo stesso
-   momento nel tempo quanto più possibile.
+2. Punta un processo temporaneo (o `psql`) su `app_restored` e verifica il conteggio delle righe,
+   un accesso utente e le tabelle più critiche.
+3. Riassegna `DATABASE_URL` verso questo database, oppure rinomina i database durante una breve
+   finestra di manutenzione.
+4. Ripristina i file caricati dal loro backup dedicato, allineandoti al punto nel tempo più
+   vicino possibile a quello del database.
 
 ## Il pannello Backups
 
-Il pannello **Backups** di Studio, nel gruppo *Database*, elenca i backup
-presenti in `BACKUP_DESTINATION`, dal più recente, con il loro orario (e la loro dimensione, per una
-destinazione locale). **Download** scarica il dump; **Roles file** scarica il suo
-`.globals.sql`. Scarica entrambi e conservali nella stessa cartella. Un
-backup contrassegnato **No roles file** non ha il file collaterale: ricrea i
-suoi ruoli a mano prima di ripristinarlo in un nuovo Postgres.
+Il pannello **Backups** di Studio, nella sezione *Database*, elenca i backup presenti in
+`BACKUP_DESTINATION`, dal più recente al più vecchio, con la relativa data e ora (e la dimensione, nel caso di una
+destinazione locale). **Download**
+scarica il dump; **Roles file** scarica il rispettivo file `.globals.sql`. Scarica entrambi e
+conservali nella stessa directory. Un backup contrassegnato con **No roles file** non ha un file collaterale associato:
+ricrea manualmente i ruoli prima di ripristinarlo in un nuovo Postgres.
 
-Sopra l'elenco, il pannello riporta il job di backup pianificato e la sua ultima
-esecuzione. Un'esecuzione fallita viene mostrata come errore con il proprio messaggio,
-così un backup notturno che non riesce a eseguirsi è visibile dove sono
-elencati i backup, non solo nel pannello Cron Jobs.
+Sopra l'elenco, il pannello riporta il job di backup pianificato e la sua ultima esecuzione. Un'esecuzione fallita viene mostrata come
+un errore con il relativo messaggio, rendendo visibile un backup notturno non riuscito direttamente dove
+sono elencati i backup, e non solo nel pannello Processi pianificati.
 
-Cosa dice del job:
+Cosa viene indicato a proposito del job:
 
-- **Last scheduled backup** è l'ultima esecuzione fatta dalla pianificazione. Un'esecuzione
-  avviata a mano da allora (**Run Now** in Cron Jobs) ha una riga a sé, così un'esecuzione
-  di prova riuscita non può nascondere un backup notturno fallito, e una fallita non viene
-  riportata come il backup notturno.
-- Un job dichiarato `enabled: false` risulta come backup pianificati **off**.
-  È ciò che esporta il file di cron qui sopra finché `BACKUP_SCHEDULE` non è impostata, e
-  impostare `BACKUP_SCHEDULE` li attiva. **Paused** significa che un admin ha messo in pausa
-  il job in Cron Jobs, e riprenderlo lì lo riattiva.
-- Un job che lo scheduler ha rifiutato, per una pianificazione, un fuso orario o un timeout
-  non validi, viene riportato con il motivo. Non viene mai eseguito finché il suo file di
-  cron non viene corretto.
-- Quando la cronologia delle esecuzioni in `rebase.cron_logs` non può essere letta, il
-  pannello lo dice, anziché dire che il backup non è ancora stato eseguito.
+- **Last scheduled backup** è l'ultima esecuzione effettuata dalla pianificazione. Un'esecuzione avviata
+  manualmente nel frattempo (**Run Now** in Processi pianificati) ottiene una riga separata, in modo che un'esecuzione
+  di test riuscita non nasconda un backup notturno fallito, e un test fallito non venga
+  scambiato per l'esecuzione notturna.
+- Un job dichiarato con `enabled: false` viene indicato con i backup pianificati **disattivati**.
+  Questo è quanto esportato dal file cron sopra riportato finché `BACKUP_SCHEDULE` non è impostata;
+  la definizione di `BACKUP_SCHEDULE` provvede ad attivarli. **Paused** indica che un admin ha sospeso
+  il job in Processi pianificati, e la sua ripresa da tale schermata lo riattiva.
+- Un job rifiutato dallo scheduler per pianificazione, fuso orario o timeout non valido
+  viene riportato con la relativa motivazione. Non verrà mai eseguito finché il rispettivo file cron non sarà corretto.
+- Quando la cronologia delle esecuzioni in `rebase.cron_logs` non è accessibile, il pannello lo segnala
+  chiaramente, anziché indicare che il backup non è ancora stato eseguito.
 
-L'elenco viene letto dal processo server che risponde a `GET /api/admin/backups`,
-e non sempre è il processo che esegue la pianificazione:
+L'elenco viene letto dal processo del server che risponde a `GET /api/admin/backups`,
+e tale processo non coincide sempre con quello che esegue la pianificazione:
 
 - Una destinazione `s3://` viene elencata e scaricata tramite un client per quel
-  bucket, costruito dalle stesse variabili `S3_*` usate dal cron di backup. Una `gs://`
-  usa le credenziali predefinite dell'applicazione (ADC). Forniscile a **ogni** processo che
-  serve `/api/admin`, compreso il ruolo `api` di un
-  [deployment suddiviso](/docs/deployment/split-processes/), non solo a quello che esegue
-  il cron. Una destinazione che il processo non riesce a leggere risponde `503`
-  con la destinazione e il motivo, e il pannello mostra questo anziché un
-  elenco vuoto.
-- Un percorso locale è il disco proprio di quel processo. Quando la pianificazione viene
-  eseguita in un altro processo (un `api` con `REBASE_CRON_SCHEDULER=false` accanto a un
-  `worker`), il pannello dice che sta elencando il disco di questo processo: i backup
-  pianificati compaiono lì solo se entrambi i processi montano la stessa directory. Un
-  deployment suddiviso dovrebbe fare il backup su object storage.
+  bucket, configurato con le stesse variabili `S3_*` usate dal cron di backup. Una destinazione `gs://`
+  utilizza le Application Default Credentials. Forniscile a **ogni** processo che
+  gestisce `/api/admin`, compreso il ruolo `api` in un
+  [deployment con processi separati](/docs/deployment/split-processes/), non solo a quello
+  che esegue il cron. Una destinazione non leggibile dal processo risponde con un codice `503`
+  indicando la destinazione e il motivo, e il pannello mostra questo messaggio anziché
+  un elenco vuoto.
+- Un percorso locale fa riferimento al disco del singolo processo. Quando la pianificazione viene eseguita in un altro
+  processo (un'istanza `api` con `REBASE_CRON_SCHEDULER=false` accanto a un `worker`), il
+  pannello segnala che sta leggendo il disco di quel processo: i backup pianificati compariranno
+  lì solo se entrambi i processi condividono lo stesso volume montato. Un deployment con processi separati
+  dovrebbe sempre salvare i backup su object storage.
 
-I download passano attraverso
-`GET /api/admin/backups/download?key=…`, riservato agli admin, così il
-bucket non deve mai essere pubblico; una chiave fuori dal prefisso della
-destinazione viene rifiutata. Con `BACKUP_DESTINATION` non impostata, il
-pannello indica che i backup non sono configurati.
+I download vengono inviati in streaming tramite `GET /api/admin/backups/download?key=…`, riservato agli admin,
+in modo che il bucket non debba mai essere reso pubblico; qualsiasi chiave esterna al prefisso della destinazione viene
+rifiutata. Se `BACKUP_DESTINATION` non è impostata, il pannello segnala che i backup non sono
+configurati.
 
 ### Scaricare un backup
 
 Un browser non può
-mettere un header `Authorization` su un download, quindi Studio e l'SDK chiedono prima
-un link. `POST /api/admin/backups/download-url` con `{ "key": "…" }` (stesso scope admin e
-stessi controlli sulla chiave del download) risponde
-`{ url, token, expiresIn }`: un URL il cui token sostituisce l'header, per
-quel solo backup alla destinazione corrente, per 60 secondi. Il token viene
-rifiutato ovunque altro — come sessione, come token di download dello storage, per un altro
-backup — e una volta scaduto. Il browser trasmette poi il dump direttamente
-su disco, così un backup grande quanto il tuo database non deve mai stare in una tab.
+inviare un header `Authorization` durante un download diretto, quindi Studio e l'SDK richiedono prima un
+link. `POST /api/admin/backups/download-url` con `{ "key": "…" }` (con gli stessi
+permessi admin e controlli sulla chiave previsti per il download) restituisce
+`{ url, token, expiresIn }`: un URL il cui token sostituisce l'header per
+quello specifico backup nella destinazione corrente, con una validità di 60 secondi. Il token viene
+rifiutato per qualsiasi altro scopo — come sessione, come token di download dello storage o per un altro
+backup — e non appena scade. Il browser scarica quindi il dump direttamente su
+disco, evitando che un backup grande quanto l'intero database debba risiedere nella memoria di una scheda.
 
 ```ts
 // In a browser: the browser saves the file.
@@ -368,27 +356,23 @@ const { stream, name } = await client.backups.stream(key);
 await pipeline(Readable.fromWeb(stream), createWriteStream(name));
 ```
 
-`backups.download(key)` salva il file in un browser e lancia un errore altrove; usa `stream(key)`
-in Node. Contro un server senza link di download (uno precedente alla 0.25, o uno
-senza un segreto JWT per firmarli), `download()` ripiega sulla lettura dei byte
-da sé.
+`backups.download(key)` salva il file in un browser e genera un errore altrove; usa `stream(key)`
+in ambiente Node. Con un server privo del supporto per i link di download (versioni precedenti alla 0.25, o istanze
+prive del segreto JWT per firmarli), `download()` effettua un fallback leggendo direttamente i byte.
 
-## Mantieni i backup privati
+## Mantenere i backup privati
 
-Un backup contiene tutti i tuoi dati, credenziali e dati personali inclusi.
+Un backup contiene tutti i tuoi dati, incluse le credenziali e le informazioni personali.
 
-- Non usare mai un bucket pubblico. Mantieni il suo accesso privato e
-  registralo nei log.
-- Attiva la cifratura at-rest: la server-side encryption di S3, la
-  cifratura predefinita di GCS, o la cifratura del disco per una cartella
-  locale.
-- Limita chi può leggere la posizione dei backup, e ruota le sue credenziali.
-- Preferisci un bucket dedicato, separato dai file caricati dagli utenti.
+- Non usare mai un bucket pubblico. Mantieni l'accesso strettamente privato e monitoralo con i log.
+- Attiva la crittografia at-rest: crittografia lato server di S3, crittografia predefinita di GCS,
+  oppure crittografia a livello di disco per una directory locale.
+- Limita chi può accedere alla destinazione dei backup e ruota periodicamente le relative credenziali.
+- Prediligi un bucket dedicato, separato da quello dei caricamenti degli utenti.
 
 ## Point-in-time recovery
 
-Un backup `pg_dump` si ripristina al momento in cui è stato eseguito il
-dump. Recuperare a un secondo qualsiasi nel mezzo richiede l'archiviazione
-dei WAL e backup di base, che la distribuzione open source non esegue per
-te. Se ti serve in self-hosting, esegui `pgBackRest` o `wal-g` accanto al tuo
-Postgres e mantieni questi dump come una seconda copia, portabile.
+Un backup `pg_dump` consente il ripristino limitatamente all'istante esatto in cui è stato eseguito il dump. Il ripristino
+a qualsiasi secondo intermedio richiede l'archiviazione dei file WAL e base backup, operazioni che
+la distribuzione open-source non gestisce automaticamente. Se hai questa esigenza in un ambiente self-hosted, utilizza `pgBackRest`
+o `wal-g` accanto alla tua istanza Postgres, conservando questi dump come seconda copia portabile.

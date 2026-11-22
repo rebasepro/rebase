@@ -1,25 +1,25 @@
 ---
-sourceHash: 408bc318cfdfdf07
-title: Cron Jobs
-sidebar_label: Cron Jobs
-description: Agende tarefas recorrentes em segundo plano com o sistema de cron jobs integrado do Rebase. Defina jobs como arquivos TypeScript, monitore-os no Studio e gerencie-os por meio da API REST.
+sourceHash: 571b6448756b487e
+title: Tarefas Cron
+sidebar_label: Tarefas Cron
+description: Agende tarefas recorrentes em segundo plano com o sistema de cron jobs integrado do Rebase. Defina tarefas como arquivos TypeScript, monitore-as no Studio e gerencie-as por meio da API REST.
 ---
 
 ## Visão Geral
 
-O Rebase inclui um **agendador de cron jobs** integrado para executar tarefas recorrentes em segundo plano — limpeza de dados, geração de relatórios, verificações de integridade (health checks), sincronizações com APIs externas e muito mais.
+O Rebase inclui um **agendador de tarefas cron integrado** para executar tarefas recorrentes em segundo plano — limpeza de dados, geração de relatórios, verificações de integridade (health checks), sincronizações de APIs externas e muito mais.
 
-Os cron jobs seguem o mesmo padrão de **descoberta baseada em arquivos** das funções personalizadas: adicione um arquivo TypeScript no seu diretório `crons/`, e o Rebase o registra e agenda automaticamente.
+Os cron jobs seguem o mesmo padrão de **descoberta baseada em arquivos** das funções personalizadas: adicione um arquivo TypeScript no seu diretório `crons/`, e o Rebase o registra e o agenda automaticamente.
 
 - **Zero dependências** — Nenhuma biblioteca externa de agendamento é necessária
-- **API de administração** — Endpoints REST para listar, acionar, habilitar/desabilitar e visualizar logs
-- **Painel do Studio** — Monitore todos os jobs, visualize o histórico de execução e acione execuções manualmente
+- **API de Administração** — Endpoints REST para listar, disparar, habilitar/desabilitar e visualizar logs
+- **Painel do Studio** — Monitore todas as tarefas, visualize o histórico de execução e dispare execuções manualmente
 - **Persistência em banco de dados** — Logs de execução armazenados no PostgreSQL, sobrevivendo a reinicializações
-- **Cache em memória** — Ring buffer rápido (últimas 50 execuções) para o painel, apoiado pelo banco de dados
+- **Cache em memória** — Ring buffer rápido (últimas 50 execuções) para o painel, sustentado pelo banco de dados
 
-## Definindo um Cron Job
+## Definindo uma Tarefa Cron
 
-Crie um arquivo no seu diretório `backend/crons/` que exporte por padrão (default export) uma definição de cron. Use o helper `defineCron` de `@rebasepro/server` para inferência de tipos e autocompletar:
+Crie um arquivo no seu diretório `backend/crons/` que faça a exportação padrão (default export) de uma definição de cron. Use o helper `defineCron` de `@rebasepro/server` para inferência de tipos e autocompletar:
 
 ```typescript
 // backend/crons/health-check.ts
@@ -47,26 +47,28 @@ export default defineCron({
 });
 ```
 
-O `rebase dev` monitora o diretório de crons, portanto, um job adicionado enquanto ele está em execução é registrado na próxima recarga — sem reinicialização. (Ele precisa ser informado: o diretório é escaneado em vez de importado, de modo que o monitor não consegue inferi-lo.)
+O `rebase dev` monitora o diretório crons, portanto, uma tarefa adicionada enquanto ele estiver em execução será
+registrada no próximo recarregamento — sem reinicialização. (Ele precisa ser avisado: o diretório é
+escaneado em vez de importado, então o monitor não consegue inferi-lo.)
 
 :::note
-`defineCron` é uma função de identidade — ela retorna o mesmo objeto que você passa. Um objeto `CronJobDefinition` comum exportado por padrão funciona de forma idêntica; `defineCron` simplesmente fornece verificação de tipos em tempo de compilação e autocompletar no editor.
+`defineCron` é uma função de identidade — ela retorna o mesmo objeto que você passa para ela. Um objeto `CronJobDefinition` padrão simples exportado como default funciona de forma idêntica; `defineCron` apenas fornece checagem de tipos em tempo de compilação e autocompletar no editor.
 :::
 
-O **nome do arquivo** (sem extensão) se torna o ID exclusivo do job — por exemplo, `health-check`.
+O **nome do arquivo** (sem extensão) se torna o ID exclusivo da tarefa — por exemplo, `health-check`.
 
 
 ## Configuração
 
 :::note[Onde isso vai]
-**Runtime gerenciado** — coloque os arquivos em `backend/crons/`; o runtime descobre esse diretório por conta própria, e `entry.crons` em `rebase.json` só é necessário se você o tiver movido. `REBASE_CRON_SCHEDULER` no `.env` decide se *este* processo executa os temporizadores.
+**Runtime gerenciado** — coloque os arquivos em `backend/crons/`; o runtime descobre esse diretório por conta própria, e `entry.crons` no `rebase.json` só é necessário se você o moveu de lugar. `REBASE_CRON_SCHEDULER` no `.env` decide se *este* processo executa os timers.
 
-**Ejetado** — `cronsDir` em `initializeRebaseBackend({ … })`, conforme abaixo, ou `crons` com os jobs como valores.
+**Ejetado** — `cronsDir` em `initializeRebaseBackend({ … })`, conforme abaixo, ou `crons` com as tarefas como valores.
 
-O mapeamento completo está na [Visão Geral do Backend](/docs/backend/#where-each-option-lives).
+O mapa completo está na [Visão Geral do Backend](/docs/backend/#where-each-option-lives).
 :::
 
-Habilite os cron jobs adicionando `cronsDir` à configuração do seu backend:
+Habilite as tarefas cron adicionando `cronsDir` à configuração do seu backend:
 
 ```typescript no-verify
 const instance = await initializeRebaseBackend({
@@ -76,17 +78,17 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
-É isso. O Rebase irá:
+É só isso. O Rebase irá:
 
 1. Escanear o diretório em busca de arquivos `.ts` / `.js`
-2. Registrar cada exportação padrão como um cron job
+2. Registrar cada exportação padrão como uma tarefa cron
 3. Criar automaticamente as tabelas `rebase.cron_logs`, `rebase.cron_claims` e `rebase.cron_job_state` no PostgreSQL (se o driver suportar SQL)
 4. Iniciar o agendador e preencher os contadores a partir dos logs existentes no banco de dados
-5. Montar rotas REST de administração em `/api/admin/cron`
+5. Montar as rotas REST de administração em `/api/admin/cron`
 
-### Cron jobs como valores
+### Tarefas cron como valores
 
-`crons` recebe os jobs como um record do ID do job para a definição, ao lado de `tables`. Um diretório é uma forma de construí-lo: `loadCrons(dir)` lê um diretório exatamente nesse formato.
+`crons` recebe as tarefas como um registro do ID da tarefa para a definição, ao lado de `tables`. Um diretório é uma forma de criá-lo: `loadCrons(dir)` lê um diretório exatamente nesse formato.
 
 ```typescript
 import path from "path";
@@ -104,18 +106,18 @@ await initializeRebaseBackend({ app, server, crons: { "nightly-report": nightlyR
 await initializeRebaseBackend({ app, server, crons: await loadCrons(path.resolve(__dirname, "../crons")) });
 ```
 
-Informe `crons` ou `cronsDir`, não ambos: a inicialização recusa o par. Construir o backend registra os jobs; o que inicia seus temporizadores é `start()`, que `initializeRebaseBackend` chama para você. Com [`createRebaseBackend`](/docs/backend/custom-server/), você mesmo o chama no processo que deve executá-los. `loadCronJobsFromDirectory` e `loadCronJobsWithDiagnostics` ainda funcionam, estão obsoletos (deprecated) e exibem um aviso uma única vez.
+Passe `crons` ou `cronsDir`, não ambos: a inicialização recusa o par. A construção do backend registra as tarefas; o que inicia seus timers é o `start()`, que o `initializeRebaseBackend` chama para você. Com [`createRebaseBackend`](/docs/backend/custom-server/) você mesmo o chama, no processo que deve executá-los. `loadCronJobsFromDirectory` e `loadCronJobsWithDiagnostics` ainda funcionam, estão obsoletos (deprecated) e emitem um aviso uma única vez.
 
 ## Sintaxe de Agendamento
 
-As expressões cron usam o **formato padrão de 5 campos**:
+Expressões cron usam o **formato padrão de 5 campos**:
 
 ```
-┌───────────── minute (0–59)
-│ ┌─────────── hour (0–23)
-│ │ ┌───────── day of month (1–31)
-│ │ │ ┌─────── month (1–12)
-│ │ │ │ ┌───── day of week (0–6, Sunday = 0)
+┌───────────── minuto (0–59)
+│ ┌─────────── hora (0–23)
+│ │ ┌───────── dia do mês (1–31)
+│ │ │ ┌─────── mês (1–12)
+│ │ │ │ ┌───── dia da semana (0–6, Domingo = 0)
 │ │ │ │ │
 * * * * *
 ```
@@ -127,14 +129,18 @@ As expressões cron usam o **formato padrão de 5 campos**:
 | `0 3 * * *` | Diariamente às 3:00 |
 | `0 0 * * 1` | Toda segunda-feira à meia-noite |
 | `0 9 1 * *` | Primeiro dia de cada mês às 9:00 |
-| `0,30 * * * *` | A cada 30 minutos (nos minutos :00 e :30) |
-| `0 9-17 * * 1-5` | De hora em hora, das 9h às 17h, somente em dias úteis |
+| `0,30 * * * *` | A cada 30 minutos (no minuto :00 e :30) |
+| `0 9-17 * * 1-5` | De hora em hora, das 9:00 às 17:00, apenas em dias de semana |
 
 Valores de passo (`*/n`), intervalos (`a-b`) e listas (`a,b,c`) são todos suportados.
 
-Quando tanto o dia do mês quanto o dia da semana são restritos, um dia que coincida com qualquer um deles é correspondido, como no cron padrão: `0 9 1 * 1` é executado no dia 1º de cada mês e em todas as segundas-feiras. Quando qualquer um dos campos começa com `*`, o dia precisa corresponder a ambos.
+Quando o dia do mês e o dia da semana são restritos, um dia que coincida com qualquer um deles é correspondido, como no cron padrão: `0 9 1 * 1` roda no primeiro dia de cada mês e em todas as segundas-feiras. Quando qualquer um dos campos começa com `*`, o dia deve coincidir com ambos.
 
-Um agendamento é avaliado em relação ao relógio de parede (wall clock) de seu fuso horário. Durante uma mudança de horário de verão, isso significa que um job com horário fixo dentro da hora repetida (`30 2 * * *` onde os relógios atrasam às 03:00) é executado em ambas as passagens dessa hora, e um dentro da hora pulada, quando os relógios adiantam, não é executado naquele dia.
+Um agendamento é avaliado em relação ao relógio de parede de seu fuso horário. Em uma mudança de
+horário de verão, isso significa que uma tarefa em horário fixo dentro da hora repetida
+(`30 2 * * *` onde os relógios atrasam às 03:00) executa em ambas as passagens daquela hora,
+e uma dentro da hora pulada, quando os relógios adiantam, não executa naquele
+dia.
 
 ## Referência de CronJobDefinition
 
@@ -174,7 +180,7 @@ interface CronJobDefinition {
 
 ## Contexto do Handler
 
-Cada handler recebe um `CronJobContext` contendo métodos utilitários e a instância do Rebase Server Client:
+Cada handler recebe um `CronJobContext` contendo métodos utilitários e a instância do Rebase Client:
 
 ```typescript no-verify
 interface CronJobContext {
@@ -199,13 +205,15 @@ interface CronJobContext {
 }
 ```
 
-Use `ctx.log()` para emitir saídas estruturadas. Essas linhas são capturadas no log de execução e visíveis no Studio e por meio da API REST. Cada linha também é gravada no log do servidor no nível `info` com um campo `cron` contendo o ID do job, para que apareça onde quer que a saída do seu contêiner seja coletada, incluindo os logs de depuração do Rebase Cloud. Essa cópia é ofuscada (redacted) da mesma forma que as linhas de log do próprio servidor: os valores de chaves como `password` ou `apiKey`, bem como o SQL e parâmetros de uma consulta com falha, são substituídos. O log de execução armazena a linha sem essa ofuscação.
+Use `ctx.log()` para emitir saídas estruturadas. Essas linhas são capturadas no log de execução e ficam visíveis no Studio e através da API REST. Cada linha também é gravada no log do servidor no nível `info` com um campo `cron` contendo o ID da tarefa, de modo que apareça onde a saída do seu container for coletada, incluindo os logs de depuração do Rebase Cloud. Essa cópia é redigida da mesma forma que as próprias linhas de log do servidor: os valores de chaves como `password` ou `apiKey`, e o SQL e parâmetros de uma consulta com falha, são substituídos. O log de execução armazena a linha sem essa censura.
 
-O log de execução mantém as primeiras 500 linhas de uma execução ou 64 KB delas, o que ocorrer primeiro, e depois inclui uma linha informando quantas outras existiam: `… 9500 more lines not kept — see the server log`. O log do servidor recebe todas as linhas. Um job que registra uma linha por item processado deve esperar que seu histórico mostre apenas o início da execução.
+O log de execução mantém as primeiras 500 linhas ou 64 KB de uma execução, o que ocorrer primeiro, e depois uma linha informando quantas outras existiram: `… 9500 more lines not kept — see the server log`. O log do servidor recebe todas as linhas. Uma tarefa que registra uma linha por item processado deve esperar que seu histórico mostre o início da execução.
 
-### `ctx.signal` — interrompa o trabalho quando a execução parar
+### `ctx.signal` — interromper o trabalho quando a execução parar
 
-O timeout encerra a *execução*: o agendador para de esperar e registra uma falha. Ele não encerra o handler. Passe `ctx.signal` para qualquer operação que aceite um sinal de cancelamento, e o trabalho será interrompido junto com ele:
+O tempo limite encerra a *execução*: o agendador para de esperar e registra uma falha.
+Ele não encerra o handler. Passe `ctx.signal` para qualquer coisa que aceite um, e
+o trabalho será interrompido junto com ele:
 
 ```typescript no-verify
 export default defineCron({
@@ -219,20 +227,35 @@ export default defineCron({
 });
 ```
 
-Sem isso, um job cujo timeout coincide com seu intervalo vaza uma requisição abandonada por tick — de forma invisível, já que toda execução já foi registrada como falha.
+Sem isso, uma tarefa cujo tempo limite coincide com o seu intervalo vaza uma requisição abandonada
+a cada ciclo — invisível, porque cada execução já foi registrada como com falha.
 
 :::note[`ctx.client` foi removido]
-Era um segundo nome para `ctx.rebase`, e seu tipo reexpunha `client.data` — o alias que `RebaseServerClient` omite deliberadamente para que o plano privilegiado tenha exatamente um único nome. Um desenvolvedor que aprendesse `client.data` aqui o levaria para um hook de tabela, onde `context.data` é o plano com *escopo de usuário*: mesma grafia, privilégio oposto. Use `ctx.rebase.dataAsAdmin`.
+Era um segundo nome para `ctx.rebase`, e seu tipo reexibia `client.data` —
+o alias `RebaseServerClient` omite isso deliberadamente para que o plano privilegiado
+tenha exatamente um nome. Um leitor que aprendesse `client.data` aqui o levaria para um
+hook de tabela, onde `context.data` é o plano com *escopo de usuário*: mesma
+grafia, privilégio oposto. Use `ctx.rebase.dataAsAdmin`.
 :::
 
 ### Interagindo com o banco de dados e serviços via `ctx.rebase`
 
-`ctx.rebase.dataAsAdmin` é o plano de dados com escopo de administrador. Um cron não possui um usuário por requisição, portanto não há alternativa com escopo de usuário aqui — defina o escopo dos filtros de cada consulta você mesmo.
+`ctx.rebase.dataAsAdmin` é o plano de dados com escopo de administração. Uma tarefa cron não tem
+usuário por requisição, então não há alternativa com escopo de usuário aqui — aplique o escopo
+dos filtros de cada consulta você mesmo.
 
-:::caution[Escopo de administrador não ignora o RLS]
-`dataAsAdmin` é delimitado uma vez, na inicialização, como `{ uid: "service", roles: ["admin"] }`. Cada leitura e escrita ainda é executada em uma transação que realizou `SET LOCAL ROLE rebase_user` com `app.uid = 'service'`, e **suas políticas são avaliadas** — em relação a essa identidade. Ela passa pelas políticas padrão integradas por meio de seu braço `rolesOverlap(['admin'])`, razão pela qual a diferença raramente se manifesta. Ela se manifesta quando você escreve suas próprias regras: `policy.serverContext()` é compilado para `rebase.uid() IS NULL` e, portanto, é **false** aqui, de modo que uma tabela com `defaultPolicies: false` cuja única regra seja `serverContext()` negará essas escritas e retornará zero linhas — HTTP 200, vazio — para essas leituras.
+:::caution[Escopo de administrador não significa ignorar o RLS]
+`dataAsAdmin` recebe escopo uma vez, na inicialização, como `{ uid: "service", roles: ["admin"] }`.
+Cada leitura e gravação ainda é executada em uma transação que executou `SET LOCAL ROLE
+rebase_user` com `app.uid = 'service'`, e **suas políticas são avaliadas** —
+contra essa identidade. Ela passa pelas políticas padrão integradas por meio do
+braço `rolesOverlap(['admin'])`, motivo pelo qual a diferença raramente aparece. Ela
+aparece quando você escreve as suas próprias: `policy.serverContext()` compila para
+`rebase.uid() IS NULL` e, portanto, é **falso** aqui, de modo que uma tabela com
+`defaultPolicies: false` cuja única regra seja `serverContext()` negará essas
+gravações e retornará zero linhas — HTTP 200, vazio — para essas leituras.
 
-`rebase.sql()` *é* um bypass incondicional: conexão do proprietário (owner), sem políticas.
+`rebase.sql()` *é* um bypass incondicional: conexão do proprietário, sem políticas.
 :::
 
 ```typescript
@@ -290,66 +313,70 @@ O handler pode retornar qualquer valor serializável em JSON. Ele será armazena
 
 ## API REST
 
-A listagem, o acionamento, a pausa e a retomada de jobs via HTTP, bem como o `client.cron` do SDK tipado, estão documentados na [API de Cron Jobs](/docs/backend/cron-jobs-api/).
+Listar, acionar, pausar e retomar tarefas via HTTP, bem como o `client.cron` tipado do SDK, estão em [API de Tarefas Cron](/docs/backend/cron-jobs-api/).
 
 ## Painel do Studio
 
-Quando os cron jobs estão configurados, uma ferramenta **Cron Jobs** aparece no Rebase Studio sob **Compute**, ao lado do console JS. O painel oferece:
+Quando tarefas cron estão configuradas, uma ferramenta de **Tarefas agendadas** aparece no Rebase Studio sob **Computação**, ao lado do console JS. O painel oferece:
 
-- **Lista de jobs** — Todos os jobs registrados com indicadores de status em tempo real
+- **Lista de tarefas** — Todas as tarefas registradas com indicadores de status em tempo real
 - **Painel de detalhes** — Agendamento, próxima/última execução, duração e informações de erro
-- **Histórico de execução** — Entradas de log expansíveis com saídas e resultados capturados
-- **Acionamento manual** — Execute qualquer job sob demanda com um clique. O painel aguarda a conclusão da execução e informa como ela ocorreu: uma execução com falha exibe seu erro
-- **Habilitar/desabilitar** — Pause e retome jobs sem reiniciar o servidor, para todos os processos de uma vez; uma pausa permanece ativa entre reinicializações e deploys
-- **Jobs que não estão presentes** — cada job recusado pelo agendador, com seu agendamento e o motivo, e quantos arquivos de cron falharam ao carregar. Nenhum deles é agendado; consulte [Jobs que não estão presentes](/docs/backend/cron-jobs-api/#jobs-that-are-not-there)
+- **Histórico de execução** — Entradas de log expansíveis com saídas capturadas e resultados
+- **Disparo manual** — Execute qualquer tarefa sob demanda com um clique. O painel aguarda a conclusão da execução e informa o resultado: uma execução que falhou exibe seu erro
+- **Habilitar/desabilitar** — Pause e retome tarefas sem reiniciar o servidor, para todos os processos de uma vez; uma pausa permanece ativa entre reinicializações e deploys
+- **Tarefas inexistentes** — cada tarefa que o agendador recusou, com seu agendamento e o motivo, e quantos arquivos de cron falharam ao carregar. Nenhuma delas é agendada; consulte [Tarefas inexistentes](/docs/backend/cron-jobs-api/#jobs-that-are-not-there)
 
 O painel é atualizado automaticamente a cada 15 segundos.
 
-O painel exibe as mesmas informações independentemente de qual processo o atenda. Um job executado por outro processo é exibido como em execução.
-Em todo processo que possui um store, a contagem de execuções, a contagem de falhas e a última execução são lidas do banco de dados, onde as execuções de todos os processos são contabilizadas. Os contadores próprios de um processo registram apenas as execuções que ele próprio realizou: a role `api` ao lado de um worker não executa nada e, entre duas réplicas que agendam tarefas, nenhuma vê os slots que a outra reivindicou. Somente quando o banco de dados não puder ser lido o card recorrerá aos contadores locais deste processo, exibindo um aviso no log do servidor.
+O painel exibe a mesma informação independentemente de qual processo a esteja servindo. Uma tarefa que outro
+processo está executando aparece como em execução.
+Em todo processo que possui um store, a contagem de execuções, a contagem de falhas e a última execução são lidas do banco de dados, onde as execuções de cada processo são contabilizadas. Os contadores próprios de um processo mantêm apenas as execuções que ele próprio realizou: a role `api` ao lado de um worker não executa nada, e de duas réplicas que agendam, nenhuma vê os slots que a outra reivindicou. Apenas quando o banco de dados não puder ser lido o card recorre aos contadores locais deste processo, emitindo um aviso no log do servidor.
 
-As contagens abrangem todo o período histórico; o histórico corresponde aos últimos 30 dias. A linha de cada execução em `rebase.cron_logs` é excluída 30 dias após seu início, por meio de uma varredura horária, enquanto as contagens de execuções e falhas continuam a contabilizá-la. Uma execução ignorada conta como uma execução, como sempre aconteceu: ela é uma linha no histórico.
+As contagens são históricas (de todos os tempos); o histórico refere-se aos últimos 30 dias. A linha de cada execução em `rebase.cron_logs` é excluída 30 dias após o seu início por uma varredura horária, enquanto as contagens de execução e de falhas continuam computando-a. Uma execução ignorada conta como uma execução, como sempre aconteceu: é uma linha do histórico.
 
-## Validação de Agendamento e Análise de AST
+## Validação de Agendamento e Análise AST
 
-Na inicialização do backend, o Rebase analisa todas as programações de cron registradas usando um expansor de cron baseado em JS sem dependências:
-- **Verificação de sintaxe**: Verifica se a string contém exatamente 5 campos separados por espaço em branco (`minute`, `hour`, `day of month`, `month`, `day of week`).
-- **Expansão de intervalos**: Decompõe passos (`*/15`), intervalos (`9-17`) e listas separadas por vírgula (`0,30`) em arrays explícitos de inteiros válidos mapeados para seus respectivos limites (por exemplo, minutos `0-59`, horas `0-23`, meses `1-12`).
-- **Tokens inteiros**: Todo número, limite de intervalo e passo deve ser um número inteiro: `5abc`, `*/5x` e `1.5` são recusados, assim como um intervalo invertido (`5-1`).
-- Se qualquer expressão cron falhar na validação, o Rebase rejeita a definição, registra um erro de inicialização e se recusa a registrar o job para evitar falhas de execução em tempo de execução.
+Na inicialização do backend, o Rebase analisa todos os agendamentos de cron registrados usando um expandidor de cron baseado em JS com zero dependências:
+- **Verificação de Sintaxe**: Verifica se a string contém exatamente 5 campos separados por espaço em branco (`minuto`, `hora`, `dia do mês`, `mês`, `dia da semana`).
+- **Expansão de Intervalos**: Desconstrói passos (`*/15`), intervalos (`9-17`) e listas separadas por vírgula (`0,30`) em arrays explícitos de inteiros válidos mapeados para seus respectivos limites (por exemplo, minutos `0-59`, horas `0-23`, meses `1-12`).
+- **Tokens Inteiros**: Cada número, limite de intervalo e passo deve ser um número inteiro: `5abc`, `*/5x` e `1.5` são recusados, assim como um intervalo invertido (`5-1`).
+- Se alguma expressão cron falhar na validação, o Rebase rejeita a definição, registra um erro de inicialização e se recusa a registrar a tarefa para evitar falhas de execução em tempo de execução.
 
 ---
 
-## Sob o Capô: Correção de Desvio de Relógio (Clock-Drift)
+## Por Baixo dos Panos: Correção de Desvio de Relógio (Clock-Drift)
 
-Agendadores padrão baseados em intervalos (como `setInterval`) sofrem desvios com o tempo e causam picos significativos de CPU devido a atrasos de agendamento no event loop no nível do sistema operacional. Para garantir a precisão da execução, o Rebase implementa um **loop dinâmico de cálculo de tempo-alvo**:
-1. **Cálculo de candidato**: Ao concluir um job ou iniciar o agendador, o Rebase calcula o timestamp exato do *próximo* minuto candidato correspondente.
-2. **Espera dinâmica**: Ele calcula a diferença em milissegundos (`nextRun.getTime() - now.getTime()`) e agenda um único `setTimeout`.
-3. **Limite de segurança contra desvio**: Um buffer de espera mínimo (`MIN_SCHEDULE_INTERVAL_MS`) de **5.000ms** é aplicado. Se um tick do agendador for concluído com extrema rapidez, esse limite evita disparos duplos quase instantâneos.
-4. **Amigável ao encerramento**: Os identificadores de temporizadores são desvinculados explicitamente do event loop do Node.js usando `timer.unref()`, garantindo que os agendadores de cron em segundo plano não bloqueiem o encerramento limpo do processo durante os deploys.
+Agendadores padrão baseados em intervalo (como `setInterval`) sofrem desvio ao longo do tempo e causam picos significativos de CPU devido a atrasos de agendamento no event loop do sistema operacional. Para garantir a precisão da execução, o Rebase implementa um **loop de cálculo dinâmico de tempo-alvo**:
+1. **Cálculo de Candidato**: Ao concluir uma tarefa ou iniciar o agendador, o Rebase calcula o timestamp exato do *próximo* minuto candidato correspondente.
+2. **Espera Dinâmica (Sleep)**: Ele calcula a diferença em milissegundos (`nextRun.getTime() - now.getTime()`) e agenda um único `setTimeout`.
+3. **Limite Seguro contra Desvios**: Um buffer mínimo de espera (`MIN_SCHEDULE_INTERVAL_MS`) de **5.000ms** é imposto. Se um ciclo do agendador for concluído extremamente rápido, esse limite impede disparos duplos quase instantâneos.
+4. **Encerramento Amigável**: Os identificadores de timer são explicitamente desvinculados do event loop do Node.js usando `timer.unref()`, garantindo que os agendadores de cron em segundo plano não bloqueiem encerramentos limpos de processos durante deploys.
 
 ---
 
 ## Mais de um processo
 
-Cada processo cujo agendador está ativo arma os mesmos temporizadores; o banco de dados decide qual deles executa cada slot. Como um slot é executado apenas uma vez, como um slot perdido por uma reinicialização é recuperado, como uma pausa chega a todas as réplicas e por que um acionamento manual nunca é executado em paralelo com uma execução agendada estão documentados em [Cron entre instâncias](/docs/backend/cron-across-instances).
+Cada processo cujo agendador está ativo arma os mesmos timers; o banco de dados decide
+qual deles executa cada slot. Como um slot roda uma única vez, como um slot perdido por uma reinicialização
+é recuperado, como uma pausa alcança todas as réplicas e por que um disparo manual nunca
+roda ao lado de uma execução agendada estão em [Cron em várias instâncias](/docs/backend/cron-across-instances).
 
 ---
 
-## Timeouts e Isolamento de Erros
+## Limites de Tempo e Isolamento de Erros
 
-- **Disputa forçada de timeout**: Blocos de execução são envolvidos em uma `Promise.race` contra um temporizador de timeout derivado de `timeoutSeconds` (padrão: `300` segundos / 5 minutos; `Infinity` para nenhum). Se o handler travar além desse limite, `ctx.signal` é abortado e a promise é rejeitada, lançando:
+- **Disputa Forçada por Timeout**: Blocos de execução são encapsulados em um `Promise.race` contra um timer de tempo limite derivado de `timeoutSeconds` (padrão: `300` segundos / 5 minutos; `Infinity` para nenhum). Se o handler travar além desse limite, o `ctx.signal` é abortado e a promise é rejeitada, lançando:
   `Error: Cron job "<id>" timed out after <N>ms`
-  O aborto é a parte que interrompe o *trabalho*; a rejeição apenas impede o agendador de continuar esperando. Um handler que ignora `ctx.signal` continua executando além do término da sua execução.
-- **Encerramento (Shutdown)**: `backend.shutdown()` aguarda uma execução em andamento dentro do mesmo limite de tempo da fila de jobs (dois terços do timeout de desligamento). Uma execução ainda em andamento quando esse tempo expirar terá seu `ctx.signal` abortado e será registrada como falha, acompanhada do motivo. Seu slot permanece reivindicado, garantindo que nenhuma outra instância o execute novamente.
-- **Try/Catch à prova de falhas**: Cada handler de job é executado dentro de um wrapper isolado. Quaisquer exceções não capturadas são interceptadas, gravando a mensagem do erro (ofuscada) como string, definindo o status do job como `"error"` e atualizando o contador de falhas do job. Uma falha inesperada dentro de uma única tarefa cron nunca derrubará o loop do agendador ou o servidor web HTTP Hono principal.
-- **Ring Buffer em memória**: O agendador mantém um ring buffer contendo as últimas **50 execuções** por job. Esse buffer é mantido na memória para permitir leituras quase instantâneas a partir do Rebase Studio.
+  A anulação é a metade que interrompe o *trabalho*; a rejeição apenas faz o agendador parar de esperar. Um handler que ignora `ctx.signal` continua executando além de sua própria execução.
+- **Desligamento (Shutdown)**: `backend.shutdown()` aguarda uma execução em andamento, dentro do mesmo orçamento da fila de tarefas (dois terços do tempo limite de desligamento). Uma execução que ainda esteja rodando quando o tempo expira tem seu `ctx.signal` abortado e é registrada como falha, com o motivo. Seu slot continua reservado, portanto nenhuma outra instância irá reexecutá-lo.
+- **Try/Catch à Prova de Falhas**: Cada handler de tarefa roda dentro de um invólucro isolado. Quaisquer exceções não capturadas são interceptadas, gravando a mensagem do erro (redigida) como uma string, definindo o status da tarefa para `"error"` e atualizando o contador de falhas da tarefa. Uma falha dentro de uma única tarefa cron nunca causará a queda do loop do agendador ou do servidor HTTP principal do Hono.
+- **Ring Buffer em Memória**: O agendador mantém um ring buffer contendo as últimas **50 execuções** por tarefa. Esse buffer é mantido em memória para permitir leituras quase instantâneas a partir do Rebase Studio.
 
 ---
 
 ## Esquema de Persistência no Banco de Dados
 
-Quando adaptadores de banco de dados com suporte a SQL (por exemplo, PostgreSQL) estão ativos, o Rebase provisiona a tabela `rebase.cron_logs`:
+Quando adaptadores de banco de dados que suportam SQL (por exemplo, PostgreSQL) estão ativos, o Rebase provisiona a tabela `rebase.cron_logs`:
 
 ```sql
 CREATE SCHEMA IF NOT EXISTS rebase;
@@ -389,13 +416,17 @@ CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
 );
 ```
 
-Cada uma é criada na inicialização se estiver ausente, portanto, um banco de dados anterior a ela a receberá no próximo deploy. Nenhuma delas é uma tabela declarada, e a role de usuário final `rebase_user` não possui privilégios sobre nenhuma delas: uma `cron_job_state` com permissão de escrita permitiria que um usuário autenticado pausasse um job para todos, ou retivesse seu lease para que nada o executasse.
+Cada uma é criada na inicialização se estiver ausente, de modo que um banco de dados anterior à sua existência a
+receba no próximo deploy. Nenhuma delas é uma tabela declarada, e o papel de usuário final
+`rebase_user` não tem privilégios em nenhuma delas: um `cron_job_state` com permissão de escrita
+permitiria que um usuário autenticado pausasse uma tarefa para todos, ou segurasse seu lease para que nada
+a executasse.
 
-A linha de uma execução e sua contagem são gravadas em uma única instrução: a inserção em `cron_logs` e um upsert dos contadores do job em `cron_job_state`. Uma listagem lê uma linha de `cron_job_state` por job, independentemente da extensão do histórico, assim como o agendador faz ao preencher `totalRuns` e `totalFailures` na inicialização. As gravações de log não travam a execução; se uma falhar, o agendador registra o erro e prossegue, mantendo a execução no ring buffer em memória.
+A linha de uma execução e sua contagem são gravadas em uma única instrução: o insert em `cron_logs` e um upsert dos contadores da tarefa em `cron_job_state`. Uma listagem lê uma linha de `cron_job_state` por tarefa, independentemente do tamanho do histórico, e o mesmo faz o agendador ao inicializar `totalRuns` e `totalFailures` na partida. Gravações de logs não atrasam a execução; se uma falhar, o agendador registra o erro e continua, mantendo a execução no ring buffer em memória.
 
-Uma vez por hora, e ao iniciar, o agendador exclui as linhas do histórico com mais de 30 dias e contabiliza qualquer execução que ainda não tenha sido contada, ambos em lotes de 5.000 linhas. Um histórico gravado antes da versão 0.24 é contabilizado pela primeira dessas varreduras, fora do caminho crítico de boot. Até que ela termine, a listagem adiciona as execuções ainda não contabilizadas aos contadores, para que os números não mudem durante uma atualização. O mesmo se aplica a uma execução registrada por um servidor mais antigo durante um rolling deploy.
+Uma vez por hora, e quando inicializa, o agendador exclui as linhas de histórico com mais de 30 dias e contabiliza qualquer execução que ainda não tenha sido contada, ambas as ações em lotes de 5.000 linhas. Um histórico gravado antes da versão 0.24 é contabilizado pela primeira dessas varreduras, fora do caminho crítico de inicialização. Até que ela termine, uma listagem adiciona as execuções ainda não computadas aos contadores, de modo que os números não se alterem na atualização. O mesmo vale para uma execução que um servidor mais antigo registre durante um deploy contínuo (rolling deploy).
 
-## Exemplo: Job de Limpeza Diária
+## Exemplo: Tarefa de Limpeza Diária
 
 ```typescript
 // backend/crons/cleanup-sessions.ts
@@ -428,11 +459,19 @@ const job: CronJobDefinition = {
 export default job;
 ```
 
-## Crons no grafo de recursos
+## Tarefas Cron no Grafo de Recursos
 
-Cada arquivo de cron também é uma declaração. O comando `rebase resources` o lista sob o nome do arquivo — o mesmo ID usado pelo agendador para executá-lo e exibido no Studio — com sua programação e fuso horário, de modo que o host leia as programações de um projeto antes de executar qualquer coisa. Um cron não se vincula a nenhuma variável de ambiente; o comando `rebase status` o exibe em verde, sem nada para configurar.
+Cada arquivo de cron é também uma declaração. O comando `rebase resources` o lista sob o
+nome do arquivo — o mesmo ID com o qual o agendador o executa e o Studio exibe —
+com seu agendamento e fuso horário, para que um host leia os agendamentos de um projeto antes
+de executar qualquer coisa. Um cron não se vincula a nenhuma variável de ambiente; `rebase status`
+o mostra verde sem nada a ser configurado.
 
-Ler a programação significa importar o arquivo, e `rebase resources` é uma etapa de build: sem `.env`, sem secrets. Portanto, mantenha o **escopo do módulo** de um cron livre de qualquer elemento que leia configurações durante a importação — como um cliente de banco de dados instanciado no topo de um arquivo utilitário ou um `env.ts` que valide `DATABASE_URL`. Em vez disso, importe esse trabalho dentro do handler:
+Ler o agendamento significa importar o arquivo, e `rebase resources` é uma etapa de
+build: sem `.env`, sem segredos. Portanto, mantenha o **escopo de módulo** de um cron livre de qualquer coisa
+que leia configurações na importação — um cliente de banco de dados construído no topo de um
+helper, um `env.ts` que valide `DATABASE_URL`. Em vez disso, importe esse trabalho dentro do
+handler:
 
 ```ts
 async handler({ log }) {
@@ -442,9 +481,14 @@ async handler({ log }) {
 }
 ```
 
-O handler é executado no ambiente de implantação, onde essas variáveis existem. Uma importação no nível superior do mesmo módulo tornaria o grafo derivável apenas em uma máquina que por acaso possuísse um `.env` — além de carregar toda a dependência em cada inicialização que apenas registra o job.
+O handler é executado na implantação, onde essas variáveis existem. Uma importação
+de nível superior (top-level) do mesmo módulo torna o grafo derivável apenas em uma máquina que
+por acaso possua um `.env` — e carrega toda a dependência em cada inicialização
+que apenas registra a tarefa.
 
-Carregar um cron não declara nada. Uma etapa de build própria que precise dos crons no grafo declara isso explicitamente com `declareCrons`:
+Carregar um cron
+não declara nada. Um passo de build personalizado seu que queira crons no grafo informa
+isso usando `declareCrons`:
 
 ```ts
 import { declareCrons, loadCrons } from "@rebasepro/server";
@@ -457,4 +501,4 @@ declareCrons(await loadCrons("./crons", { onSkip: (problem) => console.warn(prob
 - **[Visão Geral do Backend](/docs/backend)** — Referência completa de configuração do backend
 - **[Hooks de tabela](/docs/collections/callbacks)** — Execute lógica em alterações de dados
 - **[Integração com Webhooks](/docs/recipes/webhooks)** — Envie notificações em eventos
-- **[Cron entre instâncias](/docs/backend/cron-across-instances)** — Uma execução por slot, slots perdidos, pausar em todos os lugares e execuções concorrentes
+- **[Cron em várias instâncias](/docs/backend/cron-across-instances)** — Uma execução por slot, slots perdidos, pausando em todos os lugares e execuções concorrentes

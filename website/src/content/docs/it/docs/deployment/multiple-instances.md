@@ -1,80 +1,80 @@
 ---
-sourceHash: d156ac95aebe2dab
+sourceHash: 079933126e9be226
 title: Esecuzione di più istanze
 sidebar_label: Più istanze
-description: Ogni porzione di stato che un processo Rebase mantiene per sé e la configurazione per condividerla — cosa impostare prima che una seconda replica, un deployment progressivo o un deployment a processi separati riceva traffico.
+description: Ogni elemento di stato che un processo Rebase mantiene per sé e l'impostazione per condividerlo — cosa configurare prima che una seconda replica, un rolling deploy o un deployment suddiviso riceva traffico.
 ---
 
 ## Panoramica
 
-La maggior parte di un deployment Rebase risiede già nel database: righe, utenti e sessioni, chiavi API, la coda dei job, le acquisizioni cron, le chiavi di idempotenza, la cronologia dei record, i token del server OAuth MCP. Un secondo processo puntato allo stesso database vede tutto questo.
+La maggior parte di un deployment Rebase risiede già nel database: righe, utenti e sessioni, chiavi API, la coda dei job, le assegnazioni cron, le chiavi di idempotenza, la cronologia dei record, i token del server OAuth MCP. Un secondo processo puntato sullo stesso database vede tutto questo.
 
-Alcune cose non lo fanno. Ciascuna è per processo per impostazione predefinita, poiché un singolo processo costituisce il deployment predefinito e la condivisione comporta un costo: una tabella, una scrittura su bucket, una connessione al database. Eseguire due processi dietro un bilanciatore di carico, l'autoscaling oltre un'istanza o un deployment progressivo (rolling deploy) che esegue brevemente la vecchia e la nuova versione affiancate, ricadono tutti in questa casistica. Lo stesso vale per un [deployment a processi separati](/docs/deployment/split-processes/), che per definizione è composto da più processi.
+Alcuni elementi, tuttavia, non risiedono nel database. Ognuno di essi è isolato per processo per impostazione predefinita, poiché un singolo processo rappresenta il deployment standard e la condivisione comporta dei costi: una tabella, una scrittura su bucket, una connessione al database. L'esecuzione di due processi dietro un bilanciatore di carico, l'autoscaling oltre un'istanza o un rolling deploy che esegue brevemente la versione vecchia e nuova affiancate richiedono tutti queste configurazioni. Lo stesso vale per un [deployment suddiviso](/docs/deployment/split-processes/), che per definizione è composto da più processi.
 
-Esamina l'elenco seguente prima che la seconda istanza inizi a ricevere traffico. Nessun elemento causerà un errore esplicito: ciascuno si manifesterà invece come un limite applicato tre volte, un evento che alcuni client non vedranno mai o una pagina che mostra log diversi a ogni aggiornamento.
+Esamina l'elenco seguente prima che la seconda istanza riceva traffico. Nessun elemento causerà errori evidenti o bloccanti: ciascuno si manifesterà come un limite applicato con una tolleranza tripla, un evento che alcuni client non vedranno mai o una pagina che mostra log diversi a ogni aggiornamento.
 
-## La checklist
+## Elenco di controllo
 
-| Cosa | Per processo per impostazione predefinita | Come condividerlo |
+| Elemento | Per processo per impostazione predefinita | Come condividerlo |
 | --- | --- | --- |
 | Segreti di firma | Generati per processo in fase di sviluppo | `JWT_SECRET` e `REBASE_SERVICE_KEY`, impostati esplicitamente e **identici** ovunque |
-| Contatori di rate limit | In memoria | `REBASE_RATE_LIMIT_STORE=sql` |
-| Indirizzo del client dietro un proxy | `TRUSTED_PROXY_HOPS=0` | Il numero di proxy a monte, uguale ovunque |
-| Sottoscrizioni alle tabelle | Condivise tramite il database quando il CDC è attivo | `REALTIME_CDC=auto` (impostazione predefinita) |
-| Canali di broadcast e presenza | In memoria | `REALTIME_CHANNEL_BUS=postgres` |
-| File caricati, `STORAGE_TYPE=local` | Disco locale dell'istanza | S3 o GCS, oppure un volume condiviso sulla cartella genitore di `STORAGE_PATH` |
-| Caricamenti ripristinabili (TUS) in corso | Disco dell'istanza, in `STORAGE_PATH/.tus-uploads` | Un volume condiviso su `STORAGE_PATH`, o sessioni persistenti (sticky sessions) |
-| Trasformazioni delle immagini | Cache interna al processo | `STORAGE_RENDITION_CACHE=true` |
-| Logs Explorer | Un buffer circolare delle ultime 10.000 righe | Nulla — inoltra stdout a un aggregatore di log |
-| Timer cron | Ogni processo che esegue lo scheduler | Acquisiti nel database: un'esecuzione per slot. `REBASE_CRON_SCHEDULER` sceglie dove risiedono i timer |
-| Audit RLS pianificato | Ogni processo che ne è proprietario | `REBASE_RLS_AUDIT=false` su tutte tranne una |
-| `index.html` di un'app statica | Letto una volta per processo | Riavviare ogni istanza quando la build cambia |
-| `/metrics` | Ciascun processo conta i propri | Eseguire lo scraping di ogni istanza |
+| Contatori del rate limit | In memoria | `REBASE_RATE_LIMIT_STORE=sql` |
+| Indirizzo client dietro un proxy | `TRUSTED_PROXY_HOPS=0` | Il numero di proxy a monte, uguale ovunque |
+| Sottoscrizioni alle tabelle | Condivise tramite il database quando CDC è abilitato | `REALTIME_CDC=auto` (impostazione predefinita) |
+| Canali broadcast e presence | In memoria | `REALTIME_CHANNEL_BUS=postgres` |
+| File caricati, `STORAGE_TYPE=local` | Il disco locale dell'istanza | S3 o GCS, oppure un volume condiviso nella cartella padre di `STORAGE_PATH` |
+| Caricamenti ripristinabili (TUS) in corso | Il disco dell'istanza, in `STORAGE_PATH/.tus-uploads` | Un volume condiviso su `STORAGE_PATH`, oppure sessioni persistenti (sticky sessions) |
+| Trasformazioni di immagini | Una cache interna al processo | `STORAGE_RENDITION_CACHE=true` |
+| Vista Log di Studio | Un buffer circolare delle ultime 10.000 righe | Nulla — invia stdout a un aggregatore di log |
+| Timer dei cron | Ogni processo che esegue lo scheduler | Assegnati nel database: un'esecuzione per slot. `REBASE_CRON_SCHEDULER` sceglie dove risiedono i timer |
+| Audit RLS pianificato | Ogni processo che lo possiede | `REBASE_RLS_AUDIT=false` su tutti tranne uno |
+| `index.html` di un'app statica | Letto una sola volta per processo | Riavvia ogni istanza quando la build cambia |
+| `/metrics` | Ogni processo conta le proprie | Effettua lo scrape di ogni istanza |
 
-Le sezioni seguenti spiegano il comportamento di ciascuna voce quando viene lasciata configurata per processo.
+Le sezioni seguenti spiegano il comportamento di ciascun elemento quando viene lasciato isolato per processo.
 
 ## Segreti di firma
 
-`JWT_SECRET` firma ogni sessione e `REBASE_SERVICE_KEY` autentica le chiamate server-to-server. In fase di sviluppo ciascun processo genera i propri valori quando non sono impostati, quindi un token emesso da un processo verrà rifiutato dal successivo. La produzione rifiuta già l'avvio in assenza di `JWT_SECRET` (senza `REBASE_SERVICE_KEY` si avvia senza alcuna chiave di servizio); ciò che conta con più processi è che ciascuno riceva gli **stessi** valori — da un unico segreto, non uno per replica.
+`JWT_SECRET` firma ogni sessione e `REBASE_SERVICE_KEY` autentica le chiamate server-to-server. In fase di sviluppo, ogni processo genera i propri se non sono impostati, quindi un token emesso da un processo viene rifiutato dal successivo. L'ambiente di produzione rifiuta già l'avvio senza `JWT_SECRET` (senza `REBASE_SERVICE_KEY` si avvia senza alcuna chiave di servizio); ciò che conta quando ci sono più processi è che ciascuno riceva gli **stessi** valori — da un unico segreto, non uno per replica.
 
 ## Rate limit e indirizzo del client
 
-I rate limiter — il budget per chiamante sulle API di dati, storage e funzioni, e i limitatori di autenticazione per accesso, reimpostazione della password, codici monouso e tentativi MFA — contano in memoria per impostazione predefinita. Un processo non può rilevare quanti peer siano attivi, quindi tre repliche con la configurazione predefinita applicheranno ogni limite tre volte. Imposta `REBASE_RATE_LIMIT_STORE=sql` affinché i contatori risiedano invece nel database.
+I rate limiter — la quota per chiamante sulle API di dati, storage e funzioni, e i limitatori di autenticazione per l'accesso, il ripristino della password, i codici monouso e i tentativi MFA — tengono il conteggio in memoria per impostazione predefinita. Un processo non è a conoscenza del numero di peer presenti, per cui tre repliche con l'impostazione predefinita applicheranno ogni limite moltiplicato per tre. Imposta `REBASE_RATE_LIMIT_STORE=sql` e i contatori risiederanno invece nel database.
 
-Dietro un bilanciatore di carico, il limiter necessita anche del reale indirizzo del client, che viene trasmesso in `X-Forwarded-For`. `TRUSTED_PROXY_HOPS` definisce quanti proxy attraversare; con il valore predefinito `0`, ogni richiesta sembrerà provenire dal bilanciatore di carico e tutti i client condivideranno lo stesso bucket. Consulta [Configurazione](/docs/getting-started/configuration/#runtime-behaviour).
+Dietro un bilanciatore di carico, il limiter necessita inoltre del reale indirizzo del client, fornito nell'header `X-Forwarded-For`. `TRUSTED_PROXY_HOPS` specifica quanti proxy oltrepassare; con il valore predefinito `0`, ogni richiesta sembrerà provenire dal bilanciatore di carico e tutti i client condivideranno lo stesso bucket. Consulta [Configurazione](/docs/getting-started/configuration/#runtime-behaviour).
 
 ## Realtime
 
-Le **sottoscrizioni alle tabelle** funzionano su più istanze quando il change data capture a livello di database è attivo, cosa che avviene per impostazione predefinita (`REALTIME_CDC=auto`): il write-ahead log (dove il database supporta la decodifica logica) o un trigger notifica ogni scrittura confermata (commit) e il listener di ogni istanza recupera nuovamente i dati per i propri iscritti. Le istanze che acquisiscono modifiche tramite WAL mantengono attivi i trigger finché un'altra istanza è ancora in ascolto su di essi, in modo che una replica che ha fatto fallback sui trigger non rimanga mai esclusa. Se il CDC è disattivato, o se la modalità `auto` non è riuscita a effettuarne il provisioning (il log di avvio ne indica il motivo), una sottoscrizione vedrà solo le scritture effettuate tramite l'istanza a cui è connesso il proprio socket. Consulta [Realtime](/docs/backend/realtime-cdc/).
+Le **sottoscrizioni alle tabelle** funzionano tra più istanze quando la cattura delle modifiche a livello di database (CDC) è attiva, cosa che avviene per impostazione predefinita (`REALTIME_CDC=auto`): il write-ahead log (WAL, dove il database consente la decodifica logica) o un trigger notifica ogni scrittura confermata, e il listener di ogni istanza recupera nuovamente i dati per i propri iscritti. Le istanze che utilizzano l'acquisizione tramite WAL lasciano attivi i trigger finché un'istanza è ancora in ascolto su di essi, in modo che una replica che ha effettuato il fallback sui trigger non rimanga mai esclusa. Se CDC è disabilitato, o se `auto` non è riuscito a configurarlo (il log di avvio specifica quale sia il caso), una sottoscrizione vede solo le scritture effettuate tramite l'istanza a cui è connesso il proprio socket. Consulta [Realtime](/docs/backend/realtime-cdc/).
 
-I **canali di broadcast e la presenza** rimangono interni al singolo processo a meno che non sia configurato un bus di messaggistica: due client connessi a istanze diverse nello stesso canale non comunicheranno tra loro e ciascuna istanza risponderà a "chi è presente?" solo con la propria porzione di utenti. Imposta `REALTIME_CHANNEL_BUS=postgres`. Il bus ascolta le notifiche del database, operazione che richiede una connessione diretta anziché un transaction pooler — imposta `DATABASE_DIRECT_URL` quando `DATABASE_URL` passa attraverso pgBouncer. Consulta [Canali e presenza su più istanze](/docs/backend/realtime-transports/#channels-and-presence-across-instances).
+I **canali broadcast e la presence** sono interni al processo a meno che non vengano veicolati da un bus: due client su istanze diverse nello stesso canale non comunicano tra loro, e ogni istanza risponde alla domanda "chi è presente?" solo con la propria quota. Imposta `REALTIME_CHANNEL_BUS=postgres`. Il bus rimane in ascolto sul database, che richiede una connessione diretta anziché un pooler di transazioni: imposta `DATABASE_DIRECT_URL` quando `DATABASE_URL` passa attraverso pgBouncer. Consulta [Canali e presence tra istanze](/docs/backend/realtime-transports/#channels-and-presence-across-instances).
 
 ## File
 
-Con `STORAGE_TYPE=local`, i file caricati risiedono sul disco dell'istanza che li ha ricevuti, e un'altra istanza risponderà con un errore 404 per essi. Utilizza S3 o GCS, oppure monta un volume condiviso su ogni istanza, sulla cartella genitore di `STORAGE_PATH` in modo che contenga anche la directory `<STORAGE_PATH>__<key>` di ciascun bucket locale con nome. Consulta [Self-hosting: archiviazione file](/docs/deployment/self-hosting/#file-storage).
+Con `STORAGE_TYPE=local`, i file caricati risiedono sul disco dell'istanza che li ha ricevuti, e un'altra istanza restituirà un 404 per essi. Usa S3 o GCS, oppure monta un volume su ogni istanza nella directory padre di `STORAGE_PATH`, in modo che contenga anche la directory `<STORAGE_PATH>__<key>` di ciascun bucket locale con nome. Consulta [Self-hosting: archiviazione file](/docs/deployment/self-hosting/#file-storage).
 
-I **caricamenti ripristinabili** (l'endpoint TUS) conservano il file parziale di ciascun caricamento, insieme al relativo record, sul disco dell'istanza che lo ha generato, in `STORAGE_PATH/.tus-uploads` — anche quando i file completati vengono inviati a S3 o GCS. Montando un unico volume su `STORAGE_PATH` su ogni istanza, qualsiasi istanza potrà gestire qualsiasi caricamento; un riavvio o un rolling deploy riprenderà il caricamento dal punto in cui era stato interrotto. Senza un volume condiviso, un blocco (chunk) inviato a un'altra istanza riceverà un errore 404: instrada le richieste di caricamento di un client verso un'unica istanza (sticky session sul bilanciatore di carico). L'SDK e il pannello di amministrazione, che utilizzano questo endpoint per file superiori a 8 MiB, invieranno quindi il file tramite `POST /upload`, continuando a farlo per il resto della sessione. I caricamenti ordinari tramite `POST /upload` consistono in una singola richiesta e non sono influenzati da questo comportamento.
+I **caricamenti ripristinabili** (l'endpoint TUS) conservano il file parziale di ciascun caricamento, insieme al rispettivo record, sul disco dell'istanza che lo ha generato, all'interno di `STORAGE_PATH/.tus-uploads` — anche quando i file completati vengono archiviati su S3 o GCS. Montando un unico volume su `STORAGE_PATH` per ogni istanza, qualunque istanza può gestire qualsiasi caricamento; un riavvio o un rolling deploy riprenderà l'upload dal punto in cui è stato interrotto. Senza un volume condiviso, un blocco (chunk) che arriva su un'altra istanza riceverà un errore 404: instrada le richieste di upload di un client verso una singola istanza (sessioni persistenti o sticky sessions sul bilanciatore di carico). In questo caso, l'SDK e il pannello di amministrazione, che usano questo endpoint per file superiori a 8 MiB, invieranno il file tramite `POST /upload`, continuando a farlo per il resto della sessione. I normali caricamenti tramite `POST /upload` consistono in una singola richiesta e non sono impattati.
 
-Le **trasformazioni delle immagini** (`?width=400&format=webp`) vengono memorizzate nella cache in memoria; di conseguenza, ogni istanza calcola ogni variante una volta e una nuova istanza parte a freddo. Imposta `STORAGE_RENDITION_CACHE=true` per salvare ogni rendering nel bucket di provenienza, dove ogni istanza potrà trovarlo. Ciò fa sì che una richiesta `GET` esegua una scrittura nel bucket, motivo per cui questa opzione è disabilitata a meno che non venga richiesta esplicitamente. Consulta [Storage](/docs/backend/storage/).
+Le **trasformazioni di immagini** (`?width=400&format=webp`) sono memorizzate nella cache in memoria, quindi ogni istanza calcola ciascuna variante una sola volta e una nuova istanza parte a freddo. Imposta `STORAGE_RENDITION_CACHE=true` per riscrivere ciascuna resa (rendition) nel rispettivo bucket di provenienza, rendendola accessibile a tutte le istanze. Questo fa sì che una richiesta `GET` effettui una scrittura sul tuo bucket, motivo per cui è disabilitato a meno che non venga richiesto esplicitamente. Consulta [Storage](/docs/backend/storage/).
 
-## Logs Explorer
+## Vista Log di Studio
 
-Il Logs Explorer di Studio legge un buffer circolare delle ultime 10.000 righe di log conservate dal processo che gestisce la richiesta. Dietro un bilanciatore di carico, ogni aggiornamento della pagina potrebbe mostrare le righe di un'istanza diversa, e nessuna di esse mostrerà l'intero deployment. L'explorer indica il nome dell'istanza visualizzata. Non esiste un'impostazione per condividere questo buffer: in produzione, il runtime scrive una riga JSON per evento su stdout, ed è proprio questo il flusso da raccogliere — tramite il servizio di log della piattaforma, Loki o qualsiasi strumento che legga l'output dei container.
+La vista Log di Studio legge un buffer circolare delle ultime 10.000 righe di log conservate dal processo che serve la richiesta. Dietro un bilanciatore di carico, ogni aggiornamento può mostrare le righe di un'istanza diversa, e nessuna di esse mostra l'intero deployment. L'explorer indica il nome dell'istanza visualizzata. Non esiste un'impostazione per condividere questo buffer circolare: in produzione, il runtime scrive una riga JSON per evento su stdout, ed è questo che va raccolto — tramite il servizio di log della tua piattaforma, Loki o qualsiasi strumento che legga l'output dei container.
 
 ## Cron e la coda dei job
 
-Ogni processo che esegue lo scheduler cron avvia i propri timer e l'esecuzione viene prima acquisita nel database, garantendo che uno slot venga eseguito **una sola volta** indipendentemente da quanti processi si attivino per esso. La messa in pausa di un job e il lease che impedisce a un trigger manuale di interferire con un'esecuzione in corso sono condivisi nello stesso modo. Non c'è nulla da configurare, purché il database sia Postgres. `REBASE_CRON_SCHEDULER` e `REBASE_JOB_WORKERS` determinano quali processi devono eseguire timer e worker — consulta [Processi separati](/docs/deployment/split-processes/).
+Ogni processo che esegue il cron scheduler inizializza i propri timer e l'esecuzione viene prima prenotata nel database, garantendo che uno slot venga eseguito **una sola volta** indipendentemente da quanti processi scattino per esso. La messa in pausa di un job e il lease che impedisce a un trigger manuale di interferire con un'esecuzione in corso sono condivisi nello stesso modo. Non c'è nulla da configurare, a patto che il database sia Postgres. `REBASE_CRON_SCHEDULER` e `REBASE_JOB_WORKERS` determinano quali processi devono eseguire i timer e i worker — consulta [Processi suddivisi](/docs/deployment/split-processes/).
 
-L'audit RLS pianificato costituisce un'eccezione: non viene acquisito a livello di database, pertanto ogni processo che ne ha la titolarità eseguirà la scansione in base al proprio timer. Si tratta di un comportamento ridondante ma non rischioso; imposta `REBASE_RLS_AUDIT=false` su tutte le istanze tranne una.
+L'audit RLS pianificato fa eccezione: non viene prenotato nel database, pertanto ogni processo configurato per eseguirlo effettua la scansione secondo il proprio timer. Ciò è ridondante ma non pericoloso; imposta `REBASE_RLS_AUDIT=false` su tutte le istanze tranne una.
 
 ## App statiche
 
-Un processo che distribuisce il frontend o il CMS (`REBASE_SERVE_STATIC`, attivo per impostazione predefinita) legge l'`index.html` di ogni app una sola volta e lo mantiene in memoria. La sostituzione della build su un volume condiviso non ha effetto su un processo già in esecuzione: continuerà a servire il vecchio documento, che fa riferimento a chunk che potrebbero non esistere più. Rilascia una nuova build riavviando o aggiornando progressivamente (rolling deploy) ogni istanza — cosa che una nuova immagine o bundle fa comunque. In presenza di una CDN a monte e con `REBASE_SERVE_STATIC=false`, questo problema non si pone.
+Un processo che serve il frontend o il CMS (`REBASE_SERVE_STATIC`, abilitato per impostazione predefinita) legge il file `index.html` di ogni app una sola volta e lo mantiene in memoria. La sostituzione della build su un volume condiviso non ha effetto su un processo in esecuzione: questo continuerà a servire il vecchio documento, che fa riferimento a chunk che potrebbero non esistere più. Rilascia una nuova build riavviando o effettuando il rolling update di ogni istanza — operazione che una nuova immagine o bundle comporta comunque. In presenza di una CDN a monte e con `REBASE_SERVE_STATIC=false`, questo non si applica.
 
 ## Metriche
 
-L'endpoint `/metrics` restituisce i dati relativi al processo che risponde alla richiesta. Esegui lo scraping di ogni singola istanza — un job di service-discovery Prometheus per pod, non un unico target dietro il bilanciatore di carico — ed esegui la somma nella query.
+L'endpoint `/metrics` riporta i dati del processo che risponde alla richiesta. Esegui lo scrape di ogni istanza — tramite un job di service-discovery Prometheus per pod, non un unico target dietro il bilanciatore di carico — ed effettua la somma nella query.
 
 ## Provisioning all'avvio
 
-Ogni istanza esegue il passaggio additivo sullo schema all'avvio (`REBASE_MIGRATE_ON_BOOT=ensure`). Istanze con lo stesso ruolo possono eseguirlo contemporaneamente: è progettato per tollerare che un'altra istanza crei la stessa tabella un istante prima. In un deployment a processi separati, esattamente un solo ruolo si occupa del provisioning e tutti gli altri impostano `none` — consulta [Processi separati](/docs/deployment/split-processes/).
+Ogni istanza esegue il passaggio additivo dello schema all'avvio (`REBASE_MIGRATE_ON_BOOT=ensure`). Le istanze con lo stesso ruolo possono eseguirlo contemporaneamente: è strutturato per tollerare che un peer crei la stessa tabella un istante prima. In un deployment suddiviso, esattamente un solo ruolo effettua il provisioning e tutti gli altri impostano `none` — consulta [Processi suddivisi](/docs/deployment/split-processes/).
