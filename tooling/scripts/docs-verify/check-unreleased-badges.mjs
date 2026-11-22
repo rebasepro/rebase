@@ -458,7 +458,9 @@ export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
                     // `cron-jobs.md` names `timezone` exactly once, on the
                     // `timezone?: string;` line of `CronJobDefinition`. A
                     // token seen only there is still a section teaching it.
-                    : new RegExp(`(^|[^\\w$.])${escaped}\\b`).test(fenced);
+                    // A command is a whole word too: `rebase cloud access` is
+                    // not `rebase cloud access-token`.
+                    : new RegExp(`(^|[^\\w$.])${escaped}${token.includes(" ") ? "(?![\\w-])" : "\\b"}`).test(fenced);
                 const mentioned = token.includes("(")
                     ? body.includes(`\`${token}\``)
                     : new RegExp(`\`${escaped}\``).test(body) || inFencedCode;

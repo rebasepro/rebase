@@ -105,3 +105,29 @@ test("once a release ships the entry, the behaviour is dead weight and the relea
     assert.deepEqual(JSON.parse(d.read(BEHAVIOURS)), {});
     assert.deepEqual(checkUnreleasedBadges(d.root).findings, []);
 });
+
+test("a new command is not found inside a longer one that shipped", (t) => {
+    const log = `# Changelog
+
+## [Unreleased]
+
+### Added
+
+- **\`rebase cloud access\` manages who reaches one project.**
+
+## [0.23.0] - 2026-09-27
+
+### Added
+
+- **\`rebase cloud access-token\` prints the bearer.**
+`;
+    const cli = "website/src/content/docs/docs/cli/cloud.md";
+    const d = tree(t, {
+        "CHANGELOG.md": log,
+        [cli]: "---\ntitle: Cloud\n---\n\n## Auth\n\n```bash\nrebase cloud access-token\n```\n\n## Access\n\n```bash\nrebase cloud access invite a@x.com\n```\n"
+    });
+
+    const { findings } = checkUnreleasedBadges(d.root);
+
+    assert.deepEqual(findings.map(f => f.message.match(/^"([^"]+)"/)?.[1]), ["Access"]);
+});

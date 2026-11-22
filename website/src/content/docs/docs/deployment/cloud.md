@@ -438,6 +438,31 @@ verify their address first. From a terminal:
 [`rebase cloud orgs members invite <email>`](/docs/cli/cloud/#organizations), which
 says so when the address has no account.
 
+## Cloud access and your app's users
+
+<span class="since-badge" data-since="0.35">Since 0.35</span>
+
+Two separate sets of people are involved, as in Firebase and Supabase:
+
+- **Cloud access** is who can work on the project in Rebase Cloud. An
+  organization's owners and admins are `admin` on every project it owns, and
+  its members `developer`. A project can also give one person a role of its
+  own, `admin`, `developer` or `viewer`, through an email invitation, without
+  making them a member of the organization. The higher of the two applies.
+  [`rebase cloud access`](/docs/cli/cloud/#project-access) manages it.
+- **Your app's users** live in the app's own database, with its sign-up and
+  its roles. Cloud never lists or edits them.
+
+The one bridge is **Open admin panel**. It signs a person with `admin` Cloud
+access in to the app's admin panel, matched by their verified email: the app
+finds or creates the account with that address and gives it the `admin` role,
+and records that the role came from Rebase Cloud (Studio's Users & roles
+marks it). When that person loses `admin` Cloud access to the project, Rebase
+Cloud asks the app to take that `admin`
+back and ends their sessions in the app. A role granted by hand in the app,
+including an `admin` held before the first Open admin panel, stays, and the
+account is never deleted.
+
 ## See who did what
 
 The console's **Activity** page and `rebase cloud activity` show the
@@ -539,7 +564,7 @@ fails, `rebase cloud compute apply` tries it again.
 | `events` | What happened to the backend, newest first: the app scaling, database changes scheduled and applied, a standby taking over, the disk growing |
 | `usage` | Requests used this month against the included allowance, and the overage so far, as the invoice counts it. `usage org` lists every project of the organization |
 | `clusters` | The clusters tenants run on. Platform-admin only |
-| `settings`, `orgs`, `billing` | Project settings, organizations and their members and invitations, payment |
+| `settings`, `orgs`, `access`, `billing` | Project settings, organizations and their members and invitations, who reaches one project, payment |
 | `activity` | The organization's audit log: who deployed, changed an environment variable (by name), a domain, a backup, a member or a token. Owners and admins. See [See who did what](#see-who-did-what) |
 | `notifications` | Where the project's events are POSTed: Slack, Discord or any https URL ([Cloud notifications](/docs/deployment/cloud-notifications/)) |
 
