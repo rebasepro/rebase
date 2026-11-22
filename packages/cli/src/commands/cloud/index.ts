@@ -17,6 +17,7 @@ import { cloudInitCommand } from "./init";
 import { claimCommand } from "./claim";
 import { deployCommand, logsCommand } from "./deploy";
 import { orgsCommand, printOrgsHelp } from "./orgs";
+import { accessCommand, printAccessHelp } from "./access";
 import { dbCommand, printDbHelp } from "./databases";
 import { envCommand, printEnvHelp } from "./env";
 import { domainsCommand, printDomainsHelp } from "./domains";
@@ -240,6 +241,7 @@ export const GROUP_HELP: Record<string, () => void> = {
     settings: printSettingsHelp,
     orgs: printOrgsHelp,
     org: printOrgsHelp,
+    access: printAccessHelp,
     db: printDbHelp,
     database: printDbHelp,
     debug: printDebugHelp,
@@ -443,6 +445,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "org":
             await orgsCommand(action, rawArgs);
             break;
+        case "access":
+            await accessCommand(rawArgs);
+            break;
 
         /* databases */
         case "db":
@@ -621,6 +626,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "service-key", section: "Config", args: "[rotate] [--preview <name>]", description: "REBASE_SERVICE_KEY, admin on the app's API: its state, and replacing it; a backend preview's own with --preview. Owners and admins" },
 
     { action: "orgs", section: "Organizations", description: "Organizations you belong to, and their members" },
+    { action: "access", section: "Organizations", description: "Who can reach one project, with what role, and its invitations" },
     { action: "activity", section: "Organizations", description: "Who did what in the organization: deploys, env vars, domains, backups, members. Owners and admins" },
 
     { action: "db", section: "Data", description: "Attach a database, back it up, restore, point-in-time recovery" },

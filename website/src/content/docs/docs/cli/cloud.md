@@ -321,6 +321,34 @@ so.
 takes an owner, and the last owner stays. `--org <id>` picks an organization
 other than the selected one.
 
+### Project access
+
+```bash
+rebase cloud access [list]
+rebase cloud access invite <email> [--role admin|developer|viewer]
+rebase cloud access role <email|uid> <admin|developer|viewer>
+rebase cloud access remove <email|uid>
+rebase cloud access invites [list] | revoke <id|email> | resend <id|email>
+```
+
+`access` manages who reaches one project, the linked one or `--project`. An
+organization's owners and admins are `admin` on every project it owns and its
+members are `developer`; `access` gives someone a role on this project alone,
+whether or not they belong to the organization. Their effective role is the
+higher of the two, and `access` lists it with where it comes from. `admin` is
+everything, access and settings included; `developer` deploys and uses Studio,
+logs and the environment; `viewer` reads.
+
+`invite` opens an invitation to the project (`--role` defaults to `developer`)
+and prints its link: single use, valid 7 days, accepted only by an account
+that has verified that address. `role` and `remove` change or remove the
+project's own role and ask first (`--yes` skips it); someone who reaches the
+project through the organization is removed with `orgs members remove`.
+Losing `admin` on a project also takes back the `admin` role **Open admin
+panel** gave that person inside the app, and ends their sessions there. Every
+change needs a `rebase cloud login` session and `admin` on the project; a
+control plane without project access answers `not_served`.
+
 `activity` is the selected organization's audit log, newest first: who
 deployed, rolled back, set, deleted or revealed an environment variable (by
 name, never by value), changed a domain, created, restored or downloaded a

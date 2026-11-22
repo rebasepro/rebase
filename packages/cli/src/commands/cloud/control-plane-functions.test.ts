@@ -69,6 +69,8 @@ const CONTROL_PLANE_FUNCTIONS: Record<string, Status> = {
     audit: { pending: "sweep/2026-10-24" },
     credentials: { pending: "sweep/2026-10-24" },
     invites: { pending: "sweep/2026-10-24" },
+    // `rebase cloud access`: project roles, built with saas `functions/project-access.ts`.
+    "project-access": { pending: "feat/cloud-seam" },
     notifications: { pending: "sweep/2026-10-24" },
     usage: { pending: "sweep/2026-10-24" },
     "db-access": { pending: "feat/db-external-access" },

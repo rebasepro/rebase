@@ -519,7 +519,7 @@ describe("ACTION_HELP", () => {
         // is the safe direction, but silent. If it returned everything, the
         // sweep above would pass vacuously.
         expect(commandsWithAGroupPage().sort()).toEqual(
-            ["db", "debug", "domains", "env", "extensions", "orgs", "settings", "storage"]
+            ["access", "db", "debug", "domains", "env", "extensions", "orgs", "settings", "storage"]
         );
     });
 

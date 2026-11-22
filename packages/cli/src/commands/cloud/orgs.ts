@@ -307,7 +307,7 @@ export interface CliInvite {
     createdAt: string | null;
 }
 
-type EmailDelivery = { sent: true } | { sent: false; reason: "not_configured" | "failed" };
+export type EmailDelivery = { sent: true } | { sent: false; reason: "not_configured" | "failed" };
 
 const MEMBER_ROLES = ["owner", "admin", "member"] as const;
 
@@ -440,7 +440,7 @@ async function listMembers(rawArgs: string[], orgFlag: string | undefined): Prom
  * invitee hears nothing unless whoever ran this passes the link on, so it is
  * said in JSON mode too (stderr), and `emailDelivery` carries it in the value.
  */
-function reportDelivery(delivery: EmailDelivery, email: string): void {
+export function reportDelivery(delivery: EmailDelivery, email: string): void {
     if (delivery.sent) {
         note(chalk.gray(`Emailed the invitation to ${email}.`));
         return;
