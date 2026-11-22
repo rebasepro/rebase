@@ -1,5 +1,5 @@
 ---
-sourceHash: 194ea0c912d942b7
+sourceHash: f79d6c28d4775887
 title: Une application en cours d'exécution
 sidebar_label: Une application en cours d'exécution
 description: Commandes CLI qui interagissent avec une application Rebase en cours d'exécution via son API — lignes, utilisateurs, tâches cron, journaux, fonctions, fichiers, le simulateur RLS — sur rebase dev, un serveur personnalisé ou un projet Rebase Cloud.
@@ -98,7 +98,7 @@ rebase users guests prune --older-than 30d --yes
 
 ### Importer des comptes
 
-`import` transfère des comptes depuis un autre système et conserve leurs identifiants, afin que les lignes faisant référence à un utilisateur continuent de pointer vers le même utilisateur. La commande prend en entrée un fichier CSV, un tableau JSON ou du NDJSON (`--format`, sinon selon l'extension), avec les colonnes suivantes :
+<span class="since-badge" data-since="0.35">Depuis 0.35</span> `import` transfère des comptes depuis un autre système et conserve leurs identifiants, afin que les lignes faisant référence à un utilisateur continuent de pointer vers le même utilisateur. La commande prend en entrée un fichier CSV, un tableau JSON ou du NDJSON (`--format`, sinon selon l'extension), avec les colonnes suivantes :
 
 | Colonne | |
 |---|---|
