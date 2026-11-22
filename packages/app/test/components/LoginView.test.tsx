@@ -78,31 +78,55 @@ describe("LoginView Component", () => {
         };
     });
 
-    it("renders login view with email and password fields after clicking Sign in with email", async () => {
-        render(<LoginView authController={mockAuthController} />);
+    describe("email and password as the only way in", () => {
+        // A self-hosted backend with no OAuth provider and no platform sign-in
+        // showed one "Sign in with email" button that had to be clicked before
+        // the form appeared.
 
-        // Click Sign in with email first to reveal the inputs
-        const signInWithEmailButton = screen.getByRole("button", { name: /Sign in with email/i });
-        fireEvent.click(signInWithEmailButton);
+        it("shows the email and password form directly", () => {
+            render(<LoginView authController={mockAuthController} />);
 
-        // Wait a short bit and verify inputs are visible
-        const emailInput = await screen.findByPlaceholderText("you@example.com");
-        const passwordInput = await screen.findByPlaceholderText("••••••••");
+            expect(screen.queryByRole("button", { name: /Sign in with email/i })).not.toBeInTheDocument();
+            expect(screen.getByLabelText("Email")).toHaveAttribute("type", "email");
+            expect(screen.getByLabelText("Password")).toHaveAttribute("type", "password");
+            // The form is the screen's home: nothing to go back to.
+            expect(screen.queryByRole("button", { name: "back" })).not.toBeInTheDocument();
+        });
 
-        expect(emailInput).toBeInTheDocument();
-        expect(passwordInput).toBeInTheDocument();
+        it("keeps the two choices when the platform also signs owners in", () => {
+            mockAuthController.platformSignIn = { url: "https://app.rebase.pro/projects/p1?open=admin" };
+            render(<LoginView authController={mockAuthController} />);
+
+            expect(screen.getByRole("link", { name: "auth_continue_with_platform" })).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: /Sign in with email/i })).toBeInTheDocument();
+            expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+        });
+
+        it("keeps a host's gate on the form, as it gated the button", () => {
+            render(<LoginView authController={mockAuthController} disabled={true} defaultEmail="a@b.co" defaultPassword="password123"/>);
+
+            expect(screen.getByRole("button", { name: /^Sign in$/i })).toBeDisabled();
+        });
+
+        it("waits for the backend's config before deciding", () => {
+            mockAuthController.storageEnabled = null;
+            render(<LoginView authController={mockAuthController} />);
+
+            expect(screen.getByRole("button", { name: /Sign in with email/i })).toBeInTheDocument();
+        });
+
+        it("does not fill the password field with a dots placeholder that reads as a saved password", () => {
+            render(<LoginView authController={mockAuthController} />);
+            expect(screen.getByLabelText("Password")).not.toHaveAttribute("placeholder", expect.stringContaining("•"));
+        });
     });
 
     it("calls emailPasswordLogin when form is submitted", async () => {
         render(<LoginView authController={mockAuthController} />);
 
-        // Click Sign in with email to reveal inputs
-        const signInWithEmailButton = screen.getByRole("button", { name: /Sign in with email/i });
-        fireEvent.click(signInWithEmailButton);
-
         const emailInput = await screen.findByPlaceholderText("you@example.com");
-        const passwordInput = await screen.findByPlaceholderText("••••••••");
-        const submitButton = await screen.findByRole("button", { name: /Sign in/i });
+        const passwordInput = screen.getByLabelText("Password");
+        const submitButton = await screen.findByRole("button", { name: /^Sign in$/i });
 
         fireEvent.change(emailInput, { target: { value: "test@rebase.pro" } });
         fireEvent.change(passwordInput, { target: { value: "password123" } });
@@ -125,7 +149,8 @@ describe("LoginView Component", () => {
         const registerButton = await screen.findByRole("button", { name: /Create account/i });
         const nameInput = await screen.findByPlaceholderText("Jane Doe (optional)");
         const emailInput = await screen.findByPlaceholderText("you@example.com");
-        const passwordInput = await screen.findByPlaceholderText("••••••••");
+        const passwordInput = screen.getByLabelText("Password");
+        expect(passwordInput).not.toHaveAttribute("placeholder", expect.stringContaining("•"));
 
         fireEvent.change(emailInput, { target: { value: "new@rebase.pro" } });
         fireEvent.change(passwordInput, { target: { value: "password123" } });
@@ -144,7 +169,6 @@ describe("LoginView Component", () => {
 
         it("names the sign-in fields Email and Password", async () => {
             render(<LoginView authController={mockAuthController} />);
-            fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
 
             expect(await screen.findByLabelText("Email")).toHaveAttribute("type", "email");
             expect(screen.getByLabelText("Password")).toHaveAttribute("type", "password");
@@ -162,7 +186,6 @@ describe("LoginView Component", () => {
 
         it("names the forgot-password email field", async () => {
             render(<LoginView authController={mockAuthController} />);
-            fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
             fireEvent.click(await screen.findByRole("button", { name: /Forgot/i }));
 
             expect(await screen.findByText("Reset password")).toBeInTheDocument();
@@ -358,6 +381,11 @@ enabledProviders: ["github"] }
         const optIn = () => screen.getByText("join_newsletter").closest("label")!
             .querySelector("button")!;
 
+        // A second way in, so there is a provider screen in front of the form.
+        beforeEach(() => {
+            mockAuthController.platformSignIn = { url: "https://app.rebase.pro/projects/p1?open=admin" };
+        });
+
         it("is offered on the provider screen, not on the credentials form", async () => {
             render(<LoginView authController={mockAuthController} onNewsletterOptIn={jest.fn()}/>);
 
@@ -383,7 +411,7 @@ enabledProviders: ["github"] }
 
             const emailInput = await screen.findByPlaceholderText("you@example.com");
             fireEvent.change(emailInput, { target: { value: "reader@example.com" } });
-            fireEvent.change(await screen.findByPlaceholderText("••••••••"), { target: { value: "password123" } });
+            fireEvent.change(await screen.findByLabelText("Password"), { target: { value: "password123" } });
 
             await act(async () => {
                 fireEvent.click(await screen.findByRole("button", { name: /^Sign in$/i }));
@@ -398,7 +426,7 @@ enabledProviders: ["github"] }
 
             fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
             fireEvent.change(await screen.findByPlaceholderText("you@example.com"), { target: { value: "reader@example.com" } });
-            fireEvent.change(await screen.findByPlaceholderText("••••••••"), { target: { value: "password123" } });
+            fireEvent.change(await screen.findByLabelText("Password"), { target: { value: "password123" } });
 
             await act(async () => {
                 fireEvent.click(await screen.findByRole("button", { name: /^Sign in$/i }));
@@ -415,7 +443,7 @@ enabledProviders: ["github"] }
             fireEvent.click(optIn());
             fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
             fireEvent.change(await screen.findByPlaceholderText("you@example.com"), { target: { value: "reader@example.com" } });
-            fireEvent.change(await screen.findByPlaceholderText("••••••••"), { target: { value: "password123" } });
+            fireEvent.change(await screen.findByLabelText("Password"), { target: { value: "password123" } });
 
             await act(async () => {
                 fireEvent.click(await screen.findByRole("button", { name: /^Sign in$/i }));
@@ -743,7 +771,7 @@ enabledProviders: ["github"] }
 
             render(<LoginView authController={mockAuthController}/>);
 
-            expect(screen.getByRole("button", { name: /Sign in with email/i })).toBeInTheDocument();
+            expect(screen.getByLabelText("Password")).toHaveAttribute("type", "password");
         });
     });
 
@@ -817,9 +845,8 @@ enabledProviders: ["github"] }
         }
 
         async function signInWithPassword() {
-            fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
             fireEvent.change(await screen.findByPlaceholderText("you@example.com"), { target: { value: "mfa@rebase.pro" } });
-            fireEvent.change(await screen.findByPlaceholderText("••••••••"), { target: { value: "password123" } });
+            fireEvent.change(await screen.findByLabelText("Password"), { target: { value: "password123" } });
             await act(async () => {
                 fireEvent.click(await screen.findByRole("button", { name: /^Sign in$/i }));
             });
@@ -922,7 +949,7 @@ enabledProviders: ["github"] }
 
             fireEvent.click(screen.getByRole("button", { name: "auth_mfa_sign_in_again" }));
 
-            expect(await screen.findByPlaceholderText("••••••••")).toBeInTheDocument();
+            expect(await screen.findByLabelText("Password")).toBeInTheDocument();
             expect(screen.queryByLabelText("auth_mfa_code_label")).not.toBeInTheDocument();
         });
 
@@ -973,7 +1000,7 @@ enabledProviders: ["github"] }
             render(<LoginView authController={mockAuthController} layout="form-first"/>);
 
             expect(screen.getByPlaceholderText("you@example.com")).toBeInTheDocument();
-            expect(screen.getByPlaceholderText("••••••••")).toBeInTheDocument();
+            expect(screen.getByLabelText("Password")).toBeInTheDocument();
             expect(screen.queryByRole("button", { name: /Sign in with email/i })).not.toBeInTheDocument();
             expect(screen.queryByRole("button", { name: "back" })).not.toBeInTheDocument();
         });
@@ -982,7 +1009,7 @@ enabledProviders: ["github"] }
             render(<LoginView authController={mockAuthController} layout="form-first"/>);
 
             fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "test@rebase.pro" } });
-            fireEvent.change(screen.getByPlaceholderText("••••••••"), { target: { value: "password123" } });
+            fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password123" } });
             await act(async () => {
                 fireEvent.click(screen.getByRole("button", { name: /^Sign in$/i }));
             });
@@ -1010,7 +1037,7 @@ enabledProviders: ["github"] }
 
             fireEvent.click(screen.getByText("join_newsletter").closest("label")!.querySelector("button")!);
             fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "reader@example.com" } });
-            fireEvent.change(screen.getByPlaceholderText("••••••••"), { target: { value: "password123" } });
+            fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password123" } });
             await act(async () => {
                 fireEvent.click(screen.getByRole("button", { name: /^Sign in$/i }));
             });

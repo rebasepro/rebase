@@ -555,6 +555,17 @@ export function LoginView({
         hasLinkedinLogin && linkedinClientId
     ].filter(Boolean).length;
 
+    // Email and password is the only way in: no OAuth button and no platform
+    // sign-in. A list holding one "Sign in with email" button is then a click
+    // in front of the form, so the card shows the form itself. Both depend on
+    // `GET /auth/config`, so this waits for it (`storageEnabled` is `null`
+    // while the config is in flight).
+    const emailOnly = !formFirst
+        && providerCount === 0
+        && !authController.platformSignIn
+        && authController.storageEnabled !== null;
+    const buttonsScreenError = emailOnly ? providerError : buttonsErrorMessage;
+
     let notAllowedMessage: string | undefined;
     if (notAllowedError) {
         if (typeof notAllowedError === "string") {
@@ -620,8 +631,11 @@ export function LoginView({
                                         and returned the visitor to an unchanged
                                         login screen, with the reason only in the
                                         browser console. */}
-                                    {buttonsErrorMessage && (
-                                        <ErrorView error={buttonsErrorMessage}/>
+                                    {/* The email form renders the controller's
+                                        refusal itself; only a failure it never
+                                        sees is shown here when it is on screen. */}
+                                    {buttonsScreenError && (
+                                        <ErrorView error={buttonsScreenError}/>
                                     )}
                                     {(title || subtitle) && (
                                         <div className="text-center mb-2">
@@ -681,14 +695,31 @@ export function LoginView({
                                     {authController.platformSignIn && (
                                         <PlatformSignIn platformSignIn={authController.platformSignIn} disabled={disabled}/>
                                     )}
-                                    <LoginButton
-                                        disabled={disabled}
-                                        text={"Sign in with email"}
-                                        icon={<MailIcon/>}
-                                        onClick={() => switchMode("login")}
-                                    />
+                                    {emailOnly ? (
+                                        <LoginForm
+                                            authController={authController}
+                                            registrationMode={false}
+                                            embedded={true}
+                                            disabled={disabled}
+                                            onClose={() => undefined}
+                                            onForgotPassword={hasPasswordReset ? () => switchMode("forgot") : undefined}
+                                            noUserComponent={noUserComponent}
+                                            disableSignupScreen={disableSignupScreen}
+                                            switchToRegister={showRegistration ? () => switchMode("register") : undefined}
+                                            defaultEmail={defaultEmail}
+                                            defaultPassword={defaultPassword}
+                                            onSignedIn={subscribeIfOptedIn}
+                                        />
+                                    ) : (
+                                        <LoginButton
+                                            disabled={disabled}
+                                            text={"Sign in with email"}
+                                            icon={<MailIcon/>}
+                                            onClick={() => switchMode("login")}
+                                        />
+                                    )}
                                     {providerButtons(false)}
-                                    {showRegistration && (
+                                    {showRegistration && !emailOnly && (
                                         <div className="mt-2 text-center">
                                             <Typography variant="body2" color="secondary">
                                                 Don&apos;t have an account?{" "}
@@ -1169,7 +1200,8 @@ function LoginForm({
     newsletterOptIn = false,
     setNewsletterOptIn,
     showNewsletterOptIn = false,
-    embedded = false
+    embedded = false,
+    disabled = false
 }: {
     onClose: () => void,
     onForgotPassword?: () => void,
@@ -1196,7 +1228,13 @@ function LoginForm({
      * since there is nowhere to go back to, and no heading, since the host
      * page titles the sign-in.
      */
-    embedded?: boolean
+    embedded?: boolean,
+    /**
+     * The view's `disabled`, for a form shown in place of the provider
+     * buttons: a host that gates sign-in (a consent tick in `topComponent`)
+     * gates the form's submit the same way it gated the buttons.
+     */
+    disabled?: boolean
 }) {
     const passwordRef = useRef<HTMLInputElement | null>(null);
     const { t } = useTranslation();
@@ -1265,6 +1303,7 @@ function LoginForm({
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
+        if (disabled) return;
         if (registrationMode)
             handleRegistration();
         else
@@ -1377,7 +1416,7 @@ function LoginForm({
                 <Typography variant="label" component="label" color="secondary" className="mb-1" htmlFor={passwordId}>
                     Password
                 </Typography>
-                <TextField placeholder="••••••••"
+                <TextField
                     id={passwordId}
                     className={loginFieldClasses}
                     value={password ?? ""}
@@ -1429,7 +1468,7 @@ function LoginForm({
                 className="w-full mt-1"
                 size="large"
                 loading={authController.authLoading}
-                disabled={authController.authLoading || !email || !password}
+                disabled={disabled || authController.authLoading || !email || !password}
             >
                 {buttonLabel}
             </LoadingButton>

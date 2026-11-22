@@ -13,7 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chromium, type FullConfig } from "@playwright/test";
-import { AUTH_STATE } from "./auth";
+import { AUTH_STATE, openEmailForm } from "./auth";
 import { API_PORT } from "./playwright.config";
 
 const titleOf = (html: string) => html.match(/<title>([^<]*)<\/title>/i)?.[1]?.trim();
@@ -120,12 +120,15 @@ async function signIn(baseURL: string, attempts = 3) {
             try {
                 await page.goto("/", { waitUntil: "load" });
 
-                // Whichever screen this build is showing, one of these two
-                // buttons is on it. Racing them keeps the branch decision and
-                // the click reading the same DOM.
+                // Whichever screen this build is showing, one of these is on
+                // it: the setup form's button, or the sign-in — the email form
+                // itself when email is the only way in, else the button in
+                // front of it. Racing them keeps the branch decision and the
+                // click reading the same DOM.
                 const createAccount = page.getByRole("button", { name: /^Create account$/i });
                 const withEmail = page.getByRole("button", { name: /Sign in with email/i });
-                await createAccount.or(withEmail).first()
+                const signInForm = page.locator("button", { hasText: /^Sign in$/i });
+                await createAccount.or(withEmail).or(signInForm).first()
                     .waitFor({ state: "visible", timeout: 30_000 });
 
                 if (await createAccount.isVisible()) {
@@ -147,7 +150,7 @@ async function signIn(baseURL: string, attempts = 3) {
                     // mode refuses. Privacy comes from the host's `topComponent`, which renders
                     // above the newsletter row, so it is the first one.
                     await page.getByRole("checkbox").first().check();
-                    await withEmail.click();
+                    await openEmailForm(page);
 
                     const submit = page.locator("button", { hasText: /^Sign in$/i }).first();
                     await submit.waitFor({ state: "visible", timeout: 15_000 });

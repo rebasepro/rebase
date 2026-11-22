@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { openEmailForm } from "../auth";
 
 test("App loads and shows login view", async ({ page }) => {
   await page.goto("/");
@@ -6,9 +7,11 @@ test("App loads and shows login view", async ({ page }) => {
   // Expect a title "to contain" a substring.
   await expect(page).toHaveTitle(/Rebase/);
 
-  // Check if we are at the login view by searching for the sign in button
-  const signInBtn = page.getByRole("button", { name: /Sign in with email/i });
-  await expect(signInBtn).toBeVisible({ timeout: 10000 });
+  // The login view: the email form itself, or the button in front of it when
+  // the backend offers another way in.
+  const loginView = page.locator('input[type="password"]')
+    .or(page.getByRole("button", { name: /Sign in with email/i }));
+  await expect(loginView.first()).toBeVisible({ timeout: 10000 });
 });
 
 test("Can click through to sign in (mock)", async ({ page }) => {
@@ -22,8 +25,7 @@ test("Can click through to sign in (mock)", async ({ page }) => {
   // above the newsletter row, so it is the first one.
   await page.getByRole("checkbox").first().check();
 
-  // Click sign in button
-  await page.getByRole("button", { name: /Sign in with email/i }).click();
+  await openEmailForm(page);
 
   // Wait for login form
   const emailInput = page.getByPlaceholder(/you@example.com/i);

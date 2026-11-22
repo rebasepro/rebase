@@ -275,6 +275,12 @@ export const hi: RebaseTranslations = {
     // ─── Search ───────────────────────────────────────────────────
     search_collections: "संग्रह खोजें",
 
+    // ─── Home page with no tables of its own ─────────────────────
+    home_no_tables_title: "अभी कोई टेबल नहीं",
+    home_no_tables_body: "सामग्री उन टेबल्स से आती है जिन्हें आपका बैकएंड घोषित करता है, और यह प्रोजेक्ट केवल बिल्ट-इन users टेबल घोषित करता है। backend/schema/ में एक फ़ाइल जोड़ें जो defineTable को कॉल करे, और उसे backend/schema/index.ts से export करें:",
+    home_no_tables_dev: "जब तक rebase dev चल रहा है, वह नई टेबल को पहचानता है, उसे डेटाबेस में बनाता है और यहाँ दिखाता है।",
+    home_no_tables_docs: "टेबल कैसे परिभाषित करें",
+
     // ─── Navigation groups ────────────────────────────────────────
     views_group: "दृश्य",
 
@@ -1188,7 +1194,8 @@ export const hi: RebaseTranslations = {
     // The admin's own three groups, read by `useNavigationGroupLabel` the same
     // way as the Studio ones below — the group *name* is an identifier the
     // ordering and the icons key off, and only the heading is translated.
-    studio_group_views: "दृश्य",
+    // The default group (named "Views") holds the project's tables.
+    studio_group_views: "टेबल्स",
     studio_group_admin: "व्यवस्थापन",
     studio_group_settings: "सेटिंग्स",
     studio_group_database: "डेटाबेस",
@@ -1972,4 +1979,7 @@ export const hi: RebaseTranslations = {
     select_row: "{{id}} चुनें",
     relation_open_record: "{{label}} खोलें",
     select: "चुनें",
+    studio_home_quick_start: "त्वरित शुरुआत",
+    studio_home_quick_start_dev: "आपकी टेबल्स के लिए पूरी तरह typed SDK को generated/sdk में यह कमांड अद्यतन रखती है:",
+    studio_home_quick_start_outside_dev: "dev के बाहर, इसे दोबारा बनाने के लिए चलाएँ",
 };

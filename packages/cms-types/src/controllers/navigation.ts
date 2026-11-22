@@ -178,7 +178,7 @@ export interface AppView {
      * Navigation group for this view.
      * Views sharing the same group name will be visually grouped
      * together in the drawer and home page. If not set, the view
-     * falls into the default "Views" group.
+     * falls into the default group (named `"Views"`, labelled "Tables").
      *
      * Two names are special: a group called `"Admin"` or `"Settings"` sinks to
      * the bottom of the drawer, by string comparison on the name. That predates

@@ -470,16 +470,24 @@ export function StudioHomePage({
                             color="secondary"
                             className="py-1 rounded"
                         >
-                            Quick Start
+                            {t("studio_home_quick_start")}
                         </Typography>
                     </div>
 
+                    {/* `rebase dev` writes the typed SDK to generated/sdk on every
+                        schema change, so a scaffold never needs to run the
+                        generator by hand; `generate-sdk` is for outside dev. */}
                     <Typography variant="body2" color="secondary" className="mb-4 max-w-2xl">
-                        Generate a fully-typed SDK from your tables with{" "}
+                        {t("studio_home_quick_start_dev")}{" "}
                         <code className="text-emerald-400 font-mono text-xs bg-emerald-400/10 px-1.5 py-0.5 rounded">
-                            npx rebase generate-sdk
+                            rebase dev
                         </code>
-                        {" "}and start querying your data with full TypeScript autocompletion.
+                        {". "}
+                        {t("studio_home_quick_start_outside_dev")}{" "}
+                        <code className="text-emerald-400 font-mono text-xs bg-emerald-400/10 px-1.5 py-0.5 rounded">
+                            rebase generate-sdk
+                        </code>
+                        {"."}
                     </Typography>
 
                     <div className="rounded-lg border border-hairline bg-surface-card overflow-hidden">
@@ -584,7 +592,9 @@ function SyntaxHighlightedSnippet({ baseUrl }: { baseUrl: string }) {
             <span className={tx}>{" } "}</span>
             <span className={kw}>from</span>
             <span className={tx}> </span>
-            <span className={str}>&apos;./database.types&apos;</span>
+            {/* A script in the project root; scripts/example.ts, one level
+                down, imports "../generated/sdk/database.types". */}
+            <span className={str}>&apos;./generated/sdk/database.types&apos;</span>
             <span className={op}>;</span>
             {"\n\n"}
 
@@ -614,7 +624,7 @@ function SyntaxHighlightedSnippet({ baseUrl }: { baseUrl: string }) {
             <span className={op}>);</span>
             {"\n\n"}
 
-            <span className={cm}>{"// Fully typed — autocompletion for tables and columns"}</span>
+            <span className={cm}>{"// Every table is a typed property: rebase.data.<table>"}</span>
             {"\n"}
             <span className={kw}>const</span>
             <span className={tx}>{" { "}</span>
@@ -638,7 +648,7 @@ function SyntaxHighlightedSnippet({ baseUrl }: { baseUrl: string }) {
             <span className={tx}>{" { "}</span>
             <span className={tx}>data</span>
             <span className={op}>: </span>
-            <span className={tx}>posts</span>
+            <span className={tx}>admins</span>
             <span className={tx}>{" } "}</span>
             <span className={op}>= </span>
             <span className={kw}>await</span>
@@ -646,10 +656,20 @@ function SyntaxHighlightedSnippet({ baseUrl }: { baseUrl: string }) {
             <span className={op}>.</span>
             <span className={tx}>data</span>
             <span className={op}>.</span>
-            <span className={fn}>collection</span>
+            <span className={tx}>users</span>
+            {"\n"}
+            <span className={tx}>{"    "}</span>
+            <span className={op}>.</span>
+            <span className={fn}>where</span>
             <span className={op}>(</span>
-            <span className={str}>&apos;posts&apos;</span>
+            <span className={str}>&apos;roles&apos;</span>
+            <span className={op}>, </span>
+            <span className={str}>&apos;array-contains&apos;</span>
+            <span className={op}>, </span>
+            <span className={str}>&apos;admin&apos;</span>
             <span className={op}>)</span>
+            {"\n"}
+            <span className={tx}>{"    "}</span>
             <span className={op}>.</span>
             <span className={fn}>find</span>
             <span className={op}>();</span>

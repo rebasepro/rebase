@@ -71,7 +71,14 @@ describe("a navigation group has one label", () => {
     it("translates all three, rather than leaving two in English", () => {
         const labels = GROUPS.map(group => homeLabel(group, "es"));
 
-        expect(labels).toEqual(["Vistas", "Base de datos", "Ajustes"]);
+        expect(labels).toEqual(["Tablas", "Base de datos", "Ajustes"]);
+    });
+
+    it("labels the default group, where tables land, \"Tables\" rather than \"Views\"", () => {
+        // "Views" collided with `defineView`, which is a SQL view; the group
+        // holds the project's tables. Its name stays "Views" (an identifier).
+        expect(homeLabel(NAVIGATION_DEFAULT_GROUP_NAME, "en")).toBe("Tables");
+        expect(drawerLabel(NAVIGATION_DEFAULT_GROUP_NAME, "en")).toBe("Tables");
     });
 
     it("renders a group the app declared itself exactly as written", () => {

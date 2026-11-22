@@ -283,6 +283,12 @@ export const en: RebaseTranslations = {
     // ─── Search ───────────────────────────────────────────────────
     search_collections: "Search collections",
 
+    // ─── Home page with no tables of its own ─────────────────────
+    home_no_tables_title: "No tables yet",
+    home_no_tables_body: "Content comes from the tables your backend declares, and this project declares only the built-in users table. Add one as a file in backend/schema/ that calls defineTable, and export it from backend/schema/index.ts:",
+    home_no_tables_dev: "While rebase dev is running it picks the new table up, creates it in the database and shows it here.",
+    home_no_tables_docs: "How to define a table",
+
     // ─── Navigation groups ────────────────────────────────────────
     views_group: "Views",
 
@@ -1196,7 +1202,8 @@ export const en: RebaseTranslations = {
     // The admin's own three groups, read by `useNavigationGroupLabel` the same
     // way as the Studio ones below — the group *name* is an identifier the
     // ordering and the icons key off, and only the heading is translated.
-    studio_group_views: "Views",
+    // The default group (named "Views") holds the project's tables.
+    studio_group_views: "Tables",
     studio_group_admin: "Admin",
     studio_group_settings: "Settings",
     studio_group_database: "Database",
@@ -1980,4 +1987,7 @@ export const en: RebaseTranslations = {
     select_row: "Select {{id}}",
     relation_open_record: "Open {{label}}",
     select: "Select",
+    studio_home_quick_start: "Quick start",
+    studio_home_quick_start_dev: "A fully typed SDK for your tables is kept in generated/sdk by",
+    studio_home_quick_start_outside_dev: "Outside dev, regenerate it with",
 };

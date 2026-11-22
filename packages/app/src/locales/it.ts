@@ -275,6 +275,12 @@ export const it: RebaseTranslations = {
     // ─── Search ───────────────────────────────────────────────────
     search_collections: "Cerca collezioni",
 
+    // ─── Home page with no tables of its own ─────────────────────
+    home_no_tables_title: "Ancora nessuna tabella",
+    home_no_tables_body: "I contenuti vengono dalle tabelle che il backend dichiara, e questo progetto dichiara solo la tabella utenti integrata. Aggiungi un file in backend/schema/ che chiama defineTable ed esportalo da backend/schema/index.ts:",
+    home_no_tables_dev: "Mentre rebase dev è in esecuzione, rileva la nuova tabella, la crea nel database e la mostra qui.",
+    home_no_tables_docs: "Come definire una tabella",
+
     // ─── Navigation groups ────────────────────────────────────────
     views_group: "Viste",
 
@@ -1188,7 +1194,8 @@ export const it: RebaseTranslations = {
     // The admin's own three groups, read by `useNavigationGroupLabel` the same
     // way as the Studio ones below — the group *name* is an identifier the
     // ordering and the icons key off, and only the heading is translated.
-    studio_group_views: "Viste",
+    // The default group (named "Views") holds the project's tables.
+    studio_group_views: "Tabelle",
     studio_group_admin: "Amministrazione",
     studio_group_settings: "Impostazioni",
     studio_group_database: "Database",
@@ -1972,4 +1979,7 @@ export const it: RebaseTranslations = {
     select_row: "Seleziona {{id}}",
     relation_open_record: "Apri {{label}}",
     select: "Seleziona",
+    studio_home_quick_start: "Avvio rapido",
+    studio_home_quick_start_dev: "Un SDK completamente tipizzato per le tue tabelle è tenuto aggiornato in generated/sdk da",
+    studio_home_quick_start_outside_dev: "Fuori da dev, rigeneralo con",
 };
