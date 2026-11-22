@@ -316,7 +316,7 @@ Listing, triggering, pausing and resuming jobs over HTTP, and the typed SDK's `c
 
 ## Studio Dashboard
 
-When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio under **Compute**, beside the JS console. The dashboard provides:
+When cron jobs are configured, a **Scheduled jobs** tool appears in Rebase Studio under **Compute**, beside the JS console. The dashboard provides:
 
 - **Job list** — All registered jobs with live status indicators
 - **Detail panel** — Schedule, next/last run, duration, and error information

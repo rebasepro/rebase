@@ -28,7 +28,8 @@ import {
     Tooltip,
     Trash2Icon,
     Typography,
-    SendIcon
+    SendIcon,
+    WebhookIcon
 } from "@rebasepro/ui";
 import { useSnackbarController, useTableDescriptors, useTranslation } from "@rebasepro/app";
 import {
@@ -247,9 +248,9 @@ export function WebhooksView() {
         <div className="flex flex-col h-full w-full bg-surface-sheet overflow-hidden">
             <div className={cls("px-5 py-3 border-b flex items-center justify-between gap-4", defaultBorderMixin)}>
                 <div className="flex items-center gap-2.5">
-                    <SendIcon size={iconSize.medium} className={"text-text-secondary"} />
+                    <WebhookIcon size={iconSize.medium} className={"text-text-secondary"} />
                     <div>
-                        <Typography variant="h6">{t("studio_webhooks_title")}</Typography>
+                        <Typography variant="h6">{t("studio_tool_webhooks")}</Typography>
                         <Typography variant="caption" color="secondary">
                             {t("studio_webhooks_subtitle")}
                         </Typography>

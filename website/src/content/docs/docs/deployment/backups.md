@@ -288,18 +288,18 @@ recreate its roles by hand before restoring it into a new Postgres.
 
 Above the list, the panel reports the scheduled backup job and its last run. A failed run is shown as an
 error with its message, so a nightly backup that cannot run is visible where
-the backups are listed, not only in the Cron Jobs panel.
+the backups are listed, not only in the Scheduled jobs panel.
 
 What it says about the job:
 
 - **Last scheduled backup** is the last run the schedule made. A run started
-  by hand since then (**Run Now** in Cron Jobs) gets a line of its own, so a
+  by hand since then (**Run Now** in Scheduled jobs) gets a line of its own, so a
   test run that worked cannot hide a failed nightly, and one that failed is not
   reported as the nightly.
 - A job declared `enabled: false` reads as scheduled backups being **off**.
   That is what the cron file above exports while `BACKUP_SCHEDULE` is unset, and
   setting `BACKUP_SCHEDULE` turns them on. **Paused** means an admin paused the
-  job in Cron Jobs, and resuming it there turns it back on.
+  job in Scheduled jobs, and resuming it there turns it back on.
 - A job the scheduler refused, for an invalid schedule, timezone or timeout,
   is reported with the reason. It never runs until its cron file is fixed.
 - When the run history in `rebase.cron_logs` cannot be read, the panel says

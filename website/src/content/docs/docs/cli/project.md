@@ -136,7 +136,7 @@ rebase cron reset nightly-backup          # the job's code decides again
 
 ## `rebase logs`
 
-The server's request and application log — the buffer the Studio Logs Explorer reads — once, or followed with `-f`.
+The server's request and application log — the buffer Studio's Logs view reads — once, or followed with `-f`.
 
 ```bash
 rebase logs -n 50 --level warn

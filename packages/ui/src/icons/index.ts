@@ -71,6 +71,7 @@ export {
     CircleDotIcon,
     CircleIcon,
     CircleUserIcon,
+    ClockIcon,
     CodeIcon,
     ColumnsIcon,
     CopyIcon,
@@ -176,6 +177,7 @@ export {
     VideoIcon,
     VoteIcon,
     Wand2Icon,
+    WebhookIcon,
     WrenchIcon,
     XCircleIcon,
     XIcon

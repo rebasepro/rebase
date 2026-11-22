@@ -153,10 +153,12 @@ icon: "Webhook",
 description: t("studio_tool_webhooks_description"),
 view: suspense(<WebhooksView/>) });
         }
+        // Filed under API, not Database: the server's log carries every source
+        // it serves (api, auth, storage, realtime, system), not only queries.
         if (activeTools.includes("logs")) {
             views.push({ slug: "logs",
 name: t("studio_tool_logs"),
-group: "Database",
+group: "API",
 icon: "Activity",
 description: t("studio_tool_logs_description"),
 view: suspense(<LogsExplorer/>) });

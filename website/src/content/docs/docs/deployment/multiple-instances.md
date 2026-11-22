@@ -34,7 +34,7 @@ some clients never see, or a page that shows different logs on every refresh.
 | Uploaded files, `STORAGE_TYPE=local` | The instance's own disk | S3 or GCS, or one shared volume on the parent of `STORAGE_PATH` |
 | Resumable (TUS) uploads in progress | The instance's disk, at `STORAGE_PATH/.tus-uploads` | One shared volume at `STORAGE_PATH`, or sticky sessions |
 | Image transforms | An in-process cache | `STORAGE_RENDITION_CACHE=true` |
-| Logs Explorer | A ring of the last 10,000 lines | Nothing — ship stdout to a log aggregator |
+| Studio's Logs view | A ring of the last 10,000 lines | Nothing — ship stdout to a log aggregator |
 | Cron timers | Every process that runs the scheduler | Claimed in the database: one run per slot. `REBASE_CRON_SCHEDULER` picks where timers live |
 | Scheduled RLS audit | Every process that owns it | `REBASE_RLS_AUDIT=false` on all but one |
 | A static app's `index.html` | Read once per process | Restart every instance when the build changes |
@@ -113,9 +113,9 @@ came from, where every instance finds it. That makes a `GET` write to your
 bucket, which is why it is off unless asked for. See
 [Storage](/docs/backend/storage/).
 
-## Logs Explorer
+## Studio's Logs view
 
-Studio's Logs Explorer reads a ring of the last 10,000 log lines kept by the
+Studio's Logs view reads a ring of the last 10,000 log lines kept by the
 process that serves the request. Behind a load balancer each refresh may show a
 different instance's lines, and none of them shows the whole deployment.
 The explorer names the instance it is showing.

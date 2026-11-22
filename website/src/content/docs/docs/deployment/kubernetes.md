@@ -188,5 +188,5 @@ uses it only to decide whether to warn. Ordinary table subscriptions are
 unaffected; those travel through Postgres CDC.
 
 The rest of what a process keeps to itself — local files, resumable uploads,
-the image-transform cache, the Logs Explorer — is listed with the setting that
+the image-transform cache, Studio's Logs view — is listed with the setting that
 shares each in [Running more than one instance](/docs/deployment/multiple-instances/).

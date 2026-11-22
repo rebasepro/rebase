@@ -4,7 +4,7 @@ import {
     Alert,
     AlertCircleIcon,
     Button,
-    CalendarIcon,
+    ClockIcon,
     Card,
     CheckCircleIcon,
     ChevronDownIcon,
@@ -328,7 +328,7 @@ message: e instanceof Error ? e.message : String(e) });
 
     if (jobs.length === 0) return (
         <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
-            <CalendarIcon size={iconSize.medium} className="text-surface-300 dark:text-surface-600"/>
+            <ClockIcon size={iconSize.medium} className="text-surface-300 dark:text-surface-600"/>
             {hasProblems ? (
                 <div className="max-w-lg text-left">
                     <CronLoadProblems problems={problems}/>
@@ -358,7 +358,7 @@ message: e instanceof Error ? e.message : String(e) });
             <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
                 <div className={cls("flex items-center justify-between px-4 h-14 shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
-                        <CalendarIcon size={iconSize.smallest} className="text-primary"/>
+                        <ClockIcon size={iconSize.smallest} className="text-primary"/>
                         <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_cron")}</Typography>
                         <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{jobs.length}</Chip>
                     </div>

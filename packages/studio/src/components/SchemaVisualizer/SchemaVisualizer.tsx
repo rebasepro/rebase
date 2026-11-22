@@ -495,7 +495,7 @@ duration: 400 }
                                 variant="subtitle2"
                                 className="font-medium text-text-primary dark:text-text-primary-dark"
                             >
-                                Schema Visualizer
+                                {t("studio_tool_schema_visualizer")}
                             </Typography>
                             {/* What this diagram is drawn from. Everything on it
                                 but the RLS markers comes from the tables the
