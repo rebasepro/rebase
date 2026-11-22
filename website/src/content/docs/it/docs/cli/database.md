@@ -1,5 +1,5 @@
 ---
-sourceHash: 535fb9801df93ad9
+sourceHash: 231870126ca746bf
 title: Comandi del database
 sidebar_label: Comandi del database
 description: I comandi rebase db — push, generate e migrate, backup e ripristini, estrazione di una copia, stringa di connessione, database di sviluppo gestito e branch.
@@ -39,6 +39,10 @@ viste, indici creati manualmente e i vincoli CHECK ed EXCLUDE su una tabella
 dichiarata, che una dichiarazione non può esprimere. Consulta
 [`rebase db push`](/docs/cli/schema/#rebase-db-push) per verificare cosa viene applicato e
 cosa viene ignorato.
+
+L'SQL che una dichiarazione di tabella non può esprimere (funzioni, trigger, vincoli CHECK, grant) va in `backend/sql/*.sql`. Il push applica quei file in ordine alfabetico di nome, dopo le tabelle e le viste e prima delle policy, così una policy può chiamare una funzione definita in un file. Ogni file è registrato per nome e hash in `rebase.sql_files` ed eseguito di nuovo solo quando cambia, in una propria transazione: un file che fallisce viene annullato con rollback e ferma il push. Scrivi file che si possano rieseguire senza danni (`CREATE OR REPLACE FUNCTION`, `DROP TRIGGER IF EXISTS` prima di `CREATE TRIGGER`). Un file il cui nome inizia con `_` è una bozza e non viene applicato. Rimuovere un file non annulla nulla di ciò che ha fatto. `--dry-run` elenca i file che applicherebbe.
+
+Anche un deploy applica gli stessi file: `rebase build` li include nel bundle, e all'avvio il server esegue ciascun file nuovo o modificato dopo le tabelle e l'autenticazione e prima delle policy, registrandoli nella stessa `rebase.sql_files`. La transazione di ogni file acquisisce prima un unico advisory lock, quindi più istanze che si avviano insieme, o un push durante un deploy, eseguono ciascun file una sola volta. Un file può durare fino a 15 minuti. Un file che fallisce ferma l'avvio e ne indica il nome. Anche `rebase dev` li applica all'avvio. Un'applicazione che costruisce il proprio backend indica la directory con `createPostgresAdapter({ sqlDir: "backend/sql" })`. Con `REBASE_PROVISION=false` o `REBASE_MIGRATE_ON_BOOT=none` non viene applicato nulla.
 
 :::caution
 `db push` modifica il database direttamente senza file di migrazione. Usa `db generate` + `db migrate` per la produzione.

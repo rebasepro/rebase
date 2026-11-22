@@ -1,5 +1,5 @@
 ---
-sourceHash: b0a8aee611208b26
+sourceHash: b8772b5c20745be6
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -81,6 +81,7 @@ Envoyer le vôtre permet à une trace de survivre à un saut : une passerelle ou
 | `EMAIL_EXISTS` | 409 | Un compte avec cette adresse existe déjà — lors de l'inscription, d'un changement d'adresse, ou en suivant un lien de changement d'adresse lorsqu'un autre compte a récupéré l'adresse pendant l'attente. | Connectez-vous, ou démarrez une réinitialisation de mot de passe ; pour un changement d'adresse, choisissez une autre adresse. |
 | `EMAIL_NOT_CONFIGURED` | 503 | Des liens magiques ou des OTP ont été demandés et le serveur ne dispose d'aucun transport d'e-mails. | Configurez SMTP, ou utilisez une autre méthode de connexion. |
 | `EMAIL_NOT_VERIFIED` | 403 | Une connexion OAuth a trouvé un compte avec la même adresse, mais le fournisseur n'a pas vérifié cette adresse, elle n'est donc pas liée. | Connectez-vous avec la méthode existante, puis faites `POST /auth/link/<provider>`. |
+| `CSRF_REFUSED` | 403 | La protection CSRF est activée (`csrf: { origin }`) et une requête sans en-tête `Authorization` provient d'une origine absente de la liste : un envoi de formulaire authentifié par cookie depuis un autre site, ou une requête sans corps et sans `Origin`. | Envoyez-la depuis une origine autorisée, avec un corps JSON, ou avec un en-tête `Authorization`. |
 | `FACTOR_NOT_VERIFIED` | 400 | Le facteur MFA a été enregistré mais jamais confirmé. | Confirmez le facteur. |
 | `ID_EXISTS` | 409 | Un compte possède déjà l'ID qu'une importation de compte conserve (`POST /api/admin/users/import`). L'importation le signale comme `skipped` et laisse le compte inchangé. | Rien à faire si le compte a déjà été importé. Sinon, omettez `id` ou choisissez-en un autre. |
 | `IDENTITY_ALREADY_LINKED` | 409 | Cette identité OAuth appartient à un autre compte. | Connectez-vous avec cette dernière, ou dissociez-la d'abord sur l'autre compte. |

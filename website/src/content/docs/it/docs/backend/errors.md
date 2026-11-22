@@ -1,5 +1,5 @@
 ---
-sourceHash: b0a8aee611208b26
+sourceHash: b8772b5c20745be6
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il relativo stato HTTP, il loro significato e cosa fare al riguardo — oltre all'envelope di risposta, X-Request-ID e le regole per i dettagli.
@@ -81,6 +81,7 @@ Inviare il proprio è il modo in cui una traccia sopravvive a un hop: un gateway
 | `EMAIL_EXISTS` | 409 | Esiste già un account con quell'indirizzo — durante la registrazione, la modifica dell'indirizzo o aprendo un link di cambio indirizzo quando un altro account ha occupato l'indirizzo nel frattempo. | Accedi o avvia il recupero password; per un cambio di indirizzo, scegline un altro. |
 | `EMAIL_NOT_CONFIGURED` | 503 | Sono stati richiesti magic link o OTP ma il server non ha un trasporto email configurato. | Configura SMTP o usa un altro metodo di accesso. |
 | `EMAIL_NOT_VERIFIED` | 403 | Un accesso OAuth ha trovato un account con lo stesso indirizzo, ma il provider non ha verificato quell'indirizzo, quindi non è collegato. | Accedi con il metodo esistente, poi esegui `POST /auth/link/<provider>`. |
+| `CSRF_REFUSED` | 403 | La protezione CSRF è attiva (`csrf: { origin }`) e una richiesta senza header `Authorization` proviene da un'origine che non è nell'elenco: un invio di form autenticato con cookie da un altro sito, oppure una richiesta senza body e senza `Origin`. | Inviala da un'origine consentita, con un body JSON o con un header `Authorization`. |
 | `FACTOR_NOT_VERIFIED` | 400 | Il fattore MFA è stato registrato ma mai confermato. | Conferma il fattore. |
 | `ID_EXISTS` | 409 | Un account possiede già l'ID che un'importazione di account intende mantenere (`POST /api/admin/users/import`). L'importazione lo segnala come `skipped` e lascia l'account inalterato. | Nulla, se l'account era già stato importato in precedenza. Altrimenti ometti `id` o scegline un altro. |
 | `IDENTITY_ALREADY_LINKED` | 409 | Quell'identità OAuth appartiene a un altro account. | Accedi con quell'identità, oppure scollegala prima da lì. |

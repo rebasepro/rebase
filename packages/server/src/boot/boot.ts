@@ -484,6 +484,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         cronsDir: bundle.cronsDir,
         // The presentation the frontend ships, for the server's views.
         uiConfigFile: bundle.uiConfigFile,
+        // The project's backend/sql, applied after auth and before policies.
+        sqlDir: bundle.sqlDir,
         requireFilesLoaded: env.REBASE_REQUIRE_FILES_LOADED,
         surfaces: runtimeRole.surfaces,
         ownership: runtimeRole.ownership,

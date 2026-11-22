@@ -1,5 +1,5 @@
 ---
-sourceHash: 535fb9801df93ad9
+sourceHash: 231870126ca746bf
 title: Commandes de base de données
 sidebar_label: Commandes de base de données
 description: Les commandes rebase db — push, generate et migrate, sauvegardes et restaurations, extraction d'une copie, chaîne de connexion, base de données de développement gérée et branches.
@@ -24,6 +24,10 @@ rebase db push
 `--database-url <url>` spécifie la base de données, et `--docker` celle de compose, démarrée si nécessaire. `generate`, `migrate`, `branch`, `backup` et `restore` acceptent également les deux.
 
 La commande ne touche pas à ce que vos déclarations de tables ne décrivent pas : les autres tables et vues, les index que vous avez écrits, ainsi que les contraintes CHECK et EXCLUDE sur une table déclarée, qu'une déclaration ne peut pas exprimer. Consultez [`rebase db push`](/docs/cli/schema/#rebase-db-push) pour savoir ce qu'elle applique et devant quoi elle s'arrête.
+
+Le SQL qu'une déclaration de table ne peut pas exprimer (fonctions, déclencheurs, contraintes CHECK, droits d'accès) va dans `backend/sql/*.sql`. Le push applique ces fichiers dans l'ordre de leur nom, après les tables et les vues et avant les policies, de sorte qu'une policy peut appeler une fonction qu'un fichier définit. Chaque fichier est enregistré par son nom et son hachage dans `rebase.sql_files` et ne s'exécute à nouveau que lorsqu'il change, dans sa propre transaction : un fichier qui échoue est annulé et arrête le push. Écrivez des fichiers qui peuvent être réexécutés sans risque (`CREATE OR REPLACE FUNCTION`, `DROP TRIGGER IF EXISTS` avant `CREATE TRIGGER`). Un fichier dont le nom commence par `_` est un brouillon et n'est pas appliqué. Supprimer un fichier n'annule rien de ce qu'il a fait. `--dry-run` liste les fichiers qu'il appliquerait.
+
+Un déploiement applique les mêmes fichiers : `rebase build` les place dans le bundle, et le démarrage du serveur exécute chacun de ceux qui sont nouveaux ou modifiés après les tables et l'authentification et avant les policies, enregistrés dans le même `rebase.sql_files`. La transaction de chaque fichier prend d'abord un verrou consultatif unique, de sorte que plusieurs instances démarrant en même temps, ou un push pendant un déploiement, exécutent chaque fichier une seule fois. Un fichier peut s'exécuter pendant 15 minutes. Un fichier qui échoue arrête le démarrage et est nommé. `rebase dev` les applique aussi au démarrage. Une application qui construit son propre backend indique le répertoire avec `createPostgresAdapter({ sqlDir: "backend/sql" })`. Rien n'est appliqué avec `REBASE_PROVISION=false` ou `REBASE_MIGRATE_ON_BOOT=none`.
 
 :::caution
 `db push` modifie directement la base de données sans fichiers de migration. Utilisez `db generate` + `db migrate` pour la production.

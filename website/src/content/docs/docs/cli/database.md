@@ -39,6 +39,27 @@ table, which a declaration cannot express. See
 [`rebase db push`](/docs/cli/schema/#rebase-db-push) for what it applies and
 what it stops before.
 
+The SQL a table declaration cannot say (functions, triggers, CHECK
+constraints, grants) goes in `backend/sql/*.sql`. The push applies those files
+in name order, after the tables and views and before the policies, so a policy
+may call a function a file defines. Each file is recorded by name and hash in
+`rebase.sql_files` and runs again only when it changes, in its own transaction:
+a file that fails is rolled back and stops the push. Write files that are safe
+to run again (`CREATE OR REPLACE FUNCTION`, `DROP TRIGGER IF EXISTS` before
+`CREATE TRIGGER`). A file whose name starts with `_` is a draft and is not
+applied. Removing a file undoes nothing it did. `--dry-run` lists the files it
+would apply.
+
+A deploy applies the same files: `rebase build` carries them in the bundle, and
+the server's boot runs each new or changed one after the tables and auth and
+before the policies, recorded in the same `rebase.sql_files`. Each file's
+transaction takes one advisory lock first, so several instances starting
+together, or a push during a deploy, run each file once. A file may run for
+15 minutes. A file that fails stops the boot and names the file. `rebase dev` applies them at boot too. An
+application that builds its own backend names the directory with
+`createPostgresAdapter({ sqlDir: "backend/sql" })`. Nothing is applied with
+`REBASE_PROVISION=false` or `REBASE_MIGRATE_ON_BOOT=none`.
+
 :::caution
 `db push` modifies the database directly without migration files. Use `db generate` + `db migrate` for production.
 :::

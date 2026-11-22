@@ -1,5 +1,5 @@
 ---
-sourceHash: b0a8aee611208b26
+sourceHash: b8772b5c20745be6
 title: Códigos de error
 sidebar_label: Códigos de error
 description: Cada código de error que un backend de Rebase puede devolver, con su estado HTTP, qué significa y qué hacer al respecto — además del sobre de respuesta, X-Request-ID y las reglas de details.
@@ -105,6 +105,7 @@ el ID que recibiste. Lee la cabecera de respuesta.
 | `EMAIL_EXISTS` | 409 | Ya existe una cuenta con esa dirección — en el registro, en un cambio de dirección, o al seguir un enlace de cambio de dirección cuando otra cuenta tomó la dirección mientras esperaba. | Inicia sesión o inicia un restablecimiento de contraseña; para un cambio de dirección, elige otra. |
 | `EMAIL_NOT_CONFIGURED` | 503 | Se solicitaron enlaces mágicos u OTP y el servidor no tiene transporte de correo configurado. | Configura SMTP o usa otro método de inicio de sesión. |
 | `EMAIL_NOT_VERIFIED` | 403 | Un inicio de sesión OAuth encontró una cuenta con la misma dirección y el proveedor no verificó esa dirección, por lo que no está vinculada. | Inicia sesión con el método existente y luego ejecuta `POST /auth/link/<provider>`. |
+| `CSRF_REFUSED` | 403 | La protección CSRF está activada (`csrf: { origin }`) y llegó una solicitud sin encabezado `Authorization` desde un origen que no está en la lista: un envío de formulario autenticado por cookie desde otro sitio, o una solicitud sin cuerpo y sin `Origin`. | Envíala desde un origen permitido, con un cuerpo JSON o con un encabezado `Authorization`. |
 | `FACTOR_NOT_VERIFIED` | 400 | El factor MFA fue registrado pero nunca confirmado. | Confirma el factor. |
 | `ID_EXISTS` | 409 | Una cuenta ya tiene el id que una importación de cuentas mantiene (`POST /api/admin/users/import`). La importación lo reporta como `skipped` y deja la cuenta como está. | Nada, si la cuenta fue importada previamente. De lo contrario, omite `id` o elige otro. |
 | `IDENTITY_ALREADY_LINKED` | 409 | Esa identidad OAuth pertenece a otra cuenta. | Inicia sesión con ella, o desvincúlala de allí primero. |

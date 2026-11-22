@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     BUNDLED_UI_CONFIG,
     buildBundle,
+    bundleSqlFiles,
     bundleUiConfig,
     bundledNpmrc,
     buildStaticBundle,
+    composeBundleManifest,
     collectDeclaredDependencies,
     detectDeclaredDepConflicts,
     detectFrameworkDepDrift,
@@ -864,6 +866,55 @@ describe("carrying the frontend's ui-config.json to the server", () => {
         const outDir = path.join(scratch, "dist-bundle");
         fs.mkdirSync(outDir);
         expect(() => bundleUiConfig(scratch, outDir)).toThrow(/frontend\/src\/cms\/ui-config\.json must be a JSON object/);
+    });
+});
+
+describe("carrying backend/sql for the boot to apply", () => {
+    it("copies the files a push applies, drafts left out, and returns each hash in apply order", async () => {
+        write("backend/schema/index.ts", "export {};");
+        write("backend/sql/020_trigger.sql", "CREATE TRIGGER t;");
+        write("backend/sql/010_fn.sql", "CREATE FUNCTION f();");
+        write("backend/sql/_introspected-left-behind.sql", "-- review me");
+        write("backend/sql/notes.md", "not sql");
+        const outDir = path.join(scratch, "dist-bundle");
+        fs.mkdirSync(outDir);
+
+        const carried = await bundleSqlFiles(scratch, "backend/schema", outDir);
+        expect(carried?.entry).toBe("backend/sql");
+        expect(carried?.files.map(file => file.name)).toEqual(["010_fn.sql", "020_trigger.sql"]);
+        expect(carried?.files[0].hash).toMatch(/^[0-9a-f]{64}$/);
+        expect(fs.readdirSync(path.join(outDir, "backend/sql")).sort()).toEqual(["010_fn.sql", "020_trigger.sql"]);
+        expect(fs.readFileSync(path.join(outDir, "backend/sql/010_fn.sql"), "utf8")).toBe("CREATE FUNCTION f();");
+    });
+
+    it("follows a tables directory moved in rebase.json: sql sits beside it", async () => {
+        write("server/tables/index.ts", "export {};");
+        write("server/sql/010_fn.sql", "SELECT 1;");
+        const outDir = path.join(scratch, "dist-bundle");
+        fs.mkdirSync(outDir);
+        expect((await bundleSqlFiles(scratch, "server/tables", outDir))?.entry).toBe("server/sql");
+    });
+
+    it("carries nothing for a project with no files, or only drafts", async () => {
+        const outDir = path.join(scratch, "dist-bundle");
+        fs.mkdirSync(outDir);
+        expect(await bundleSqlFiles(scratch, "backend/schema", outDir)).toBeUndefined();
+        write("backend/sql/_draft.sql", "-- later");
+        expect(await bundleSqlFiles(scratch, "backend/schema", outDir)).toBeUndefined();
+        expect(fs.existsSync(path.join(outDir, "backend/sql"))).toBe(false);
+    });
+
+    it("records the files in the manifest only when there are some", () => {
+        const input = {
+            runtimeRange: "^2", builtAgainst: "1.0.0", schemaVersion: "", appName: "backend",
+            entry: { sql: "backend/sql" }, tableSlugs: [], functions: [], nativeModules: [],
+            declaresStorageAuthorize: false, resources: undefined, declaredDeps: {},
+            build: { cli: "0", node: "22", createdAt: "2026-01-01T00:00:00.000Z" }
+        };
+        const files = [{ name: "010_fn.sql", hash: "a".repeat(64) }];
+        expect(composeBundleManifest({ ...input, sqlFiles: files }).sqlFiles).toEqual(files);
+        expect("sqlFiles" in composeBundleManifest({ ...input, sqlFiles: [] })).toBe(false);
+        expect("sqlFiles" in composeBundleManifest(input)).toBe(false);
     });
 });
 

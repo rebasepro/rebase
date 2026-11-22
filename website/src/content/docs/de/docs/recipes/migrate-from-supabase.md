@@ -1,5 +1,5 @@
 ---
-sourceHash: eda5c036273f52d9
+sourceHash: 6670d26e763252ab
 title: "Rezept: Migration von Supabase"
 sidebar_label: Migration von Supabase
 description: "Migrieren Sie ein Supabase-Projekt zu Rebase: Schema introspektieren, SQL-Objekte anwenden, die keine Tabellen sind, Daten unter Beibehaltung der Benutzer-IDs kopieren, Edge Functions portieren und deployen – alles über das CLI."
@@ -33,7 +33,7 @@ rebase schema introspect --database-url "$SUPABASE_DB_URL" --from supabase
 
 Benutzer-ID-Spalten werden zu `text`, da `rebase.users.id` und `rebase.uid()` Text sind: Ein Vergleich einer `uuid`-Spalte mit `rebase.uid()` in einer Policy schlägt fehl.
 
-Der Durchlauf endet mit einer Liste der Dinge, die **nicht** übernommen wurden (Funktionen, Trigger, Extensions, CHECK-Constraints, sonstige Indizes, zusammengesetzte Fremdschlüssel), und schreibt das entsprechende SQL nach `backend/sql/introspected-left-behind.sql`.
+Der Durchlauf endet mit einer Liste der Dinge, die **nicht** übernommen wurden (Funktionen, Trigger, Extensions, CHECK-Constraints, sonstige Indizes, zusammengesetzte Fremdschlüssel), und schreibt das entsprechende SQL nach `backend/sql/_introspected-left-behind.sql`, einen Entwurf, den `rebase db push` erst anwendet, wenn Sie ihn umbenennen.
 
 ## 2. Projekt auf die neue Datenbank ausrichten
 
@@ -44,14 +44,16 @@ rebase db push
 ```
 
 ## 3. SQL-Objekte anwenden
+<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
-Bearbeiten Sie `backend/sql/introspected-left-behind.sql` analog zur Anpassung der Tabellen: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, kein `GRANT … TO anon, authenticated`. Funktionen, die `pg_net` aufgerufen haben, eignen sich besser als [Custom Function](/docs/backend/custom-functions/). Wenden Sie die Datei anschließend an:
+Bearbeiten Sie `backend/sql/_introspected-left-behind.sql` analog zur Anpassung der Tabellen: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, kein `GRANT … TO anon, authenticated`. Funktionen, die `pg_net` aufgerufen haben, eignen sich besser als [Custom Function](/docs/backend/custom-functions/). Machen Sie jede Anweisung gefahrlos wiederholbar (`DROP TRIGGER IF EXISTS` vor jedem `CREATE TRIGGER`), benennen Sie die Datei dann ohne das führende `_` um und pushen Sie:
 
 ```bash
-psql "$DATABASE_URL" -f backend/sql/introspected-left-behind.sql
-# on Rebase Cloud, with no local psql:
-rebase cloud db query --file backend/sql/introspected-left-behind.sql
+mv backend/sql/_introspected-left-behind.sql backend/sql/introspected.sql
+rebase db push
 ```
+
+`rebase db push` wendet jede `.sql`-Datei in `backend/sql` in Namensreihenfolge an, nach den Tabellen und vor den Policies, und erfasst jede per Hash in `rebase.sql_files`, sodass eine Datei nur erneut läuft, wenn sie sich ändert. Ein Deploy wendet sie genauso an (Schritt 8).
 
 Eine Funktion, die der Browser mit `supabase.rpc('fn')` aufgerufen hat, wird mit <span class="since-badge" data-since="0.35">Seit 0.35</span> [`defineRpc`](/docs/backend/rpc/) neben den Tabellen deklariert. Sie wird dann unter `POST /api/rpc/<name>` bereitgestellt und als Aufrufer unter Row-Level-Security ausgeführt, sodass sich eine `SECURITY DEFINER`-Funktion wie in Supabase verhält:
 
@@ -127,9 +129,11 @@ export default defineFunction((app) => {
 Die Anmeldung per Magic-Link und E-Mail-Code erfordert einen E-Mail-Dienst. Setzen Sie `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` und `SMTP_FROM` (mittels `rebase cloud env set` in der Cloud). Ohne diese Einstellungen antwortet die Route mit 503 und `rebase cloud status` meldet `blockedOn: email_not_configured`.
 
 ## 8. Deployment
+<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 ```bash
 rebase cloud projects create --name Triptelier --link
 rebase cloud deploy
-rebase cloud db query --file backend/sql/introspected-left-behind.sql
 ```
+
+Der Deploy wendet `backend/sql` an wie `rebase db push`: Das Bundle enthält die Dateien, und der Boot der neuen Revision führt jede neue oder geänderte Datei einmal aus, nach den Tabellen und vor den Policies. Eine Datei, die fehlschlägt, stoppt den Boot und nennt die Datei, sodass sich ein Fehler darin im Deploy zeigt und nicht in einer laufenden App.

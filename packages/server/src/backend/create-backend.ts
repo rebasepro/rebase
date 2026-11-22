@@ -64,6 +64,7 @@ import {
     provisionTargetsFor,
     provisioningDisabled,
     type ProvisionTarget,
+    provisionSqlFiles,
     provisionTablePolicies,
     provisionTableSchema,
     PROVISIONING_OFF_NOTICE,
@@ -530,6 +531,9 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
             : undefined,
         ensureRlsRuntime: dbAdapter.ensureRlsRuntime
             ? (driverResult) => dbAdapter.ensureRlsRuntime!(driverResult)
+            : undefined,
+        ensureSqlFiles: dbAdapter.ensureSqlFiles
+            ? (dir, driverResult, log) => dbAdapter.ensureSqlFiles!(dir, driverResult, log)
             : undefined,
         finalizeSecurityPosture: dbAdapter.finalizeSecurityPosture
             ? (driverResult) => dbAdapter.finalizeSecurityPosture!(driverResult)
@@ -1173,6 +1177,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
         return target;
     };
+    // The project's backend/sql, between auth (a file may call rebase.uid())
+    // and the policies (a policy may call a function a file defines). A file
+    // that fails throws here, and the boot with it — see provisionSqlFiles.
+    await provisionSqlFiles(config.sqlDir, initializedTarget(provisionTarget), {
+        provision: provision.tables,
+        skipReason: provisionSkipReason
+    });
     const policyOutcome = await provisionTablePolicies(provisionable, compiledOf, initializedTarget(provisionTarget), {
         introspecting: introspectCollections,
         provision: provision.tables,

@@ -1,5 +1,5 @@
 ---
-sourceHash: b0a8aee611208b26
+sourceHash: b8772b5c20745be6
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, o que significa e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -105,6 +105,7 @@ o ID recebido. Leia o cabeçalho de resposta.
 | `EMAIL_EXISTS` | 409 | Uma conta com esse endereço já existe — no registro, na alteração de endereço ou ao acessar um link de alteração de endereço quando outra conta assumiu o endereço enquanto este aguardava. | Faça login ou inicie uma redefinição de senha; para alteração de endereço, escolha outro endereço. |
 | `EMAIL_NOT_CONFIGURED` | 503 | Magic links ou OTP foram solicitados e o servidor não possui transporte de e-mail configurado. | Configure o SMTP ou use outro método de login. |
 | `EMAIL_NOT_VERIFIED` | 403 | Um login OAuth encontrou uma conta com o mesmo endereço, mas o provedor não verificou esse endereço, portanto ele não foi vinculado. | Faça login com o método existente e execute `POST /auth/link/<provider>`. |
+| `CSRF_REFUSED` | 403 | A proteção CSRF está ativada (`csrf: { origin }`) e uma requisição sem cabeçalho `Authorization` veio de uma origem que não está na lista: um envio de formulário autenticado por cookie vindo de outro site, ou uma requisição sem corpo e sem `Origin`. | Envie-a de uma origem permitida, com um corpo JSON ou com um cabeçalho `Authorization`. |
 | `FACTOR_NOT_VERIFIED` | 400 | O fator MFA foi cadastrado, mas nunca confirmado. | Confirme o fator. |
 | `ID_EXISTS` | 409 | Uma conta já possui o ID mantido por uma importação de contas (`POST /api/admin/users/import`). A importação o reporta como `skipped` e mantém a conta como está. | Nada, caso a conta já tenha sido importada anteriormente. Caso contrário, omita o `id` ou escolha outro. |
 | `IDENTITY_ALREADY_LINKED` | 409 | Essa identidade OAuth pertence a outra conta. | Faça login com ela ou desvincule-a de lá primeiro. |

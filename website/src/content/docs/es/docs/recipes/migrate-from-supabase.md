@@ -1,5 +1,5 @@
 ---
-sourceHash: eda5c036273f52d9
+sourceHash: 6670d26e763252ab
 title: "Receta: Migración desde Supabase"
 sidebar_label: Migración desde Supabase
 description: "Mueve un proyecto de Supabase a Rebase: haz introspección del esquema, aplica los objetos SQL que no son tablas, copia los datos manteniendo los id de usuario, porta las edge functions y despliega, todo desde la CLI."
@@ -33,7 +33,7 @@ rebase schema introspect --database-url "$SUPABASE_DB_URL" --from supabase
 
 Las columnas de id de usuario pasan a ser `text` porque `rebase.users.id` y `rebase.uid()` son de tipo texto: una columna `uuid` comparada con `rebase.uid()` en una política fallará.
 
-La ejecución finaliza con una lista de lo que **no** se transfirió (funciones, disparadores, extensiones, restricciones CHECK, otros índices, claves foráneas compuestas) y escribe el SQL de cada uno en `backend/sql/introspected-left-behind.sql`.
+La ejecución finaliza con una lista de lo que **no** se transfirió (funciones, disparadores, extensiones, restricciones CHECK, otros índices, claves foráneas compuestas) y escribe el SQL de cada uno en `backend/sql/_introspected-left-behind.sql`, un borrador que `rebase db push` no aplica hasta que lo renombres.
 
 ## 2. Apuntar el proyecto a la nueva base de datos
 
@@ -44,14 +44,16 @@ rebase db push
 ```
 
 ## 3. Aplicar los objetos SQL
+<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
-Edita `backend/sql/introspected-left-behind.sql` del mismo modo en que se editaron las tablas: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, sin `GRANT … TO anon, authenticated`. Las funciones que llamaban a `pg_net` es mejor implementarlas como una [función personalizada](/docs/backend/custom-functions/). Luego aplícalo:
+Edita `backend/sql/_introspected-left-behind.sql` del mismo modo en que se editaron las tablas: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, sin `GRANT … TO anon, authenticated`. Las funciones que llamaban a `pg_net` es mejor implementarlas como una [función personalizada](/docs/backend/custom-functions/). Haz que cada sentencia sea segura de ejecutar otra vez (`DROP TRIGGER IF EXISTS` antes de cada `CREATE TRIGGER`), luego renombra el archivo sin el `_` inicial y haz push:
 
 ```bash
-psql "$DATABASE_URL" -f backend/sql/introspected-left-behind.sql
-# on Rebase Cloud, with no local psql:
-rebase cloud db query --file backend/sql/introspected-left-behind.sql
+mv backend/sql/_introspected-left-behind.sql backend/sql/introspected.sql
+rebase db push
 ```
+
+`rebase db push` aplica cada archivo `.sql` de `backend/sql` por orden de nombre, después de las tablas y antes de las políticas, y registra cada uno por hash en `rebase.sql_files`, de modo que un archivo se ejecuta de nuevo solo cuando cambia. Un despliegue los aplica del mismo modo (paso 8).
 
 Una función a la que el navegador llamaba con `supabase.rpc('fn')` se declara con <span class="since-badge" data-since="0.35">Desde 0.35</span> [`defineRpc`](/docs/backend/rpc/), junto a las tablas. Luego se sirve en `POST /api/rpc/<name>` y se ejecuta como el llamador bajo seguridad a nivel de fila, de modo que una función `SECURITY DEFINER` se comporta como lo hacía en Supabase:
 
@@ -127,9 +129,11 @@ Pasa `getSignal(c)` al `fetch` que llama al modelo, de modo que la llamada se de
 El inicio de sesión mediante enlace mágico (magic link) y código de correo electrónico requiere un servicio de correo electrónico. Configura `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` y `SMTP_FROM` (`rebase cloud env set` en Cloud). Sin ellos, la ruta responde con 503 y `rebase cloud status` informa `blockedOn: email_not_configured`.
 
 ## 8. Desplegar
+<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 ```bash
 rebase cloud projects create --name Triptelier --link
 rebase cloud deploy
-rebase cloud db query --file backend/sql/introspected-left-behind.sql
 ```
+
+El despliegue aplica `backend/sql` igual que `rebase db push`: el bundle incluye los archivos, y el arranque de la nueva revisión ejecuta una sola vez cada archivo nuevo o modificado, después de las tablas y antes de las políticas. Un archivo que falla detiene el arranque y nombra el archivo, de modo que un error en uno se ve en el despliegue, no en una aplicación en marcha.

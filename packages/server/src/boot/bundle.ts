@@ -54,6 +54,12 @@ export interface LoadedBundle {
      */
     uiConfigFile?: string;
     /**
+     * Absolute path to the project's `backend/sql` (the bundle's copy,
+     * `entry.sql`, or the source directory for `rebase dev`), applied by a
+     * provisioning boot. Absent when there is none.
+     */
+    sqlDir?: string;
+    /**
      * Built static apps to serve from this process, in mount order.
      *
      * A list, not a single directory: one process serves a site at `/` and an
@@ -320,6 +326,7 @@ export function loadBundle(bundleDir: string): LoadedBundle {
         functionsDir: resolveEntry(entry.functions, "functions"),
         cronsDir: resolveEntry(entry.crons, "crons"),
         uiConfigFile: resolveEntry(entry.uiConfig, "uiConfig"),
+        sqlDir: resolveEntry(entry.sql, "sql"),
         staticApps: (entry.static ?? [])
             .map((item): LoadedStaticApp | undefined => {
                 // Before the directory check, so a bad hostname is reported
@@ -620,6 +627,9 @@ createdAt: new Date().toISOString() }
         hooksModule: resolveModule(hooks),
         functionsDir: resolve(options.functions),
         cronsDir: resolve(options.crons),
+        // Beside the tables directory, where `rebase db push` reads it, so
+        // `rebase dev` applies the same files a deploy will.
+        sqlDir: resolve(path.join(path.dirname(tables), "sql")),
         staticApps: sourceStaticApps(dir)
     };
 }

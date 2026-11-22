@@ -1,5 +1,5 @@
 ---
-sourceHash: b0a8aee611208b26
+sourceHash: b8772b5c20745be6
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, samt HTTP-Status, Bedeutung und Behebung – plus Response-Envelope, X-Request-ID und die Regeln für Details.
@@ -81,6 +81,7 @@ Das Senden einer eigenen ID ermöglicht es einem Trace, Netzwerkhops zu überste
 | `EMAIL_EXISTS` | 409 | Ein Konto mit dieser Adresse existiert bereits – bei der Registrierung, bei einer Adressänderung oder beim Aufrufen eines Links zur Adressänderung, wenn ein anderes Konto die Adresse zwischenzeitlich belegt hat. | Melden Sie sich an oder starten Sie das Zurücksetzen des Passworts; wählen Sie bei einer Adressänderung eine andere Adresse. |
 | `EMAIL_NOT_CONFIGURED` | 503 | Magic Links oder OTP wurden angefordert, aber der Server verfügt über keinen E-Mail-Transport. | Konfigurieren Sie SMTP oder verwenden Sie eine andere Anmeldemethode. |
 | `EMAIL_NOT_VERIFIED` | 403 | Eine OAuth-Anmeldung hat ein Konto mit derselben Adresse gefunden, aber der Provider hat diese Adresse nicht verifiziert, daher ist sie nicht verknüpft. | Melden Sie sich mit der bestehenden Methode an, dann `POST /auth/link/<provider>`. |
+| `CSRF_REFUSED` | 403 | Der CSRF-Schutz ist aktiv (`csrf: { origin }`), und eine Anfrage ohne `Authorization`-Header kam von einem Origin, der nicht auf der Liste steht: ein cookie-authentifizierter Formular-Post von einer anderen Website oder eine Anfrage ohne Body und ohne `Origin`. | Senden Sie sie von einem erlaubten Origin, mit einem JSON-Body oder mit einem `Authorization`-Header. |
 | `FACTOR_NOT_VERIFIED` | 400 | Der MFA-Faktor wurde registriert, aber nie bestätigt. | Bestätigen Sie den Faktor. |
 | `ID_EXISTS` | 409 | Ein Konto besitzt bereits die ID, die ein Konto-Import beibehalten möchte (`POST /api/admin/users/import`). Der Import meldet dies als `skipped` und lässt das Konto unverändert. | Nichts, falls das Konto zuvor importiert wurde. Andernfalls lassen Sie `id` weg oder wählen Sie eine andere. |
 | `IDENTITY_ALREADY_LINKED` | 409 | Diese OAuth-Identität gehört bereits zu einem anderen Konto. | Melden Sie sich damit an oder trennen Sie die Verknüpfung dort zuerst. |

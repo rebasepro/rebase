@@ -1661,6 +1661,28 @@ export interface BackendBootstrapper {
     ): Promise<{ applied: number }>;
 
     /**
+     * Apply the project's own SQL — `backend/sql/*.sql`, the functions,
+     * triggers and CHECKs a table declaration cannot say — as `rebase db push`
+     * does: in file-name order, each new or changed file once, in its own
+     * transaction, recorded by hash. This is how a deploy applies them.
+     *
+     * `dir` is the directory the boot found (a bundle carries it); without one
+     * the adapter falls back to the directory it was constructed with, and
+     * with neither there is nothing to do. Runs after auth initialization and
+     * before {@link ensureTablePolicies}, on the default source only, so a file
+     * may call `rebase.uid()` and a policy may call a function a file defines.
+     *
+     * MUST be safe for several instances booting at once (each file applied
+     * once), and MUST throw, naming the file, when one fails: the boot fails
+     * rather than serve a half-applied schema.
+     */
+    ensureSqlFiles?(
+        dir: string | undefined,
+        driverResult?: InitializedDriver,
+        log?: (message: string) => void
+    ): Promise<SqlFilesOutcome>;
+
+    /**
      * Create the RLS helper functions on this source's database. See
      * `DatabaseAdapter.ensureRlsRuntime`; needed on every source that is not
      * the default, whose helpers arrive with the auth tables.
@@ -1869,3 +1891,16 @@ export interface AuthSchemaHealth {
     /** Auth schema version this runtime expects. */
     runtimeVersion?: number;
 }
+
+/** What {@link BackendBootstrapper.ensureSqlFiles} did with `backend/sql`. */
+export interface SqlFilesOutcome {
+    /** The directory read, or `undefined` when there was none to read. */
+    dir?: string;
+    /** Files run by this call, in order. */
+    applied: string[];
+    /** Files already applied at their current content (by an earlier boot, a push, or another instance). */
+    unchanged: string[];
+    /** Recorded as applied but no longer present. Nothing they did is undone. */
+    removed: string[];
+}
+

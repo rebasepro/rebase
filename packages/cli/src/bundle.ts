@@ -1389,6 +1389,32 @@ export function bundleUiConfig(projectRoot: string, outDir: string): { source: s
     return { source, entry: BUNDLED_UI_CONFIG };
 }
 
+/**
+ * Copy the project's `backend/sql/*.sql` — beside the tables directory, where
+ * `rebase db push` reads it — into the bundle at the same relative path, for
+ * `entry.sql`: the runtime applies these at boot, after auth and before the
+ * policies, as a push does. Drafts (`_`-prefixed) are left out, because
+ * nothing applies them. Returns the entry and each file's hash, in the order
+ * they apply; nothing when there are none.
+ */
+export async function bundleSqlFiles(
+    projectRoot: string,
+    tablesDir: string,
+    outDir: string
+): Promise<{ entry: string; files: { name: string; hash: string }[] } | undefined> {
+    const sourceDir = path.join(path.dirname(path.resolve(projectRoot, tablesDir)), "sql");
+    if (!fs.existsSync(sourceDir)) return undefined;
+    // The driver's reader, so the build carries exactly what a push applies.
+    const { readSqlFiles } = await import("@rebasepro/server-postgres");
+    const files = readSqlFiles(sourceDir);
+    if (files.length === 0) return undefined;
+    const entry = path.relative(projectRoot, sourceDir).split(path.sep).join("/");
+    const target = path.join(outDir, entry);
+    fs.mkdirSync(target, { recursive: true });
+    for (const file of files) fs.writeFileSync(path.join(target, file.name), file.sql, "utf8");
+    return { entry, files: files.map(file => ({ name: file.name, hash: file.hash })) };
+}
+
 /** What `composeBundleManifest` needs: every input, already resolved. */
 export interface ComposeManifestInput {
     runtimeRange: string;
@@ -1404,6 +1430,8 @@ export interface ComposeManifestInput {
     resources: ResourceGraph | undefined;
     declaredDeps: Record<string, string>;
     build: RebaseBundleManifest["build"];
+    /** `backend/sql`'s files and hashes, when the bundle carries any. */
+    sqlFiles?: { name: string; hash: string }[];
 }
 
 /**
@@ -1431,6 +1459,7 @@ export function composeBundleManifest(input: ComposeManifestInput): RebaseBundle
         entry: input.entry,
         tables: [...input.tableSlugs].sort(),
         ...(input.functions.length > 0 ? { functions: input.functions } : {}),
+        ...(input.sqlFiles && input.sqlFiles.length > 0 ? { sqlFiles: input.sqlFiles } : {}),
         hooks: {
             native: input.nativeModules.length > 0,
             nativeModules: input.nativeModules.length > 0 ? input.nativeModules : undefined
@@ -1674,6 +1703,10 @@ stdio: toolStdio(options.quietStdout) });
     const uiConfig = bundleUiConfig(projectRoot, outDir);
     if (uiConfig) log(options, chalk.dim(`  carried ${path.relative(projectRoot, uiConfig.source)} for the server's views`));
 
+    // The SQL a table declaration cannot say, for the boot to apply.
+    const sql = await bundleSqlFiles(projectRoot, paths.tables, outDir);
+    if (sql) log(options, chalk.dim(`  carried ${sql.files.length} SQL file(s) from ${sql.entry}, applied at boot`));
+
     // What is in the functions directory, and what each one needs from its
     // host. Read from the *source*, not the compiled output, because the answer
     // is about imports and `tsc` has already resolved some of them away.
@@ -1717,7 +1750,8 @@ stdio: toolStdio(options.quietStdout) });
             functions: relative(paths.functions),
             crons: relative(paths.crons),
             schema: relative(schemaOut),
-            ...(uiConfig && { uiConfig: uiConfig.entry })
+            ...(uiConfig && { uiConfig: uiConfig.entry }),
+            ...(sql && { sql: sql.entry })
         },
         tableSlugs: tables.map(table => table.slug),
         functions: bundledFunctions,
@@ -1725,6 +1759,7 @@ stdio: toolStdio(options.quietStdout) });
         declaresStorageAuthorize,
         resources: resourceGraph,
         declaredDeps: declared,
+        sqlFiles: sql?.files,
         build: {
             cli: cliVersion(),
             node: process.versions.node.split(".")[0],

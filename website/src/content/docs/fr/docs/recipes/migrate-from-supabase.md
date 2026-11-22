@@ -1,5 +1,5 @@
 ---
-sourceHash: eda5c036273f52d9
+sourceHash: 6670d26e763252ab
 title: "Recette : Migrer depuis Supabase"
 sidebar_label: Migrer depuis Supabase
 description: "Migrez un projet Supabase vers Rebase : introspectez le schéma, appliquez les objets SQL qui ne sont pas des tables, copiez les données en conservant les identifiants utilisateurs, portez les fonctions edge et déployez, le tout depuis la CLI."
@@ -44,7 +44,8 @@ de type text : comparer une colonne `uuid` avec `rebase.uid()` dans une policy �
 
 L'exécution se termine par la liste de ce qui n'a **pas** été reporté (fonctions,
 déclencheurs, extensions, contraintes CHECK, autres index, clés étrangères composites)
-et écrit le SQL correspondant dans `backend/sql/introspected-left-behind.sql`.
+et écrit le SQL correspondant dans `backend/sql/_introspected-left-behind.sql`, un
+brouillon que `rebase db push` n'applique pas tant que vous ne le renommez pas.
 
 ## 2. Pointer le projet vers la nouvelle base de données
 
@@ -57,17 +58,19 @@ rebase db push
 ```
 
 ## 3. Appliquer les objets SQL
+<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
-Modifiez `backend/sql/introspected-left-behind.sql` de la même manière que les tables ont été
+Modifiez `backend/sql/_introspected-left-behind.sql` de la même manière que les tables ont été
 modifiées : `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, pas de
 `GRANT … TO anon, authenticated`. Les fonctions qui faisaient appel à `pg_net` sont plus adaptées sous forme de
-[fonction personnalisée](/docs/backend/custom-functions/). Appliquez-le ensuite :
+[fonction personnalisée](/docs/backend/custom-functions/). Rendez chaque instruction réexécutable sans risque (`DROP TRIGGER IF EXISTS` avant chaque `CREATE TRIGGER`), puis renommez le fichier sans le `_` initial et poussez :
 
 ```bash
-psql "$DATABASE_URL" -f backend/sql/introspected-left-behind.sql
-# on Rebase Cloud, with no local psql:
-rebase cloud db query --file backend/sql/introspected-left-behind.sql
+mv backend/sql/_introspected-left-behind.sql backend/sql/introspected.sql
+rebase db push
 ```
+
+`rebase db push` applique chaque fichier `.sql` de `backend/sql` dans l'ordre de leur nom, après les tables et avant les policies, et enregistre chacun par son hachage dans `rebase.sql_files`, de sorte qu'un fichier ne s'exécute à nouveau que lorsqu'il change. Un déploiement les applique de la même manière (étape 8).
 
 Une fonction appelée par le navigateur avec `supabase.rpc('fn')` est déclarée avec
 <span class="since-badge" data-since="0.35">Depuis 0.35</span> [`defineRpc`](/docs/backend/rpc/), aux côtés des tables. Elle est ensuite servie sur
@@ -167,9 +170,11 @@ sur Cloud). Sans ces variables, la route répond 503, et `rebase cloud status`
 indique `blockedOn: email_not_configured`.
 
 ## 8. Déployer
+<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 ```bash
 rebase cloud projects create --name Triptelier --link
 rebase cloud deploy
-rebase cloud db query --file backend/sql/introspected-left-behind.sql
 ```
+
+Le déploiement applique `backend/sql` comme le fait `rebase db push` : le bundle transporte les fichiers, et le démarrage de la nouvelle révision exécute une seule fois chacun de ceux qui sont nouveaux ou modifiés, après les tables et avant les policies. Un fichier qui échoue arrête le démarrage et est nommé, de sorte qu'une erreur dans l'un d'eux apparaît lors du déploiement, et non dans une application en cours d'exécution.

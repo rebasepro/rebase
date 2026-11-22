@@ -1,5 +1,5 @@
 ---
-sourceHash: eda5c036273f52d9
+sourceHash: 6670d26e763252ab
 title: "Ricetta: Migrazione da Supabase"
 sidebar_label: Migrazione da Supabase
 description: "Trasferisci un progetto Supabase su Rebase: esegui l'introspezione dello schema, applica gli oggetti SQL che non sono tabelle, copia i dati mantenendo gli ID utente, porta le edge function ed effettua il deploy, tutto dalla CLI."
@@ -33,7 +33,7 @@ rebase schema introspect --database-url "$SUPABASE_DB_URL" --from supabase
 
 Le colonne degli ID utente diventano `text` perché `rebase.users.id` e `rebase.uid()` sono di tipo text: il confronto tra una colonna `uuid` e `rebase.uid()` in una policy fallisce.
 
-L'esecuzione termina con un elenco di ciò che **non** è stato trasferito (funzioni, trigger, estensioni, vincoli CHECK, altri indici, chiavi esterne composite) e scrive l'SQL corrispondente in `backend/sql/introspected-left-behind.sql`.
+L'esecuzione termina con un elenco di ciò che **non** è stato trasferito (funzioni, trigger, estensioni, vincoli CHECK, altri indici, chiavi esterne composite) e scrive l'SQL corrispondente in `backend/sql/_introspected-left-behind.sql`, una bozza che `rebase db push` non applica finché non la rinomini.
 
 ## 2. Punta il progetto al nuovo database
 
@@ -44,14 +44,16 @@ rebase db push
 ```
 
 ## 3. Applica gli oggetti SQL
+<span class="since-badge" data-since="0.35">Da 0.35</span>
 
-Modifica `backend/sql/introspected-left-behind.sql` nello stesso modo in cui sono state modificate le tabelle: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, nessun `GRANT … TO anon, authenticated`. Le funzioni che chiamavano `pg_net` funzionano meglio come [custom function](/docs/backend/custom-functions/). Quindi applicalo:
+Modifica `backend/sql/_introspected-left-behind.sql` nello stesso modo in cui sono state modificate le tabelle: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, nessun `GRANT … TO anon, authenticated`. Le funzioni che chiamavano `pg_net` funzionano meglio come [custom function](/docs/backend/custom-functions/). Rendi ogni istruzione rieseguibile senza danni (`DROP TRIGGER IF EXISTS` prima di ogni `CREATE TRIGGER`), poi rinomina il file senza il `_` iniziale ed esegui il push:
 
 ```bash
-psql "$DATABASE_URL" -f backend/sql/introspected-left-behind.sql
-# on Rebase Cloud, with no local psql:
-rebase cloud db query --file backend/sql/introspected-left-behind.sql
+mv backend/sql/_introspected-left-behind.sql backend/sql/introspected.sql
+rebase db push
 ```
+
+`rebase db push` applica ogni file `.sql` in `backend/sql` in ordine alfabetico di nome, dopo le tabelle e prima delle policy, e registra ciascuno per hash in `rebase.sql_files`, così un file viene eseguito di nuovo solo quando cambia. Un deploy li applica allo stesso modo (passo 8).
 
 Una funzione che il browser chiamava con `supabase.rpc('fn')` viene dichiarata con <span class="since-badge" data-since="0.35">Da 0.35</span> [`defineRpc`](/docs/backend/rpc/), accanto alle tabelle. Viene quindi servita all'indirizzo `POST /api/rpc/<name>` ed eseguita come il chiamante sotto row-level security, così una funzione `SECURITY DEFINER` si comporta come faceva su Supabase:
 
@@ -127,9 +129,11 @@ Passa `getSignal(c)` alla `fetch` che chiama il modello, in modo che la chiamata
 L'accesso tramite magic link e codice via email richiede un servizio email. Imposta `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` e `SMTP_FROM` (`rebase cloud env set` su Cloud). Senza queste variabili la route restituisce 503 e `rebase cloud status` segnala `blockedOn: email_not_configured`.
 
 ## 8. Deploy
+<span class="since-badge" data-since="0.35">Da 0.35</span>
 
 ```bash
 rebase cloud projects create --name Triptelier --link
 rebase cloud deploy
-rebase cloud db query --file backend/sql/introspected-left-behind.sql
 ```
+
+Il deploy applica `backend/sql` come fa `rebase db push`: il bundle include i file, e all'avvio la nuova revisione esegue una sola volta ciascun file nuovo o modificato, dopo le tabelle e prima delle policy. Un file che fallisce ferma l'avvio e ne indica il nome, così un errore in uno di essi emerge nel deploy e non in un'app già in esecuzione.

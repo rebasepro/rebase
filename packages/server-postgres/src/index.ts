@@ -44,6 +44,16 @@ export * from "./open-rebase";
 export { assertDbCommandLine } from "./db-command-line";
 
 /**
+ * `backend/sql/*.sql`: which files apply (drafts are `_`-prefixed), read with
+ * their hashes — what `rebase build` carries in a bundle and records in its
+ * manifest — and the applier `rebase db push` and a provisioning boot share.
+ */
+export { readSqlFiles, isDraftSqlFile, sqlFilesDir } from "./schema/sql-files";
+export type { SqlFile, SqlFilesPlan } from "./schema/sql-files";
+export { applySqlFilesOn, SqlFileError, SQL_FILES_LOCK_KEY } from "./schema/sql-files-apply";
+export type { SqlFilesSession } from "./schema/sql-files-apply";
+
+/**
  * Whether the migration files still build what the collections declare —
  * offline, without Atlas or a dev database. `rebase verify` runs it after every
  * collection edit and in CI.

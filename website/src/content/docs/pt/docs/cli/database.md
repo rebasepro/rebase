@@ -1,5 +1,5 @@
 ---
-sourceHash: 535fb9801df93ad9
+sourceHash: 231870126ca746bf
 title: Comandos de Banco de Dados
 sidebar_label: Comandos de Banco de Dados
 description: Os comandos rebase db — push, generate e migrate, backups e restaurações, extração de cópia, a string de conexão, o banco de dados de desenvolvimento gerenciado e branches.
@@ -39,6 +39,28 @@ views, índices que você criou e as restrições CHECK e EXCLUDE em uma tabela 
 que uma declaração não pode expressar. Consulte
 [`rebase db push`](/docs/cli/schema/#rebase-db-push) para saber o que ele aplica e
 antes do que ele para.
+
+O SQL que uma declaração de tabela não consegue expressar (funções, triggers,
+restrições CHECK, grants) vai em `backend/sql/*.sql`. O push aplica esses arquivos
+em ordem alfabética de nome, depois das tabelas e views e antes das políticas, de
+modo que uma política pode chamar uma função definida por um arquivo. Cada arquivo é
+registrado por nome e hash em `rebase.sql_files` e só roda novamente quando muda,
+em sua própria transação: um arquivo que falha sofre rollback e interrompe o push.
+Escreva arquivos que sejam seguros para executar de novo (`CREATE OR REPLACE FUNCTION`,
+`DROP TRIGGER IF EXISTS` antes de `CREATE TRIGGER`). Um arquivo cujo nome começa com
+`_` é um rascunho e não é aplicado. Remover um arquivo não desfaz nada do que ele
+fez. `--dry-run` lista os arquivos que seriam aplicados.
+
+Um deploy aplica os mesmos arquivos: `rebase build` os leva no bundle, e o boot do
+servidor executa cada um que seja novo ou tenha mudado, depois das tabelas e da
+autenticação e antes das políticas, registrados no mesmo `rebase.sql_files`. A
+transação de cada arquivo adquire primeiro um advisory lock, de modo que várias
+instâncias iniciando juntas, ou um push durante um deploy, executam cada arquivo uma
+única vez. Um arquivo pode rodar por até 15 minutos. Um arquivo que falha interrompe
+o boot e informa o nome do arquivo. O `rebase dev` também os aplica no boot. Uma
+aplicação que monta seu próprio backend indica o diretório com
+`createPostgresAdapter({ sqlDir: "backend/sql" })`. Nada é aplicado com
+`REBASE_PROVISION=false` ou `REBASE_MIGRATE_ON_BOOT=none`.
 
 :::caution
 O `db push` modifica o banco de dados diretamente sem arquivos de migração. Use `db generate` + `db migrate` para produção.

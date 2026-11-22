@@ -1223,6 +1223,17 @@ export interface RebaseBundleEntrypoints {
      */
     uiConfig?: string;
     /**
+     * The project's `backend/sql` — the functions, triggers and CHECKs a table
+     * declaration cannot say — copied as is (drafts, `_`-prefixed, left out).
+     * The runtime applies it at boot, after auth and before the policies, as
+     * `rebase db push` does: each new or changed file once, in name order,
+     * recorded by hash in `rebase.sql_files`.
+     *
+     * Optional and additive within format 3: absent when the project has no
+     * such files, and on bundles built before it existed.
+     */
+    sql?: string;
+    /**
      * Built static apps to serve from this process, in declaration order.
      *
      * A list rather than a single directory because one process serves several
@@ -1416,6 +1427,13 @@ export interface RebaseBundleManifest {
      * consumer must treat it as optional rather than as an empty list.
      */
     functions?: RebaseBundleFunction[];
+    /**
+     * The files in `entry.sql`, in the order they are applied, with the
+     * SHA-256 of each — what `rebase.sql_files` records once a boot has
+     * applied it. For inspection: a host can tell which files a deploy will
+     * run without opening the bundle. Absent when the bundle carries none.
+     */
+    sqlFiles?: { name: string; hash: string }[];
     hooks: {
         /**
          * Whether the dependency closure contains native code.

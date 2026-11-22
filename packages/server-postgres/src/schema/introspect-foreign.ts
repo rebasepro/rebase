@@ -167,8 +167,9 @@ export function objectsLeftBehind(objects: readonly DatabaseObjectRow[]): LeftBe
 export function renderLeftBehindSql(schema: string, items: readonly LeftBehind[]): string {
     const lines = [
         `-- Objects \`rebase schema introspect\` did not carry over from schema "${schema}".`,
-        "-- Review each one, then apply after `rebase db push`:",
-        "--   psql \"$DATABASE_URL\" -f this-file.sql      (or `rebase cloud db query --file this-file.sql`)",
+        "-- A draft: `rebase db push` does not apply a file whose name starts with `_`.",
+        "-- Review each one, make it safe to run again (DROP TRIGGER IF EXISTS before CREATE TRIGGER),",
+        "-- then rename the file without the `_`: every push applies it, and again whenever it changes.",
         "-- Functions that referenced Supabase (auth.uid(), auth.users, roles anon/authenticated)",
         "-- need the same edits the tables got: rebase.uid(), the users table, no such roles.",
         ""

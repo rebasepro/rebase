@@ -76,6 +76,12 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
                 bootstrapper.ensureTablePolicies!(collections, driverResult, log)
             : undefined,
 
+        // The project's backend/sql. Dropped, a deploy boots without the
+        // functions and triggers it ships, and says nothing.
+        ensureSqlFiles: bootstrapper.ensureSqlFiles
+            ? (dir, driverResult, log) => bootstrapper.ensureSqlFiles!(dir, driverResult, log)
+            : undefined,
+
         finalizeSecurityPosture: bootstrapper.finalizeSecurityPosture
             ? (driverResult) => bootstrapper.finalizeSecurityPosture!(driverResult)
             : undefined,

@@ -26,7 +26,7 @@ class TableRegistry { authTable, get, list, named, replaceAll, revision, setHook
 class TransformCache { buildKey, get, set }
 class TusHandler { create, delete, head, options, patch, startCleanup }
 class UnknownStorageSourceError { knownKeys, storageId }
-class WebhookDispatcher { deliverQueuedJob, enqueueEntityChange, flush, onEntityChange, sendTest, setWebhooks }
+class WebhookDispatcher { deliverQueuedJob, enqueueEntityChange, flush, onEntityChange, sendTest, setWebhooks, watchesTable }
 const ACCOUNT_SCOPED_STORAGE_BASES
 const BATCH_REF_KEY
 const CONCURRENT_DDL_SQLSTATES
@@ -71,7 +71,7 @@ const looksLikeFieldOp
 const optionalAuth
 const policy { and, authClaim, authRoles, authUid, authenticated, compare, existsIn, false, field, literal, not, or, outerField, raw, registered, rolesContain, rolesOverlap, serverContext, true }
 const queryTokenAuth
-const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, push, resolveToken, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, sqlAsAdmin, storage, storageRegistry, ws }
+const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, push, resolveToken, rpc, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, sqlAsAdmin, storage, storageRegistry, ws }
 const rel { belongsTo, hasMany, hasOne, manyToMany, via }
 const requireAdmin
 const requireAuth
@@ -155,6 +155,7 @@ function defaultBackoff
 function defineAuthTable
 function defineCron
 function defineFunction
+function defineRpc
 function defineTable
 function defineView
 function describeMismatch
@@ -162,6 +163,7 @@ function devEmailSinkFor
 function drainBackgroundWork
 function envSuffixForKey
 function escapeHtml
+function extractDbError
 function extractLinks
 function extractUserFromToken
 function generateSecurePassword
@@ -190,6 +192,7 @@ function hasFieldOps
 function hasRole
 function hasScope
 function hashPassword
+function honoHttpExceptionStatus
 function html
 function httpMethodToOperation
 function identityResolved
@@ -214,6 +217,7 @@ function isDuplicateObjectRace
 function isErrorStatus
 function isLocalhostOrigin
 function isNodeRuntime
+function isRpcDef
 function isSchemaLoadError
 function isTableDef
 function isTopologyEnvVar
@@ -308,6 +312,7 @@ interface AccessControl { model, resolveKeyOwner }
 interface AccessTokenPayload { aal, amr, claims, displayName, email, exp, iat, isAnonymous, mfa_verified, photoURL, roles, sid, uid }
 interface AccountAccessState { disabled, roles, sessionActive, tokensValidAfter }
 interface AmbientTransaction { afterCommit, exec }
+interface AnyRpcDef { brand, config, name }
 interface AnyTableDef { auth, brand, config, name }
 interface AnyViewDef { brand, config, name }
 interface ApiKey { created_at, created_by, expires_at, id, key_hash, key_prefix, kind, last_used_at, name, owner_uid, rate_limit, revoked_at, roles, scopes, updated_at }
@@ -347,7 +352,7 @@ interface ContractRoutesConfig { runtimeVersion, schemaTables }
 interface CountOptions { databaseId, filter, logical, searchString }
 interface CreateApiKeyRequest { expires_at, name, rate_limit, roles, scopes }
 interface CreatePersonalKeyRequest { expires_at, name, scopes }
-interface CreateUserData { displayName, email, emailVerified, isAnonymous, metadata, passwordHash, photoUrl }
+interface CreateUserData { createdAt, displayName, email, emailVerified, id, isAnonymous, metadata, passwordHash, photoUrl }
 interface CronJobPersistedState { enabled, runningBy }
 interface CronJobRunSummary { lastDurationMs, lastError, lastRunAt, lastSuccess, totalFailures, totalRuns }
 interface CronLogSweep { counted, deleted }
@@ -356,7 +361,8 @@ interface DataRepository { checkUniqueField, count, delete, fetchCollection, fet
 interface DatabaseConnection { close, isConnected, type }
 interface DdlBootstrapper { ensureObject, isReadable, step }
 interface DeclaredErrorAnswer { code, details, expected, message, status }
-interface DeclaredTables { defs, descriptors, source, tables }
+interface DeclaredTables { defs, descriptors, rpc, source, tables }
+interface DefineFunctionOptions { timeoutMs }
 interface DevEmailSink { clear, list, sendEmail }
 interface DriverConnection { connectionString, db, pool, query }
 interface DriverRegistry { get, getDefault, getOrDefault, has, list, register, size }
@@ -367,6 +373,7 @@ interface EmailService { isConfigured, send, verifyConnection }
 interface EnqueueOptions { delayMs, idempotencyKey, maxAttempts }
 interface ErrorResponse { error }
 interface FetchCollectionOptions { databaseId, filter, limit, offset, order, orderBy, searchString, startAfter }
+interface FunctionTimeoutControl { declare }
 interface FunctionUser { email, roles, uid }
 interface GCSStorageConfig { allowedMimeTypes, bucket, credentials, keyFilename, maxFileSize, projectId, type }
 interface GoogleProviderConfig { clientId, clientSecret }
@@ -389,11 +396,11 @@ interface ListUsersOptions { limit, offset, orderBy, orderDir, roleId, search }
 interface LiveSchemaConfig { allowMachineApply, repository }
 interface LoadBackendSchemaOptions { importModule, projectRoot }
 interface LoadDirectoryOptions { importModule, onSkip }
-interface LoadedBundle { cronsDir, dir, functionsDir, hooksModule, isSource, isZeroCode, manifest, resourcesModule, staticApps, storageModule, tablesDir, uiConfigFile }
+interface LoadedBundle { cronsDir, dir, functionsDir, hooksModule, isSource, isZeroCode, manifest, resourcesModule, sqlDir, staticApps, storageModule, tablesDir, uiConfigFile }
 interface LoadedCronJob { definition, id }
 interface LoadedFunction { app, name }
 interface LoadedFunctions { functions, problems }
-interface LoadedSchema { defaultRls, defs, dir, indexFile }
+interface LoadedSchema { defaultRls, defs, dir, indexFile, rpc }
 interface LocalStorageConfig { allowedMimeTypes, basePath, baseUrl, implicit, maxFileSize, standsInFor, type }
 interface Logger { child, debug, error, info, warn }
 interface MagicLinkTokenInfo { expiresAt, uid }
@@ -417,6 +424,7 @@ interface PasswordResetTokenInfo { expiresAt, uid }
 interface PasswordValidationResult { errors, valid }
 interface PendingEmailChange { email, sentAt }
 interface PgEnum { enumName, enumValues }
+interface PgLikeError { address, code, column, constraint, detail, hint, message, port, schema, table }
 interface ProvisionOptions { realtime, tables }
 interface PushDelivery { body, statusCode }
 interface PushOptions { allowedHosts, sender, vapid }
@@ -436,10 +444,10 @@ interface RealtimeProvider { counts, destroy, health, notifyUpdate, onServerRead
 interface RebaseApiError { code, details, statusCode }
 interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, captcha, cookieAuth, defaultRole, deviceLogin, disableSelfRegistration, discord, email, emailOtp, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, magicLinkCreatesUsers, microsoft, providers, refreshExpiresIn, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireAuth, requireEmailVerification, serviceKey, signingKeys, slack, spotify, twitter }
 interface RebaseBackend { attachRealtime, auth, cronScheduler, driver, driverRegistry, fetch, getTableDescriptor, getTableDescriptors, healthCheck, history, jobQueue, metricsHistory, mount, realtimeService, realtimeServices, rebase, reloadSchema, routes, services, setTableHooks, shutdown, start, storageController, storageRegistry, verifyCredential }
-interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, defaultRls, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, hooks, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provisionSchema, provisioningDriverResult, push, rateLimit, requireFilesLoaded, rlsAudit, runtimeVersion, schemaDir, schemaEditor, schemaTables, schemaVersion, server, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces, tables, uiConfigFile }
-interface RebaseBackendOptions { auth, baas, bootstrappers, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, defaultRls, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, hooks, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provision, provisioningDriverResult, push, rateLimit, requireFilesLoaded, rlsAudit, runtimeVersion, schemaDir, schemaEditor, schemaTables, schemaVersion, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces, tables, uiConfigFile }
+interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, defaultRls, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, hooks, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provisionSchema, provisioningDriverResult, push, rateLimit, requireFilesLoaded, rlsAudit, rpc, runtimeVersion, schemaDir, schemaEditor, schemaTables, schemaVersion, server, sqlDir, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces, tables, uiConfigFile }
+interface RebaseBackendOptions { auth, baas, bootstrappers, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, defaultRls, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, hooks, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provision, provisioningDriverResult, push, rateLimit, requireFilesLoaded, rlsAudit, rpc, runtimeVersion, schemaDir, schemaEditor, schemaTables, schemaVersion, sqlDir, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces, tables, uiConfigFile }
 interface RebaseFunctionContext { rebase }
-interface RebaseRoutes { admin, auth, cron, data, functions, meta, push, schema, storage }
+interface RebaseRoutes { admin, auth, cron, data, functions, meta, push, rpc, schema, storage }
 interface RecoveryCode { id, uid, usedAt }
 interface RefreshTokenInfo { aal, createdAt, expiresAt, id, ipAddress, method, revoked, rotatedAt, sessionId, sessionStartedAt, tokenHash, uid, userAgent }
 interface RefreshTokenSession { aal, id, method, rotatedFrom, startedAt }
@@ -454,6 +462,9 @@ interface RlsAuditStatus { enabled, lastError, lastRunAt, reason, result }
 interface RlsDescriptor { declaredDefaultPolicies, defaultPolicies, inherited, junctions, policies, posture, required, rules }
 interface RlsScanFinding { id, severity, target, title }
 interface RlsScanResult { database, findings, scannedAt, stats }
+interface RpcConfig { access, args, description, rateLimit, schema, write }
+interface RpcDef { brand, config, name }
+interface RpcRateLimit { limit, windowMs }
 interface S3StorageConfig { accessKeyId, allowedMimeTypes, bucket, endpoint, forcePathStyle, maxFileSize, region, secretAccessKey, type }
 interface SMTPConfig { auth, host, maxConnections, name, port, secure, timeoutMs }
 interface SchemaProvisioningOptions { provision }
@@ -561,6 +572,9 @@ type ResourceResolution
 type RlsPosture
 type RlsScanner
 type RlsSeverity
+type RpcAccess
+type RpcArgs
+type RpcArgsShape
 type SchemaModuleImporter
 type SecurityOperation
 type SecurityRule
@@ -603,11 +617,13 @@ const DEFAULT_DATA_SOURCE_KEY
 const DEFAULT_FILTERABLE_RELATION_KINDS
 const DEFAULT_FUZZY_THRESHOLD
 const DEFAULT_LIST_LIMIT
+const DEFAULT_PUBLIC_RPC_RATE_LIMIT { limit, windowMs }
 const DEFAULT_RESOURCE_KEY
 const DEFAULT_SEARCH_COLUMN
 const DEFAULT_SEARCH_LANGUAGE
 const DEFAULT_SEARCH_MODE
 const DEFAULT_SEARCH_WEIGHT
+const DEFAULT_STATIC_REDIRECT_STATUS
 const DEFAULT_STORAGE_SOURCE_KEY
 const DEFAULT_TENANT_BYPASS_ROLES
 const DEFAULT_VECTOR_LIST_LIMIT
@@ -627,8 +643,10 @@ const LEGACY_RLS_SCHEMA
 const LEGACY_RLS_UID_SQL
 const LEGACY_SCHEMA_VERSION_PREFIX
 const LIST_OPS
+const MAX_IMPORTED_USER_ID_LENGTH
 const MAX_INCLUDE_DEPTH
 const MAX_LIST_LIMIT
+const MAX_USERS_PER_IMPORT
 const MCP_APP_MODULES { @rebasepro/app, @rebasepro/cms, @rebasepro/ui, react, react/jsx-runtime }
 const NULL_OPS
 const POLICY_EXPRESSION_KINDS
@@ -647,6 +665,7 @@ const RLS_IS_REQUEST_ROLE_SQL
 const RLS_JWT_SQL
 const RLS_ROLES_SQL
 const RLS_UID_SQL
+const RPC_BRAND
 const RUNTIME_CONTRACT_VERSION
 const SCHEMA_VERSION_HEADER
 const SCOPE_TARGETS
@@ -654,6 +673,7 @@ const SIMULATED_CONTEXT_HEADER
 const SIMULATE_API_KEY_ID_HEADER
 const SIMULATE_ROLE_HEADER
 const SIMULATE_USER_ID_HEADER
+const STATIC_REDIRECT_STATUSES
 const STORAGE_REFERENCE_SCHEME
 const TABLE_BRAND
 const TABLE_OPTION_KEYS
@@ -671,9 +691,11 @@ function amendResourceKind
 function bucket
 function buildResourceGraph
 function canonicalSchemaPayload
+function cleanUrlFor
 function columnDefFromWire
 function columnTypeLabel
 function compareStaticRoutes
+function compileStaticRedirects
 function computeSchemaVersion
 function database
 function declareCron
@@ -688,6 +710,7 @@ function declaredRlsPolicyShape { adminPolicies, defaultPolicies, policyTarget }
 function declaredStorageSources
 function declaredSubscriptions
 function defineAuthTable
+function defineRpc
 function defineTable
 function defineView
 function describeJsonShape
@@ -701,6 +724,7 @@ function getDataSourceCapabilities
 function hasAdminRole
 function hasFieldOperation
 function holdsAdminRole
+function importedUserIdProblem
 function intersectScopes
 function isAdminScope
 function isAnonymousUid
@@ -724,10 +748,12 @@ function isRedactedSecurityRule
 function isRelationAggregateSort
 function isRelationDef
 function isResourceHandle
+function isRpcDef
 function isSQLAdmin
 function isSchemaAdmin
 function isSchemaEditingAdmin
 function isSqlTemplate
+function isStaticRedirectStatus
 function isStorageReference
 function isTableDef
 function isTablePatchList
@@ -808,13 +834,14 @@ function uiTablePreferencesProblems
 function unsupportedMethod
 function usesLegacyRlsFunctions
 function validateScopes
+function validateStaticRedirect
 function validateStaticRoute
 interface AccessModel { roles, scopes }
 interface AccessSimulation { apiKeyId, role, userId }
 interface AddColumnPatch { before, column, key, op, table }
 interface AddRelationPatch { name, op, relation, table }
 interface AddRulePatch { index, op, rule, table }
-interface AdminAPI { bootstrap, createUser, deleteUser, getUser, listRoles, listUsers, listUsersPaginated, resetPassword, updateUser }
+interface AdminAPI { bootstrap, createUser, deleteUser, getUser, importUsers, listRoles, listUsers, listUsersPaginated, resetPassword, updateUser }
 interface AdminGuest { createdAt, lastSeenAt, uid }
 interface AdminUser { createdAt, disabled, displayName, email, metadata, photoURL, providerId, roles, uid, updatedAt }
 interface AdoptTablePatch { op, table }
@@ -822,6 +849,7 @@ interface AggregateMeta { hasMore, limit, offset }
 interface AggregateParams { groupBy, limit, logical, offset, orderBy, searchString, select, where }
 interface AggregateResult { meta }
 interface AndPolicyExpression { kind, operands }
+interface AnyRpcDef { brand, config, name }
 interface AnyTableDef { auth, brand, config, name }
 interface AnyViewDef { brand, config, name }
 interface ApiKeyMasked { created_at, created_by, expires_at, id, key_prefix, kind, last_used_at, name, owner_uid, rate_limit, revoked_at, roles, scopes, updated_at }
@@ -852,7 +880,7 @@ interface AuthUserListResult { limit, offset, total, users }
 interface AuthenticatedPolicyExpression { kind }
 interface AuthenticatedSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface AuthenticatedUser { claims, displayName, email, isAdmin, isAnonymous, photoUrl, rawToken, roles, scopes, uid }
-interface BackendBootstrapper { ensureRlsRuntime, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readTablesSchemaVersion, runMigrations, stampTablesSchemaVersion, type, verifyConnection }
+interface BackendBootstrapper { ensureRlsRuntime, ensureSqlFiles, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readTablesSchemaVersion, runMigrations, stampTablesSchemaVersion, type, verifyConnection }
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider, tableRegistry }
 interface BackendLifecycle { destroy, healthCheck, initialize }
@@ -940,7 +968,7 @@ interface DataRateLimitCaller { apiKey, header, socketAddress, uid }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 interface DataSourceDefinition { databaseId, engine, key, label, transport }
-interface DatabaseAdapter { destroy, ensureRlsRuntime, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readTablesSchemaVersion, stampTablesSchemaVersion, type, verifyConnection }
+interface DatabaseAdapter { destroy, ensureRlsRuntime, ensureSqlFiles, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readTablesSchemaVersion, stampTablesSchemaVersion, type, verifyConnection }
 interface DatabaseAdapterInitConfig { baas, dataSourceKey, introspectCollections, provision, realtime, schemaProvisioning, tables }
 interface DatabaseConnection { close, isConnected, type }
 interface DatabaseHealthSample { connections, maxConnections, replicaLagSeconds, sizeBytes }
@@ -984,6 +1012,9 @@ interface HasOneDef { access, brand, foreignKey, kind, private, sourceKey, targe
 interface HasOptions { access, foreignKey, private, sourceKey }
 interface HealthCheckResult { details, healthy, latencyMs }
 interface HistoryRetentionConfig { maxEntries, ttlDays }
+interface ImportUserInput { createdAt, displayName, email, emailVerified, id, photoUrl, roles }
+interface ImportUsersRequest { dryRun, users }
+interface ImportUsersResult { created, dryRun, failed, results, skipped }
 interface IncludeOptions { count, fields, include, limit, logical, orderBy, where }
 interface IncludeOptionsFor { count, fields, include, limit, logical, orderBy, where }
 interface InitialColumnFlags { exposed, hasDefault, notNull, primaryKey, writable }
@@ -1048,18 +1079,19 @@ interface RealtimeProvider { counts, destroy, health, notifyUpdate, onServerRead
 interface RealtimeSocketOptions { accessModel, dataRateLimit, heartbeatIntervalMs, identityRecheckIntervalMs, maxPayload, maxSocketsPerUser, path, resolveApiKey, runInScope, verifyAccessToken }
 interface RealtimeSocketTotals { bytesIn, bytesOut, closeCodes, closedBy, framesIn, framesOut, opened, refused }
 interface RebaseBackendAppConfig { context, crons, dockerfile, functions, port, registerDatabase, runtime, schema, tables, type }
-interface RebaseBundleEntrypoints { crons, functions, hooks, resources, schema, static, storage, tables, uiConfig }
+interface RebaseBundleEntrypoints { crons, functions, hooks, resources, schema, sql, static, storage, tables, uiConfig }
 interface RebaseBundleFunction { file, name, portable, requires }
-interface RebaseBundleManifest { app, build, bundleFormat, deps, entry, functions, hooks, kind, resources, runtime, schemaVersion, storage, tables }
-interface RebaseBundleStatic { cms, dir, frameAncestors, host, name, path, routes, spa }
-interface RebaseClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, data, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, storage, storageRegistry, ws }
+interface RebaseBundleManifest { app, build, bundleFormat, deps, entry, functions, hooks, kind, resources, runtime, schemaVersion, sqlFiles, storage, tables }
+interface RebaseBundleStatic { cleanUrls, cms, dir, frameAncestors, host, name, path, redirects, routes, spa }
+interface RebaseClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, data, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, rpc, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, storage, storageRegistry, ws }
 interface RebaseErrorInit { cause, code, details, requestId, retryAfterSeconds, status }
 interface RebaseProjectContract { runtime, schemaVersion, tables }
 interface RebaseProjectLink { apiUrl, org, project }
 interface RebaseProjectManifest { $schema, apps, rebase, telemetry }
-interface RebaseServerClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, push, resolveToken, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, sqlAsAdmin, storage, storageRegistry, ws }
+interface RebaseServerClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, push, resolveToken, rpc, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, sqlAsAdmin, storage, storageRegistry, ws }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
-interface RebaseStaticAppConfig { build, cms, frameAncestors, output, path, root, routes, spa, type }
+interface RebaseStaticAppConfig { build, cleanUrls, cms, frameAncestors, output, path, redirects, root, routes, spa, type }
+interface RebaseStaticRedirect { from, host, query, status, to }
 interface RebaseStaticRoute { function, path }
 interface RebaseStorageSourceConfig { engine, label, transport }
 interface RebaseWebSocket { authenticate, disconnect, on, onStateChange, setAuthTokenGetter, state }
@@ -1093,6 +1125,9 @@ interface RolesContainPolicyExpression { kind, roles }
 interface RolesOnlySecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface RolesOverlapPolicyExpression { kind, roles }
 interface RowPrecondition { check, lock }
+interface RpcConfig { access, args, description, rateLimit, schema, write }
+interface RpcDef { brand, config, name }
+interface RpcRateLimit { limit, windowMs }
 interface SDKQueryBuilderInterface { after, aggregate, count, distinct, fields, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
 interface SDKTableClient { after, aggregate, count, create, create, createMany, delete, deleteMany, deleteWhere, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, listenCount, offset, orderBy, refresh, search, trash, update, update, updateMany, updateWhere, upsert, upsert, upsert, vectorSearch, where, where, where }
 interface SQLAdmin { executeSql, executeSqlTransaction, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase, listen, openSqlCursor, poolStats, probe, runSqlScript, sampleHealth }
@@ -1123,12 +1158,15 @@ interface SimulatedContext { apiKeyId, collection, maskedColumns, role, sub }
 interface SingleSubscriptionConfig { clientId, id, path }
 interface SingleUpdateMessage { channel, error, etag, payload, requestId, row, rows, subscriptionId, type }
 interface SqlCursor { close, columns, read }
+interface SqlFilesOutcome { applied, dir, removed, unchanged }
 interface SqlScriptColumn { name, source, type }
 interface SqlScriptColumnSource { column, schema, table }
 interface SqlScriptNotice { message, severity }
 interface SqlScriptResult { columns, command, effectiveRole, notices, rowCount, rows, tables, truncated }
 interface SqlScriptTable { hasInheritors, kind, primaryKey, schema, table }
 interface SqlTemplate { brand, text }
+interface StaticRedirectMatch { location, status }
+interface StaticRedirectRequest { host, path, search }
 interface StorageAuthorizeContext { bucket, data, key, operation, storageId, user }
 interface StorageAuthorizeData { table }
 interface StorageAuthorizeUser { claims, email, roles, uid }
@@ -1164,7 +1202,7 @@ interface TableIndex { columns, include, reason, unique, using, where }
 interface TableIndexKey { column, direction, nulls }
 interface TableJunctionInfo { junction_table_name, source_column_name, target_column_name, target_table_name }
 interface TableMetadata { columns, foreignKeys, junctions, policies }
-interface TableMutationListener { afterDelete, afterSave }
+interface TableMutationListener { afterDelete, afterSave, watches }
 interface TableOptionValues { defaultPolicies, description, history, indexes, metadata, rlsRequired, search, softDelete, strictWrites, tenant }
 interface TablePatchProblem { index, key, message, table }
 interface TablePolicyInfo { cmd, permissive, policy_name, qual, roles, with_check }
@@ -1274,6 +1312,7 @@ type FrameAncestorResult
 type GeneratedDatabase
 type HistoryConfig
 type IdOf
+type ImportUserOutcome
 type IncludeArgOf
 type IncludeOf
 type IncludeSpec
@@ -1323,6 +1362,7 @@ type RebaseCallContext { client, credential, data, driver, storageSource, user }
 type RebaseCallbackClient
 type RebaseErrorCode
 type RebaseSdkData
+type RebaseStaticRedirectStatus
 type RegisteredDatabase
 type ReintrospectOutcome
 type RelationAggregateFn
@@ -1337,6 +1377,9 @@ type RestFilterOp
 type RlsPosture
 type RowOf
 type RowOfColumns
+type RpcAccess
+type RpcArgs
+type RpcArgsShape
 type SchemaChangeKind
 type SchemaChangeVerdict
 type ScopeTargetKind
@@ -1348,6 +1391,7 @@ type SecurityRuleAccess
 type SetTableOptionPatch
 type SlugOf
 type SortKey
+type StaticRedirectResult
 type StaticRouteResult
 type StorageAuthorize
 type StorageOperation
@@ -1522,6 +1566,7 @@ type QueryComputedFields
 type RealtimeDisconnectCause
 type RebaseErrorCode
 type RowOf
+type RpcCall
 type SessionRestoreOutcome
 type StorageReferenceResolver
 type UpdateOf
@@ -1956,7 +2001,7 @@ type RelativeTimeLabels { daysAgo, hoursAgo, inAMoment, inDays, inHours, inMinut
 
 ## @rebasepro/server/functions
 class ApiError { badRequest, code, conflict, databaseUnavailable, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
-const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, push, resolveToken, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, sqlAsAdmin, storage, storageRegistry, ws }
+const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, push, resolveToken, rpc, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, sqlAsAdmin, storage, storageRegistry, ws }
 const requireAdmin
 const requireAuth
 function checkRateLimit
@@ -1990,6 +2035,7 @@ function runtimeKey
 function waitUntil
 interface ApiResponse { data, error, meta }
 interface CheckRateLimitOptions { key, limit, name, windowMs }
+interface DefineFunctionOptions { timeoutMs }
 interface FunctionRateLimit { limit, name, windowMs }
 interface FunctionUser { email, roles, uid }
 interface RateLimitDecision { allowed, remaining, retryAfterMs }
@@ -2005,13 +2051,16 @@ const json { array, boolean, date, geopoint, number, object, oneOf, storage, str
 const policy { and, authClaim, authRoles, authUid, authenticated, compare, existsIn, false, field, literal, not, or, outerField, raw, registered, rolesContain, rolesOverlap, serverContext, true }
 const rel { belongsTo, hasMany, hasOne, manyToMany, via }
 function defineAuthTable
+function defineRpc
 function defineTable
 function defineView
 function isAuthTableDef
+function isRpcDef
 function isTableDef
 function isViewDef
 function pgEnum
 function sql
+interface AnyRpcDef { brand, config, name }
 interface AnyTableDef { auth, brand, config, name }
 interface AnyViewDef { brand, config, name }
 interface AuthTableConfig { auth, columns, database, defaultPolicies, description, history, hooks, indexes, metadata, relations, rls, rlsRequired, schema, search, slug, softDelete, strictWrites, table, tenant }
@@ -2022,6 +2071,9 @@ interface ColumnDescriptor { access, column, default, derived, description, elem
 interface ColumnTransform { afterRead, beforeSave }
 interface PgEnum { enumName, enumValues }
 interface RlsDescriptor { declaredDefaultPolicies, defaultPolicies, inherited, junctions, policies, posture, required, rules }
+interface RpcConfig { access, args, description, rateLimit, schema, write }
+interface RpcDef { brand, config, name }
+interface RpcRateLimit { limit, windowMs }
 interface SqlTemplate { brand, text }
 interface TableAfterReadProps { context, path, table, values }
 interface TableAfterSaveErrorProps { context, error, id, path, previousValues, status, table, values }
@@ -2051,6 +2103,9 @@ type PolicyShorthand
 type RelationDescriptor
 type RelationsShape
 type RlsPosture
+type RpcAccess
+type RpcArgs
+type RpcArgsShape
 type SecurityOperation
 type SecurityRule
 type TableIndexPredicate

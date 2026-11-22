@@ -27,7 +27,8 @@ import type {
     InitializedDriver,
     RealtimeProvider,
     RealtimeSocketOptions,
-    BootstrappedAuth
+    BootstrappedAuth,
+    SqlFilesOutcome
 } from "./backend";
 import type { HistoryConfig } from "../controllers/client";
 
@@ -154,6 +155,17 @@ export interface DatabaseAdapter {
         driverResult?: InitializedDriver,
         log?: (message: string) => void,
     ): Promise<{ applied: number }>;
+
+    /**
+     * Apply `backend/sql/*.sql` — see `BackendBootstrapper.ensureSqlFiles`.
+     * Same forwarding requirement as `ensureTableSchema`: a wrapper that drops
+     * it deploys a project whose functions and triggers never arrive.
+     */
+    ensureSqlFiles?(
+        dir: string | undefined,
+        driverResult?: InitializedDriver,
+        log?: (message: string) => void,
+    ): Promise<SqlFilesOutcome>;
 
     /**
      * Create the helper functions the generated policies call (`rebase.uid()`,

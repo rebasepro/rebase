@@ -343,6 +343,9 @@ export function adapterToBootstrapper(
         ensureRlsRuntime: adapter.ensureRlsRuntime
             ? (driverResult) => adapter.ensureRlsRuntime!(driverResult)
             : undefined,
+        ensureSqlFiles: adapter.ensureSqlFiles
+            ? (dir, driverResult, log) => adapter.ensureSqlFiles!(dir, driverResult, log)
+            : undefined,
         finalizeSecurityPosture: adapter.finalizeSecurityPosture
             ? (driverResult) => adapter.finalizeSecurityPosture!(driverResult)
             : undefined,

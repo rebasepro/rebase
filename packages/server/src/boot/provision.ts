@@ -1,5 +1,5 @@
 import { DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
-import type { BackendBootstrapper, CompiledTable, DataDriver, InitializedDriver, TableDescriptor } from "@rebasepro/types";
+import type { BackendBootstrapper, CompiledTable, DataDriver, InitializedDriver, SqlFilesOutcome, TableDescriptor } from "@rebasepro/types";
 
 import { createIdempotencyStore } from "../api/rest/idempotency";
 import { resolveRateLimitStoreKind } from "../auth/resolve-rate-limit-store";
@@ -71,6 +71,7 @@ export interface ProvisionTarget {
         | "ensureTableSchema"
         | "ensureTablePolicies"
         | "ensureRlsRuntime"
+        | "ensureSqlFiles"
         | "readTablesSchemaVersion"
         | "stampTablesSchemaVersion"
     >;
@@ -391,6 +392,70 @@ reason };
     }
     return { status: "applied",
 applied };
+}
+
+/**
+ * Apply the project's `backend/sql/*.sql` — the functions, triggers and CHECKs
+ * a table declaration cannot say — as `rebase db push` does. This is how a
+ * deploy applies them: a Cloud project's database is provisioned by its own
+ * boot, and nothing else reaches it.
+ *
+ * Runs after auth initialization (so a file may call `rebase.uid()`) and
+ * before the policies (so a policy may call a function a file defines), on
+ * the default source. The driver serializes several instances on one advisory
+ * lock and records each file by hash, so a deploy that starts five replicas
+ * applies each file once.
+ *
+ * Gated like the declared tables, because it is part of the same schema:
+ * skipped when this process does not provision (`provision: false`,
+ * `REBASE_PROVISION=false`) and under `REBASE_MIGRATE_ON_BOOT=none`.
+ *
+ * A file that fails FAILS THE BOOT, naming it. The other choice — log it and
+ * serve — leaves a revision serving against a schema missing a function or a
+ * trigger it was written for: a CHECK not in force, a trigger that should have
+ * stamped a column, a policy that calls a function that is not there. Those
+ * are silent wrong answers, not errors, and they are discovered by users. A
+ * revision that does not come up is discovered by the deploy, with the file,
+ * the statement and Postgres' message in its log; the previous revision keeps
+ * serving where the platform rolls out (as Cloud does), and the file that
+ * failed was rolled back, so fixing it and deploying again is the whole
+ * recovery. That is also what `db push` does with the same file.
+ */
+export async function provisionSqlFiles(
+    dir: string | undefined,
+    target: ProvisionTarget,
+    options: ProvisionRunOptions = {}
+): Promise<SqlFilesOutcome | undefined> {
+    if (options.provision === false || provisioningDisabled(options.env ?? process.env)) {
+        if (dir) logger.info(`backend/sql: not applied — ${options.skipReason ?? "this process does not provision the schema."}`);
+        return undefined;
+    }
+    if (!target.bootstrapper.ensureSqlFiles) {
+        if (dir) {
+            logger.warn(
+                `backend/sql: not applied — ${describeAdapter(target)} does not apply SQL files at boot. ` +
+                "Apply them with `rebase db push`, or by hand."
+            );
+        }
+        return undefined;
+    }
+    const outcome = await target.bootstrapper.ensureSqlFiles(
+        dir,
+        target.driverResult,
+        message => logger.debug(`sql files: ${message}`)
+    );
+    if (outcome.applied.length > 0) {
+        logger.info(`Applied ${outcome.applied.length} SQL file(s) from backend/sql: ${outcome.applied.join(", ")}.`);
+    } else if (outcome.dir) {
+        logger.debug(`backend/sql is up to date (${outcome.unchanged.length} file(s)).`);
+    }
+    if (outcome.removed.length > 0) {
+        logger.warn(
+            `backend/sql: ${outcome.removed.join(", ")} ${outcome.removed.length === 1 ? "was" : "were"} applied before and ` +
+            "no longer exist. Removing a file undoes nothing it did; drop what it created yourself if it should go."
+        );
+    }
+    return outcome;
 }
 
 /**
