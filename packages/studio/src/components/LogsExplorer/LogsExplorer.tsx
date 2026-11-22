@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { Alert, ArrowDownToLineIcon, Checkbox, cls, defaultBorderMixin, Label, Select, SelectItem, StatusDot, TextField, Typography, type StatusTone } from "@rebasepro/ui";
 import { idNum, useLogTail } from "./useLogTail";
 import type { LogTransport } from "./useLogTail";
+import { useTranslation } from "@rebasepro/app";
 
 const LEVEL_COLORS: Record<string, string> = {
     debug: "text-surface-500",
@@ -19,9 +20,9 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 const TRANSPORT_LABELS: Record<LogTransport, string> = {
-    connecting: "Connecting",
-    live: "Live",
-    polling: "Polling"
+    connecting: "studio_logs_transport_connecting",
+    live: "studio_logs_transport_live",
+    polling: "studio_logs_transport_polling"
 };
 
 const TRANSPORT_TONES: Record<LogTransport, StatusTone> = {
@@ -31,20 +32,19 @@ const TRANSPORT_TONES: Record<LogTransport, StatusTone> = {
 };
 
 const TRANSPORT_TITLES: Record<LogTransport, string> = {
-    connecting: "Reconnecting to the log stream.",
-    live: "Streaming — entries appear as this instance writes them.",
-    polling: "This server has no log stream; falling back to a refresh every 3 seconds."
+    connecting: "studio_logs_transport_connecting_title",
+    live: "studio_logs_transport_live_title",
+    polling: "studio_logs_transport_polling_title"
 };
 
-// The log lives in each server process's memory and nothing gathers the others,
-// so the view says whose it is.
-const INSTANCE_TITLE = "Each server process keeps its own log in memory. With more than one instance, "
-    + "you see only the one serving this view, and a reconnect can land on another.";
+const LEVELS = ["debug", "info", "warn", "error"] as const;
+const SOURCES = ["api", "auth", "storage", "realtime", "system"] as const;
 
 // How close to the bottom edge still counts as "at the bottom".
 const STICK_THRESHOLD = 40;
 
 export function LogsExplorer() {
+    const { t } = useTranslation();
     const [level, setLevel] = useState<string>("all");
     const [source, setSource] = useState<string>("all");
     const [searchInput, setSearchInput] = useState("");
@@ -61,8 +61,8 @@ export function LogsExplorer() {
 
     // Debounce the search box so typing doesn't reopen the stream per keystroke.
     useEffect(() => {
-        const t = setTimeout(() => setSearch(searchInput), 300);
-        return () => clearTimeout(t);
+        const timer = setTimeout(() => setSearch(searchInput), 300);
+        return () => clearTimeout(timer);
     }, [searchInput]);
 
     const { logs, error, transport, dropped, instance } = useLogTail({ level,
@@ -123,33 +123,26 @@ export function LogsExplorer() {
         <div className="flex flex-col h-[calc(100vh-64px)] w-full bg-surface-sheet">
             {/* Toolbar */}
             <div className={cls(
-                "flex gap-2 p-3 border-b items-center flex-wrap shrink-0",
+                "flex gap-2 p-3 border-b items-center flex-wrap shrink-0 bg-surface-sheet",
                 defaultBorderMixin
             )}>
                 <Select
                     value={level}
                     onValueChange={setLevel}
                     size="small"
-                    placeholder="All Levels"
+                    placeholder={t("studio_logs_all_levels")}
                 >
-                    <SelectItem value="all">All Levels</SelectItem>
-                    <SelectItem value="debug">Debug</SelectItem>
-                    <SelectItem value="info">Info</SelectItem>
-                    <SelectItem value="warn">Warn</SelectItem>
-                    <SelectItem value="error">Error</SelectItem>
+                    <SelectItem value="all">{t("studio_logs_all_levels")}</SelectItem>
+                    {LEVELS.map(l => <SelectItem key={l} value={l}>{t(`studio_logs_level_${l}`)}</SelectItem>)}
                 </Select>
                 <Select
                     value={source}
                     onValueChange={setSource}
                     size="small"
-                    placeholder="All Sources"
+                    placeholder={t("studio_logs_all_sources")}
                 >
-                    <SelectItem value="all">All Sources</SelectItem>
-                    <SelectItem value="api">API</SelectItem>
-                    <SelectItem value="auth">Auth</SelectItem>
-                    <SelectItem value="storage">Storage</SelectItem>
-                    <SelectItem value="realtime">Realtime</SelectItem>
-                    <SelectItem value="system">System</SelectItem>
+                    <SelectItem value="all">{t("studio_logs_all_sources")}</SelectItem>
+                    {SOURCES.map(src => <SelectItem key={src} value={src}>{t(`studio_logs_source_${src}`)}</SelectItem>)}
                 </Select>
                 <TextField
                     size="small"
@@ -181,12 +174,12 @@ export function LogsExplorer() {
                     nothing in it is ambiguous — quiet server, or a stream that
                     dropped — and this is the difference. */}
                 <div className="ml-auto pl-4 flex items-center gap-3">
-                    <div className="flex items-center" title={TRANSPORT_TITLES[transport]}>
+                    <div className="flex items-center" title={t(TRANSPORT_TITLES[transport])}>
                         <StatusDot tone={TRANSPORT_TONES[transport]} size="small">
-                            {TRANSPORT_LABELS[transport]}
+                            {t(TRANSPORT_LABELS[transport])}
                         </StatusDot>
                     </div>
-                    <div className="min-w-0" title={INSTANCE_TITLE}>
+                    <div className="min-w-0" title={t("studio_logs_instance_title")}>
                         <Typography variant="caption" color="secondary" className="block truncate max-w-[18rem]">
                             {instance ? `This instance: ${instance}` : "This instance only"}
                         </Typography>
@@ -216,7 +209,7 @@ export function LogsExplorer() {
             )}
 
             {/* Log entries */}
-            <div className="relative flex-1 min-h-0">
+            <div className="relative flex-1 min-h-0 bg-surface-card">
                 <div
                     ref={containerRef}
                     onScroll={handleScroll}

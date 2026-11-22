@@ -2,7 +2,7 @@ import React, { memo, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import { Typography, Chip, Tooltip, cls } from "@rebasepro/ui";
-import { IconForView } from "@rebasepro/app";
+import { IconForView, useTranslation } from "@rebasepro/app";
 import type { TableNodeData, ColumnInfo } from "./useSchemaGraph";
 import { getColumnRowY, getHeaderHeight } from "./schema-visualizer.utils";
 
@@ -13,6 +13,7 @@ import { getColumnRowY, getHeaderHeight } from "./schema-visualizer.utils";
  * The edge builder picks which side to use based on relative node position.
  */
 const TableNodeInner = ({ data, selected }: NodeProps) => {
+    const { t } = useTranslation();
     const {
         tableName,
         collectionName,
@@ -159,12 +160,12 @@ icon }}
                 {/* Badges */}
                 <div className="ml-auto flex items-center gap-1 shrink-0">
                     {rlsEnabled && (
-                        <Tooltip title="RLS enabled">
+                        <Tooltip title={t("studio_rls_enabled")}>
                             <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                         </Tooltip>
                     )}
                     {historyEnabled && (
-                        <Tooltip title="History enabled">
+                        <Tooltip title={t("studio_schema_visualizer_history_enabled")}>
                             <div className="w-1.5 h-1.5 rounded-full bg-blue-400"/>
                         </Tooltip>
                     )}

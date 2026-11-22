@@ -354,12 +354,12 @@ duration: 400 }
                                                 Reading the rules directly here made the
                                                 three disagree. */}
                                             {rlsEnabledFor(descriptor) && (
-                                                <Tooltip title="RLS enabled">
+                                                <Tooltip title={t("studio_rls_enabled")}>
                                                     <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                                                 </Tooltip>
                                             )}
                                             {descriptor.history && (
-                                                <Tooltip title="History enabled">
+                                                <Tooltip title={t("studio_schema_visualizer_history_enabled")}>
                                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400"/>
                                                 </Tooltip>
                                             )}
@@ -509,8 +509,8 @@ duration: 400 }
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">
                             {/* Fit view */}
-                            <Tooltip title="Fit to view">
-                                <IconButton aria-label="Fit to view"
+                            <Tooltip title={t("studio_schema_visualizer_fit_view")}>
+                                <IconButton aria-label={t("studio_schema_visualizer_fit_view")}
                                     size="small"
                                     onClick={handleFitView}
                                 >

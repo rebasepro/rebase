@@ -3,6 +3,7 @@
  */
 import { describe, expect, it, jest, afterEach } from "@jest/globals";
 import { FakeResponse } from "./helpers/fakeResponse";
+import { useEnTranslation } from "./en-translation";
 import { render, screen, waitFor } from "@testing-library/react";
 import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from "util";
 import { ReadableStream as NodeReadableStream } from "stream/web";
@@ -32,7 +33,8 @@ jest.mock("@rebasepro/app", () => ({
         apiPath: "/api",
         getAuthToken: async () => "token"
     }),
-    useApiBase: () => "http://api.test/api"
+    useApiBase: () => "http://api.test/api",
+    useTranslation: () => useEnTranslation()
 }));
 
 

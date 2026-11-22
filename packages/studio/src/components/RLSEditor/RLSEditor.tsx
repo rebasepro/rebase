@@ -682,7 +682,7 @@ totalPolicies };
                                                 from the database, the server's answer is the same. ── */}
                                             {(categorizedTables.collection.length > 0 || categorizedTables.junction.length > 0) && (
                                                 <SidebarSection
-                                                    title="Served tables"
+                                                    title={t("studio_rls_served_tables")}
                                                     icon={<DatabaseIcon size={12} className="text-primary dark:text-primary-light"/>}
                                                     expanded={expandedSections.collection ?? true}
                                                     onToggle={() => setExpandedSections(prev => ({ ...prev, collection: !(prev.collection ?? true) }))}
@@ -778,7 +778,7 @@ totalPolicies };
                                                 <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.total}</Typography>
                                             </div>
                                             <div className={cls("p-2.5 rounded border bg-surface-card flex items-center justify-between", defaultBorderMixin)}>
-                                                <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-xs">RLS enabled</Typography>
+                                                <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-xs">{t("studio_rls_enabled")}</Typography>
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                                                     <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.enabled}</Typography>
