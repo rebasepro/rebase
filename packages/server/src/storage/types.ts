@@ -79,6 +79,31 @@ export interface GCSStorageConfig {
 }
 
 /**
+ * Platform-managed storage: a prefix the hosting platform owns, reached over
+ * presigned URLs its storage broker signs. The process holds no object-store
+ * credential. See `PlatformStorageController`.
+ *
+ * Set by the platform, not by hand: `STORAGE_TYPE=platform` with
+ * `STORAGE_BROKER_URL`, `STORAGE_BROKER_PROJECT` and the deployment's own
+ * `REBASE_SERVICE_KEY`.
+ */
+export interface PlatformStorageConfig {
+    type: "platform";
+    /** The broker's origin, e.g. `https://control.rebase.website`. */
+    brokerUrl: string;
+    /** The project the broker signs for. */
+    projectId: string;
+    /** This deployment's service key, which the broker accepts for `projectId` only. */
+    serviceKey: string;
+    /** The storage source, as the platform names it (`(default)`, `media`, …). */
+    source: string;
+    /** Maximum file size in bytes (default: 50MB) */
+    maxFileSize?: number;
+    /** Allowed MIME types (if not set, all types allowed) */
+    allowedMimeTypes?: string[];
+}
+
+/**
  * Storage configuration — local filesystem, S3-compatible, or Google Cloud Storage.
  *
  * **Built-in providers:**
@@ -91,7 +116,7 @@ export interface GCSStorageConfig {
  * For other cloud storage (Azure Blob, etc.), implement the `StorageController`
  * interface and pass the instance directly to the `storage` config.
  */
-export type BackendStorageConfig = LocalStorageConfig | S3StorageConfig | GCSStorageConfig;
+export type BackendStorageConfig = LocalStorageConfig | S3StorageConfig | GCSStorageConfig | PlatformStorageConfig;
 
 /** What a storage request is trying to do to an object. */
 export type {

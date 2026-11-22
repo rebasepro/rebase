@@ -40,6 +40,8 @@ import { configureJwt } from "../src/auth/jwt";
 import { createTransport } from "../../client/src/transport";
 import { createStorage } from "../../client/src/storage";
 import { s3World, gcsWorld } from "./helpers/fake-object-stores";
+import { PlatformStorageController } from "../src/storage/PlatformStorageController";
+import { createPlatformWorld, PLATFORM_BROKER, PLATFORM_KEY, PLATFORM_PROJECT } from "./helpers/fake-platform-store";
 
 // Only the client that sends commands is replaced; the command classes are the
 // real ones, so the controllers build exactly the requests they build in
@@ -59,7 +61,17 @@ jest.mock("@google-cloud/storage", () => ({
 const S3_BUCKET = "acme-media";
 const GCS_BUCKET = "acme-gcs";
 
-type Kind = "local" | "s3" | "gcs";
+type Kind = "local" | "s3" | "gcs" | "platform";
+
+/** The platform broker and its store, in-process (helpers/fake-platform-store.ts). */
+const platformWorld = createPlatformWorld();
+const platformController = (limits: { maxFileSize?: number; allowedMimeTypes?: string[] } = {}) => {
+    platformWorld.reset();
+    return new PlatformStorageController(
+        { type: "platform", brokerUrl: PLATFORM_BROKER, projectId: PLATFORM_PROJECT, serviceKey: PLATFORM_KEY, source: "(default)", ...limits },
+        { fetch: platformWorld.fetch, now: platformWorld.now, sleep: async () => undefined }
+    );
+};
 
 interface Harness {
     controller: StorageController;
@@ -86,6 +98,7 @@ async function harness(kind: Kind): Promise<Harness> {
             cleanup: async () => undefined
         };
     }
+    if (kind === "platform") return { controller: platformController(), cleanup: async () => undefined };
     gcsWorld.reset([GCS_BUCKET]);
     return {
         controller: new GCSStorageController({ type: "gcs", bucket: GCS_BUCKET }),
@@ -106,7 +119,7 @@ async function png(): Promise<Buffer> {
         .toBuffer();
 }
 
-describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s", (kind) => {
+describe.each<Kind>(["local", "s3", "gcs", "platform"])("storage controller contract — %s", (kind) => {
     let h: Harness;
     let app: Hono<HonoEnv>;
     let putSpy: jest.SpiedFunction<StorageController["putObject"]>;
@@ -283,8 +296,9 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
             };
         }));
 
-        // An S3 listing (ListObjectsV2) carries no content type.
-        const typed = (type: string) => kind === "s3" ? undefined : type;
+        // An S3 listing (ListObjectsV2) carries no content type — nor does the
+        // one platform storage reads, which is the same call.
+        const typed = (type: string) => kind === "s3" || kind === "platform" ? undefined : type;
         expect(facts).toEqual([
             expect.objectContaining({ fullPath: "described/a.txt", size: 5, contentType: typed("text/plain") }),
             expect.objectContaining({ fullPath: "described/b.png", size: 9, contentType: typed("image/png") })
@@ -414,7 +428,7 @@ function bodyOf(...chunks: Uint8Array[]): ReadableStream<Uint8Array> {
     });
 }
 
-describe.each<Kind>(["local", "s3", "gcs"])("storage controller streamed writes — %s", (kind) => {
+describe.each<Kind>(["local", "s3", "gcs", "platform"])("storage controller streamed writes — %s", (kind) => {
     let h: Harness;
     beforeEach(async () => { h = await harness(kind); });
     afterEach(() => h.cleanup());
@@ -497,7 +511,7 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller streamed writes 
     });
 });
 
-describe.each<Kind>(["local", "s3", "gcs"])("storage controller upload limits — %s", (kind) => {
+describe.each<Kind>(["local", "s3", "gcs", "platform"])("storage controller upload limits — %s", (kind) => {
     let controller: StorageController;
     let cleanup: () => Promise<void> = async () => undefined;
 
@@ -510,6 +524,8 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller upload limits �
         } else if (kind === "s3") {
             s3World.reset([S3_BUCKET]);
             controller = new S3StorageController({ type: "s3", bucket: S3_BUCKET, accessKeyId: "test", secretAccessKey: "test", ...limits });
+        } else if (kind === "platform") {
+            controller = platformController(limits);
         } else {
             gcsWorld.reset([GCS_BUCKET]);
             controller = new GCSStorageController({ type: "gcs", bucket: GCS_BUCKET, ...limits });
