@@ -98,7 +98,10 @@ async function answered(run: () => unknown, absent: () => Response, present: (va
         const status = statusOf(error);
         if (status === undefined) throw error;
         const message = error instanceof Error ? error.message : String(error);
-        return json({ error: { message, code: "TEST_REFUSAL" } }, status);
+        // The error's own code when it carries one, as the server's envelope
+        // would: a command that branches on a code needs to see it.
+        const code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "TEST_REFUSAL";
+        return json({ error: { message, code } }, status);
     }
 }
 

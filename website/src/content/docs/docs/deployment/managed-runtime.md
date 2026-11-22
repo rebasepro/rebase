@@ -136,10 +136,11 @@ rebase cloud compute                              # what the project reserves no
 rebase cloud compute set --cpu 500m --memory 1Gi
 ```
 
-A project that never set a dial runs as a burstable pod: it reserves `100m` CPU
-and `384Mi` memory, and can burst to 2 CPU and 2 GiB. A dialled request keeps
-that ratio between request and limit. Run `rebase cloud compute` to see what
-your project has.
+A project that never set a dial runs as a burstable pod. On Belgium
+(europe-west1) the default reserves 100m CPU and 384Mi and can burst to 2 CPU
+and 2 GiB; in Falkenstein and Helsinki memory may stretch to 1.4× the request
+and CPU to 10× (at most 1.7 vCPU). `rebase cloud compute` shows your project's
+numbers.
 
 Instances:
 
@@ -223,6 +224,11 @@ Some details:
 - **Response size.** Neither the runtime nor the edge sets a limit on response
   size. A large response is still held in memory if your handler builds it in
   one piece, so stream it or serve it from storage.
+
+### Monitors and scheduled work in `/metrics`
+<span class="since-badge" data-since="0.35">Since 0.35</span>
+
+A request from a well-known uptime monitor (matched on its `User-Agent`), or one carrying an `x-rebase-probe` header with any value, is served but counted in `rebase_probe_requests_total` instead of `rebase_requests_total`, so a monitor does not read as traffic. `rebase_scheduled_jobs` is the number of enabled cron jobs registered in the app and `rebase_background_workers` is 1 while this process runs a job-queue worker; both stop while a deployment is scaled to zero, which is why a platform that sleeps idle projects reads them.
 
 ## Environment variables and secrets
 

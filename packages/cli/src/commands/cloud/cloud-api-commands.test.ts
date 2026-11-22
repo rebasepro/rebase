@@ -9,6 +9,7 @@
  * refuses off a terminal without `--yes` and sends nothing.
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { setJsonModeForTest } from "./context";
@@ -40,7 +41,8 @@ import { envCommand } from "./env";
 import { dbAccessCommand } from "./db-access";
 import { usageCommand } from "./usage";
 import { appKeyCommand } from "./app-key";
-import { computeWindowCommand } from "./maintenance";
+import { computeApplyCommand, computeWindowCommand, DATABASE_RESTART_REFUSAL, patchRestartsDatabase } from "./maintenance";
+import { sleepCommand, parseSleepAfter } from "./sleep";
 import { deployCommand } from "./deploy";
 import { isRouteNotServed } from "./not-served";
 
@@ -434,6 +436,132 @@ describe("rebase cloud clusters baseline", () => {
     });
 });
 
+/* ── clusters add --open-to-customers, clusters open|close ─────── */
+
+describe("rebase cloud clusters add", () => {
+    const GKE = { id: "gke", name: "rebase-gke", region: "europe-west1", baseDomain: "rebase.website", platformCapacity: true, baselineStatus: "ready", openToCustomers: true };
+    let kubeconfig = "";
+    const created: Array<Record<string, unknown>> = [];
+
+    beforeEach(() => {
+        kubeconfig = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-cl-")), "kubeconfig");
+        fs.writeFileSync(kubeconfig, "apiVersion: v1\n");
+        created.length = 0;
+    });
+
+    function addLine(...extra: string[]): string[] {
+        return argv(
+            "clusters", "add", "--name", "rebase-fsn1", "--provider", "hetzner", "--region", "fsn1", "--kubeconfig", kubeconfig,
+            "--base-domain", "rebase.website", "--ingress-address", "49.13.1.1", "--platform-capacity",
+            "--backup-bucket", "b", "--backup-access-key-id", "AK", "--backup-secret-access-key", "SK", ...extra
+        );
+    }
+
+    function clustersTable(existing: Array<Record<string, unknown>>): CollectionAnswers {
+        return {
+            create: (data) => {
+                created.push(data);
+                return { id: "c_new", ...data };
+            },
+            find: () => ({ data: [...existing, ...created.map((row) => ({ id: "c_new", ...row }))] })
+        };
+    }
+
+    it("sends openToCustomers only when the flag is given", async () => {
+        tables.clusters = clustersTable([]);
+        const closed = await stdoutOf(() => clustersCommand("add", addLine()));
+        expect(created[0]).not.toHaveProperty("openToCustomers");
+        expect(closed.json()).toMatchObject({ id: "c_new", openToCustomers: false, baseDomainShared: false });
+
+        const open = await stdoutOf(() => clustersCommand("add", addLine("--open-to-customers")));
+        expect(created[1]).toMatchObject({ openToCustomers: true, platformCapacity: true, baseDomain: "rebase.website" });
+        expect(open.json()).toMatchObject({ openToCustomers: true });
+    });
+
+    it("prints the shared-domain DNS sentence when another cluster serves the base domain", async () => {
+        tables.clusters = clustersTable([GKE]);
+        setJsonModeForTest(false);
+        const err = vi.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            await clustersCommand("add", addLine());
+            const printed = err.mock.calls.map((c) => String(c[0])).join("\n");
+            expect(printed).toContain("customers are offered the region only after --open-to-customers (or `rebase cloud clusters open c_new`)");
+            expect(printed).toContain("Another cluster already serves rebase.website, so add explicit records for ingress.rebase.website, s3.rebase.website");
+            expect(printed).not.toContain("Point *.rebase.website");
+        } finally {
+            err.mockRestore();
+        }
+    });
+
+    it("prints the wildcard sentence when no other cluster serves it", async () => {
+        tables.clusters = clustersTable([{ ...GKE, baseDomain: "eu.rebase.website" }]);
+        setJsonModeForTest(false);
+        const err = vi.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            await clustersCommand("add", addLine());
+            const printed = err.mock.calls.map((c) => String(c[0])).join("\n");
+            expect(printed).toContain("Point *.rebase.website at 49.13.1.1.");
+            expect(printed).not.toContain("explicit records");
+        } finally {
+            err.mockRestore();
+        }
+    });
+});
+
+describe("rebase cloud clusters open|close", () => {
+    const FSN1 = { id: "c_fsn1", name: "rebase-fsn1", region: "fsn1", baseDomain: "rebase.website", platformCapacity: true, baselineStatus: "ready", openToCustomers: null };
+    const GKE = { id: "gke", name: "rebase-gke", region: "europe-west1", baseDomain: "Rebase.Website", platformCapacity: true, baselineStatus: "ready", openToCustomers: true };
+    const HEL1 = { id: "c_hel1", name: "rebase-hel1", region: "hel1", baseDomain: "hel1.rebase.website", platformCapacity: true, baselineStatus: "ready", openToCustomers: null };
+
+    it("opens by name: writes true to the row's id and says the domain is shared, on stderr, first", async () => {
+        tables.clusters = { find: () => ({ data: [GKE, FSN1, HEL1] }) };
+        const stderr: string[] = [];
+        const write = vi.spyOn(process.stderr, "write").mockImplementation((s) => {
+            stderr.push(String(s));
+            return true;
+        });
+        let r: Awaited<ReturnType<typeof stdoutOf>>;
+        try {
+            r = await stdoutOf(() => clustersCommand("open", argv("clusters", "open", "rebase-fsn1")));
+        } finally {
+            write.mockRestore();
+        }
+        expect(updates).toEqual([{ table: "clusters", id: "c_fsn1", data: { openToCustomers: true } }]);
+        expect(r.json()).toEqual({
+            id: "c_fsn1", name: "rebase-fsn1", region: "fsn1", openToCustomers: true, baseDomain: "rebase.website", baseDomainShared: true
+        });
+        expect(stderr.join("")).toContain("the wildcard record for rebase.website points at this cluster");
+    });
+
+    it("opens by id without a warning when nobody else serves the domain", async () => {
+        tables.clusters = { find: () => ({ data: [GKE, FSN1, HEL1] }) };
+        const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        try {
+            const r = await stdoutOf(() => clustersCommand("open", argv("clusters", "open", "c_hel1")));
+            expect(r.json()).toMatchObject({ id: "c_hel1", openToCustomers: true, baseDomainShared: false });
+            expect(write.mock.calls.map((c) => String(c[0])).join("")).not.toContain("wildcard");
+        } finally {
+            write.mockRestore();
+        }
+        expect(updates).toEqual([{ table: "clusters", id: "c_hel1", data: { openToCustomers: true } }]);
+    });
+
+    it("closes by writing null, the state a new row starts in", async () => {
+        tables.clusters = { find: () => ({ data: [GKE, FSN1] }) };
+        const r = await stdoutOf(() => clustersCommand("close", argv("clusters", "close", "gke")));
+        expect(updates).toEqual([{ table: "clusters", id: "gke", data: { openToCustomers: null } }]);
+        expect(r.json()).toMatchObject({ id: "gke", openToCustomers: null });
+    });
+
+    it("refuses an unknown id or name, a shared name, and a missing one, writing nothing", async () => {
+        tables.clusters = { find: () => ({ data: [GKE, FSN1, { ...HEL1, name: "rebase-fsn1" }] }) };
+        expect(errorOf(await stdoutOf(() => clustersCommand("open", argv("clusters", "open", "nope")))).code).toBe("not_found");
+        expect(errorOf(await stdoutOf(() => clustersCommand("open", argv("clusters", "open", "rebase-fsn1")))).message).toMatch(/2 clusters are named/);
+        expect(errorOf(await stdoutOf(() => clustersCommand("close", argv("clusters", "close")))).message).toMatch(/Usage: rebase cloud clusters close/);
+        expect(updates).toEqual([]);
+    });
+});
+
 /* ── deploy --git ──────────────────────────────────────────────── */
 
 describe("rebase cloud deploy --git", () => {
@@ -553,5 +681,246 @@ describe("a control plane without the route", () => {
         };
         const r = await stdoutOf(() => statusCommand(argv("status")));
         expect(r.json()).toMatchObject({ maintenance: null, notServed: ["maintenance"] });
+    });
+});
+
+/* ── database size changes: ask, and acknowledge ───────────────── */
+
+describe("compute set: a database restart is asked for and acknowledged", () => {
+    const restartRefused = () => Object.assign(
+        new Error("Changing the database size restarts the database: it is unavailable for about 30 seconds to 3 minutes. Nothing was saved."),
+        { status: 409, code: "database_restart_unconfirmed" }
+    );
+
+    beforeEach(() => {
+        answer = (name) => (name === "pricing" ? { lines: [], totalEur: 30 } : undefined);
+    });
+
+    it("refuses off a terminal without --yes, saying the database restarts, and saves nothing", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, databaseCpu: "160m" }) };
+        const refused = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-cpu", "500m")));
+        expect(errorOf(refused)).toMatchObject({ code: "confirmation_required", message: DATABASE_RESTART_REFUSAL });
+        expect(errorOf(refused).message).toContain("about 30 seconds to 3 minutes; connections are dropped and reconnect");
+        expect(updates).toEqual([]);
+    });
+
+    it("sends acknowledgeDatabaseRestart on the same write with --yes", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, databaseMemory: "1Gi" }) };
+        const r = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-memory", "2Gi", "--yes")));
+        expect(updates).toEqual([{ table: "projects", id: PROJECT_ID, data: { databaseMemory: "2Gi", acknowledgeDatabaseRestart: true } }]);
+        expect(r.json()).toMatchObject({ updated: { databaseMemory: "2Gi" }, databaseRestart: true, maintenance: null });
+    });
+
+    it("acknowledges fewer instances, not more", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, databaseInstances: 2 }) };
+        await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-instances", "1", "--yes")));
+        await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-instances", "3", "--yes")));
+        expect(updates.map(u => u.data)).toEqual([
+            { databaseInstances: 1, acknowledgeDatabaseRestart: true },
+            { databaseInstances: 3 }
+        ]);
+    });
+
+    it("an app-only change sends no consent and says nothing about a restart", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, cpu: "250m" }) };
+        const r = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--cpu", "500m", "--yes")));
+        expect(updates).toEqual([{ table: "projects", id: PROJECT_ID, data: { cpu: "500m" } }]);
+        expect(r.json()).toMatchObject({ databaseRestart: false });
+    });
+
+    it("a 409 database_restart_unconfirmed the CLI did not predict: with --yes, the same change again with the consent", async () => {
+        let calls = 0;
+        tables.projects = {
+            findById: () => ({ id: PROJECT_ID, databaseCpu: "500m" }),
+            update: (id, data) => {
+                calls++;
+                updates.push({ table: "projects", id, data });
+                if (!("acknowledgeDatabaseRestart" in data)) throw restartRefused();
+                return { id, ...data };
+            }
+        };
+        // Same CPU as stored, so the CLI predicts no restart; the server finds one.
+        const r = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-cpu", "500m", "--yes")));
+        expect(calls).toBe(2);
+        expect(updates.map(u => u.data)).toEqual([{ databaseCpu: "500m" }, { databaseCpu: "500m", acknowledgeDatabaseRestart: true }]);
+        expect(r.json()).toMatchObject({ databaseRestart: true });
+    });
+
+    it("the same 409 off a terminal without --yes refuses with the restart sentence, after one attempt", async () => {
+        tables.projects = {
+            findById: () => ({ id: PROJECT_ID, databaseInstances: 1 }),
+            update: (id, data) => {
+                updates.push({ table: "projects", id, data });
+                throw restartRefused();
+            }
+        };
+        // `--spot` changes no database dial; only the server can say it restarts.
+        const refused = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--spot", "true")));
+        // The first question (the change itself) is refused before any write.
+        expect(errorOf(refused).code).toBe("confirmation_required");
+        expect(updates).toEqual([]);
+    });
+
+    it("a different refusal from the control plane is printed as it came", async () => {
+        tables.projects = {
+            findById: () => ({ id: PROJECT_ID }),
+            update: () => {
+                throw Object.assign(new Error("databaseMemory: 64Gi is more than the region offers."), { status: 400, code: "invalid_resources" });
+            }
+        };
+        const r = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-memory", "64Gi", "--yes")));
+        expect(errorOf(r)).toMatchObject({ code: "invalid_resources" });
+        expect(errorOf(r).message).toContain("64Gi is more than the region offers");
+    });
+
+    it("predicts a restart from the dials alone", () => {
+        expect(patchRestartsDatabase({ databaseCpu: "160m" }, { databaseCpu: "500m" })).toBe(true);
+        expect(patchRestartsDatabase({ databaseCpu: "500m" }, { databaseCpu: "500m" })).toBe(false);
+        expect(patchRestartsDatabase({}, { databaseMemory: "2Gi" })).toBe(true);
+        expect(patchRestartsDatabase({}, { databaseInstances: 2 })).toBe(false);
+        expect(patchRestartsDatabase({ databaseInstances: 3 }, { databaseInstances: 2 })).toBe(true);
+        expect(patchRestartsDatabase({}, { cpu: "1", memory: "2Gi" })).toBe(false);
+    });
+});
+
+describe("compute apply: the consent alone, for a change that waits", () => {
+    it("nothing waiting: says so, exits 0, writes nothing", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, databaseApplied: null }) };
+        const r = await stdoutOf(() => computeApplyCommand(argv("compute", "apply", "--yes")));
+        expect(r.json()).toMatchObject({ status: "nothing" });
+        expect(updates).toEqual([]);
+        expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it("a waiting change: refuses off a terminal without --yes, then sends { acknowledgeDatabaseRestart: true } alone", async () => {
+        const applied = { cpu: "160m", memory: "1Gi", instances: 1, requestedAt: "2026-11-19T10:00:00Z", failedAt: "2026-11-19T10:04:00Z", error: "timed out" };
+        tables.projects = { findById: () => ({ id: PROJECT_ID, databaseCpu: "500m", databaseApplied: applied }) };
+        const refused = await stdoutOf(() => computeApplyCommand(argv("compute", "apply")));
+        expect(errorOf(refused)).toMatchObject({ code: "confirmation_required", message: DATABASE_RESTART_REFUSAL });
+        expect(updates).toEqual([]);
+
+        const r = await stdoutOf(() => computeApplyCommand(argv("compute", "apply", "--yes")));
+        expect(updates).toEqual([{ table: "projects", id: PROJECT_ID, data: { acknowledgeDatabaseRestart: true } }]);
+        expect(r.json()).toMatchObject({ status: "applying", databaseApplied: { cpu: "160m", failedAt: "2026-11-19T10:04:00Z" } });
+        // Not the maintenance function, which saas main does not serve.
+        expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it("compute shows the waiting change", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, name: "Shop", databaseApplied: { cpu: "160m", memory: "1Gi" } }) };
+        answer = (name) => {
+            if (name === "maintenance") throw notServed();
+            return undefined;
+        };
+        const r = await stdoutOf(() => computeCommand(undefined, argv("compute")));
+        expect(r.json()).toMatchObject({ databaseApplied: { cpu: "160m", memory: "1Gi" }, notServed: ["maintenance"] });
+    });
+
+    it("compute window on a control plane without windows says how a database change applies there", async () => {
+        answer = () => {
+            throw notServed();
+        };
+        const r = await stdoutOf(() => computeWindowCommand(argv("compute", "window", "--day", "sun", "--hour", "3")));
+        expect(errorOf(r).code).toBe("not_served");
+        expect(errorOf(r).hint).toContain("applies when you confirm it");
+    });
+});
+
+/* ── sleep when idle ───────────────────────────────────────────── */
+
+describe("rebase cloud sleep", () => {
+    const ASLEEP = {
+        id: PROJECT_ID, status: "sleeping", sleepWhenIdle: true, sleepAfterMinutes: 60,
+        sleptAt: "2026-11-19T09:00:00Z", lastActivityAt: "2026-11-19T07:58:00Z"
+    };
+
+    it("status: the setting, whether it sleeps now, and the credits", async () => {
+        tables.projects = { findById: () => ASLEEP };
+        answer = () => ({ billingOn: false, credits: [] });
+        const r = await stdoutOf(() => sleepCommand("status", argv("sleep", "status")));
+        expect(invoke).toHaveBeenCalledWith("sleep", undefined, { method: "GET", path: `${PROJECT_ID}/credits` });
+        expect(r.json()).toMatchObject({
+            sleepWhenIdle: true, sleepAfterMinutes: 60, asleep: true, status: "sleeping",
+            sleptAt: "2026-11-19T09:00:00Z", credits: [], sleepBillingOn: false
+        });
+    });
+
+    it("bare is status, and an empty period is the default 30 minutes", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, status: "active", sleepWhenIdle: false, sleepAfterMinutes: null }) };
+        answer = () => {
+            throw notServed();
+        };
+        const r = await stdoutOf(() => sleepCommand(undefined, argv("sleep")));
+        expect(r.json()).toMatchObject({ sleepWhenIdle: false, sleepAfterMinutes: 30, asleep: false, credits: null });
+    });
+
+    it("on --after 1h writes both columns; on alone writes only the switch", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, sleepWhenIdle: false }) };
+        const r = await stdoutOf(() => sleepCommand("on", argv("sleep", "on", "--after", "1h")));
+        await stdoutOf(() => sleepCommand("on", argv("sleep", "on")));
+        expect(updates.map(u => u.data)).toEqual([{ sleepWhenIdle: true, sleepAfterMinutes: 60 }, { sleepWhenIdle: true }]);
+        expect(r.json()).toEqual({ sleepWhenIdle: true, sleepAfterMinutes: 60 });
+    });
+
+    it("off writes the switch off", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, sleepWhenIdle: true }) };
+        const r = await stdoutOf(() => sleepCommand("off", argv("sleep", "off")));
+        expect(updates).toEqual([{ table: "projects", id: PROJECT_ID, data: { sleepWhenIdle: false } }]);
+        expect(r.json()).toEqual({ sleepWhenIdle: false, sleepAfterMinutes: null });
+    });
+
+    it("refuses a period the control plane would, before any call", async () => {
+        const r = await stdoutOf(() => sleepCommand("on", argv("sleep", "on", "--after", "10m")));
+        expect(errorOf(r).code).toBe("bad_request");
+        expect(updates).toEqual([]);
+        expect(parseSleepAfter("4h")).toBe(240);
+        expect(parseSleepAfter("15m")).toBe(15);
+        expect(parseSleepAfter("30")).toBe(30);
+        expect(parseSleepAfter("2h")).toBeUndefined();
+    });
+
+    it("prints the control plane's refusal unchanged", async () => {
+        const why = "sleepWhenIdle: this project's region cannot wake a sleeping project yet.";
+        tables.projects = {
+            findById: () => ({ id: PROJECT_ID, sleepWhenIdle: false }),
+            update: () => {
+                throw Object.assign(new Error(why), { status: 400, code: "invalid_resources" });
+            }
+        };
+        const r = await stdoutOf(() => sleepCommand("on", argv("sleep", "on")));
+        expect(errorOf(r)).toMatchObject({ code: "invalid_resources" });
+        expect(errorOf(r).message).toContain(why);
+    });
+
+    it("a control plane without the setting answers not_served and writes nothing", async () => {
+        tables.projects = { findById: () => ({ id: PROJECT_ID, status: "active" }) };
+        const on = await stdoutOf(() => sleepCommand("on", argv("sleep", "on")));
+        expect(errorOf(on).code).toBe("not_served");
+        expect(updates).toEqual([]);
+        const status = await stdoutOf(() => sleepCommand("status", argv("sleep", "status")));
+        expect(errorOf(status).code).toBe("not_served");
+    });
+
+    it("wake: POST sleep/<project>/wake, and the state it answered", async () => {
+        answer = () => ({ state: "waking" });
+        const r = await stdoutOf(() => sleepCommand("wake", argv("sleep", "wake")));
+        expect(invoke).toHaveBeenCalledWith("sleep", {}, { path: `${PROJECT_ID}/wake` });
+        expect(r.json()).toEqual({ state: "waking" });
+    });
+
+    it("wake on a control plane without the function answers not_served", async () => {
+        answer = () => {
+            throw notServed();
+        };
+        const r = await stdoutOf(() => sleepCommand("wake", argv("sleep", "wake")));
+        expect(errorOf(r)).toMatchObject({ code: "not_served", message: "This control plane does not serve sleep when idle yet." });
+    });
+
+    it("refuses an unknown action, and --after anywhere but on", async () => {
+        const typo = await stdoutOf(() => sleepCommand("of", argv("sleep", "of")));
+        expect(errorOf(typo).code).toBe("unknown_command");
+        const misplaced = await stdoutOf(() => sleepCommand("off", argv("sleep", "off", "--after", "1h")));
+        expect(errorOf(misplaced).code).toBe("bad_request");
+        expect(updates).toEqual([]);
     });
 });

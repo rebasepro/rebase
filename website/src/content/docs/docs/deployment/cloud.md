@@ -459,7 +459,7 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 
 | Dial | Unit, and what it means |
 |---|---|
-| `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `100m` and `384Mi`, bursting to 2 CPU and `2Gi` |
+| `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default, which depends on the region (below) |
 | `--replicas` | Instances that always exist: the autoscaler's floor, and what the project's subscription bills monthly |
 | `--autoscale-max` | 1–16. The ceiling it may reach. Instances the autoscaler adds above `--replicas` are metered per pod-second at the same rates, and charged only where the platform has switched that on; **Usage this month** says which. `--no-autoscale` turns it off |
 | `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
@@ -470,11 +470,20 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 An empty dial is not the same as one pinned to the same number: an empty dial
 follows the platform default and moves when it moves.
 
+On Belgium (europe-west1) the default reserves 100m CPU and 384Mi and can burst
+to 2 CPU and 2 GiB; in Falkenstein and Helsinki memory may stretch to 1.4× the
+request and CPU to 10× (at most 1.7 vCPU). `rebase cloud compute` shows your
+project's numbers.
+
 Nothing is validated by the CLI, on purpose — the limits belong to the cluster a
 project runs on, and they differ between providers. The control plane refuses a
 value it cannot honour and names the field. Run `rebase cloud compute` to see
-the €/month before and after; a change applies immediately, prorated from today,
-except one that restarts the database, which waits for a maintenance window.
+the €/month before and after; a change applies immediately, prorated from today.
+A database change applies now; billed at the current size until it is running.
+A new database CPU or memory, or fewer instances, restarts the database (about
+30 seconds to 3 minutes; connections are dropped and reconnect): `compute set`
+says so and asks, and off a terminal `--yes` is the consent. If that restart
+fails, `rebase cloud compute apply` tries it again.
 
 ## The rest of the surface
 
@@ -489,6 +498,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
 | `deploy-hooks` | Secret URLs a git host or CI calls to deploy the project: list, create (the URL is shown once), revoke. |
 | `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
+| `sleep` | Sleep when idle: `on [--after 15m\|30m\|1h\|4h]`, `off`, `wake`, and `status` (the default). Asleep, a project holds no CPU or memory and the next request wakes it; scheduled jobs and background work do not run meanwhile. Where a project cannot sleep, the control plane refuses and says why |
 | `start`, `stop`, `restart` | Pausing a project and bringing it back. A stopped project keeps its subscription, unless the platform bills stopped projects for storage and the platform fee only; the console's **Billing** row says so when it does |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `alerts` | The project's open incidents, and acknowledging or snoozing one. |

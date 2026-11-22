@@ -55,6 +55,8 @@ import {
     resolveClusterVerifyArgs,
     resolveClusterAddArgs,
     resolveClusterRegistryArgs,
+    resolveClusterOpenArgs,
+    clusterAddHint,
     readPullKey,
     storageCommand,
     clustersCommand,
@@ -516,6 +518,8 @@ describe("cloud clusters add", () => {
             name: "rebase-fsn1", provider: "hetzner", region: "fsn1", kubeconfigPath: "./cp.kubeconfig",
             baseDomain: undefined, ingressAddress: undefined, platformCapacity: false
         });
+        // `toEqual` reads an absent key and an `undefined` one alike; absent is the point.
+        expect(Object.keys(args)).not.toContain("openToCustomers");
     });
 
     it("carries the placement, address and backup store the baseline reads at insert", () => {
@@ -557,6 +561,63 @@ describe("cloud clusters add", () => {
             "clusters", "add", "--name", "x", "--provider", "azure", "--region", "r", "--kubeconfig", "k"
         )));
         expect(refusal.message).toMatch(/gcp, aws or hetzner/);
+    });
+
+    /**
+     * Absent is not `false`: the column is NULL (closed) by default, and a
+     * control plane that predates it refuses an unknown field. So the key is
+     * carried only when the flag was given.
+     */
+    it("carries openToCustomers only when --open-to-customers is given", () => {
+        const base = ["clusters", "add", "--name", "x", "--provider", "gcp", "--region", "europe-west1", "--kubeconfig", "k"];
+        expect("openToCustomers" in resolveClusterAddArgs(argv(...base))).toBe(false);
+        expect(resolveClusterAddArgs(argv(...base, "--open-to-customers")).openToCustomers).toBe(true);
+    });
+
+    it("names --open-to-customers in its usage line", async () => {
+        const refusal = await refusalOf(() => resolveClusterAddArgs(argv("clusters", "add", "--name", "x")));
+        expect(refusal.message).toContain("[--open-to-customers]");
+    });
+});
+
+describe("cloud clusters open|close", () => {
+    it("reads the id or name after the action", () => {
+        expect(resolveClusterOpenArgs(argv("clusters", "open", "rebase-fsn1"), "open").ref).toBe("rebase-fsn1");
+        expect(resolveClusterOpenArgs(argv("clusters", "close", "c_1"), "close").ref).toBe("c_1");
+        expect(resolveClusterOpenArgs(argv("clusters", "open"), "open").ref).toBeUndefined();
+    });
+
+    it("refuses an undeclared flag rather than opening a cluster named after it", async () => {
+        const refusal = await refusalOf(() => resolveClusterOpenArgs(argv("clusters", "open", "--force"), "open"));
+        expect(refusal.code).not.toBeNull();
+    });
+});
+
+describe("clusterAddHint", () => {
+    const ARGS = { region: "fsn1", baseDomain: "rebase.website", ingressAddress: "49.13.1.1" };
+    const FIRST =
+        "Projects placed in fsn1 deploy here once the baseline is ready; customers are offered the region only after " +
+        "--open-to-customers (or `rebase cloud clusters open c_9`).";
+
+    it("says to add explicit records and leave the wildcard alone when the domain is shared", () => {
+        expect(clusterAddHint(ARGS, "c_9", true)).toEqual([
+            FIRST,
+            "Another cluster already serves rebase.website, so add explicit records for ingress.rebase.website, " +
+                "s3.rebase.website and each project, and leave *.rebase.website alone until the last project has moved."
+        ]);
+    });
+
+    it("says to point the wildcard at the ingress when nobody else serves the domain", () => {
+        expect(clusterAddHint(ARGS, "c_9", false)).toEqual([FIRST, "Point *.rebase.website at 49.13.1.1."]);
+    });
+
+    it("prints both when it cannot tell", () => {
+        expect(clusterAddHint({ region: "fsn1" }, "c_9", undefined)).toEqual([
+            FIRST,
+            "If another cluster already serves <baseDomain>, add explicit records for ingress.<baseDomain>, s3.<baseDomain> " +
+                "and each project, and leave *.<baseDomain> alone until the last project has moved. " +
+                "Otherwise point *.<baseDomain> at its ingress address."
+        ]);
     });
 });
 

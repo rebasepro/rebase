@@ -47,6 +47,7 @@ import { GUESTS_ACTIONS, GUESTS_FLAGS } from "./guests";
 import { ACTIVITY_FLAGS } from "./activity";
 import { NOTIFICATIONS_ADD_FLAGS } from "./notifications";
 import { COMPUTE_WINDOW_FLAGS, EVENTS_FLAGS } from "./maintenance";
+import { SLEEP_ON_FLAGS } from "./sleep";
 import { DEPLOY_HOOKS_ACTIONS, DEPLOY_HOOKS_FLAGS } from "./deploy-hooks";
 import { ALERTS_ACTIONS, ALERTS_FLAGS } from "./alerts";
 
@@ -107,6 +108,8 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "clusters verify": null,
     "clusters baseline": CLUSTER_BASELINE_FLAGS,
     "clusters registry": CLUSTER_REGISTRY_FLAGS,
+    "clusters open": {},
+    "clusters close": {},
     // The graph. Neither listing nor pruning declares a flag of its own —
     // `prune`'s `--yes` is the global one.
     resources: null,
@@ -118,6 +121,12 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "compute apply": {},
     "compute window": COMPUTE_WINDOW_FLAGS,
     events: EVENTS_FLAGS,
+    // Sleep when idle: only `on` takes a flag of its own.
+    sleep: null,
+    "sleep status": {},
+    "sleep on": SLEEP_ON_FLAGS,
+    "sleep off": {},
+    "sleep wake": {},
     // Session, link and the operations whose only options are the global ones.
     // `{}` rather than `null` on purpose: it says "this command declares nothing
     // of its own", which turns the reverse check on — a page inventing a flag
@@ -163,6 +172,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
         "--base-domain": String,
         "--ingress-address": String,
         "--platform-capacity": Boolean,
+        "--open-to-customers": Boolean,
         "--backup-bucket": String,
         "--backup-endpoint": String,
         "--backup-access-key-id": String,
@@ -592,6 +602,39 @@ describe("printActionHelp", () => {
             expect(printed).toContain("--db <managed|byodb|none>");
         } finally {
             log.mockRestore();
+        }
+    });
+});
+
+/**
+ * What the compute pages say about a database change and the default size —
+ * both were wrong once: a database change "waited for the maintenance window"
+ * on a control plane that applies it on consent, and the default app "burst to
+ * 2 CPU / 2 GiB" in every region.
+ */
+describe("the compute pages", () => {
+    const text = (key: string) => {
+        const page = ACTION_HELP[key];
+        return [page.summary, ...page.flags.map(([, d]) => d), ...(page.notes ?? [])].join("\n");
+    };
+
+    it("says the default per region, once, and the CPU and memory flags point at it", () => {
+        const set = text("compute set");
+        expect(set).toContain(
+            "On Belgium (europe-west1) the default reserves 100m CPU and 384Mi and can burst to 2 CPU and 2 GiB; "
+            + "in Falkenstein and Helsinki memory may stretch to 1.4× the request and CPU to 10× (at most 1.7 vCPU). "
+            + "`rebase cloud compute` shows your project's numbers."
+        );
+        expect(set).not.toMatch(/bursting to 2/);
+    });
+
+    it("says a database change applies now, restarts the database, and is billed at the current size until it runs", () => {
+        const set = text("compute set");
+        expect(set).toContain("A database change applies now; billed at the current size until it is running.");
+        expect(set).toContain("about 30 seconds to 3 minutes; connections are dropped and reconnect");
+        expect(set).toContain("acknowledgeDatabaseRestart");
+        for (const key of ["compute", "compute set", "compute apply"]) {
+            expect(text(key)).not.toMatch(/waits for the maintenance window|scheduled for the project's maintenance window|instead of in its maintenance window/);
         }
     });
 });

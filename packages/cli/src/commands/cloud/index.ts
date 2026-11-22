@@ -24,6 +24,7 @@ import { extensionsCommand, printExtensionsHelp } from "./extensions";
 import { settingsCommand, printSettingsHelp } from "./settings";
 import { deploymentsListCommand, rollbackCommand, cancelCommand } from "./deployments";
 import { powerCommand } from "./power";
+import { sleepCommand } from "./sleep";
 import { debugCommand, printDebugHelp } from "./debug";
 import { cronCommand } from "./cron";
 import { connectCommand } from "./connect";
@@ -80,6 +81,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--access-key-id": String,
     "--action": String,
     "--actor": String,
+    "--after": String,
     "--allow": String,
     "--autoscale-cpu-target": String,
     "--autoscale-max": String,
@@ -397,6 +399,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "restart":
             await powerCommand(group, rawArgs);
             break;
+        case "sleep":
+            await sleepCommand(action, rawArgs);
+            break;
         case "status":
             await statusCommand(rawArgs);
             break;
@@ -596,6 +601,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "start", section: "Deploy & observe", description: "Bring a stopped project back" },
     { action: "stop", section: "Deploy & observe", description: "Stop the project. Downtime, so it confirms" },
     { action: "restart", section: "Deploy & observe", description: "Stop and start it again" },
+    { action: "sleep", section: "Deploy & observe", args: "[status|on|off|wake]", description: "Sleep when nobody uses it, and wake on the next request" },
     { action: "status", section: "Deploy & observe", description: "One glance: URL, last deploy, and what it is waiting on" },
     { action: "metrics", section: "Deploy & observe", description: "Live CPU, memory and disk; requests and errors with --runtime; history with --history" },
     { action: "debug", section: "Deploy & observe", description: "Diagnose a misbehaving deployment. Read-only" },
