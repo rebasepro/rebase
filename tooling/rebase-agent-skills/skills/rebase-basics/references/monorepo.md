@@ -46,7 +46,7 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 | `@rebasepro/app` | The frontend runtime: hooks, providers, context, the auth controller (`useRebaseAuthController`) and `LoginView` | Frontend — React integration, hooks, providers, auth flows |
 | `@rebasepro/types` | Shared TypeScript type definitions (`TableDef`, `TableDescriptor`, `SecurityRule`, `policy`, `RebaseClient`, etc.) | Type imports across all packages |
 | `@rebasepro/ui` | Standalone component library (Tailwind CSS v4 + Radix) | Building custom views in Studio or standalone UI |
-| `@rebasepro/cms` | The CMS: `RebaseCMS`, `customizeTable`, collection views, entity forms, collection editor — derived from the tables the backend serves at `GET /api/schema/tables` | The admin panel. Needs no per-table code |
+| `@rebasepro/cms` | The CMS: `RebaseCMS`, `customizeTable`, collection views, entity forms — derived from the tables the backend serves at `GET /api/schema/tables` | The admin panel. Needs no per-table code |
 | `@rebasepro/studio` | The BaaS console: SQL editor, schema visualizer, RLS editor, storage browser, logs, API explorer, API keys, backups, cron | Database tooling. Ships on BaaS with no CMS — `@rebasepro/cms` is an optional peer |
 | `@rebasepro/client` | Client SDK for consuming the Rebase API | Any client-side or script-side data operations |
 | `@rebasepro/firebase` | Firestore in the CMS: `defineFirestoreCollection`, `useFirestoreDataSource`, Firebase auth | Showing Firestore collections next to the tables (`<RebaseCMS externalCollections>`) |
@@ -54,7 +54,7 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 | `@rebasepro/forms` | Form engine | Building dynamic forms from a table's fields |
 | `@rebasepro/mcp` | AI agent MCP tools | The MCP server that agents use |
 | `@rebasepro/codegen` | Typed SDK generation from the table descriptors | Used by `rebase generate-sdk` command |
-| `@rebasepro/inference` | Infer a schema from existing data | Used by the CMS collection editor and data import (`rebase schema introspect` is the driver's own) |
+| `@rebasepro/inference` | Infer admin-panel field types from sample data | Used by the CMS data import (`rebase schema introspect` is the driver's own) |
 | `@rebasepro/plugin-ai` | AI-powered data autofill | Studio plugin for auto-completing fields |
 | `@rebasepro/plugin-insights` | Figures for KPI tiles and charts | `useInsightData` — loads a figure once per signed-in user; the tiles and charts that draw it are `KpiTile`, `TimeSeriesChart` and `BarChart` in `@rebasepro/ui` |
 | `@rebasepro/cli` | CLI tool | The `rebase` CLI binary |

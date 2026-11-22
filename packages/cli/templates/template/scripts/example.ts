@@ -85,9 +85,19 @@ async function run() {
             : { status: res.status, text: await res.text() };
         console.log("✅ Backend health:", health);
 
-        // Example: Fetch some data (requires auth if backend is secure-by-default)
-        // const items = await rebase.data.table("users").find({ limit: 5 });
-        // console.log("Items:", items);
+        // The tables this backend serves to this key: every one exported from
+        // backend/schema, or the database's own in a headless project.
+        const tables = await rebase.schema.tables();
+        console.log(`✅ ${tables.length} table(s): ${tables.map(table => table.slug).join(", ") || "none yet"}`);
+
+        // A few rows of the first one. `data.table("<slug>")` reaches any
+        // served table; with the types `rebase dev` generates (the import
+        // above) the same call is `rebase.data.<table>.find(...)`, typed.
+        const first = tables[0];
+        if (first) {
+            const { data, meta } = await rebase.data.table(first.slug).find({ limit: 3 });
+            console.log(`✅ ${first.slug}: ${meta.total} row(s); the first ${data.length}:`, data);
+        }
 
         console.log("✨ Script finished successfully.");
     } catch (error) {

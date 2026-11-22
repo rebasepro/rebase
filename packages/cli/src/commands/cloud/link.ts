@@ -175,7 +175,7 @@ export async function linkCommand(rawArgs: string[]): Promise<void> {
             if (projects.length === 0) {
                 fail(
                     "No projects found for your account.",
-                    `Create one with ${chalk.bold("rebase cloud projects create")}.`,
+                    `Create one and link this directory to it: ${chalk.bold("rebase cloud projects create --link")}.`,
                     "no_projects"
                 );
             }

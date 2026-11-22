@@ -119,7 +119,6 @@ Rebase eliminates the custom boilerplate work between database, API, and UI by g
 - **${cleanHtml(tr("showcase.sync.title"))}**: ${cleanHtml(tr("showcase.sync.subtitle"))}
   - **${cleanHtml(tr("showcase.sync.tab1.title"))}**: ${cleanHtml(tr("showcase.sync.tab1.desc"))}
   - **${cleanHtml(tr("showcase.sync.tab2.title"))}**: ${cleanHtml(tr("showcase.sync.tab2.desc"))}
-  - **${cleanHtml(tr("showcase.sync.tab3.title"))}**: ${cleanHtml(tr("showcase.sync.tab3.desc"))}
 `;
   }
 
@@ -223,13 +222,15 @@ Let AI agents read, write, and act on your Postgres data autonomously.
   if (page === "studio") {
     return `# Rebase Studio
 
-A visual developer workspace to manage database content, edit schemas, and inspect logs.
+The developer workspace inside the Rebase panel, running against your own Postgres.
 
 ## Features
-- **Visual Schema Builder**: Edit tables, columns, relations, and permissions visually.
-- **Spreadsheet Editing**: Edit Postgres records directly in a clean grid layout.
-- **AST Syncing**: Visual editor changes are synchronized directly back to your local TypeScript schema files.
-- **Developer Tools**: Explore SQL, RLS rules, custom cron jobs, and background workers in real time.
+- **SQL console**: Multiple tabs, autocomplete against your real schema, \`EXPLAIN\`, and results you can edit in place.
+- **Row-level security**: Read and edit the policies on each table, enforced natively in PostgreSQL.
+- **Schema visualizer**: An interactive diagram of your tables, columns and relationships.
+- **Database branches**: Copy the database, review what a branch changed, then merge it back or delete it.
+- **Operations**: Cron jobs, logs, storage, backups, a JS console, the API explorer and scoped API keys.
+- **Tables are code**: Tables are declared with \`defineTable\` in \`backend/schema/\` and reviewed in a pull request.
 `;
   }
 

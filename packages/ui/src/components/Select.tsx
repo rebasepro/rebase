@@ -436,23 +436,31 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                             !bare && controlHeight,
                             labelInside && ["leading-5", valuePadding]
                         )}>
-                        <SelectPrimitive.Value
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                            }}
-                            // A resting label fills the empty box, so the
-                            // placeholder waits until the label moves up, as a
-                            // TextField's does.
-                            placeholder={bareContent ?? emptyItemDisplay ?? (!labelInside || labelShrunk ? placeholder : null)}
-                            className={"w-full"}>
+                        {/* With the label inside, the value is one 20px line
+                            whatever draws it: a chip from `renderValue` (32px at
+                            large) centres on that line and overhangs it, instead
+                            of growing the box past a TextField's beside it (74px
+                            against 66 in the record form). On a wrapper: the
+                            primitive's own element does not keep a className. */}
+                        <span className={cls("w-full", labelInside && "h-5 flex items-center")}>
+                            <SelectPrimitive.Value
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }}
+                                // A resting label fills the empty box, so the
+                                // placeholder waits until the label moves up, as a
+                                // TextField's does.
+                                placeholder={bareContent ?? emptyItemDisplay ?? (!labelInside || labelShrunk ? placeholder : null)}
+                                className={"w-full"}>
 
-                            {bareContent ?? (hasValue && value !== undefined && renderValue
-                                ? renderValue(value)
-                                : (displayChildren || placeholder)
-                            )}
+                                {bareContent ?? (hasValue && value !== undefined && renderValue
+                                    ? renderValue(value)
+                                    : (displayChildren || placeholder)
+                                )}
 
-                        </SelectPrimitive.Value>
+                            </SelectPrimitive.Value>
+                        </span>
                     </div>
 
                     {/* Spaced with a margin, never padding: under border-box,

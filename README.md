@@ -282,7 +282,7 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/cli` | CLI for project scaffolding and management |
 | `@rebasepro/codegen` | TypeScript SDK code generation |
 | `@rebasepro/mcp` | MCP server for AI integrations |
-| `@rebasepro/inference` | Database schema introspection and inference |
+| `@rebasepro/inference` | Infers admin-panel field types from sample data, for the CMS data import |
 | `@rebasepro/rls-check` | Static audit of a database's row-level security |
 | `@rebasepro/plugin-ai` | AI-powered data enhancement plugin |
 | `@rebasepro/plugin-insights` | Analytics and insights plugin |

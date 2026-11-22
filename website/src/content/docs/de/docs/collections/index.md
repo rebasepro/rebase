@@ -1,5 +1,5 @@
 ---
-sourceHash: fc0bdfb0ae7ceb1b
+sourceHash: dd9910d58ec5bf33
 title: Tabellen im CMS
 sidebar_label: Tabellen im CMS
 description: "Wie das CMS jede Postgres-Tabelle ohne Frontend-Konfiguration anzeigt: Labels, das Widget für jeden Spaltentyp, Pflicht- und schreibgeschützte Felder, Relationen, Anzeige-Slots sowie Steuerelemente zum Erstellen, Bearbeiten und Löschen gemäß der Row-Level-Security der Tabelle."
@@ -28,7 +28,7 @@ Früher las das Panel `config/collections` über ein Vite-Plugin. Jetzt liest es
 
 - Das Panel fragt an, sobald jemand angemeldet ist, und fragt erneut an, wenn sich der angemeldete Benutzer oder dessen Rollen ändern. Einem abgemeldeten Besucher wird keine Tabelle gesendet.
 - Der Server versieht die Antwort mit einem `ETag`. Der Client behält die letzte Antwort und sendet das Tag zurück, sodass ein unverändertes Schema lediglich einen `304` verursacht.
-- Das Aktualisieren der Navigation fragt erneut an. Der Schema-Editor tut dies, nachdem er eine Tabelle geändert hat.
+- Das Aktualisieren der Navigation fragt erneut an. Das tut der erneute Versuch, der angeboten wird, wenn die Tabellen nicht geladen werden können.
 
 Dieselben Deskriptoren steuern das Studio und die MCP-Apps, sodass alle drei dasselbe Verständnis davon haben, was eine Tabelle ist.
 

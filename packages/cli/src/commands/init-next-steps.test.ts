@@ -64,7 +64,13 @@ describe("every command init prints works in the scaffold it is printed for", ()
                 const printed = commands(steps(flavour, pm));
                 expect(printed.length).toBeGreaterThan(0);
 
-                for (const command of printed) {
+                for (const line of printed) {
+                    // `psql "$(<command>)"` opens the database the command
+                    // names: the command inside is the project's CLI, held to
+                    // the same rules as one printed on its own line.
+                    const inner = line[0] === "psql" ? /"\$\(([^)]+)\)"/.exec(line.join(" "))?.[1] : undefined;
+                    if (line[0] === "psql") expect(inner, `${line.join(" ")} — psql with no command to connect it`).toBeDefined();
+                    const command = inner ? inner.split(/\s+/) : line;
                     const [bin, verb, ...rest] = command;
                     // SQL, comment included, is run in the database rather than a shell.
                     if (bin === "cd" || bin === "ALTER" || bin === "CREATE" || bin === "--") continue;
@@ -212,6 +218,8 @@ describe("the steps, per flavour", () => {
             "  pnpm run dev",
             "",
             "  # 2. Create your tables (migrations, SQL, any tool you like).",
+            "  #    With psql, against the database dev started:",
+            "  psql "$(pnpm exec rebase db url)"",
             "  #    A table is served once row-level security is enabled on it, and a",
             "  #    policy is what opens its rows:",
             "  ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;",
@@ -219,7 +227,8 @@ describe("the steps, per flavour", () => {
             "  CREATE POLICY your_table_owner ON your_table FOR ALL USING (user_id::text = rebase.uid());",
             "  #    The API logs any table it skips, and why.",
             "",
-            "  # Sign in: the first account you register becomes the admin.",
+            "  # There is no sign-in screen here: with dev running, create the first admin:",
+            "  pnpm exec rebase users create you@example.com --role admin --password <a password>",
             "  # In production (docker compose) that window is shut and the account named by",
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",
@@ -254,7 +263,8 @@ describe("the steps, per flavour", () => {
             "  CREATE POLICY your_table_owner ON your_table FOR ALL USING (user_id::text = rebase.uid());",
             "  #    The API logs any table it skips, and why.",
             "",
-            "  # Sign in: the first account you register becomes the admin.",
+            "  # There is no sign-in screen here: with dev running, create the first admin:",
+            "  pnpm exec rebase users create you@example.com --role admin --password <a password>",
             "  # In production (docker compose) that window is shut and the account named by",
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",
@@ -280,7 +290,8 @@ describe("the steps, per flavour", () => {
             "  # Start the API over it:",
             "  pnpm run dev",
             "",
-            "  # Sign in: the first account you register becomes the admin.",
+            "  # There is no sign-in screen here: with dev running, create the first admin:",
+            "  pnpm exec rebase users create you@example.com --role admin --password <a password>",
             "  # In production (docker compose) that window is shut and the account named by",
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",

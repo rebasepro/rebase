@@ -3,7 +3,7 @@ import type { productLocales } from "../../../backend/schema/product_locales";
 import { LOCALE_LABELS } from "./lib/locales";
 
 export const productLocalesCms = customizeTable<typeof productLocales>("product_locales", {
-    icon: "Translate",
+    icon: "Languages",
     group: "E-Commerce",
     hideFromNavigation: true,
     display: {

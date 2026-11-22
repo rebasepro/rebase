@@ -3,14 +3,17 @@ title: Live schema editing
 description: Create and alter tables against a running backend — the edit is written to backend/schema, committed to your repository first, then applied.
 ---
 
-The schema editor in the admin panel rewrites the table files in
-`backend/schema`. That works on your machine and nowhere else: a deployed
-server's files are rebuilt from your repository on every deploy, so an edit made
-there would be discarded on the next one.
+The source-only schema editor, `/api/admin/schema-editor/*`, rewrites the
+table files in `backend/schema` and touches nothing else. That works on your
+machine and nowhere else: a deployed server's files are rebuilt from your
+repository on every deploy, so an edit made there would be discarded on the
+next one.
 
 Live schema editing is the answer to that. It **commits the change to your
 repository, then applies the DDL** — so the edit survives the next deploy,
-because the deploy is built from it.
+because the deploy is built from it. Studio's RLS editor saves a table's
+policies through these routes — planned, shown as SQL, confirmed, then
+applied — and a script or an agent holding the scope can send the same edits.
 
 ```
 GET  /api/admin/schema/status   whether this backend can do it, and whether you may
@@ -196,7 +199,7 @@ no change is applied from the panel, so every change goes this way: the
 dialog's main button reads **Commit** and sends `"sourceOnly": true`, and the
 process that changes that database applies the schema.
 
-Deleting a table from the admin panel takes the same path: `/apply` with a
+Deleting a table takes the same path: `/apply` with a
 `deleteTable` edit and `"sourceOnly": true` deletes the table's file and its
 export in `index.ts` and commits both; the table and its rows stay in the
 database. It is refused while a relation of another table targets it, naming

@@ -273,10 +273,10 @@ export const hi: RebaseTranslations = {
     group_name_exists_error: "यह समूह नाम पहले से मौजूद है।",
 
     // ─── Search ───────────────────────────────────────────────────
-    search_collections: "संग्रह खोजें",
+    search_collections: "खोजें",
 
     // ─── Navigation groups ────────────────────────────────────────
-    views_group: "दृश्य",
+    views_group: "तालिकाएँ",
 
     // ─── Entity Edit View ─────────────────────────────────────────
     youd_need_to_save_before_additional_collections: "संबंधित रिकॉर्ड जोड़ने से पहले इस रिकॉर्ड को सहेजें।",
@@ -1188,7 +1188,7 @@ export const hi: RebaseTranslations = {
     // The admin's own three groups, read by `useNavigationGroupLabel` the same
     // way as the Studio ones below — the group *name* is an identifier the
     // ordering and the icons key off, and only the heading is translated.
-    studio_group_views: "दृश्य",
+    studio_group_views: "तालिकाएँ",
     studio_group_admin: "व्यवस्थापन",
     studio_group_settings: "सेटिंग्स",
     studio_group_database: "डेटाबेस",

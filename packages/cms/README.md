@@ -1,6 +1,6 @@
 # @rebasepro/cms
 
-CMS frontend — content management views, forms, routing, visual schema editor, and data import/export for Rebase.
+CMS frontend — content management views, forms, routing, and data import/export for Rebase.
 
 ## Installation
 
@@ -16,7 +16,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
-`@rebasepro/cms` is the complete CMS layer of Rebase. It renders every table the backend serves at `GET /api/schema/tables` with no configuration, changed per table by `customizeTable` (in a project's `frontend/src/cms/`), and Firestore collections passed as `externalCollections`. It provides the admin panel UI — table/card views, entity editing forms, side-panel navigation, the visual collection (schema) editor, data import/export (CSV, JSON, Excel), and the app shell with auth gating, routing, and drawer layout. It sits on top of `@rebasepro/app` (runtime hooks/providers) and `@rebasepro/ui` (design system components).
+`@rebasepro/cms` is the complete CMS layer of Rebase. It renders every table the backend serves at `GET /api/schema/tables` with no configuration, changed per table by `customizeTable` (in a project's `frontend/src/cms/`), and Firestore collections passed as `externalCollections`. It provides the admin panel UI — table/card views, entity editing forms, side-panel navigation, data import/export (CSV, JSON, Excel), and the app shell with auth gating, routing, and drawer layout. It sits on top of `@rebasepro/app` (runtime hooks/providers) and `@rebasepro/ui` (design system components).
 
 ## Key Exports
 

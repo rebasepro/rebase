@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { SchemaBuilderMiniDemo } from "./SchemaBuilderMiniDemo";
 import { SdkMiniDemo } from "./SdkMiniDemo";
 import { ApiMiniDemo } from "./ApiMiniDemo";
 import { CustomFieldsDemo } from "./CustomFieldsDemo";
@@ -24,8 +23,8 @@ export function DeveloperPlayground() {
         {
             id: "schema",
             title: "Schema-as-Code",
-            description: "Define database models in pure TypeScript. Run visual schema updates with automated AST mutations written straight back to your codebase.",
-            badge: "AST Mutation",
+            description: "Define tables in plain TypeScript. Save the file and the dev server regenerates the schema and the SDK, and adds what is new to the database.",
+            badge: "defineTable",
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -160,7 +159,7 @@ export function DeveloperPlayground() {
                                         {"    "}id: col.uuid().primaryKey().defaultRandom(),{"\n"}
                                         {"    "}title: col.text(),{"\n"}
                                         <span className={schemaStatus === "synced" ? "text-green-300 bg-green-500/10 border-l border-green-500 pl-1 animate-pulse" : "text-tone-400 opacity-60"}>
-                                            {"    "}status: col.text().notNull(),
+                                            {"    "}status: col.text(),
                                         </span>{"\n"}
                                         {"  "}&#125;,{"\n"}
                                         {"  "}rls: <span className="text-green-400">"admin-only"</span>,{"\n"}
@@ -168,7 +167,7 @@ export function DeveloperPlayground() {
                                     </pre>
                                 </div>
                                 <div className="mt-6 pt-4 border-t border-hairline flex items-center justify-between">
-                                    <div className="text-[10px] text-tone-500">AST Mutator will append new fields to this file automatically when edited in UI.</div>
+                                    <div className="text-[10px] text-tone-500">Add a column, save the file, and rebase dev picks it up.</div>
                                     <button
                                         onClick={runSchemaSync}
                                         disabled={schemaSyncing || schemaStatus === "synced"}
@@ -178,7 +177,7 @@ export function DeveloperPlayground() {
                                                 : "bg-primary text-white hover:bg-primary-dark shadow-md shadow-primary/10"
                                         }`}
                                     >
-                                        {schemaSyncing ? "Syncing..." : schemaStatus === "synced" ? "Database Synced" : "Sync schema to DB"}
+                                        {schemaSyncing ? "Saving..." : schemaStatus === "synced" ? "Applied" : "Save posts.ts"}
                                     </button>
                                 </div>
                             </div>
@@ -186,23 +185,27 @@ export function DeveloperPlayground() {
                             <div className="lg:col-span-6 bg-[#08090b] island-dark p-5 flex flex-col justify-between">
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between border-b border-hairline pb-2.5">
-                                        <span className="text-[10px] font-semibold text-tone-500 uppercase tracking-wider">Visual Studio Schema Editor</span>
+                                        <span className="text-[10px] font-semibold text-tone-500 uppercase tracking-wider">rebase dev</span>
                                         <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded border ${
                                             schemaStatus === "synced"
                                                 ? "bg-emerald-950/30 text-emerald-400 border-emerald-900/40"
                                                 : "bg-amber-950/30 text-amber-400 border-amber-900/40 animate-pulse"
                                         }`}>
-                                            {schemaStatus === "synced" ? "SCHEMA SYNCED" : "UNAPPLIED AST CODE CHANGES"}
+                                            {schemaStatus === "synced" ? "APPLIED" : "FILE CHANGED"}
                                         </span>
                                     </div>
                                     <p className="text-xs text-tone-400 leading-relaxed font-sans">
-                                        Rebase lets non-technical editors build database schemas visually. Any change updates the database instantly and generates type-safe AST code modifications.
+                                        The dev server regenerates the Drizzle schema and the SDK types from the file, then creates what is missing (a new table, a new column) before it serves again. A rename or a drop is left to rebase db push.
                                     </p>
-                                    <SchemaBuilderMiniDemo />
+                                    <pre className="text-[11px] leading-relaxed font-mono text-tone-300 bg-surface-raised rounded border border-hairline p-3 whitespace-pre-wrap">
+                                        {schemaStatus === "synced"
+                                            ? "🔄 Schema file changed: posts.ts\n✓ Schema and SDK types regenerated\nApplied 1 additive schema change(s) before boot.\n  ALTER TABLE \"posts\" ADD COLUMN \"status\" text;\nServer running"
+                                            : "Server running\nWatching backend/schema for changes"}
+                                    </pre>
                                 </div>
                                 <div className="text-[10px] text-tone-500 font-mono bg-surface-raised px-3 py-2 rounded border border-hairline">
-                                    <span>Active Engine: </span>
-                                    <code className="text-amber-400 font-semibold">drizzle-kit push:postgres</code>
+                                    <span>Renames and drops: </span>
+                                    <code className="text-amber-400 font-semibold">rebase db push</code>
                                 </div>
                             </div>
                         </>

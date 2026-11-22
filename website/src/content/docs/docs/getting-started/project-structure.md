@@ -14,8 +14,9 @@ else elsewhere in the industry.
 - **Collection** — what the admin panel shows: a table rendered as a list and a
   form, customized in `frontend/src/cms/`, or a Firestore collection the panel
   reads directly.
-- **Studio** — the developer half of the admin panel: schema editor, SQL
-  console, policy browser. The same app your content team uses, behind a toggle.
+- **Studio** — the developer half of the admin panel: SQL console, RLS
+  policies, schema diagram, branches, logs. The same app your content team uses,
+  behind a toggle.
 - **Managed runtime** — the published `rebasepro/server` image boots your
   project. You write no server file, and you get runtime upgrades without a
   rebuild. The alternative is `rebase eject`, below.
@@ -237,7 +238,7 @@ about the bundle is written by hand; if you want to see one,
 [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) is what is in it.
 
 The panel the frontend serves has two halves. **Studio** is the developer one —
-the schema editor, the SQL console, the RLS policy browser — and it is behind
+the SQL console, the RLS policy browser, the schema diagram — and it is behind
 the toggle in the drawer, not a separate deployment. See [Studio](/docs/studio/).
 
 To take ownership of the process instead — your own middleware, routes and auth

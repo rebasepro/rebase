@@ -278,10 +278,10 @@ export const pt: RebaseTranslations = {
     group_name_exists_error: "Este nome de grupo já existe.",
 
     // ─── Search ───────────────────────────────────────────────────
-    search_collections: "Pesquisar coleções",
+    search_collections: "Pesquisar",
 
     // ─── Navigation groups ────────────────────────────────────────
-    views_group: "Visualizações",
+    views_group: "Tabelas",
 
     // ─── Entity Edit View ─────────────────────────────────────────
     youd_need_to_save_before_additional_collections: "Guarde este registo antes de adicionar registos relacionados.",
@@ -1193,7 +1193,7 @@ export const pt: RebaseTranslations = {
     // The admin's own three groups, read by `useNavigationGroupLabel` the same
     // way as the Studio ones below — the group *name* is an identifier the
     // ordering and the icons key off, and only the heading is translated.
-    studio_group_views: "Visualizações",
+    studio_group_views: "Tabelas",
     studio_group_admin: "Administração",
     studio_group_settings: "Definições",
     studio_group_database: "Base de dados",

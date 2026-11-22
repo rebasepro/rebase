@@ -823,6 +823,13 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
         lines.push(note(ownDatabase
             ? "2. Serve your tables."
             : "2. Create your tables (migrations, SQL, any tool you like)."));
+        if (!ownDatabase) {
+            // "SQL, any tool you like" named no way into a database the
+            // developer never configured: the managed one listens on a port
+            // derived per project, and only `db url` knows it.
+            lines.push(note("   With psql, against the database dev started:"));
+            lines.push(cmd([`psql "$(${pm.exec("rebase", ["db", "url"]).join(" ")})"`]));
+        }
         lines.push(note("   A table is served once row-level security is enabled on it, and a"));
         lines.push(note("   policy is what opens its rows:"));
         lines.push(cmd(["ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;"]));
@@ -871,7 +878,17 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
     // without this line the honest reading of that `.env` is "these are my
     // credentials", and the first documented step (register, become the admin)
     // reads as broken.
-    lines.push(note("Sign in: the first account you register becomes the admin."));
+    if (headless) {
+        // A headless project has no sign-in screen to register on, so "the
+        // first account you register" pointed at nothing. The CLI creates the
+        // account through the running API with the project's service key. A
+        // password rather than the default invitation: the invitation's link
+        // opens the admin's reset page, which a headless project does not serve.
+        lines.push(note("There is no sign-in screen here: with dev running, create the first admin:"));
+        lines.push(cmd(pm.exec("rebase", ["users", "create", "you@example.com", "--role", "admin", "--password", "<a password>"])));
+    } else {
+        lines.push(note("Sign in: the first account you register becomes the admin."));
+    }
     lines.push(note("In production (docker compose) that window is shut and the account named by"));
     lines.push(note("REBASE_ADMIN_EMAIL in .env is created at boot instead."));
 

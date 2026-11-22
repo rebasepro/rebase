@@ -5,7 +5,6 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 
 
-import { SchemaBuilderMiniDemo } from '../../components/demos/SchemaBuilderMiniDemo.tsx';
 import { RbacMiniDemo } from '../../components/demos/RbacMiniDemo.tsx';
 import { SQLEditorDemo } from '../../components/demos/SQLEditorDemo.tsx';
 import "../../styles/editor.css";
@@ -68,7 +67,7 @@ import HeroBackdrop from "../HeroBackdrop.astro";
       </div>
     </section>
 
-    <!-- Collection Code Editor -->
+    <!-- Tables are code -->
  <section class="relative z-0 py-chapter">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -136,12 +135,6 @@ import HeroBackdrop from "../HeroBackdrop.astro";
           <p class="mt-lead text-tone-400 text-lg">{t("studiopage.09")}</p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-
-          <div class="group relative p-6 pb-8 rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
-            <SchemaBuilderMiniDemo client:load />
-            <h3 class="text-base text-tone-max mb-2 mt-auto">{t("studiopage.10")}</h3>
-            <p class="text-sm text-tone-400">{t("studiopage.11")}</p>
-          </div>
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-tone-900/50 ring-1 ring-inset ring-tone-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <RbacMiniDemo client:load />

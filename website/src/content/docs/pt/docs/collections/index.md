@@ -1,5 +1,5 @@
 ---
-sourceHash: fc0bdfb0ae7ceb1b
+sourceHash: dd9910d58ec5bf33
 title: Tabelas no CMS
 sidebar_label: Tabelas no CMS
 description: "Como o CMS exibe todas as tabelas do Postgres sem nenhuma configuração de frontend: rótulos, o widget atribuído a cada tipo de coluna, campos obrigatórios e somente leitura, relações, slots de exibição e controles de Criação, Edição e Exclusão que respeitam a segurança em nível de linha (RLS) da tabela."
@@ -48,8 +48,8 @@ do servidor; o descritor apenas informa quais hooks existem.
   recebe nenhuma tabela.
 - O servidor marca a resposta com um `ETag`. O cliente mantém a última resposta e
   envia a tag de volta, de modo que um esquema inalterado custa apenas um `304`.
-- Atualizar a navegação faz uma nova solicitação. O editor de esquema faz isso
-  depois de alterar uma tabela.
+- Atualizar a navegação faz uma nova solicitação. É o que faz a nova tentativa
+  oferecida quando as tabelas não carregam.
 
 Os mesmos descritores alimentam o Studio e os apps MCP, garantindo que os três
 estejam em sincronia sobre o que é uma tabela.
