@@ -28,6 +28,7 @@ import { ENV_SET_FLAGS } from "./env";
 import {
     COMPUTE_SET_FLAGS,
     BILLING_ACTIONS,
+    CLUSTER_ADD_FLAGS,
     CLUSTER_REGISTRY_FLAGS,
     CLUSTERS_ACTIONS,
     CLUSTER_BASELINE_FLAGS,
@@ -165,20 +166,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     previews: null,
     "previews list": PREVIEWS_LIST_FLAGS,
     "previews delete": PREVIEWS_DELETE_FLAGS,
-    "clusters add": {
-        "--name": String,
-        "--provider": String,
-        "--region": String,
-        "--kubeconfig": String,
-        "--base-domain": String,
-        "--ingress-address": String,
-        "--platform-capacity": Boolean,
-        "--open-to-customers": Boolean,
-        "--backup-bucket": String,
-        "--backup-endpoint": String,
-        "--backup-access-key-id": String,
-        "--backup-secret-access-key": String
-    }
+    "clusters add": CLUSTER_ADD_FLAGS
 };
 
 /** `--name, -n <name>` → `--name`. The page spells flags for a reader. */

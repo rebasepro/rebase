@@ -1512,6 +1512,12 @@ export interface ClusterAddArgs {
     backupEndpoint?: string;
     backupAccessKeyId?: string;
     backupSecretAccessKey?: string;
+    /** `broker`: new managed storage goes to the platform's storage broker, and the baseline installs no in-cluster object store. */
+    managedStorage?: "broker";
+    /** The fixed outbound IPv4 tenant apps leave from (Hetzner: `terraform output egress_ip`). */
+    egressAddress?: string;
+    /** The IPv6 address the ingress answers on, for AAAA records. */
+    ingressAddressV6?: string;
 }
 
 /**
@@ -1528,22 +1534,28 @@ export interface ClusterAddArgs {
  * bucket, is a row `resolveBackupStore` deliberately treats as "no store" —
  * so it is refused here, where the operator can still fix the command.
  */
+/** The flags `clusters add` declares; exported for its help page's test. */
+export const CLUSTER_ADD_FLAGS = {
+    "--name": String,
+    "--provider": String,
+    "--region": String,
+    "--kubeconfig": String,
+    "--base-domain": String,
+    "--ingress-address": String,
+    "--platform-capacity": Boolean,
+    "--open-to-customers": Boolean,
+    "--backup-bucket": String,
+    "--backup-endpoint": String,
+    "--backup-access-key-id": String,
+    "--backup-secret-access-key": String,
+    "--managed-storage": String,
+    "--egress-address": String,
+    "--ingress-address-v6": String
+};
+
 export function resolveClusterAddArgs(rawArgs: string[]): ClusterAddArgs {
     const { flags } = parseCloudArgs({
-        spec: {
-            "--name": String,
-            "--provider": String,
-            "--region": String,
-            "--kubeconfig": String,
-            "--base-domain": String,
-            "--ingress-address": String,
-            "--platform-capacity": Boolean,
-            "--open-to-customers": Boolean,
-            "--backup-bucket": String,
-            "--backup-endpoint": String,
-            "--backup-access-key-id": String,
-            "--backup-secret-access-key": String
-        },
+        spec: CLUSTER_ADD_FLAGS,
         rawArgs,
         commandWords: 2, // cloud clusters — `add` is the action positional
         command: "cloud clusters add",
@@ -1558,7 +1570,8 @@ export function resolveClusterAddArgs(rawArgs: string[]): ClusterAddArgs {
         fail(
             "Usage: rebase cloud clusters add --name <n> --provider <gcp|aws|hetzner> --region <r> --kubeconfig <path> " +
                 "[--base-domain <d>] [--ingress-address <ip>] [--platform-capacity] [--open-to-customers] " +
-                "[--backup-bucket <b> --backup-endpoint <url> --backup-access-key-id <k> --backup-secret-access-key <s>]",
+                "[--backup-bucket <b> --backup-endpoint <url> --backup-access-key-id <k> --backup-secret-access-key <s>] " +
+                "[--managed-storage broker] [--egress-address <ipv4>] [--ingress-address-v6 <ipv6>]",
             undefined,
             "bad_request"
         );
@@ -1592,6 +1605,23 @@ export function resolveClusterAddArgs(rawArgs: string[]): ClusterAddArgs {
         );
     }
 
+    const managedStorage = flags["--managed-storage"];
+    if (managedStorage !== undefined && managedStorage !== "broker") {
+        fail(
+            `--managed-storage takes one value, broker (got "${managedStorage}"). Leave it out for the object store on the cluster itself.`,
+            undefined,
+            "bad_request"
+        );
+    }
+    const egressAddress = flags["--egress-address"];
+    if (egressAddress !== undefined && !/^(\d{1,3}\.){3}\d{1,3}$/.test(egressAddress)) {
+        fail(`--egress-address must be one IPv4 address (got "${egressAddress}")`, undefined, "bad_request");
+    }
+    const ingressAddressV6 = flags["--ingress-address-v6"];
+    if (ingressAddressV6 !== undefined && !ingressAddressV6.includes(":")) {
+        fail(`--ingress-address-v6 must be an IPv6 address (got "${ingressAddressV6}")`, undefined, "bad_request");
+    }
+
     return {
         name: name!,
         provider,
@@ -1604,7 +1634,10 @@ export function resolveClusterAddArgs(rawArgs: string[]): ClusterAddArgs {
         // the column keeps its default (NULL, closed) and a control plane that
         // predates the column is never handed a field it would refuse.
         ...(flags["--open-to-customers"] === true ? { openToCustomers: true as const } : {}),
-        ...(anyBackup ? backup : {})
+        ...(anyBackup ? backup : {}),
+        ...(managedStorage === "broker" ? { managedStorage: "broker" as const } : {}),
+        ...(egressAddress ? { egressAddress } : {}),
+        ...(ingressAddressV6 ? { ingressAddressV6 } : {})
     };
 }
 

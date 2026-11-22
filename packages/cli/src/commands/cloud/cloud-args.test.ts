@@ -538,6 +538,23 @@ describe("cloud clusters add", () => {
         expect(args.backupSecretAccessKey).toBe("SK");
     });
 
+    it("carries broker storage, the egress address and the IPv6 ingress address at insert", () => {
+        const args = resolveClusterAddArgs(argv(
+            "clusters", "add", "--name", "rebase-fsn1", "--provider", "hetzner", "--region", "fsn1", "--kubeconfig", "./cp.kubeconfig",
+            "--managed-storage", "broker", "--egress-address", "5.75.215.67", "--ingress-address-v6", "2a01:4f8:c016:1e59::1"
+        ));
+        expect(args.managedStorage).toBe("broker");
+        expect(args.egressAddress).toBe("5.75.215.67");
+        expect(args.ingressAddressV6).toBe("2a01:4f8:c016:1e59::1");
+    });
+
+    it("refuses a managed storage other than broker, and an egress address that is not one IPv4", async () => {
+        setJsonModeForTest(true);
+        const base = ["clusters", "add", "--name", "x", "--provider", "hetzner", "--region", "fsn1", "--kubeconfig", "k"];
+        expect((await refusalOf(() => resolveClusterAddArgs(argv(...base, "--managed-storage", "garage")))).message).toMatch(/broker/);
+        expect((await refusalOf(() => resolveClusterAddArgs(argv(...base, "--egress-address", "2a01::1")))).message).toMatch(/IPv4/);
+    });
+
     it("refuses a backup bucket without its key — that row has NO backup store", async () => {
         setJsonModeForTest(true);
         const refusal = await refusalOf(() => resolveClusterAddArgs(argv(

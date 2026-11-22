@@ -422,7 +422,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--backup-bucket <b>", "Its own object-storage bucket for database backups (with the three below)"],
             ["--backup-endpoint <url>", "S3 endpoint of that bucket, e.g. https://fsn1.your-objectstorage.com"],
             ["--backup-access-key-id <k>", "Key for the bucket"],
-            ["--backup-secret-access-key <s>", "Secret for the bucket. Encrypted at rest"]
+            ["--backup-secret-access-key <s>", "Secret for the bucket. Encrypted at rest"],
+            ["--managed-storage broker", "New managed storage in its region goes to the platform's storage broker, and the baseline installs no in-cluster object store"],
+            ["--egress-address <ipv4>", "The fixed outbound address tenant apps leave from (Hetzner: `terraform output egress_ip`); the baseline writes the egress policy"],
+            ["--ingress-address-v6 <ipv6>", "The IPv6 address its ingress answers on, for AAAA records"]
         ],
         examples: [
             "rebase cloud clusters add --name gke-eu --provider gcp --region europe-west1 --kubeconfig ./kubeconfig",
