@@ -190,7 +190,7 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
         notes: ["--watch regenerates on every change to a schema file.", `--schema-dir <dir>: ${SCHEMA_DIR_FLAG_HELP}.`]
     },
     introspect: {
-        usage: "rebase schema introspect [--schema-dir <dir>] [--schema <name>] [--force] [--from supabase] [--data-inference | --no-data-inference]",
+        usage: "rebase schema introspect [--schema-dir <dir>] [--schema <name>] [--force] [--from supabase] [--data-inference | --no-data-inference] [--users]",
         summary: "Read an existing database and write its tables as defineTable modules into backend/schema.",
         notes: [
             "--force overwrites table modules that are already there.",
@@ -198,6 +198,9 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
             "--data-inference samples up to 100 rows per table to detect formats, constraints and UI settings; "
                 + "--no-data-inference reads the structure only. Without either it asks, and without a terminal "
                 + "it reads the structure only.",
+            "--users also writes backend/schema/users.ts for rebase.users, as a defineAuthTable that matches it: "
+                + "Users then shows in the admin as a table you can add columns to. Without it, accounts are "
+                + "managed in the Studio's Users & Roles.",
             "Reads this project's database, the one `rebase db url` prints: --database-url <url> names another; "
                 + "--docker uses the compose one, starting it if needed."
         ]
@@ -274,6 +277,7 @@ ${chalk.green.bold("introspect Options")}
   ${chalk.blue("--docker")}           Read the compose database, starting it if needed
   ${chalk.blue("--data-inference")}   Sample rows to detect formats and constraints ${chalk.gray("(asked when omitted)")}
   ${chalk.blue("--no-data-inference")} Read the structure only, without asking
+  ${chalk.blue("--users")}            Also write backend/schema/users.ts for rebase.users
   ${chalk.blue("--from supabase")}    Translate Supabase's auth.uid(), auth.users and anon/authenticated for a Rebase database
 
 ${chalk.green.bold("stale Options")}

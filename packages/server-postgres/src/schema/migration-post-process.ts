@@ -55,3 +55,21 @@ export async function finishNewMigration(
         }
     }
 }
+
+/**
+ * `CREATE TABLE "rebase"."users"` in a migration Atlas wrote, made
+ * `CREATE TABLE IF NOT EXISTS`.
+ *
+ * Auth creates `rebase.users` itself (`ensureAuthTablesExist`, on every boot
+ * and every `db push`), so a database a project has already run against has
+ * the table before the first migration that declares it: a project that adds
+ * the scaffold's `users.ts`, or the one `schema introspect --users` writes,
+ * after it has run. Atlas's plain `CREATE TABLE` then failed `db migrate` with
+ * "relation already exists". Skipping the create is safe because the table
+ * auth makes is the declared one, column for column (`defaultAuthTable`, and
+ * `server-postgres/test/default-auth-table.test.ts` holds the two in step);
+ * the policies appended after it apply either way.
+ */
+export function makeAuthTableCreateIdempotent(migration: string): string {
+    return migration.replace(/CREATE TABLE (?!IF NOT EXISTS)("rebase"\."users" \()/g, "CREATE TABLE IF NOT EXISTS $1");
+}

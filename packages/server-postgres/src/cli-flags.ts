@@ -117,7 +117,9 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "--data-inference": Boolean,
         "--no-data-inference": Boolean,
         // Translate Supabase's conventions (`introspect-foreign.ts`).
-        "--from": String
+        "--from": String,
+        // Also write `backend/schema/users.ts` for `rebase.users`.
+        "--users": Boolean
     },
     "schema stale": {
         "--schema-dir": String,

@@ -1301,7 +1301,7 @@ describe("scaffold security defaults", () => {
         it("stamps createdAt on create", () => {
             const usersPath = path.join(TEMPLATE_DIR, "backend", "schema", "users.ts");
             const content = fs.readFileSync(usersPath, "utf-8");
-            expect(content).toContain("createdAt: col.timestamp({ withTimezone: true }).onCreateNow()");
+            expect(content).toContain("createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow()");
         });
     });
 

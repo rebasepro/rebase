@@ -165,6 +165,7 @@ rebase schema introspect
 | `--docker` | Read the compose database, starting it if needed |
 | `--from supabase` | Translate Supabase's conventions (`auth.uid()` defaults, `auth.users` foreign keys, `TO anon` / `TO authenticated`) for a Rebase database. Leave it off when Rebase runs on the same database beside Supabase |
 | `--data-inference` / `--no-data-inference` | Sample up to 100 rows per table to detect formats, constraints and panel settings, or read the structure only. Without either it asks, and without a terminal it reads the structure only |
+| `--users` | Also write `users.ts` for `rebase.users`, as a `defineAuthTable` that matches the table auth created. It shows Users in the admin as a table you can add columns to. Without it, accounts are managed in the Studio's Users & Roles |
 
 This is useful when adopting Rebase on an existing database — introspect
 first, then edit the generated tables. A table with row-level security off is
