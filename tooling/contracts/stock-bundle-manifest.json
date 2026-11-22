@@ -9,7 +9,7 @@
   "app": "backend",
   "kind": "backend",
   "entry": {
-    "storage": "backend/storage.js",
+    "resources": "backend/resources.js",
     "static": [
       {
         "path": "/",
@@ -25,11 +25,19 @@
     "native": false
   },
   "storage": {
-    "authorize": true
+    "authorize": false
   },
   "resources": {
     "version": 1,
-    "resources": []
+    "resources": [
+      {
+        "kind": "database",
+        "key": "(default)",
+        "engine": "postgres",
+        "transport": "server",
+        "options": {}
+      }
+    ]
   },
   "deps": {
     "declared": {

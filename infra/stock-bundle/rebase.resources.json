@@ -1,5 +1,12 @@
 {
     "$generated": "Generated from backend/resources.ts and backend/schema by `rebase resources`. Edit the declarations, not this file.",
     "version": 1,
-    "resources": []
+    "resources": [
+        {
+            "kind": "database",
+            "key": "(default)",
+            "engine": "postgres",
+            "transport": "server"
+        }
+    ]
 }

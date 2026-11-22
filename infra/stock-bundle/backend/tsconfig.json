@@ -15,22 +15,13 @@
     "sourceMap": true,
     "rootDir": "."
   },
-  // `functions/` as well as `src/`, because this project has nothing in src:
-  // its tables come from the database, so there is no generated schema, and
-  // the server entrypoint lives behind `rebase eject`. An include matching only
-  // an empty directory is TS18003 — tsc reports "no inputs" as an error.
+  // Only resources.ts: the stock backend has no code of its own. Its tables
+  // come from the database and its storage model is the project's
+  // STORAGE_POLICIES (see resources.ts), so there is no src/, schema/,
+  // functions/ or crons/ to include — and an include that matches nothing
+  // fails check:tsconfig-entries. Add a directory here when one exists.
   //
-  // `rootDir` is `.`: everything compiled lives under backend/, so the emit
-  // mirrors it (`dist/functions/…`, `dist/src/…`). Inferring it stopped being
-  // an option in TypeScript 6 (TS5011).
-  //
-  // `crons/` too: `rebase build` compiles it through a generated tsconfig, but
-  // an ejected project builds with *this* file, so leaving it out meant an
-  // ejected server had no compiled jobs to load and silently stopped running
-  // every schedule.
-  //
-  // `scripts/` because that is where the Scripts page puts a script that opens
-  // the project with `openRebase`, and a type error there should be one `tsc`
-  // reports. `schema/` for the day you declare tables in code (see the README).
-  "include": ["src/**/*", "schema/**/*", "functions/**/*", "crons/**/*", "scripts/**/*", "generated/**/*", "resources.ts", "storage.ts", "hooks.ts"]
+  // `rootDir` is `.`: inferring it stopped being an option in TypeScript 6
+  // (TS5011).
+  "include": ["resources.ts"]
 }

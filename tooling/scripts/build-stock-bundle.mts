@@ -16,11 +16,12 @@
  *  - **The admin panel**, folded in at `/` like the scaffold's, built from
  *    `infra/stock-bundle/admin`: no customizations, every table from
  *    `GET /api/schema/tables`.
- *  - **`backend/storage.ts` is the headless scaffold's**, byte for byte (this
- *    script refuses to build when the two differ). A console-created project
- *    has a bucket, and the deploy path refuses a bucket with no access model;
- *    the scaffold's is the conservative one — `public/…` readable by anyone,
- *    everything else only under the caller's own `users/<uid>/`.
+ *  - **No storage code.** A console-created project has a bucket, and its
+ *    access model is the project's `STORAGE_POLICIES` — rules as data, which
+ *    the control plane seeds with `RECOMMENDED_STORAGE_RULES` on the stock
+ *    deploy and the console edits. A `storageAuthorize` here would be asked
+ *    about every key no rule covers, so the rules the console shows would not
+ *    be the whole answer; this script refuses to build one in.
  *
  * Two things `rebase build` cannot do here, done after it:
  *
@@ -106,13 +107,12 @@ if (serverVersion !== driverVersion) {
 }
 const version = serverVersion;
 
-// ── The storage default is the scaffold's, not a fork of it ──────────────────
-const scaffoldStorage = path.join(repoRoot, "packages/cli/templates/overlays/baas/backend/storage.ts");
+// ── No storage code: the project's STORAGE_POLICIES are the whole model ──────
 const stockStorage = path.join(projectRoot, "backend/storage.ts");
-if (fs.readFileSync(scaffoldStorage, "utf8") !== fs.readFileSync(stockStorage, "utf8")) {
+if (fs.existsSync(stockStorage)) {
     fail(
-        `${path.relative(repoRoot, stockStorage)} differs from ${path.relative(repoRoot, scaffoldStorage)}. ` +
-        "The stock bundle ships the same storage default `rebase init --headless` does — copy it over."
+        `${path.relative(repoRoot, stockStorage)} exists. The stock bundle carries no storage code: a stock ` +
+        "project's access model is its STORAGE_POLICIES, and a storageAuthorize would widen them for every key no rule covers."
     );
 }
 
@@ -182,7 +182,7 @@ readBundleManifest(bundleDir);
 const problems: string[] = [];
 if (manifest.entry.tables) problems.push("it declares tables (entry.tables); a stock backend introspects");
 if (manifest.kind !== "backend") problems.push(`its kind is ${manifest.kind}, not backend`);
-if (manifest.storage?.authorize !== true) problems.push("it ships no storageAuthorize, so a project with a bucket refuses it");
+if (manifest.storage?.authorize) problems.push("it ships a storageAuthorize, which would answer for every key the project's STORAGE_POLICIES do not cover");
 if (manifest.hooks.native) problems.push("its dependencies contain native code, which the managed runtime refuses");
 const statics = Array.isArray(manifest.entry.static) ? manifest.entry.static : [];
 if (!statics.some(app => (app.path ?? "/") === "/" && app.cms === "/")) problems.push("it carries no admin panel at /");
