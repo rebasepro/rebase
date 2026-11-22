@@ -1,4 +1,5 @@
 ---
+import { offerKey } from "../../data/cloud-offer";
 const { lang, t } = Astro.props;
 
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
@@ -171,7 +172,7 @@ import HeroBackdrop from "../HeroBackdrop.astro";
               {t("manifesto.money.p2")}
             </p>
             <p class="text-lg text-tone-300 leading-relaxed">
-              {t("manifesto.money.p3")}
+              {t(offerKey("manifesto.money.p3"))}
             </p>
           </div>
         </div>

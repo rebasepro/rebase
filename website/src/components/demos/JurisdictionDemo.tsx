@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { CLOUD_FLAGS, REGION_FACTS } from "../../data/cloud-flags";
 
 /**
  * Every sentence this figure says, keyed. The page passes a resolved
@@ -34,6 +35,7 @@ const EN: Record<string, string> = {
     "jd.supabase.note": "It is Postgres in Frankfurt, which is genuinely good. The company operating it is incorporated in Delaware, and that is a separate fact from where the disk is.",
     "jd.cloud.exit": "pg_dump, and the same image runs on your own box the same day",
     "jd.cloud.note": "We run it, so there is a second party, and it is us. FireCMS S.L. is a Spanish company with no US parent — that is the row that moves. Today the machines underneath are Google Cloud's in Belgium, which makes Google a sub-processor; moving Cloud onto a European host is work we have committed to, and until it is done this row says so.",
+    "jd.cloud.note.fsn1": "We run it, so there is a second party, and it is us. FireCMS S.L. is a Spanish company with no US parent — that is the row that moves. The machines underneath are Hetzner's in Germany, a German company, which makes Hetzner a sub-processor. No company outside the EU is in the chain.",
     "jd.self.label": "Rebase, self-hosted",
     "jd.self.region": "Wherever you rented the box",
     "jd.self.seat": "seated in your own jurisdiction",
@@ -124,13 +126,14 @@ const VENDORS: Vendor[] = [
     {
         id: "rebase-cloud",
         label: "Rebase Cloud",
-        region: "europe-west1 · Belgium",
+        // Follows src/data/cloud-flags.ts: where new projects run today.
+        region: CLOUD_FLAGS.region === "fsn1" ? "Falkenstein · Germany" : "europe-west1 · Belgium",
         operator: "FireCMS S.L.",
         operatorSeat: "jd.seat.es",
         posture: "eu",
-        keyholders: ["jd.you", "FireCMS S.L.", "Google Cloud jd.subprocessor"],
+        keyholders: ["jd.you", "FireCMS S.L.", `${CLOUD_FLAGS.region === "fsn1" ? "Hetzner" : REGION_FACTS[CLOUD_FLAGS.region].provider} jd.subprocessor`],
         exit: "jd.cloud.exit",
-        note: "jd.cloud.note"
+        note: CLOUD_FLAGS.region === "fsn1" ? "jd.cloud.note.fsn1" : "jd.cloud.note"
     },
     {
         id: "rebase",
