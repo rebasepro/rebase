@@ -300,6 +300,8 @@ mounts it this way.
 
 ### Storage needs an access-control model
 
+<span class="since-badge" data-since="0.35">Since 0.35</span>
+
 Once a bucket **is** configured, the runtime **refuses to boot in production**
 until the deployment states how objects are protected. Storage is not under
 row-level security and its keys share one flat namespace, so with no rule the

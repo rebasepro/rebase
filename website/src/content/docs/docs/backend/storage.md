@@ -14,6 +14,8 @@ Rebase supports three storage backends:
 
 ## Configuration
 
+<span class="since-badge" data-since="0.35">Since 0.35</span>
+
 :::note[Where this goes]
 **Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffix any of them `__<KEY>` for a named source), plus a `bucket("<key>")` declaration in `backend/resources.ts` for every bucket beyond the default, and `export const storageAuthorize` from `backend/storage.ts`. Per-object rules can also be set as data in `STORAGE_POLICIES` — "public", "authenticated", "owner" (the key's `:uid` segment is the caller) and roles — see [Storage authorization](/docs/backend/storage-authorization/#as-data-storage_policies).
 
@@ -301,6 +303,8 @@ over 8 MiB the resumable way. See
 protocol, what it answers and how it behaves across instances.
 
 ## Environment Variables
+
+<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 | Variable | Description |
 |----------|-------------|

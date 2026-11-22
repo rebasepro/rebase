@@ -68,6 +68,8 @@ the users table itself may also name every auth column, declared or not.
 
 ## Without a users table
 
+<span class="since-badge" data-since="0.35">Since 0.35</span>
+
 Declaring one is optional. Auth runs either way: with no `defineAuthTable`,
 it keeps its users in `rebase.users`, and accounts and roles are managed in the
 Studio's **Users & Roles**. The admin shows Users as a table only when the
