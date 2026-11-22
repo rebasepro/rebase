@@ -358,6 +358,7 @@ export default defineConfig({
                         { label: "Overview", slug: "docs/deployment" },
                         { label: "Deployment Guide", slug: "docs/getting-started/deployment" },
                         { label: "Rebase Cloud", slug: "docs/deployment/cloud" },
+                        { label: "Cloud Beta Limits", slug: "docs/deployment/cloud-beta-limits" },
                         { label: "Cloud CI and Agents", slug: "docs/deployment/cloud-agents" },
                         { label: "Cloud Notifications", slug: "docs/deployment/cloud-notifications" },
                         { label: "Managed Runtime", slug: "docs/deployment/managed-runtime" },
