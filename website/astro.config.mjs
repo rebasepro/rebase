@@ -362,6 +362,7 @@ export default defineConfig({
                         { label: "Cloud Notifications", slug: "docs/deployment/cloud-notifications" },
                         { label: "Managed Runtime", slug: "docs/deployment/managed-runtime" },
                         { label: "Self-Hosting", slug: "docs/deployment/self-hosting" },
+                        { label: "Connection Pooling", slug: "docs/deployment/connection-pooling" },
                         { label: "Split Processes", slug: "docs/deployment/split-processes" },
                         { label: "More Than One Instance", slug: "docs/deployment/multiple-instances" },
                         { label: "Existing or shared database", slug: "docs/deployment/existing-database" },
