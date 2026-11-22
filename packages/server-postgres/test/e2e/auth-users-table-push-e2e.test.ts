@@ -145,7 +145,7 @@ describe("the rebase.users auth created, and the tools that declare it", () => {
         expect(plan.exitCode, plan.all).toBe(0);
         // Atlas's plan, the table DDL: nothing on rebase.users. (The policy
         // step after it does name the table — it gets its declared policies
-        // and RLS, as any declared users table does; that is not the table.)
+        // and RLS, like every declared users table; that is not the table.)
         const atlasPlan = (plan.all ?? "").split("Planned row-level security changes:")[0];
         expect(atlasPlan).toContain("--dry-run — nothing was applied");
         expect(atlasPlan).not.toMatch(/"rebase"\."users"|rebase\.users/);

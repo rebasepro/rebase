@@ -57,7 +57,8 @@ describe("storage rules from STORAGE_POLICIES, on the routes", () => {
                     const token = request.headers.get("authorization")?.replace(/^Bearer /, "");
                     if (!token) return null;
                     const [uid, roles = ""] = token.split(":");
-                    return { uid, roles: roles ? roles.split(",") : [] };
+                    const roleList = roles ? roles.split(",") : [];
+                    return { uid, email: `${uid}@example.com`, roles: roleList, isAdmin: roleList.includes("admin") };
                 }
             })
         });

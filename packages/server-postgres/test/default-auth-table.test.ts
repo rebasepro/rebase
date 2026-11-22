@@ -24,7 +24,6 @@ import fs from "fs";
 import path from "path";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { compileSchema } from "@rebasepro/common";
 import { col, defineTable, isAuthTableDef, type AnyTableDef, type CompiledTable } from "@rebasepro/types";
 import { compileSchemaDefs, loadBackendSchema } from "@rebasepro/server";
@@ -66,7 +65,7 @@ beforeAll(async () => {
     ensured = new PGlite();
     await ensured.waitReady;
     // PGlite's drizzle database stands in for node-postgres's: no typed bridge between the two exists.
-    await ensureAuthTablesExist(drizzle(ensured) as unknown as NodePgDatabase);
+    await ensureAuthTablesExist(drizzle(ensured));
     ensuredColumns = await usersColumns(ensured);
 }, 60_000);
 
@@ -98,7 +97,7 @@ async function expectNoTableChanges(tables: readonly CompiledTable[]): Promise<v
     const db = new PGlite();
     try {
         await db.waitReady;
-        await ensureAuthTablesExist(drizzle(db) as unknown as NodePgDatabase);
+        await ensureAuthTablesExist(drizzle(db));
         const first = await plannedActions(db, tables);
         expect(first.filter(action => action.kind !== "create-trigger" && action.kind !== "create-function")).toEqual([]);
         for (const action of first) await db.exec(action.sql);
@@ -206,7 +205,7 @@ describe("schema introspect's users.ts", () => {
         const db = new PGlite();
         try {
             await db.waitReady;
-            await ensureAuthTablesExist(drizzle(db) as unknown as NodePgDatabase);
+            await ensureAuthTablesExist(drizzle(db));
             await db.exec("ALTER TABLE rebase.users ADD COLUMN agency_name text");
             const generated = generateAuthTableModule(await readSchemaMetadata(db, "rebase", { forGeneration: true }));
             expect(generated?.remarks.join(" ")).toContain("\"agency_name\"");

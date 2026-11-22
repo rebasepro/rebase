@@ -9,7 +9,7 @@
  * customer marks its own checks with it) or when its `User-Agent` names a
  * well-known uptime monitor.
  *
- * A probe is still served exactly as any other request; it is only counted
+ * A probe is still served like every other request; it is only counted
  * apart, in `rebase_probe_requests_total`, so it stays visible without being
  * activity.
  *
