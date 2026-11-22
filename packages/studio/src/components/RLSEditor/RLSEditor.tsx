@@ -1106,7 +1106,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                     <Typography variant="caption" className="opacity-80">
                                                         This is an auto-generated junction table for a many-to-many relation.
                                                         Rebase derives its policies: rows are readable when both related rows
-                                                        are, and writable following the declaring collection&apos;s update rules
+                                                        are, and writable following the declaring table&apos;s update rules
                                                         (plus the server/admin baseline). You can still add RLS policies
                                                         directly to broaden access.
                                                     </Typography>

@@ -90,7 +90,7 @@ const MAX_HISTORY = 50;
  * It runs. That is the point: the console opens with the Run button armed, and
  * a starter that reads `collection("your_collection")` made the first thing a
  * new user did be a 404 — a placeholder presented as working code. `slug` is
- * the project's first collection when one is known.
+ * the project's first table when one is known.
  */
 const makeDefaultCode = (slug?: string) => `// Available: client (RebaseClient), context
 // Press Cmd+Enter (Ctrl+Enter) to run
@@ -104,7 +104,7 @@ const result = await client.data.table(${JSON.stringify(slug)}).find({ limit: 10
 return result;
 `
         : `
-// Name one of your collections to query it:
+// Name one of your tables to query it:
 //   const result = await client.data.table("posts").find({ limit: 10 });
 //   return result;
 
