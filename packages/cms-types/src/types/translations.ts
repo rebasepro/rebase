@@ -1510,7 +1510,6 @@ export interface RebaseTranslations {
     studio_users_role_save_failed?: string;
     studio_users_role_deleted?: string;
     studio_users_role_delete_failed?: string;
-    studio_users_subtitle?: string;
     studio_users_new_role?: string;
     studio_users_tab_users?: string;
     studio_users_tab_roles?: string;
@@ -1549,7 +1548,6 @@ export interface RebaseTranslations {
     studio_webhooks_test_failed?: string;
     studio_webhooks_deleted?: string;
     studio_webhooks_delete_failed?: string;
-    studio_webhooks_title?: string;
     studio_webhooks_subtitle?: string;
     studio_webhooks_refresh_aria?: string;
     studio_webhooks_new?: string;
