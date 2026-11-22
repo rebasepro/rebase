@@ -33,6 +33,7 @@ import { applyPolicyEdit, type PolicyEditRefusal, type PolicyRule } from "./poli
 import { declaredPoliciesOf, listPolicies, readPolicyRoles, type DeclaredPolicies, type ListedPolicy } from "./policyListing";
 import { quoteIdentifier } from "../../utils/sql_utils";
 import { schemaSourceProblem, SchemaSourceProblemAlert } from "../schema-source";
+import { DirectRlsPoliciesPanel } from "./DirectRlsPoliciesPanel";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
 
@@ -178,6 +179,27 @@ function SidebarTableRow({ table, isSelected, onSelect, badge, dimmed, t }: {
 }
 
 export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
+    const [mode, setMode] = useState<"inspector" | "direct">("inspector");
+
+    return (
+        <div className="flex flex-col h-full w-full overflow-hidden">
+            <Tabs
+                value={mode}
+                onValueChange={(v) => { if (v === "inspector" || v === "direct") setMode(v); }}
+                variant="boxy"
+                className="border-b border-hairline px-4 bg-surface-sheet shrink-0"
+            >
+                <Tab value="inspector">Schema Inspector</Tab>
+                <Tab value="direct">Direct Policies (DB)</Tab>
+            </Tabs>
+            <div className="flex-1 min-h-0 overflow-hidden">
+                {mode === "direct" ? <DirectRlsPoliciesPanel /> : <RLSEditorInspector apiUrl={apiUrl} />}
+            </div>
+        </div>
+    );
+};
+
+const RLSEditorInspector = ({ apiUrl = "" }: { apiUrl?: string }) => {
     const { databaseAdmin } = useRebaseContext();
     const snackbarController = useSnackbarController();
     // The tables the server declares, with the policies it compiles for each:
@@ -632,22 +654,19 @@ totalPolicies };
                 minPanelSizePx={220}
                 firstPanel={
                     <div className={cls("flex flex-col h-full w-full bg-surface-card border-r", defaultBorderMixin)}>
-                        <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as "tables" | "info")} variant="boxy" className="border-b border-hairline">
-                            <Tab value="tables">Tables</Tab>
-                            <Tab value="info">Info</Tab>
-                        </Tabs>
+                        <div className={cls("flex items-center justify-between pl-2 pr-2 border-b bg-surface-sheet shrink-0", defaultBorderMixin)}>
+                            <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as "tables" | "info")} variant="boxy" className="w-[unset] flex-shrink-0">
+                                <Tab value="tables">Tables</Tab>
+                                <Tab value="info">Info</Tab>
+                            </Tabs>
+                            <IconButton aria-label={t("refresh")} size="small" onClick={fetchRLSData} title={t("refresh")}>
+                                <RefreshCwIcon size={iconSize.smallest}/>
+                            </IconButton>
+                        </div>
 
                         <div className="flex-grow overflow-hidden relative">
                             {sidebarTab === "tables" && (
                                 <div className="flex flex-col h-full">
-                                    <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
-                                        <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
-                                            {t("studio_schema_tables")}
-                                        </Typography>
-                                        <IconButton aria-label={t("refresh")} size="small" onClick={fetchRLSData} title={t("refresh")}>
-                                            <RefreshCwIcon size={iconSize.smallest}/>
-                                        </IconButton>
-                                    </div>
                                     <div className="flex-grow overflow-y-auto no-scrollbar p-1">
                                         {isLoading && tables.length === 0 ? (
                                             <div className="flex justify-center p-4"><CircularProgress size="small"/></div>
@@ -657,35 +676,17 @@ totalPolicies };
                                             </div>
                                         ) : (
                                             <>
-                                            {/* ── Schema Tables ── */}
-                                            {categorizedTables.collection.length > 0 && (
+                                            {/* ── Served tables: what the API serves, and the junction
+                                                tables its relations read through. Declared or read
+                                                from the database, the server's answer is the same. ── */}
+                                            {(categorizedTables.collection.length > 0 || categorizedTables.junction.length > 0) && (
                                                 <SidebarSection
-                                                    title="Schema Tables"
+                                                    title="Served tables"
                                                     icon={<DatabaseIcon size={12} className="text-primary dark:text-primary-light"/>}
                                                     expanded={expandedSections.collection ?? true}
                                                     onToggle={() => setExpandedSections(prev => ({ ...prev, collection: !(prev.collection ?? true) }))}
                                                 >
                                                     {categorizedTables.collection.map(table => (
-                                                        <SidebarTableRow
-                                                            key={`${table.schemaName}.${table.tableName}`}
-                                                            table={table}
-                                                            isSelected={selectedTable === `${table.schemaName}.${table.tableName}`}
-                                                            onSelect={() => setSelectedTable(`${table.schemaName}.${table.tableName}`)}
-                                                            t={t}
-                                                        />
-                                                    ))}
-                                                </SidebarSection>
-                                            )}
-
-                                            {/* ── Other Tables (unmapped + junction) ── */}
-                                            {(categorizedTables.other.length > 0 || categorizedTables.junction.length > 0) && (
-                                                <SidebarSection
-                                                    title="Other Tables"
-                                                    icon={<AlertTriangleIcon size={12} className="text-yellow-500 dark:text-yellow-400"/>}
-                                                    expanded={expandedSections.other ?? true}
-                                                    onToggle={() => setExpandedSections(prev => ({ ...prev, other: !(prev.other ?? true) }))}
-                                                >
-                                                    {categorizedTables.other.map(table => (
                                                         <SidebarTableRow
                                                             key={`${table.schemaName}.${table.tableName}`}
                                                             table={table}
@@ -702,6 +703,28 @@ totalPolicies };
                                                             onSelect={() => setSelectedTable(`${table.schemaName}.${table.tableName}`)}
                                                             badge="Junction"
                                                             dimmed
+                                                            t={t}
+                                                        />
+                                                    ))}
+                                                </SidebarSection>
+                                            )}
+
+                                            {/* ── Not served: in the database, but the API does not serve
+                                                them (no row-level security, or not declared). The one
+                                                section that warrants the warning. ── */}
+                                            {categorizedTables.other.length > 0 && (
+                                                <SidebarSection
+                                                    title="Not served"
+                                                    icon={<AlertTriangleIcon size={12} className="text-yellow-500 dark:text-yellow-400"/>}
+                                                    expanded={expandedSections.other ?? true}
+                                                    onToggle={() => setExpandedSections(prev => ({ ...prev, other: !(prev.other ?? true) }))}
+                                                >
+                                                    {categorizedTables.other.map(table => (
+                                                        <SidebarTableRow
+                                                            key={`${table.schemaName}.${table.tableName}`}
+                                                            table={table}
+                                                            isSelected={selectedTable === `${table.schemaName}.${table.tableName}`}
+                                                            onSelect={() => setSelectedTable(`${table.schemaName}.${table.tableName}`)}
                                                             t={t}
                                                         />
                                                     ))}
@@ -737,11 +760,6 @@ totalPolicies };
 
                             {sidebarTab === "info" && (
                                 <div className="flex flex-col h-full">
-                                    <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
-                                        <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
-                                            Overview
-                                        </Typography>
-                                    </div>
                                     <div className="flex-grow overflow-y-auto p-3 space-y-3 no-scrollbar">
                                         <div className={cls("p-3 rounded-lg border bg-surface-card", defaultBorderMixin)}>
                                             <div className="flex items-center gap-2 mb-2">
@@ -812,7 +830,7 @@ totalPolicies };
                 secondPanel={
                     <div className="flex-grow flex flex-col min-w-0 h-full w-full bg-surface-card">
                         {/* Toolbar Header matching SQL/JS Editor style */}
-                        <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-card min-h-[46px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-sheet h-[42px] shrink-0", defaultBorderMixin)}>
                             <div className="flex items-center flex-grow overflow-hidden px-4">
                                 <Typography variant="subtitle2" className="font-mono text-text-secondary dark:text-text-secondary-dark truncate">
                                     {activeTableData ? `${activeTableData.schemaName}.${activeTableData.tableName}` : t("studio_rls_select_table")}

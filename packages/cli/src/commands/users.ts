@@ -10,8 +10,10 @@
  * Roles are declared in code (the auth table's `auth.roles`); `users roles`
  * lists them and `users update --role` assigns them.
  */
+import fs from "fs";
 import type arg from "arg";
 import chalk from "chalk";
+import { MAX_USERS_PER_IMPORT, type ImportUserOutcome, type ImportUsersResult } from "@rebasepro/types";
 
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
@@ -30,11 +32,12 @@ import {
     stringOf,
     type HelpAction
 } from "../utils/project-command";
-import { confirmDestructive, keyValues, note, success, warn } from "./cloud/context";
+import { confirmDestructive, isJsonMode, keyValues, note, success, warn } from "./cloud/context";
+import { readImportRows } from "./data";
 
 /** Everything the switch below dispatches, for the did-you-mean. */
 export const USERS_SUBCOMMANDS = [
-    "list", "get", "create", "update", "delete", "reset-password", "mfa-reset", "roles", "guests"
+    "list", "get", "create", "import", "update", "delete", "reset-password", "mfa-reset", "roles", "guests"
 ] as const;
 
 export async function usersCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
@@ -52,6 +55,9 @@ export async function usersCommand(subcommand: string | undefined, rawArgs: stri
             break;
         case "create":
             await createUser(rawArgs);
+            break;
+        case "import":
+            await importUsers(rawArgs);
             break;
         case "update":
             await updateUser(rawArgs);
@@ -243,6 +249,143 @@ async function createUser(rawArgs: string[]): Promise<void> {
             warn("No invitation could be sent, so the server set a temporary password. It is shown this once:", temporary);
         }
     }, body);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   import
+   ═══════════════════════════════════════════════════════════════ */
+
+export const IMPORT_USERS_FLAGS = {
+    ...PROJECT_TARGET_FLAGS,
+    "--format": String,
+    "--dry-run": Boolean
+} satisfies arg.Spec;
+
+/** A CSV header or JSON key, as `POST /admin/users/import` names the field: `display_name` → `displayName`. */
+const IMPORT_FIELD_ALIASES: Record<string, string> = {
+    display_name: "displayName",
+    photo_url: "photoUrl",
+    created_at: "createdAt",
+    email_verified: "emailVerified"
+};
+
+const TRUE_WORDS = new Set(["true", "t", "1", "yes", "y"]);
+const FALSE_WORDS = new Set(["false", "f", "0", "no", "n"]);
+
+/**
+ * One row of an import file as the route takes it. Exported for tests.
+ *
+ * A CSV cell is text, so the CLI does what the file cannot: `emailVerified`
+ * from `true`/`t`/`1` (psql writes `t`), `roles` from `editor;viewer`, a
+ * quoted `editor,viewer` or a Postgres array (`{editor,viewer}`), `createdAt`
+ * as an ISO date. An empty cell is a field not given. Snake-case headers, as
+ * `psql \copy` writes them, are read as the camel-case fields. Any other
+ * column goes as it is, so the server can say it is not one it takes.
+ */
+export function importUserOf(row: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [rawKey, value] of Object.entries(row)) {
+        const key = IMPORT_FIELD_ALIASES[rawKey] ?? rawKey;
+        if (value === undefined || value === null || value === "") continue;
+        if (key === "emailVerified" && typeof value === "string") {
+            const word = value.trim().toLowerCase();
+            out[key] = TRUE_WORDS.has(word) ? true : FALSE_WORDS.has(word) ? false : value;
+        } else if (key === "roles" && typeof value === "string") {
+            out[key] = value.replace(/^\{|\}$/g, "").split(/[,;]/).map(role => role.trim()).filter(Boolean);
+        } else if (key === "createdAt" && typeof value === "string") {
+            const date = new Date(value.trim());
+            out[key] = Number.isNaN(date.getTime()) ? value : date.toISOString();
+        } else {
+            out[key] = typeof value === "string" ? value.trim() : value;
+        }
+    }
+    return out;
+}
+
+/**
+ * Accounts from another system, keeping their ids: `POST /api/admin/users/import`,
+ * in requests of {@link MAX_USERS_PER_IMPORT}. No password and no email. An
+ * account whose id or email is taken is skipped, never updated, so a file can
+ * be run again. Exits 1 when any account failed.
+ */
+async function importUsers(rawArgs: string[]): Promise<void> {
+    const { flags, positionals } = parsedLine(() => parseCommandArgs({
+        spec: IMPORT_USERS_FLAGS,
+        rawArgs,
+        commandWords: 2,
+        command: "users import",
+        maxPositionals: 1
+    }));
+    const { file, rows } = parsedLine(() => {
+        const path = positionals[0];
+        if (!path) throw new UsageError("rebase users import needs a file: rebase users import <users.csv|users.json> (- for stdin).");
+        const format = flags["--format"] ?? (path.endsWith(".csv") ? "csv" : path.endsWith(".ndjson") || path.endsWith(".jsonl") ? "ndjson" : "json");
+        if (!["json", "ndjson", "csv"].includes(format)) throw new UsageError(`--format takes json, ndjson or csv (got "${format}").`);
+        let text: string;
+        try {
+            text = fs.readFileSync(path === "-" ? 0 : path, "utf8");
+        } catch (e) {
+            throw new UsageError(`Cannot read ${path}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        return { file: path, rows: readImportRows(text, format).map(importUserOf) };
+    });
+    const dryRun = flags["--dry-run"] === true;
+    if (rows.length === 0) {
+        emit(() => note(`${file} holds no accounts; nothing was imported.`), { dryRun, created: 0, skipped: 0, failed: 0, results: [] });
+        return;
+    }
+    const target = await projectTarget(flags, { command: "users import" });
+
+    const results: ImportUserOutcome[] = [];
+    for (let start = 0; start < rows.length; start += MAX_USERS_PER_IMPORT) {
+        const slice = rows.slice(start, start + MAX_USERS_PER_IMPORT);
+        const body = await requestJson(target, `${ADMIN}/users/import`, `Accounts ${start + 1}–${start + slice.length} of ${file} were refused (${results.length} handled before them)`, {
+            method: "POST",
+            json: { users: slice, ...(dryRun ? { dryRun: true } : {}) },
+            timeoutMs: 120_000
+        });
+        // Each request numbers its accounts from 0; the file numbers them from its first line.
+        for (const outcome of importOutcomesOf(body)) results.push({ ...outcome, index: outcome.index + start });
+        if (!isJsonMode() && rows.length > MAX_USERS_PER_IMPORT) note(chalk.gray(`${Math.min(start + slice.length, rows.length)}/${rows.length}`));
+    }
+
+    const count = (status: ImportUserOutcome["status"]) => results.filter(result => result.status === status).length;
+    const summary: ImportUsersResult = { dryRun, created: count("created"), skipped: count("skipped"), failed: count("failed"), results };
+    emit(() => {
+        for (const outcome of results) {
+            if (outcome.status === "created") continue;
+            const who = outcome.email ?? outcome.uid ?? "?";
+            const line = `  ${outcome.status === "failed" ? chalk.red("failed ") : chalk.yellow("skipped")} #${outcome.index + 1} ${who}: ${outcome.message}`;
+            console.log(line);
+        }
+        const verb = dryRun ? "Would import" : "Imported";
+        const tally = `${summary.created} account(s)${summary.skipped ? `, skipped ${summary.skipped}` : ""}${summary.failed ? `, ${summary.failed} failed` : ""}`;
+        if (summary.failed > 0) warn(`${verb} ${tally} on ${target.label}.`);
+        else success(`${verb} ${tally} on ${target.label}.`);
+        if (dryRun) note("Nothing was written. Run it again without --dry-run to import.");
+        else if (summary.created > 0) note("No email was sent. They sign in by magic link, an email code, a provider, or a password reset.");
+    }, summary);
+    if (summary.failed > 0) process.exitCode = 1;
+}
+
+/** The outcomes of one import answer, read without trusting its shape. */
+function importOutcomesOf(body: unknown): ImportUserOutcome[] {
+    const outcomes: ImportUserOutcome[] = [];
+    for (const record of recordsOf(isRecord(body) ? body.results : undefined)) {
+        const index = typeof record.index === "number" ? record.index : outcomes.length;
+        const uid = stringOf(record.uid);
+        const email = stringOf(record.email);
+        const code = stringOf(record.code) ?? "UNKNOWN";
+        const message = stringOf(record.message) ?? "";
+        if (record.status === "created" && email !== undefined) {
+            outcomes.push({ index, status: "created", ...(uid !== undefined ? { uid } : {}), email });
+        } else if (record.status === "skipped" && email !== undefined && (code === "ID_EXISTS" || code === "EMAIL_EXISTS")) {
+            outcomes.push({ index, status: "skipped", ...(uid !== undefined ? { uid } : {}), email, code, message });
+        } else {
+            outcomes.push({ index, status: "failed", ...(uid !== undefined ? { uid } : {}), ...(email !== undefined ? { email } : {}), code, message });
+        }
+    }
+    return outcomes;
 }
 
 export const UPDATE_USER_FLAGS = {
@@ -540,6 +683,12 @@ export const USERS_ACTIONS: HelpAction[] = [
         flags: [["--email, -e <email>", "The email (or as the argument)"], ["--name <name>", "Display name"], ["--role <role>", "A role to give it (repeatable, or a,b)"], ["--password <password>", "Set this password instead of inviting"], ["--skip-password-policy", "Accept a password the policy would refuse (imports)"], ["--no-invite", "No password and no email: for an app that signs in by magic link, code or provider"]]
     },
     {
+        action: "import",
+        args: "<file>",
+        description: "Accounts from another system, keeping their ids: no password, no email; a taken id or email is skipped",
+        flags: [["--format <csv|json|ndjson>", "The file's format (else from its extension)"], ["--dry-run", "Check every account and write nothing"]]
+    },
+    {
         action: "update",
         args: "<uid|email>",
         description: "Change roles, name, email, or switch the account off (confirms grants and --disable)",
@@ -565,6 +714,7 @@ function printUsersHelp(): void {
         notes: [
             "Examples:",
             "  rebase users create ada@example.com --role admin",
+            "  rebase users import users.csv --dry-run   (columns: id, email, display_name, created_at, email_verified, roles)",
             "  rebase users update bob@example.com --add-role editor",
             "  rebase users guests prune --older-than 30d --yes",
             "No caller may grant a role above its own, or act on an account that outranks it — the server refuses both."

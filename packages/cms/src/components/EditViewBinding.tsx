@@ -22,7 +22,6 @@ import {
     HistoryIcon,
     IconButton,
     Maximize2Icon,
-    Skeleton,
     Tab,
     Tabs,
     Tooltip,
@@ -43,6 +42,7 @@ import {
 } from "@rebasepro/app";
 import { getEntityFromMemoryCache, removeEntityFromMemoryCache, saveEntityToMemoryCache } from "@rebasepro/app";
 import { EntityFormBinding } from "../form";
+import { EntityFormSkeleton } from "../form/components/EntityFormSkeleton";
 import { getEditHandoffValues } from "../form/form_utils";
 import type { EntityFormBindingProps } from "../form";
 import type { OnSavedParams } from "../types/components/EntityFormProps";
@@ -1064,7 +1064,7 @@ parentEntityIds,
             than sitting third behind two unlabelled developer tools. The row
             disappears entirely when there is nowhere else to go. */}
         {hasAdditionalViews && <div className={cls(
-            "h-10 shrink-0 flex items-stretch border-b px-2 min-w-0",
+            "shrink-0 flex items-stretch border-b px-2 min-w-0",
             ENTITY_VIEW_TAB_BAR_CLASS,
             defaultBorderMixin
         )}>
@@ -1117,7 +1117,7 @@ parentEntityIds,
 
             <div className={"flex-1 min-w-0 flex flex-col"}>
                 {globalLoading
-                    ? <EntityFormSkeleton collection={collection} />
+                    ? <EntityFormSkeleton collection={collection} status={status} openEntityMode={layout}/>
                     : <>
                         {entityReadOnlyView}
                         {entityView}
@@ -1175,49 +1175,5 @@ parentEntityIds,
     }
 
     return result;
-}
-
-function EntityFormSkeleton({ collection }: { collection: AdminCollection }) {
-    return (
-        <div className="flex-1 flex flex-row w-full overflow-y-auto justify-center">
-            <div className="relative flex flex-row max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl w-full h-fit">
-                <div className="flex flex-col w-full pt-12 pb-16 px-4 sm:px-8 md:px-10">
-
-                    <div className="flex flex-row gap-4 self-end sticky top-4 z-10">
-                        <Skeleton height={24} className="w-8 rounded-full" />
-                    </div>
-
-                    <div className="w-full flex flex-col items-start my-4 lg:my-6">
-                        <div className={`py-1 my-4 w-2/3 ${collection.hideIdFromForm ? "mb-6" : ""}`}>
-                            <Skeleton height={28} className="w-full rounded-md" />
-                        </div>
-                        <Skeleton height={32} className="w-full rounded-md" />
-                    </div>
-
-                    <div className="mt-12 flex flex-col gap-8">
-                        <div className="flex flex-wrap gap-x-4 w-full space-y-8">
-
-                            <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
-                            </div>
-
-                            <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
-                            </div>
-
-                            <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
-                            </div>
-
-                            <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
 }
 

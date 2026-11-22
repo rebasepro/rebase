@@ -13,6 +13,7 @@ import { EntityIdentityBar } from "./EntityIdentityBar";
 import { SplitListCloseButton } from "./CollectionViewBinding/SplitListCloseButton";
 import { SplitListShowButton } from "./CollectionViewBinding/SplitListShowButton";
 import { EntityInspector, InspectorTab } from "./EntityInspector";
+import { EntityFormSkeleton } from "../form/components/EntityFormSkeleton";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import {
     Alert,
@@ -25,7 +26,6 @@ import {
     IconButton,
     Maximize2Icon,
     PencilIcon,
-    Skeleton,
     Tab,
     Tabs,
     Tooltip,
@@ -598,7 +598,7 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
         />
 
         {hasAdditionalViews && <div className={cls(
-            "h-10 shrink-0 flex items-stretch border-b px-2 min-w-0",
+            "shrink-0 flex items-stretch border-b px-2 min-w-0",
             ENTITY_VIEW_TAB_BAR_CLASS,
             defaultBorderMixin
         )}>
@@ -648,7 +648,7 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
 
             <div className={"flex-1 min-w-0 flex flex-col"}>
                 {globalLoading
-                    ? <DetailViewSkeleton collection={collection} />
+                    ? <EntityFormSkeleton collection={collection} openEntityMode={layout} mode={"read"}/>
                     : mainView}
 
                 {customViewsView}
@@ -687,37 +687,4 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
     }
 
     return result;
-}
-
-function DetailViewSkeleton({ collection }: { collection: AdminCollection<Record<string, unknown>> }) {
-    return (
-        <div className="flex-1 flex flex-row w-full overflow-y-auto justify-center">
-            <div className="relative flex flex-row max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl w-full h-fit">
-                <div className="flex flex-col w-full pt-12 pb-16 px-4 sm:px-8 md:px-10">
-                    <div className="w-full flex flex-col items-start my-4 lg:my-6">
-                        <div className={`py-1 my-4 w-2/3 ${collection.hideIdFromForm ? "mb-6" : ""}`}>
-                            <Skeleton height={28} className="w-full rounded-md" />
-                        </div>
-                        <Skeleton height={32} className="w-full rounded-md" />
-                    </div>
-                    <div className="mt-12 flex flex-col gap-8">
-                        <div className="flex flex-wrap gap-x-4 w-full space-y-8">
-                            <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
-                            </div>
-                            <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
-                            </div>
-                            <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
-                            </div>
-                            <div className="relative w-full">
-                                <Skeleton height={60} className="w-full rounded-md" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
 }

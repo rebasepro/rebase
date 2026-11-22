@@ -80,7 +80,7 @@ export const TableHeader = React.memo(({
     <tr
         className={cls(
             defaultBorderMixin,
-            "text-sm font-medium text-surface-700 dark:text-surface-accent-300",
+            "text-xs font-medium text-text-secondary dark:text-text-secondary-dark",
             "bg-surface-sheet border-b",
             className
         )}
@@ -162,7 +162,7 @@ export const TableCell = React.memo(({
             colSpan={colspan}
             style={style}
             className={cls(
-                "px-4 py-3 text-clip ",
+                "px-3.5 py-2.5 text-clip ",
                 align === "center" ? "text-center" : (align === "right" ? "text-right" : "text-left"),
                 className
             )}

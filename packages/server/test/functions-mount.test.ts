@@ -10,6 +10,8 @@ import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { _resetRebaseMock } from "../src/singleton";
+import { defineFunction } from "../src/functions/define-function";
+import { getSignal } from "../src/functions/context";
 import { tablesFrom } from "./helpers/tables";
 
 /**
@@ -184,5 +186,24 @@ describe("request timeout on the functions router", () => {
         expect(error.code).toBe("FUNCTION_TIMEOUT");
         // The caller learns which setting to raise, not only that it timed out.
         expect(error.message).toContain("REBASE_FUNCTIONS_TIMEOUT_MS");
+    });
+
+    it("holds a function to the timeout it declares, with the server-wide one switched off", async () => {
+        // Mounted whatever the server-wide setting: `0` once meant no
+        // timeout middleware at all, and a function's own would have had
+        // nothing to declare itself to.
+        const slow = defineFunction((fn) => {
+            fn.get("/", async (c) => {
+                await new Promise(resolve => setTimeout(resolve, 2_000).unref());
+                return c.json({ ok: true, aborted: getSignal(c).aborted });
+            });
+        }, { timeoutMs: 40 });
+        const app = await boot({ functionsDir: undefined, functions: { slow }, functionsTimeoutMs: 0 });
+
+        const res = await app.request("/api/functions/slow");
+        expect(res.status).toBe(504);
+        const error = (await res.json() as { error: { code: string; details: Record<string, unknown> } }).error;
+        expect(error.code).toBe("FUNCTION_TIMEOUT");
+        expect(error.details).toMatchObject({ timeoutMs: 40, source: "function", declaredMs: 40 });
     });
 });

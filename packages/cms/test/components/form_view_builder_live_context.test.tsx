@@ -375,7 +375,9 @@ describe("a record its reader cannot edit", () => {
                 key: "domain",
                 name: "Domain",
                 Builder: () => <span>{"sales.example.com"}</span>
-            }]
+            }],
+            // A computed column is on the record where the form names it.
+            form: { sidebar: ["domain"] }
         }));
 
         await waitFor(() => expect(screen.getAllByText("sales.example.com").length).toBeGreaterThan(0));
@@ -402,7 +404,9 @@ describe("an additional field on the record", () => {
                 value: ({ row, id }: { row: Record<string, unknown>; id: string }) =>
                     `valued ${id} ${String(row.name)} ${"id" in row ? "with" : "without"} id`
             }
-        ]
+        ],
+        // A computed column is on the record where the form names it.
+        form: { sections: [{ key: "computed", properties: ["built", "valued"] }] }
     });
 
     it("is handed the record's id beside the row on the edit form", async () => {

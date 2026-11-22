@@ -1,13 +1,15 @@
 ---
-sourceHash: e275bf79725ed509
+sourceHash: 3c089e6c404f4635
 title: Colonne aggiuntive
 sidebar_label: Colonne aggiuntive
-description: Aggiungi colonne calcolate/virtuali alle tabelle di collezione che derivano valori dai dati delle entità.
+description: Aggiungi colonne calcolate/virtuali alle tabelle delle collezioni che derivano valori dai dati delle entità.
 ---
 
 ## Panoramica
 
 Le colonne aggiuntive consentono di visualizzare dati calcolati o derivati nella tabella della collezione senza archiviarli nel database.
+
+Una colonna calcolata appartiene alla tabella. Il record mostra già i valori da cui viene calcolata, quindi non è presente sul record a meno che il form non lo richieda: indica la sua `key` in `form.sections` o `form.sidebar` (vedi [Form layout](/docs/frontend/form-layout/)), o nei `fields` forniti a un `RecordForm` o `RecordDetail`.
 
 ## Definizione delle colonne aggiuntive
 
@@ -44,24 +46,24 @@ export const productsCms = customizeTable<typeof products>("products", {
 
 | Chiave | Cosa fa |
 |---|---|
-| `key` | Identifica la colonna. Nominala in `fieldOrder` o `listFields` come `"total" as AdditionalFieldKey`. |
+| `key` | Identifica la colonna. Indicala in `fieldOrder` o `listFields` come `"total" as AdditionalFieldKey`. |
 | `name` | L'intestazione. |
 | `width` | La larghezza, in pixel. |
 | `Builder` | Esegue il rendering della cella. |
-| `dependencies` | I campi la cui modifica comporta il re-rendering della cella; verificati rispetto alla tabella. |
+| `dependencies` | I campi la cui modifica attiva nuovamente il rendering della cella; verificati rispetto alla tabella. |
 | `value` | Il valore della cella, per l'esportazione. |
 
-## Prop del Builder
+## Prop di Builder
 
 | Prop | Tipo | Descrizione |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | Il record così come il server invia la riga: date come stringhe ISO, un belongsTo come la sua colonna di chiave esterna, `id` solo dove la tabella possiede tale colonna. Una relazione caricata dall'admin è annidata sotto il proprio nome con le colonne del record correlato |
-| `id` | `string` | L'id del record: la sua chiave primaria come stringa, oppure le parti di una chiave composita unite da `:::`. L'id accettato da `useSidePanel().open` e da una route |
+| `row` | `Record<string, unknown>` | Il record così come il server invia la riga: date come stringhe ISO, un belongsTo come colonna di chiave esterna, `id` solo se la tabella include tale colonna. Una relazione caricata dall'admin è nidificata sotto il proprio nome con le colonne del record correlato |
+| `id` | `string` | L'id del record: la sua chiave primaria come stringa, con le parti di una chiave composta unite da `:::`. L'id accettato da `useSidePanel().open` e da una route |
 | `context` | `RebaseContext` | Contesto Rebase completo |
 
 `value({ row, id, context })` riceve le stesse prop.
 
-## Prossimi passi
+## Passaggi successivi
 
 - **[Entity Actions](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
-- **[Custom Fields](/docs/frontend/custom-fields)** — Campi modulo personalizzati
+- **[Custom Fields](/docs/frontend/custom-fields)** — Campi del form personalizzati

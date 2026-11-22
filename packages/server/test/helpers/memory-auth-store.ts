@@ -76,9 +76,12 @@ export class MemoryAuthStore {
                 if (this.findUserByEmail(email)) {
                     throw new Error(`duplicate email ${email}`);
                 }
+                if (data.id !== undefined && this.users.has(data.id)) {
+                    throw new Error(`duplicate id ${data.id}`);
+                }
                 const now = new Date();
                 const user: UserData = {
-                    id: randomUUID(),
+                    id: data.id ?? randomUUID(),
                     email,
                     passwordHash: data.passwordHash ?? null,
                     displayName: data.displayName ?? null,
@@ -86,7 +89,7 @@ export class MemoryAuthStore {
                     emailVerified: data.emailVerified ?? false,
                     isAnonymous: data.isAnonymous ?? false,
                     metadata: data.metadata ?? {},
-                    createdAt: now,
+                    createdAt: data.createdAt ?? now,
                     updatedAt: now
                 };
                 this.users.set(user.id, user);

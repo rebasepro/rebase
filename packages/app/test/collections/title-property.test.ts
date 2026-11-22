@@ -7,6 +7,11 @@ import {
     looksLikeIdentifierValue
 } from "../../src/collections/title-property";
 
+/** A relation's target: a collection by that slug, with nothing in it. */
+function relationTarget(slug: string): AdminCollection {
+    return { slug, name: slug, table: slug, properties: {} };
+}
+
 describe("Title property resolution", () => {
 
     describe("identifiers never fill the title slot", () => {
@@ -71,7 +76,7 @@ type: "string" },
                         type: "relation",
                         relation: {
                             kind: "belongsTo",
-                            target: "customers",
+                            target: () => relationTarget("customers"),
                             localKey: "customer_id",
                         }
                     },
@@ -98,7 +103,7 @@ type: "string" },
                         type: "relation",
                         relation: {
                             kind: "belongsTo",
-                            target: "users",
+                            target: () => relationTarget("users"),
                         }
                     },
                     headline: { name: "Headline",
@@ -126,7 +131,7 @@ type: "string" }
             expect(getTitlePropertyKey(collection)).toBe("title");
         });
 
-        it("prefers plain text over email, enum, description and relation", () => {
+        it("prefers plain text over email, enum and description, and never takes a relation", () => {
             const collection: AdminCollection = {
                 name: "Leads",
                 slug: "leads",
@@ -137,7 +142,7 @@ type: "string" }
 type: "relation",
     relation: {
         kind: "belongsTo",
-        target: "users",
+        target: () => relationTarget("users"),
     }
 },
                     bio: { name: "Bio",
@@ -157,10 +162,12 @@ type: "string" }
                 }
             };
             expect(getTitlePropertyCandidates(collection))
-                .toEqual(["company", "email", "status", "bio", "owner"]);
+                .toEqual(["company", "email", "status", "bio"]);
         });
 
-        it("falls back to a relation when the collection holds no text", () => {
+        it("does not fall back to a relation when the collection holds no text", () => {
+            // The surfaces show the id instead: a junction row titled by one of
+            // its relations reads as the related record.
             const collection: AdminCollection = {
                 name: "Posts tags",
                 slug: "posts_tags",
@@ -174,10 +181,60 @@ isId: "uuid" },
 type: "relation",
     relation: {
         kind: "belongsTo",
-        target: "tags",
+        target: () => relationTarget("tags"),
         localKey: "tag_id",
     }
 }
+                }
+            };
+            expect(getTitlePropertyKey(collection)).toBeUndefined();
+        });
+
+        it("titles a client by its own email, not by the agency it belongs to", () => {
+            // A client whose name lives in a JSON column, and which belongs to
+            // an agency: every client read as its agency's name.
+            const collection: AdminCollection = {
+                name: "Clients",
+                slug: "clients",
+                table: "clients",
+                properties: {
+                    id: { name: "ID",
+type: "string",
+isId: "uuid" },
+                    agency: {
+                        name: "Agency",
+                        type: "relation",
+                        relation: { kind: "belongsTo", target: () => relationTarget("agencies"), localKey: "agency_id" }
+                    },
+                    agency_id: { name: "Agency id",
+type: "string" },
+                    data: { name: "Data",
+type: "map",
+keyValue: true },
+                    consent: { name: "Consent",
+type: "boolean" }
+                }
+            };
+            expect(getTitlePropertyKey(collection)).toBeUndefined();
+            const withEmail: AdminCollection = {
+                ...collection,
+                properties: { ...collection.properties, email: { name: "Email", type: "string", email: true } }
+            };
+            expect(getTitlePropertyKey(withEmail)).toBe("email");
+        });
+
+        it("titles by a relation that display.title names", () => {
+            const collection: AdminCollection = {
+                name: "Posts tags",
+                slug: "posts_tags",
+                table: "posts_tags",
+                display: { title: "tag" },
+                properties: {
+                    tag: {
+                        name: "Tag",
+                        type: "relation",
+                        relation: { kind: "belongsTo", target: () => relationTarget("tags"), localKey: "tag_id" }
+                    }
                 }
             };
             expect(getTitlePropertyKey(collection)).toBe("tag");
@@ -269,6 +326,22 @@ type: "string" }
 
         it("keeps the declared order instead of reranking", () => {
             const collection: AdminCollection = {
+                name: "Products",
+                slug: "products",
+                table: "products",
+                properties: {
+                    title: { name: "Title",
+type: "string" },
+                    sku: { name: "SKU",
+type: "string" }
+                },
+                propertiesOrder: ["sku", "title"]
+            };
+            expect(getTitlePropertyKey(collection)).toBe("sku");
+        });
+
+        it("skips a relation even when it is ordered first", () => {
+            const collection: AdminCollection = {
                 name: "Databases",
                 slug: "databases",
                 table: "databases",
@@ -281,7 +354,7 @@ isId: "uuid" },
 type: "relation",
     relation: {
         kind: "belongsTo",
-        target: "projects",
+        target: () => relationTarget("projects"),
     }
 },
                     connection_string: { name: "Connection string",
@@ -289,7 +362,7 @@ type: "string" }
                 },
                 propertiesOrder: ["id", "project", "connection_string"]
             };
-            expect(getTitlePropertyKey(collection)).toBe("project");
+            expect(getTitlePropertyKey(collection)).toBe("connection_string");
         });
 
         it("still skips identifiers declared first", () => {
@@ -311,7 +384,7 @@ type: "string" },
                         type: "relation",
                         relation: {
                             kind: "belongsTo",
-                            target: "tenants",
+                            target: () => relationTarget("tenants"),
                             localKey: "tenant_id",
                         }
                     },

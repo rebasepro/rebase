@@ -7,6 +7,7 @@ import { PropertyPreview } from "../PropertyPreview";
 import { cls, defaultBorderMixin } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { resolveArrayProperties } from "@rebasepro/cms-types";
+import { DocumentSummaryLine } from "./MapPropertyPreview";
 
 /**
  * @group Preview components
@@ -42,9 +43,7 @@ export function ArrayPropertyPreview({
     // Each entry is a block of its own — a bordered row, sometimes a whole
     // sub-table. Stating how many there are is the only honest one-liner.
     if (compact) {
-        return <span className={"text-sm truncate"}>
-            {values.length === 1 ? "1 item" : `${values.length} items`}
-        </span>;
+        return <DocumentSummaryLine summary={{ kind: "items", count: values.length }}/>;
     }
 
     const childSize: PreviewSize = size === "medium" ? "medium" : "small";

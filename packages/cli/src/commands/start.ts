@@ -48,6 +48,7 @@ ${chalk.bold("Usage")}
 ${chalk.bold("Options")}
   --bundle <dir>     Bundle directory (default: ${DEFAULT_BUNDLE_DIR})
   --workspace        Run the backend workspace's own start script
+  --zero-code        Start directly in zero-code BaaS mode (no bundle or project files)
   -h, --help         Show this help
 
 Runs the bundle the way a deployment does, reading PORT and the rest of .env,
@@ -222,13 +223,44 @@ export async function startCommand(rawArgs: string[] = []): Promise<void> {
     const { flags: args } = parseCommandArgs({
         spec: {
             "--bundle": String,
-            "--workspace": Boolean
+            "--workspace": Boolean,
+            "--zero-code": Boolean
         },
         rawArgs,
         commandWords: 1,
         command: "start",
         maxPositionals: 0
     });
+
+    const detectedRoot = findProjectRoot();
+    const zeroCodeFlag = Boolean(args["--zero-code"]);
+
+    // True zero-code BaaS mode: no `rebase.json`, no `backend/`, no bundle.
+    // Boots straight against `DATABASE_URL` with live PostgreSQL introspection.
+    if (zeroCodeFlag || (!detectedRoot && !args["--bundle"] && !args["--workspace"])) {
+        const cwd = process.cwd();
+        const envFile = findEnvFile(cwd);
+        if (envFile && fs.existsSync(envFile)) {
+            const dotenv = await import("dotenv");
+            dotenv.config({ path: envFile, quiet: true });
+        }
+        printNonProductionWarning(cwd);
+        if (!process.env.DATABASE_URL?.trim()) {
+            console.error(chalk.red("✗ DATABASE_URL is not set, so the zero-code BaaS runtime has no database to start against."));
+            console.error(chalk.gray("  Set DATABASE_URL in the environment or .env, or run `rebase dev` to start a local managed PostgreSQL."));
+            process.exit(1);
+        }
+        console.log(`${chalk.bold("Rebase")} — starting in zero-code BaaS mode (no project bundle)\n`);
+        try {
+            const { runFromBundle } = await import("@rebasepro/server");
+            await runFromBundle({ zeroCode: true });
+        } catch (err) {
+            console.error(chalk.red("\n✗ Failed to start the runtime."));
+            console.error(err instanceof Error ? err.message : String(err));
+            process.exit(1);
+        }
+        return;
+    }
 
     const projectRoot = requireProjectRoot();
 

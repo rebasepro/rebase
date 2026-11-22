@@ -33,47 +33,50 @@ export const NavigationCard = React.memo(function NavigationCard({
             }}
         >
 
-            <div className="flex flex-col h-full">
-                {/* Header: title + icon left, actions right */}
-                <div className="flex items-center w-full justify-between mb-1">
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-5 h-5 text-surface-400 dark:text-surface-500 transition-colors duration-150 group-hover:text-primary dark:group-hover:text-primary">
-                            {icon}
-                        </div>
+            <div className="flex items-start gap-3.5 h-full">
+                <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-lg bg-surface-raised text-text-secondary dark:text-text-secondary-dark transition-colors duration-150 group-hover:bg-surface-raised-hover group-hover:text-text-primary dark:group-hover:text-text-primary-dark">
+                    {icon}
+                </div>
+
+                <div className="flex flex-col min-w-0 flex-1 h-full">
+                    {/* Header: title left, actions right */}
+                    <div className="flex items-center w-full justify-between gap-2">
                         <Typography variant="subtitle1"
-                            component="h2">
+                            component="h2"
+                            className="truncate">
                             {name}
                         </Typography>
+
+                        <div
+                            className="flex items-center gap-0.5 shrink-0"
+                            onClick={(event: React.MouseEvent) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                            }}>
+                            {actions}
+                        </div>
                     </div>
 
-                    <div
-                        className="flex items-center gap-0.5"
-                        onClick={(event: React.MouseEvent) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                        }}>
-                        {actions}
-                    </div>
+                    {/* Description */}
+                    {description && (
+                        <div className="mt-0.5">
+                            <Typography variant="caption"
+                                color="secondary"
+                                component="div">
+                                <Markdown source={description} size={"small"}/>
+                            </Typography>
+                        </div>
+                    )}
+
+                    {additionalContent && (
+                        <div className="mt-2 pointer-events-none">
+                            {additionalContent}
+                        </div>
+                    )}
+
+                    {/* Spacer pushes content above to align at the top across grid siblings */}
+                    <div className="grow"/>
                 </div>
-
-                {/* Description */}
-                <div className="pl-8">
-                    {description && <Typography variant="caption"
-                        color="secondary"
-                        component="div">
-                        <Markdown source={description} size={"small"}/>
-                    </Typography>}
-                </div>
-
-                {additionalContent && (
-                    <div className="pl-8 pointer-events-none">
-                        {additionalContent}
-                    </div>
-                )}
-
-                {/* Spacer pushes content above to align at the top across grid siblings */}
-                <div className="grow"/>
-
             </div>
 
         </Card>)

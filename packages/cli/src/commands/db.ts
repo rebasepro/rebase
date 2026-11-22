@@ -668,6 +668,19 @@ export async function runDriverDbCommand(
     } finally {
         await atlasDev?.stop();
     }
+
+    // A `rebase dev` on this database applies schema edits as files are saved,
+    // so the push found nothing it had already applied. Said, so "No changes"
+    // is not read as the planner missing them. Not for `rebase dev`'s own
+    // start-up push, which is quiet.
+    if (!options.quiet && typedArgs[1] === "push") {
+        const { devServerAppliesSchemaNote, preparedDatabaseUrl, runningDevOnDatabase } = await import("../utils/dev-run");
+        const dev = runningDevOnDatabase(projectRoot, preparedDatabaseUrl(prepared) ?? env.DATABASE_URL ?? null);
+        if (dev) {
+            console.log(chalk.gray(`  ${devServerAppliesSchemaNote(dev)}`));
+            console.log("");
+        }
+    }
 }
 
 export async function dbCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
@@ -1725,11 +1738,13 @@ const DATABASE_FLAGS_HELP =
 
 const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: string[] }> = {
     push: {
-        usage: "rebase db push [--schema-dir <dir>] [--dry-run] [--allow-destructive] [--yes]",
+        usage: "rebase db push [--schema-dir <dir>] [--dry-run] [--allow-destructive] [--prune-policies] [--yes]",
         summary: "Apply the schema straight to the database. Development only — it does not write a migration.",
         notes: [
             "--dry-run prints the SQL and applies nothing. Read it before you approve it.",
             "A change that drops data, or re-keys a table (every row gets a new id), needs --allow-destructive.",
+            "--prune-policies also drops the policies on declared tables that no table declares (the dry run lists them "
+                + "as left in force). Never on a table backend/schema does not declare. Gated like a dropped column.",
             "--yes approves non-destructive pushes. It still approves destructive ones too in this release, with a "
                 + "deprecation warning; from the next release it will not — pass --allow-destructive for those.",
             `--schema-dir <dir>: ${SCHEMA_DIR_FLAG_HELP}.`,

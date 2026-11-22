@@ -124,10 +124,13 @@ so with container variants: `className="col-span-2 @4xl:col-span-3"`, never
 Pass the slots as one module-level array, `<Rebase slots={insightSlots}>`, so
 its identity is stable.
 
-## 4. Link a chart to its records
+## 4. Link a chart or a figure to its records
 
-A chart that counts records should open them. `BarChart`'s `onBarClick` makes
-each row a button:
+A chart or a figure that counts records should open them. `BarChart`'s
+`onBarClick` makes each row a button; `KpiTile`'s `onClick` makes the tile one,
+and its `href` makes it a link that a modified click opens in a new tab while a
+plain click goes to `onClick` (navigate there). Never wrap a tile in a
+`<button>` or `<a>` of your own:
 
 - **Open the list filtered to the bar**: navigate to the collection's URL with
   its filter in the query, `?<field>_op=%3D%3D&<field>_value=<value>` (repeat

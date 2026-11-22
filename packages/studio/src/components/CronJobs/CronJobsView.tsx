@@ -19,8 +19,11 @@ import {
     PauseIcon,
     PlayIcon,
     RefreshCwIcon,
+    Tab,
+    Tabs,
     Typography
 } from "@rebasepro/ui";
+import { DbCronJobsPanel } from "./DbCronJobsPanel";
 import { useRebaseClient, useSnackbarController, useTranslation } from "@rebasepro/app";
 import type { CronJobListing, CronJobStatus, CronJobLogEntry, RejectedCronJob } from "@rebasepro/types";
 import type { RebaseClient } from "@rebasepro/types";
@@ -100,6 +103,26 @@ disabled: "bg-surface-400"
 };
 
 export function CronJobsView() {
+    const [tab, setTab] = useState<"scheduler" | "zero-code">("scheduler");
+    return (
+        <div className="flex flex-col h-full w-full overflow-hidden">
+            <Tabs
+                value={tab}
+                onValueChange={(v) => { if (v === "scheduler" || v === "zero-code") setTab(v); }}
+                variant="boxy"
+                className="border-b border-hairline px-4 bg-surface-sheet shrink-0"
+            >
+                <Tab value="scheduler">Active Scheduler</Tab>
+                <Tab value="zero-code">Scheduled Jobs (DB)</Tab>
+            </Tabs>
+            <div className="flex-1 min-h-0 overflow-hidden">
+                {tab === "scheduler" ? <CronSchedulerMonitorView /> : <DbCronJobsPanel />}
+            </div>
+        </div>
+    );
+}
+
+function CronSchedulerMonitorView() {
     const client = useRebaseClient<RebaseClient>();
     const snackbar = useSnackbarController();
     const { t, i18n } = useTranslation();
@@ -332,7 +355,7 @@ message: e instanceof Error ? e.message : String(e) });
         <div className="flex h-full w-full overflow-hidden bg-surface-card">
             {/* ── Job List ── */}
             <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
-                <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
+                <div className={cls("flex items-center justify-between px-4 h-14 shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
                         <CalendarIcon size={iconSize.smallest} className="text-primary"/>
                         <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_cron")}</Typography>
@@ -377,7 +400,7 @@ message: e instanceof Error ? e.message : String(e) });
                 ) : (
                     <>
                         {/* Header */}
-                        <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-surface-card min-h-[56px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-5 h-14 shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className={cls("w-2.5 h-2.5 rounded-full", stateColors[selectedJob.state])}/>
                                 <div className="min-w-0">
@@ -446,7 +469,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     <Typography variant="body2" color="disabled">{t("studio_cron_no_executions")}</Typography>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-surface-100 dark:divide-surface-950">
+                                <div className="divide-y divide-hairline">
                                     {logs.map((log, idx) => (
                                         <LogRow key={idx} log={log}/>
                                     ))}

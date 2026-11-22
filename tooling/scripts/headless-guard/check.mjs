@@ -219,6 +219,27 @@ for (const pkg of SERVER_PACKAGES) {
     await check(pkg, pathToFileURL(entry).href);
 }
 
+// Verify built server dist never inlines React / CMS / UI packages (e.g. via
+// devDependencies accidentally bundled by Vite).
+const serverDistDir = path.join(repoRoot, "packages", "server", "dist");
+if (fs.existsSync(serverDistDir)) {
+    const FORBIDDEN_DIST_RE = /\bfrom\s+["'](react|react-dom|@rebasepro\/cms|@rebasepro\/ui|@rebasepro\/app)(?:\/[^"']*)?["']|createElement\s*\(\s*["']div["']\s*,\s*\{[^}]*className:\s*["'][^"']*bg-surface-/;
+    for (const entry of fs.readdirSync(serverDistDir, { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith(".js")) continue;
+        const full = path.join(serverDistDir, entry.name);
+        const text = fs.readFileSync(full, "utf8");
+        const hit = FORBIDDEN_DIST_RE.exec(text);
+        if (hit) {
+            const label = path.relative(repoRoot, full);
+            failures.push({
+                label,
+                message: `server dist bundle contains UI/React code (${hit[0]}). Externalize optional UI packages in packages/server/vite.config.ts.`
+            });
+            console.log(`  ERR  ${label}`);
+        }
+    }
+}
+
 if (failures.length > 0) {
     console.error(`\n${failures.length} headless violation(s):\n`);
     for (const { label, message } of failures) {

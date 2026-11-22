@@ -1,5 +1,25 @@
 # Supabase migration follow-ups
 
+## Status, 2026-11-21
+
+Built on `fix/triptelier-feedback`: item 3 (`defineRpc`, `POST /api/rpc/<name>`,
+`rebase.rpc`), item 8 (static-app `redirects` and `cleanUrls`), item 10
+(`rebase users import`, `POST /api/admin/users/import`), item 17
+(`defineFunction(…, { timeoutMs })`), and the later feedback: `rebase apps add
+admin`, `db push --prune-policies`, the admin's defaults (title, JSON summary,
+`listFields`, `hidden`, computed fields, kanban hint), `KpiTile` links, and the
+cloud CLI items (linked org, `env set --prompt`, domains and certificates,
+platform-rebuild drift, member invites). Item 5 (rest) and item 2's `db push`
+half are in rebasepro/rebase#88.
+
+Still open, and why:
+
+- **Item 2, the rest:** applying `backend/sql` at boot and at preview creation (the bundle has to carry the files).
+- **C5:** release a runtime image with every framework release; until then a bundle using `defineRpc` or `timeoutMs` on an older runtime fails to boot or ignores the option.
+- **C7, `cloud db import`:** a control-plane job.
+- **Control plane:** invitations by email for people with no account (saas `sweep/2026-10-24` has the `invites` function), a certificate state on domain rows (the CLI does a TLS handshake meanwhile), an email when a rollout rebuilds an app, and static-app redirects and `cleanUrls` for a static app deployed on its own (the front door in `saas/backend/src/static/`).
+- **`rebase migrate supabase`:** its pieces now exist; the command that runs them in order does not.
+
 What is left from the feedback written during the Triptelier migration
 (Supabase + Vercel → Rebase Cloud, 2026-11-18). The bugs found there are fixed
 on branch `claude/migration-feedback-fixes-5af765`; this note covers the items

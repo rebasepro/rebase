@@ -30,6 +30,7 @@ export { COLUMN_BRAND, ColumnBuilder, col, isColumnBuilder, isSqlTemplate, pgEnu
 export * from "./relations";
 export * from "./table_options";
 export * from "./table";
+export * from "./rpc";
 export * from "./descriptor";
 export * from "./infer";
 export * from "./table_patch";

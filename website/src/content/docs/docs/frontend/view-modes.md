@@ -54,7 +54,7 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
                 done:        { label: "Done", color: "green" },
             },
         },
-        __order: { hidden: true, hiddenInForm: true },
+        __order: { hidden: true },
     },
 });
 ```
@@ -86,13 +86,15 @@ column's own order, or in `enumOrder`, with the labels and colours of
 `enumLabels`. Dragging a card to another column writes `columnField`.
 
 `kanban.orderField` names where a card's position **within** a column is stored.
-Declare it every time: three mistakes here all produce a board that looks
-configured and is not.
+Declare it whenever that order matters: three mistakes here all produce a board
+that looks configured and is not.
 
-**`orderField` is not optional.** Without it a card still drags between columns,
-because that writes `columnField`. Its position within a column has nowhere to
-be stored, so it resets on the next read, and the board shows an amber bar
-saying ordering is not configured.
+**Without `orderField`, only the column is kept.** A card still drags between
+columns, because that writes `columnField`, which is all a status board needs.
+Its position within a column has nowhere to be stored, so it resets on the next
+read. The board says so the first time a card is dropped at a new place in its
+own column, in a bar that can be dismissed; a board whose cards only move
+between columns shows nothing.
 
 **The column must be text.** Reordering writes a
 [fractional-indexing](https://github.com/rocicorp/fractional-indexing) key
@@ -187,14 +189,19 @@ Prefer a path whenever the value is on the record: a path keeps the field's own
 rendering, so an enum status stays a coloured chip and a date stays formatted,
 which a resolver returning a string cannot do.
 
-When no slot names the title, the CMS picks one. With `fieldOrder`, the first
-field in that order that can be a title: text, a single-cardinality relation or
-a reference. Otherwise the candidates are ranked: text whose key names a label
-(`name`, `title`, `label`…) first, then short text, an email, an enum, long text,
-a relation and a reference. Keys, uuid columns, file fields and hidden fields
-never qualify. Whatever the title holds is drawn as text: a date formatted, an
-array joined, and a relation as the first of `name`, `title`, `label` or
-`displayName` on the related row, falling back to its id.
+When no slot names the title, the CMS picks one from the table's own text.
+With `fieldOrder`, the first field in that order that can be a title.
+Otherwise the candidates are ranked: text whose key names a label (`name`,
+`title`, `label`…) first, then short text, an email, an enum, long text and a
+user picker. Keys, uuid columns, foreign keys, relations, references, JSON
+documents, file fields and hidden fields never qualify: a relation names
+another record, so a client that belongs to an agency is never titled by the
+agency. A table with none of these is titled by its id. A name that lives
+inside a JSON column, or a relation that really is what a row is called (a
+junction row), is named with `display.title`: `title: "data.name"`,
+`title: "agency"`. Whatever the title holds is drawn as text: a date formatted,
+an array joined, and a relation as its related row's title, falling back to
+its id.
 
 ## Filters, presets and sort
 

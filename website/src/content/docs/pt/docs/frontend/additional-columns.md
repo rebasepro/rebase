@@ -1,13 +1,15 @@
 ---
-sourceHash: e275bf79725ed509
+sourceHash: 3c089e6c404f4635
 title: Colunas Adicionais
 sidebar_label: Colunas Adicionais
-description: Adicione colunas computadas/virtuais a tabelas de coleções que derivam valores de dados da entidade.
+description: Adicione colunas computadas/virtuais a tabelas de coleção que derivam valores de dados da entidade.
 ---
 
 ## Visão Geral
 
-As colunas adicionais permitem exibir dados computados ou derivados na tabela da coleção sem armazená-los no banco de dados.
+Colunas adicionais permitem exibir dados computados ou derivados na tabela da coleção sem armazená-los no banco de dados.
+
+Uma coluna computada pertence à tabela. O registro já exibe os valores a partir dos quais ela é calculada, portanto, ela não está no registro a menos que o formulário a solicite: nomeie sua `key` em `form.sections` ou `form.sidebar` (consulte [Form layout](/docs/frontend/form-layout/)), ou nos `fields` fornecidos a um `RecordForm` ou `RecordDetail`.
 
 ## Definindo Colunas Adicionais
 
@@ -44,11 +46,11 @@ export const productsCms = customizeTable<typeof products>("products", {
 
 | Chave | O que faz |
 |---|---|
-| `key` | Identifica a coluna. Declare-a em `fieldOrder` ou `listFields` como `"total" as AdditionalFieldKey`. |
+| `key` | Identifica a coluna. Indique-a em `fieldOrder` ou `listFields` como `"total" as AdditionalFieldKey`. |
 | `name` | O cabeçalho. |
 | `width` | A largura, em pixels. |
 | `Builder` | Renderiza a célula. |
-| `dependencies` | Os campos cuja alteração renderiza a célula novamente; verificado em relação à tabela. |
+| `dependencies` | Os campos cuja alteração renderiza a célula novamente; verificados em relação à tabela. |
 | `value` | O valor da célula, para exportação. |
 
 ## Props do Builder
@@ -56,12 +58,12 @@ export const productsCms = customizeTable<typeof products>("products", {
 | Prop | Tipo | Descrição |
 |------|------|-------------|
 | `row` | `Record<string, unknown>` | O registro conforme o servidor envia a linha: datas como strings ISO, um belongsTo como sua coluna de chave estrangeira, `id` apenas onde a tabela possui essa coluna. Uma relação carregada pelo admin é aninhada sob seu nome como as próprias colunas do registro relacionado |
-| `id` | `string` | O id do registro: sua chave primária como uma string, as partes de uma chave composta unidas por `:::`. O id que `useSidePanel().open` e uma rota recebem |
+| `id` | `string` | O id do registro: sua chave primária como uma string, as partes de uma chave composta unidas por `:::`. O id aceito por `useSidePanel().open` e por uma rota |
 | `context` | `RebaseContext` | Contexto completo do Rebase |
 
 `value({ row, id, context })` recebe as mesmas props.
 
 ## Próximos Passos
 
-- **[Ações de Entidade](/docs/frontend/entity-actions)** — Botões de ação personalizados
-- **[Campos Personalizados](/docs/frontend/custom-fields)** — Campos de formulário personalizados
+- **[Entity Actions](/docs/frontend/entity-actions)** — Botões de ação personalizados
+- **[Custom Fields](/docs/frontend/custom-fields)** — Campos de formulário personalizados

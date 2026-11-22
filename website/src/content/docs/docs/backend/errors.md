@@ -96,6 +96,8 @@ the ID you got. Read the response header.
 | `CAPTCHA_FAILED` | 400 | The provider rejected the CAPTCHA token. | Solve a fresh challenge. |
 | `CAPTCHA_REQUIRED` | 400 | The route requires a CAPTCHA token and none was sent. | Include the token. |
 | `CHALLENGE_EXHAUSTED` | 401 | Too many wrong codes against one MFA challenge. | Start a new challenge. |
+| `CONFIRMATION_REQUIRED` | 400 | A destructive DDL operation (`DELETE /api/admin/db/tables/:table` or `DELETE …/columns/:column`) was called without `{ confirm: "<name>" }`. | Re-send with the exact target name in `confirm`, or pass `dryRun: true` to preview SQL. |
+| `DDL_REJECTED` | 400, or 409 when the object already exists | PostgreSQL refused a statement `/api/admin/db/*` ran for you — a type, a default, a policy condition, a name already taken. The message is Postgres's own, and `details.dbCode` its SQLSTATE. | Change what the message names and send the request again; `dryRun: true` shows the SQL first. |
 | `DEVICE_LOGIN_DECIDED` | 409 | The device sign-in was already approved or denied. A sign-in is decided once. | Start a new one on the device. |
 | `DEVICE_LOGIN_EXPIRED` | 410 | The device sign-in passed its ten minutes before it was decided. | Start a new one on the device. |
 | `DEVICE_LOGIN_NOT_FOUND` | 404 | No device sign-in has that user code. The device's poll itself answers RFC 8628's lowercase codes instead: `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, `invalid_grant`. | Check the code against the one the device shows. |
@@ -104,6 +106,7 @@ the ID you got. Read the response header.
 | `EMAIL_NOT_VERIFIED` | 403 | An OAuth sign-in found an account with the same address, and the provider did not verify that address, so it is not linked. | Sign in with the existing method, then `POST /auth/link/<provider>`. |
 | `CSRF_REFUSED` | 403 | CSRF protection is on (`csrf: { origin }`) and a request with no `Authorization` header came from an origin not on the list: a cookie-authenticated form post from another site, or a request with no body and no `Origin`. | Send it from an allowed origin, with a JSON body, or with an `Authorization` header. |
 | `FACTOR_NOT_VERIFIED` | 400 | The MFA factor was enrolled but never confirmed. | Confirm the factor. |
+| `ID_EXISTS` | 409 | An account already has the id an account import keeps (`POST /api/admin/users/import`). The import reports it as `skipped` and leaves the account as it is. | Nothing, when the account was imported before. Otherwise leave `id` out, or pick another. |
 | `IDENTITY_ALREADY_LINKED` | 409 | That OAuth identity belongs to another account. | Sign in with it, or unlink it there first. |
 | `IMPERSONATION_FORBIDDEN` | 403 | A request sent `x-rebase-impersonate` and its caller may not run a request as another user. Only a signed-in administrator's own session may, never an API key or the service key. | Send it with an administrator's session, or leave the header out. |
 | `IMPERSONATION_INVALID` | 400 | `x-rebase-impersonate` was sent empty. | Send the uid of the user to act as, or leave the header out. |
@@ -125,6 +128,7 @@ the ID you got. Read the response header.
 | `INVALID_SCOPES` | 400 | A key was asked for something that is not a scope: malformed, unknown, or with a target the scope does not take. `details.problems` says which and why; `details.validScopes` lists the scopes a key may hold. It leaves out `keys:read` and `keys:write`, which no key can hold. | Use a name from the list. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | A verification, reset, magic-link or address-change token is malformed, unknown, spent or expired (400). An OAuth provider credential or a refresh token that does not verify is a 401. | Request a fresh link, or sign in again. |
 | `INVALID_USER_CODE` | 400 | What was sent as a device sign-in code is not one: eight letters, like `BCDF-GHJK`. | Copy the code the device shows. |
+| `INVALID_ID` | 400 | An imported account's `id` is not one an account may keep: empty, over 128 characters, a character outside letters, digits and `_ - . : \|`, a reserved id (`service`, `anonymous`), or a value the users table's id column cannot hold (not a uuid on a `uuid` column). | Fix the id, or leave it out and let the table generate one. |
 | `INVALID_ROLE` | 400 | A role name being written is not a string, is empty, or contains `,` `{` `}` `"` `\` or a control character. Those characters would be read back as other roles: a role travels in a Postgres `text[]` and in the comma-joined list RLS policies split, so `"support,admin"` would come back as `admin`. `details.problems` names each one. | Rename the role. Any other name is accepted. |
 | `KEY_MANAGEMENT_SCOPE` | 400 | A key was asked for `keys:read` or `keys:write`. No key may manage keys. `details.scopes` names them. | Leave them out. |
 | `KEY_OUTRANKS_CALLER` | 403 | A holder of `keys:write` tried to change or revoke a service key that holds a role or scope they do not. Only an admin manages any key. `details.roles` and `details.scopes` name what the key holds beyond the caller. | Have an admin, or someone who holds them, change the key. |
@@ -164,6 +168,7 @@ the ID you got. Read the response header.
 | `SETUP_REQUIRED` | 403 | The project has no admin yet, so this route is not available. | Complete first-admin setup. |
 | `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed, or a refresh token that was rotated away more than `refreshTokenReuseIntervalSeconds` ago. | Request a fresh one, or sign in again. |
 | `TOKEN_EXPIRED` | 401 | The token is past its lifetime. | Request a fresh one. |
+| `TOO_MANY_USERS` | 400 | One `POST /api/admin/users/import` carried more than 100 accounts. `details.max` says the limit. | Send them in requests of 100; `rebase users import` does. |
 | `USER_NOT_FOUND` | 404 | No account with that id. | Check the id. |
 | `WEAK_PASSWORD` | 400 | The password does not meet the [password policy](/docs/backend/auth-endpoints/#password-policy) (by default 8+ characters with an upper-case letter, a lower-case letter and a digit) — on sign-up, a reset or change, and an administrator's chosen password: `POST /api/admin/users`, a create on the auth table through the data API, `PUT /api/admin/users/:id` or `POST /api/admin/users/:id/reset-password`. | Choose a stronger one. An administrator importing accounts may send `skipPasswordPolicy: true` on a create. |
 
@@ -332,8 +337,26 @@ the message names the constraint.
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
 | `FUNCTION_NOT_FOUND` | 404 | No function of that name is served — or one is, and its own routes do not cover the path after it. A signed-in caller is also told what *is* served; an anonymous one is not, because that list is an inventory of every custom endpoint. When a file of that name failed to load, the message tells a signed-in caller so, naming the file: that is the difference between a typo and a broken deploy. An anonymous caller gets the plain unknown-name answer, as for a name that matches nothing. | Check the name against `GET /api/functions`, or the boot log for a file that did not load. |
-| `FUNCTION_TIMEOUT` | 504 | The handler exceeded its timeout. It is still running; it cannot be cancelled from here. | Give outbound calls an `AbortSignal`, or raise `REBASE_FUNCTIONS_TIMEOUT_MS`. |
+| `FUNCTION_TIMEOUT` | 504 | The handler exceeded its timeout. It is still running; it cannot be cancelled from here. The message and `details` (`{ timeoutMs, source }`) say which limit applied and where it was set. | Give outbound calls an `AbortSignal`, declare the function's own `timeoutMs` (`defineFunction(…, { timeoutMs })`, at most `REBASE_FUNCTIONS_MAX_TIMEOUT_MS`), or raise `REBASE_FUNCTIONS_TIMEOUT_MS`. |
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | This process proxies functions to another one, which did not answer. | Check that the functions unit is running. |
+
+## SQL functions as RPC
+
+<span class="since-badge" data-since="0.35">Since 0.35</span>
+
+`POST /api/rpc/<name>` — see [SQL functions as RPC](/docs/backend/rpc/). A bad argument is `VALIDATION_CONSTRAINT` (400), with `details.violations` naming each field, as on the data API; a credential without `data:read` is `SCOPE_MISSING` (403); a public RPC over its limit is `RATE_LIMITED` (429).
+
+| Code | Status | Means | Do |
+| --- | --- | --- | --- |
+| `RPC_NOT_FOUND` | 404 | No `defineRpc` of that name is exported from `backend/schema/index.ts`. Only declared functions are callable, so a function the database has and nobody declared answers this too. | Declare it with `defineRpc`, or check the name. |
+| `METHOD_NOT_ALLOWED` | 405 | The RPC exists, and is called with another method than `POST`. The response carries `Allow: POST`. | `POST` a JSON body of named arguments. |
+| `INVALID_RPC_BODY` | 400 | The body is JSON, and not an object of named arguments (an array, a string). | Send `{ "argument": value }`, or no body for no arguments. |
+| `RPC_ARGUMENTS_MISMATCH` | 400 | No overload of the SQL function takes the arguments sent: a parameter without a `DEFAULT` was left out, or one it does not have was named. The message lists what it takes. | Send what the function takes, and mark it `.required()` in `args`. |
+| `RPC_INVALID_ARGUMENT` | 400 | Postgres refused a value for the function's parameter type (a class 22 SQLSTATE): `"abc"` for a `uuid`, a label outside an enum. | Send a value of the parameter's type. |
+| `RPC_EXCEPTION` | 400, or the status a `PTnnn` SQLSTATE names | The function raised an exception: `RAISE EXCEPTION '…'` answers 400 with its message, and `details` carries `sqlState`, `detail` and `hint`; `RAISE SQLSTATE 'PT404'` answers 404, as PostgREST does. | The message is the function's own. |
+| `RPC_READ_ONLY` | 500 | The function wrote, and an RPC runs in a read-only transaction unless it is declared `write: true`. | Add `write: true` to its `defineRpc`. |
+| `RPC_FUNCTION_MISSING` | 500 | The RPC is declared and the database has no function of that schema and name. Postgres stores an unquoted name in lower case. | Create the function, or fix the name or `schema` in `defineRpc`. |
+| `RPC_AMBIGUOUS` | 500 | Several overloads of the function take the arguments sent. | Drop the overloads the RPC should not reach, or rename them. |
 
 ## Push notifications
 

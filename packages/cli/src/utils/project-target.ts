@@ -20,8 +20,8 @@
  *      which any member with log access holds.
  *   2. `--url <server>` — a server the developer names.
  *   3. `REBASE_BASE_URL`, in the shell or in `.env`.
- *   4. The `rebase dev` this checkout is running (`.rebase/state.json`, while
- *      the pid it names is alive).
+ *   4. The `rebase dev` this checkout is running (`.rebase/dev.json`, else
+ *      `.rebase/state.json`, while the pid it names is alive).
  *
  * Nothing else: an address the CLI only guessed is one it would hand the
  * service key to without knowing whose server answers.
@@ -42,7 +42,7 @@ import chalk from "chalk";
 
 import { findProjectRoot, readEnvFile } from "./project";
 import { cliUserAgent } from "./version";
-import { serverUnreachableHint } from "./dev-server";
+import { runningBackend, serverUnreachableHint } from "./dev-server";
 
 /* ═══════════════════════════════════════════════════════════════
    Flags
@@ -117,17 +117,6 @@ export type BackendAddress =
     }
     | { url: null; reason: string };
 
-/** Whether a process with this pid is alive and ours to signal. */
-function isAlive(pid: number): boolean {
-    try {
-        process.kill(pid, 0);
-        return true;
-    } catch {
-        // ESRCH: gone. EPERM: alive, but another user's — not this project's backend.
-        return false;
-    }
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -135,12 +124,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * The address the service key may be sent to, from the project alone.
  *
- * In order: `REBASE_BASE_URL` in the shell or in `.env`, then the
- * `.rebase/state.json` this project's backend writes when it binds — and only
- * while the pid it names is alive, because a backend that was killed leaves
- * the file behind. `.env`'s `PORT` was once the fallback, and every scaffold
- * writes `PORT=3001`: with `rebase dev` stopped, the key went to whatever
- * listened on 3001.
+ * In order: `REBASE_BASE_URL` in the shell or in `.env`, then this
+ * project's running backend ({@link runningBackend}): the port the running
+ * `rebase dev` recorded for its backend, else the `.rebase/state.json` the
+ * backend writes when it binds — each only while the pid it names is alive,
+ * because a process that was killed leaves its file behind. `.env`'s `PORT`
+ * was once the fallback, and every scaffold writes `PORT=3001`: with
+ * `rebase dev` stopped, the key went to whatever listened on 3001.
  */
 export function resolveBackendAddress(env: Record<string, string>, projectRoot: string): BackendAddress {
     const fromShell = process.env.REBASE_BASE_URL?.trim();
@@ -150,9 +140,10 @@ export function resolveBackendAddress(env: Record<string, string>, projectRoot: 
         return cloudProject ? { url: configured, source: "configured", cloudProject } : { url: configured, source: "configured" };
     }
 
-    const state = readBackendState(projectRoot);
-    if (state && isAlive(state.pid)) return { url: state.url, source: "running" };
+    const running = runningBackend(projectRoot);
+    if (running) return { url: running.url, source: "running" };
 
+    const state = readBackendState(projectRoot);
     const last = state ? ` The last one recorded here, at ${state.url} (pid ${state.pid}), has stopped.` : "";
     return {
         url: null,

@@ -365,6 +365,12 @@ parentEntityIds,
         return columns[0] || "";
     }, [entityColumnMap, columnProperty, columns]);
 
+    // A board without an order field still moves cards between columns, which
+    // is all most status boards are for. Only a drop within a column asks for
+    // something it cannot keep, so the hint waits for one.
+    const [orderNotKept, setOrderNotKept] = useState(false);
+    const onOrderNotKept = useCallback(() => setOrderNotKept(true), []);
+
     const { handleItemsReorder } = useKanbanDragAndDrop({
         collection,
         fullPath,
@@ -373,7 +379,8 @@ parentEntityIds,
         dataClient,
         context,
         boardDataController,
-        analyticsController
+        analyticsController,
+        onOrderNotKept
     });
 
     // Backfill order values for all entities
@@ -589,12 +596,14 @@ parentEntityIds,
                 </div>
             )}
 
-            {/* Warning: orderProperty not configured - drag reorder won't persist */}
-            {!orderProperty && !dataLoading && (
+            {/* A card was dropped within its column, and with no order field
+                that position is not stored. */}
+            {!orderProperty && orderNotKept && (
                 <div className="px-4 pt-2 flex-shrink-0">
-                    <Alert color="warning"
+                    <Alert color="info"
                         size="small"
-                        role={null}
+                        role={"status"}
+                        onDismiss={() => setOrderNotKept(false)}
                         action={kanbanSetupSlots.length > 0 ? kanbanSetupSlots[0] : undefined}>
                         {t("kanban_order_not_configured")}
                     </Alert>

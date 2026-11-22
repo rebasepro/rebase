@@ -8,6 +8,7 @@ import {
     bundleSqlFiles,
     bundleUiConfig,
     bundledNpmrc,
+    buildStaticBundle,
     composeBundleManifest,
     collectDeclaredDependencies,
     detectDeclaredDepConflicts,
@@ -741,6 +742,55 @@ entry: {} });
                 frameAncestors: ["https://admin.example.com"]
             }
         ]);
+    });
+
+    it("records an app's redirects and cleanUrls, and nothing for an app without them", () => {
+        // The runtime reads both from the bundle, so it never parses rebase.json.
+        const bundleDir = bundleWith({ bundleFormat: 3, app: "backend", entry: {} });
+        foldStaticIntoBundle({
+            bundleDir,
+            assetsDir: assets({ "index.html": "apex" }),
+            appName: "apex",
+            path: "/",
+            host: "example.com",
+            spa: false,
+            redirects: [{ from: "/:path*", to: "https://www.example.com/:path*" }]
+        });
+        foldStaticIntoBundle({
+            bundleDir,
+            assetsDir: assets({ "index.html": "site", "privacidad.html": "p" }),
+            appName: "site",
+            path: "/",
+            host: "www.example.com",
+            spa: false,
+            cleanUrls: true
+        });
+        foldStaticIntoBundle({ bundleDir, assetsDir: assets({ "index.html": "docs" }), appName: "docs", path: "/docs", spa: true, redirects: [], cleanUrls: false });
+
+        const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
+        const byName = (name: string) => manifest.entry.static.find((app: { name: string }) => app.name === name);
+        expect(byName("apex")).toEqual({
+            path: "/", host: "example.com", dir: "static/apex", spa: false, name: "apex",
+            redirects: [{ from: "/:path*", to: "https://www.example.com/:path*" }]
+        });
+        expect(byName("site")).toEqual({ path: "/", host: "www.example.com", dir: "static/site", spa: false, name: "site", cleanUrls: true });
+        expect(byName("docs")).toEqual({ path: "/docs", dir: "static/docs", spa: true, name: "docs" });
+    });
+
+    it("records them on a static app built on its own, too", () => {
+        const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-static-bundle-"));
+        fs.writeFileSync(path.join(projectRoot, "package.json"), "{}");
+        const { manifest } = buildStaticBundle({
+            projectRoot,
+            appName: "site",
+            assetsDir: assets({ "index.html": "site" }),
+            outDir: path.join(projectRoot, "dist-bundle-site"),
+            runtimeRange: "*",
+            redirects: [{ from: "/old", to: "/new", status: 301 }],
+            cleanUrls: true
+        });
+        expect(manifest.entry?.static?.[0]).toMatchObject({ redirects: [{ from: "/old", to: "/new", status: 301 }], cleanUrls: true });
+        fs.rmSync(projectRoot, { recursive: true, force: true });
     });
 
     it("refuses a route to a function the backend bundle does not contain, and lists what it has", () => {

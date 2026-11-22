@@ -144,6 +144,7 @@ rebase schema introspect
 - With `--from supabase`, translates Supabase's conventions for a database you are leaving: a column default of `auth.uid()` becomes `.onCreateUser()` (the server writes the caller's id), a column holding a Supabase user id (that default, or a foreign key to `auth.users`) becomes `col.text().userId()`, as `rebase.users.id` and `rebase.uid()` are text, and a policy `TO authenticated` / `TO anon` loses the role (a Rebase database has neither) and requires a signed-in / signed-out caller instead; a policy only for `service_role` is dropped. Each change is noted at the top of the table's file. Without the flag these are left as they are (Rebase running on the same database beside Supabase still needs them), and the run says when it saw them
 - Ends with what it did **not** carry over: functions, triggers, extensions, CHECKs, indexes `indexes` cannot spell, foreign keys over several columns or into another schema. The SQL that recreates each one Postgres can print is written to `backend/sql/_introspected-left-behind.sql`, a draft: review it, make it safe to run again, and rename it without the leading `_`, and `rebase db push` and every deploy apply it whenever it changed
 - Reminds you that `DATABASE_URL` still names the database it read: in a migration that is the source, and a `db push` now would write into it
+- In a headless project, replaces the scaffold's `ai-instructions.md` ("the database is the schema") with the backend-only schema-in-code rules while the file is exactly as the scaffold wrote it; an edited one is left alone, and the command says which of its rules no longer hold
 - Puts what it could not state exactly in a comment at the top of the table's file and on the terminal — a closed set of strings on a text column, a generated column whose expression it did not read, a custom type — with what a push would do to it
 - With `--data-inference`, samples up to 100 rows per table and writes what it
   found that is presentation — titles, icons, boards, sorts, field options — to
@@ -200,6 +201,7 @@ rebase db push
   schema change and before any step that can fail, so a push that stops part-way leaves a new table
   denying every request rather than open to it
 - Applies the RLS policies your tables' `rls` compiles to, and **removes policies an earlier push superseded**
+- <span class="since-badge" data-since="0.35">Since 0.35</span> With `--prune-policies`, also drops the policies on declared tables that no table declares — the ones the dry run lists as "left in force", such as a database's own policies after a table moved to `rls: "admin-only"` — in the transaction that applies the declared ones. The dry run lists each under "Planned row-level security changes", and the push gates them like a dropped column (it asks on a terminal, and elsewhere needs `--allow-destructive`): dropping a policy changes who can read and write the rows, and a dropped `RESTRICTIVE` one widens access. A table `backend/schema` does not declare, and the `rebase` schema, are never touched
 - Leaves every
   CHECK and EXCLUDE constraint on a declared table as it is. A table
   cannot declare either, so they are the database's own rules, written by hand
@@ -230,6 +232,7 @@ rebase db push
   neither do policies `db migrate` applied. Only one it could not compare (its
   table's lock not granted within two seconds, say) is listed apart. The push
   itself prints one line counting the changes
+- Says so when a `rebase dev` is running on the same database: it applies new tables and columns as you save, so "No changes" can mean it already applied them
 - Shows each
   statement Atlas applies once. Atlas connects without SSL to a database on this
   machine (`localhost`, `127.x`, `::1`) whose URL names no `sslmode`, as the app
@@ -285,7 +288,7 @@ That used to matter a great deal: Postgres ORs `PERMISSIVE` policies together, s
 
 To audit a database that was pushed before this landed, run `rebase doctor --policies`. It works as a CI gate: it exits non-zero on drift, and also when it could not run the check at all — no `DATABASE_URL`, a `--schema-dir` path that does not resolve, a `pg_policies` read the CI role is not granted. A gate that could not look has not passed.
 
-`doctor` and `db push` tell the two kinds of orphan apart. A policy with a generated name was superseded, and the next push drops it. Any other name was written by hand or by another tool and is still in force: describe it in its table's `rls` to keep it (Studio's RLS view imports it), or drop it by hand if it is stale.
+`doctor` and `db push` tell the two kinds of orphan apart. A policy with a generated name was superseded, and the next push drops it. Any other name was written by hand or by another tool and is still in force: describe it in its table's `rls` to keep it (Studio's RLS view imports it), or drop it with `rebase db push --prune-policies` if it is stale.
 :::
 
 :::caution

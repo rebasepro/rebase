@@ -23,7 +23,7 @@ import path from "path";
 import { execa } from "execa";
 import { assertBackendGuarded } from "./utils/backend-guard";
 import chalk from "chalk";
-import type { RebaseStaticRoute } from "@rebasepro/types";
+import type { RebaseStaticRedirect, RebaseStaticRoute } from "@rebasepro/types";
 import { foldStaticIntoBundle } from "./bundle";
 import { compareMountOrder, staticAppAddress } from "./manifest";
 import { toolStdio } from "./utils/tool-stdio";
@@ -39,6 +39,8 @@ export interface FoldableManifest {
         cms?: string;
         routes?: RebaseStaticRoute[];
         frameAncestors?: string[];
+        redirects?: RebaseStaticRedirect[];
+        cleanUrls?: boolean;
     }>;
 }
 
@@ -92,6 +94,10 @@ export interface FoldableApp {
     routes?: RebaseStaticRoute[];
     /** Origins besides its own that may frame it. */
     frameAncestors?: string[];
+    /** Requests it answers with a redirect before its files. */
+    redirects?: RebaseStaticRedirect[];
+    /** Serve `x.html` at `/x`. Present only when `true`. */
+    cleanUrls?: boolean;
 }
 
 /**
@@ -127,7 +133,9 @@ reason: `"${name}" declares no output directory — not folded in.` });
             spa: app.spa ?? true,
             cms: app.cms,
             ...(app.routes?.length ? { routes: app.routes } : {}),
-            ...(app.frameAncestors?.length ? { frameAncestors: app.frameAncestors } : {})
+            ...(app.frameAncestors?.length ? { frameAncestors: app.frameAncestors } : {}),
+            ...(app.redirects?.length ? { redirects: app.redirects } : {}),
+            ...(app.cleanUrls === true ? { cleanUrls: true } : {})
         });
     }
 
@@ -296,7 +304,9 @@ export async function foldFrontendIntoBundle(options: FoldOptions): Promise<Fold
             spa: app.spa,
             cms: app.cms,
             routes: app.routes,
-            frameAncestors: app.frameAncestors
+            frameAncestors: app.frameAncestors,
+            redirects: app.redirects,
+            cleanUrls: app.cleanUrls
         });
         outcomes.push({ appName: app.name,
 fileCount,

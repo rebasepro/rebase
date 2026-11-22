@@ -126,7 +126,7 @@ export async function linkCommand(rawArgs: string[]): Promise<void> {
         rawArgs,
         commandWords: 2, // cloud link
         command: "cloud link",
-        maxPositionals: 1 // [url]
+        maxPositionals: 1 // [url | project]
     });
 
     // A positional URL means "this exact backend", which needs no login and no
@@ -137,16 +137,30 @@ export async function linkCommand(rawArgs: string[]): Promise<void> {
         return;
     }
 
+    // Anything else is a project, as `--project` names one: `rebase cloud link
+    // my-app` used to drop the slug and open the picker (or, with no terminal,
+    // ask for `--project`).
+    const positionalProject = positionals.find(value => !/^https?:\/\//i.test(value));
+    const flagProject = args["--project"];
+    if (positionalProject && flagProject && positionalProject !== flagProject) {
+        fail(
+            `Two projects were named: ${positionalProject} and --project ${flagProject}.`,
+            "Name the project once.",
+            "usage"
+        );
+    }
+    const projectRef = flagProject ?? positionalProject;
+
     const { client, url } = await requireClient(rawArgs);
 
     try {
         let project: ProjectRow | undefined;
 
-        if (args["--project"]) {
-            const projectId = await resolveProjectRef(args["--project"], client);
+        if (projectRef) {
+            const projectId = await resolveProjectRef(projectRef, client);
             project = (await client.data.table("projects").findById(projectId)) as ProjectRow | undefined;
             if (!project) {
-                fail(`Project ${args["--project"]} not found.`, undefined, "project_not_found");
+                fail(`Project ${projectRef} not found.`, undefined, "project_not_found");
             }
         } else {
             // The picker needs a terminal. Without this, `rebase cloud link`

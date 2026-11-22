@@ -9,7 +9,12 @@ import { getMimeType } from "hono/utils/mime";
 import { responseCompression } from "./utils/compression.js";
 import { logger } from "./utils/logger.js";
 import { staticAppCsp } from "./boot/security-headers.js";
-import { isContentHashedFileName } from "@rebasepro/types";
+import {
+    cleanUrlFor,
+    compileStaticRedirects,
+    isContentHashedFileName,
+    type RebaseStaticRedirect
+} from "@rebasepro/types";
 
 /**
  * Configuration for serving a Single Page Application
@@ -99,6 +104,44 @@ export interface ServeSPAConfig {
      * @example ["https://admin.example.com"]
      */
     frameAncestors?: readonly string[];
+
+    /**
+     * Requests under `basePath` answered with a redirect before any file
+     * (default: none). The first that matches answers, in declaration order;
+     * see `RebaseStaticAppConfig.redirects` in `@rebasepro/types`.
+     *
+     * Each must have passed `validateStaticRedirect`; the mount throws on one
+     * that would not. Applied whether or not the build directory exists, so an
+     * app whose only job is a redirect answers even with nothing to serve.
+     */
+    redirects?: readonly RebaseStaticRedirect[];
+
+    /**
+     * Serve `x.html` at `/x`, and answer `/x.html` with a 308 to `/x`
+     * (default: false). A file or directory of the request's exact name is
+     * served first; `index.html` redirects to its directory, `/docs/index.html`
+     * to `/docs/`. The query string is kept.
+     */
+    cleanUrls?: boolean;
+}
+
+/**
+ * A request's hostname in the form an app's `host` is written in: lowercase,
+ * with no port and no trailing dot.
+ *
+ * All three are ways of naming the same host that a browser, a proxy or a
+ * person with curl will send. `Admin.Example.com`, `admin.example.com:443` and
+ * the fully-qualified `admin.example.com.` are one site, and an app that
+ * answered only the first spelling would be down for whoever typed another.
+ *
+ * An IPv6 literal comes back as it arrived: its colons are not a port, and no
+ * app is ever given one, so all it has to do here is not be mangled into
+ * something that could match.
+ */
+export function normalizeRequestHost(host: string): string {
+    const lower = host.trim().toLowerCase();
+    if (lower.startsWith("[")) return lower;
+    return lower.replace(/:\d*$/, "").replace(/\.$/, "");
 }
 
 /** What {@link ServeSPAConfig.owns} is asked about. */
@@ -557,17 +600,10 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
     const rawBase = config.basePath ?? "/";
     const basePath = rawBase !== "/" ? rawBase.replace(/\/+$/, "") : "/";
     const isRoot = basePath === "/";
-
-    // Validate frontend path exists.
-    //
-    // NOTE: this warns and disables itself rather than throwing, so a wrong path
-    // leaves the API answering perfectly while the site 404s. Verify a mount by
-    // fetching it, never by reading the logs.
-    if (!fs.existsSync(frontendPath)) {
-        logger.warn(`⚠️ Frontend build path does not exist: ${frontendPath}`);
-        logger.warn("   SPA serving is disabled. Build your frontend first.");
-        return;
-    }
+    const cleanUrls = config.cleanUrls === true;
+    // Compiled at mount, so a redirect the validator would refuse throws here
+    // rather than on the first request.
+    const redirect = config.redirects?.length ? compileStaticRedirects(config.redirects) : undefined;
 
     // Scoped to this app's prefix. Registering at "/*" would mean one process
     // could serve exactly one SPA — and, worse, the first one registered would
@@ -595,6 +631,38 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
     const unlessDeclined = (handler: MiddlewareHandler): MiddlewareHandler => owns === undefined
         ? handler
         : async (c, next) => declines(c) ? next() : handler(c, next);
+
+    // The app's redirects, before its files and before the build is even
+    // looked for: an app whose only job is sending a hostname elsewhere has
+    // nothing to serve, and its redirects must answer anyway. Every method,
+    // as a redirect rule means; 307 and 308 keep it. Matched on the path as
+    // it arrived, percent-encoding and all, so a captured segment is written
+    // into `Location` exactly as the client sent it.
+    if (redirect) {
+        app.use(scope, async (c, next) => {
+            if (declines(c) || isExcludedFromApp(c.req.path)) return next();
+            const url = new URL(c.req.url);
+            const match = redirect({
+                host: normalizeRequestHost(c.req.header("host") ?? url.host),
+                path: url.pathname,
+                search: url.search
+            });
+            return match ? c.redirect(match.location, match.status) : next();
+        });
+    }
+
+    // Validate frontend path exists.
+    //
+    // NOTE: this warns and disables itself rather than throwing, so a wrong path
+    // leaves the API answering perfectly while the site 404s. Verify a mount by
+    // fetching it, never by reading the logs.
+    if (!fs.existsSync(frontendPath)) {
+        logger.warn(`⚠️ Frontend build path does not exist: ${frontendPath}`);
+        logger.warn(redirect
+            ? "   Its redirects are served; nothing else is. Build your frontend first."
+            : "   SPA serving is disabled. Build your frontend first.");
+        return;
+    }
 
     // Compress the bundle. The API is compressed by `configureMiddlewares`, but
     // that is scoped to the API base path — static assets are served here, and
@@ -656,6 +724,24 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
 
         return next();
     });
+
+    // `cleanUrls`: a request naming an HTML file of the build is sent to its
+    // address without the extension, query kept. Only when the file exists, so
+    // nobody is sent to an address that would not serve it. After the
+    // containment check, so the file is known to be the build's.
+    if (cleanUrls) {
+        app.use(scope, async (c, next) => {
+            if (c.req.method !== "GET" && c.req.method !== "HEAD") return next();
+            if (declines(c) || isExcludedFromApp(c.req.path)) return next();
+            const url = new URL(c.req.url);
+            const clean = cleanUrlFor(url.pathname);
+            const decoded = clean === undefined ? null : decodeStaticPath(c.req.path);
+            if (clean === undefined || decoded === null) return next();
+            const relative = isRoot ? decoded : (decoded.slice(basePath.length) || "/");
+            const isFile = await fsp.stat(path.join(frontendPath, relative)).then(stats => stats.isFile(), () => false);
+            return isFile ? c.redirect(`${clean}${url.search}`, 308) : next();
+        });
+    }
 
     // Validators, and the kept gzip of hashed chunks — for a request that maps
     // to a file of the build. After the containment check above, before
@@ -722,6 +808,39 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         // lives at `<adminBuild>/assets/x.js`.
         ...(isRoot ? {} : { rewriteRequestPath: (p: string) => p.slice(basePath.length) || "/" })
     })));
+
+    // `cleanUrls`: `/x` serves `x.html`. After `serveStatic`, which has already
+    // answered a file or directory of the exact name, and before the SPA
+    // fallback, which would otherwise answer with the app's index.html. Its
+    // own validators and cache policy, as the fallback's: the file served is
+    // not the one the URL's last segment names.
+    if (cleanUrls) {
+        app.use(scope, async (c, next) => {
+            if (c.req.method !== "GET" && c.req.method !== "HEAD") return next();
+            if (declines(c) || isExcludedFromApp(c.req.path)) return next();
+            const decoded = decodeStaticPath(c.req.path);
+            if (decoded === null || decoded.endsWith("/") || decoded.endsWith(".html")) return next();
+            const relative = `${isRoot ? decoded : (decoded.slice(basePath.length) || "/")}.html`;
+            if (relative === "/.html") return next();
+            const target = path.join(frontendPath, relative);
+            const file = await statStaticFile(target);
+            // `statStaticFile` reads a directory as its index.html; a directory
+            // named `x.html` is not the page `x`.
+            if (!file || file.path !== target) return next();
+            if (!await resolvesInsideBuild(buildRoot, frontendPath, `.${relative}`)) {
+                logger.warn(
+                    `[static] Refused ${c.req.path}: its page ${relative} resolves outside the build directory ` +
+                    `(${frontendPath}). A symlink in a build is a way out of it.`
+                );
+                return next();
+            }
+            c.header("Cache-Control", REVALIDATE_CACHE);
+            if (isNotModified(c, file.etag, file.mtimeMs)) return notModified(c, file);
+            c.header("ETag", file.etag);
+            c.header("Last-Modified", file.lastModified);
+            return c.html(await fsp.readFile(target, "utf-8"));
+        });
+    }
 
     if (!spa) {
         logger.info(`✅ Static serving enabled at ${basePath} from: ${frontendPath}`);

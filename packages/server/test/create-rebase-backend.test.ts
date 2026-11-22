@@ -277,17 +277,19 @@ describe("a function's rateLimit counts in the backend's shared store", () => {
 });
 
 describe("a group mounted alone answers the impersonation and simulation headers itself", () => {
-    // `mount()` refused the headers on every route but data and functions at
-    // its base path; a group mounted on its own carried no such guard, so a
-    // custom server's storage or admin group answered `x-rebase-impersonate`
-    // as the administrator who sent it, under the other user's label.
-    const HONOURED = new Set(["data", "functions"]);
+    // `mount()` refused the headers on every route but data, functions and
+    // rpc at its base path; a group mounted on its own carried no such guard,
+    // so a custom server's storage or admin group answered
+    // `x-rebase-impersonate` as the administrator who sent it, under the
+    // other user's label. The RPC group runs its calls through the same auth
+    // middleware as data, which applies them.
+    const HONOURED = new Set(["data", "functions", "rpc"]);
     const ATTEMPTS: Array<[Record<string, string>, string]> = [
         [{ "x-rebase-impersonate": "u-2" }, "IMPERSONATION_UNSUPPORTED"],
         [{ "x-rebase-simulate-role": "customer" }, "SIMULATION_UNSUPPORTED"]
     ];
 
-    it("every group but data and functions refuses them, wherever it is mounted", async () => {
+    it("every group but data, functions and rpc refuses them, wherever it is mounted", async () => {
         const backend = await create({ surfaces: { cron: true, meta: true }, push: true });
         const auth = await bearer("admin-1", ["admin"]);
         let checked = 0;

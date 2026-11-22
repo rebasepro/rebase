@@ -8,7 +8,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { usersCms } from "./cms/users";
-// How the collection editor laid out the tables in development (labels, columns, views).
+// The admin panel's shared layout for each table (labels, columns, views).
 import uiConfig from "./cms/ui-config.json";
 
 // `rebase dev` injects VITE_API_URL with the port it actually bound, and that

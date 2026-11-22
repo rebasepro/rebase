@@ -45,6 +45,7 @@ import { FilesFailedToLoadError } from "../utils/load-failure";
 import { isSchemaLoadError, loadBackendSchema } from "../schema/load-schema";
 import {
     BundleError,
+    createZeroCodeBundle,
     loadBundle,
     loadBundleProjectExports,
     loadBundleSchema,
@@ -101,6 +102,13 @@ export interface BootOptions {
     /** Bundle directory. Defaults to `REBASE_BUNDLE` or `./dist-bundle`. */
     bundleDir?: string;
     /**
+     * Boot directly in zero-code BaaS mode without requiring a compiled
+     * project bundle (`manifest.json`). When omitted, booting with no
+     * explicit `bundleDir`, `REBASE_BUNDLE`, or `REBASE_BUNDLE_URL` and no
+     * `./dist-bundle/manifest.json` on disk also enters zero-code BaaS mode.
+     */
+    zeroCode?: boolean;
+    /**
      * A bundle that has already been resolved.
      *
      * `rebase dev` passes one built from source (see `createSourceBundle`), so
@@ -108,6 +116,12 @@ export interface BootOptions {
      * implementations that drift apart.
      */
     bundle?: LoadedBundle;
+    /**
+     * Directory containing a prebuilt standalone Rebase Studio SPA to serve
+     * at `/_studio`. Falls back to `REBASE_STUDIO_DIR` or `/studio` when
+     * `REBASE_STUDIO` is not `"false"`.
+     */
+    studioDir?: string;
     /** Skip binding a port. Used by tests that drive `app.fetch` directly. */
     listen?: boolean;
     /** Install SIGTERM/SIGINT handlers. Off for tests. */
@@ -165,7 +179,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // after an hour idle — which is why the URL it is given is a stable endpoint
     // rather than a signed one that would have expired.
     let fetchedDir: string | undefined;
-    if (!options.bundleDir && !options.bundle && shouldFetchBundle()) {
+    if (!options.zeroCode && !options.bundleDir && !options.bundle && shouldFetchBundle()) {
         try {
             fetchedDir = await fetchBundle({
                 url: process.env[BUNDLE_URL_ENV]!,
@@ -201,10 +215,12 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         }
     }
 
-    const bundleDir = options.bundleDir
-        || fetchedDir
-        || process.env.REBASE_BUNDLE
-        || path.resolve(process.cwd(), "dist-bundle");
+    const explicitBundleDir = options.bundleDir || fetchedDir || process.env.REBASE_BUNDLE;
+    const defaultBundleDir = path.resolve(process.cwd(), "dist-bundle");
+    const useZeroCode = options.zeroCode === true
+        || (!options.bundle && !explicitBundleDir && !fs.existsSync(path.join(defaultBundleDir, "manifest.json")));
+
+    const bundleDir = explicitBundleDir || (useZeroCode ? process.cwd() : defaultBundleDir);
 
     // Collapse any second copy of a runtime package the bundle brought with it,
     // before anything is loaded out of that bundle.
@@ -221,14 +237,19 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     //
     // A no-op outside a container image, where there is no second copy to
     // collapse, and a no-op on a bundle the entrypoint already stitched.
-    dedupeRuntimePackages(bundleDir, imageModulesDir());
+    if (!useZeroCode) {
+        dedupeRuntimePackages(bundleDir, imageModulesDir());
+    }
 
     // The bundle is located before the environment is validated, because
     // pointing at the wrong directory is the likeliest first-run mistake, and
     // "no bundle here, build one" is far more useful than being told
     // DATABASE_URL is missing — which it also is, but only because nothing has
     // been set up yet.
-    const bundle = options.bundle ?? loadBundle(bundleDir);
+    const bundle = options.bundle ?? (useZeroCode ? createZeroCodeBundle(bundleDir) : loadBundle(bundleDir));
+    if (bundle.isZeroCode) {
+        logger.info("Booting in zero-code BaaS mode (no project bundle; schema is served live from PostgreSQL)");
+    }
 
     // Where dev-only state (the port file, the MCP discovery file) lives. A
     // source boot runs from the project root; a built bundle sits inside it.
@@ -456,6 +477,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // schema editor rewrites on a source boot.
         tables: loadedSchema?.defs,
         defaultRls: loadedSchema?.defaultRls,
+        // The SQL functions the same index exports with `defineRpc`.
+        rpc: loadedSchema?.rpc,
         schemaDir: bundle.tablesDir,
         functionsDir: bundle.functionsDir,
         cronsDir: bundle.cronsDir,
@@ -642,6 +665,32 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // what its siblings own, or a miss under "/admin" would be answered with
     // the site's index.html at the admin's URL. `planStaticAppMounts` decides
     // which rule does that.
+    // ── Built-in Rebase Studio Console at `/_studio` ─────────────────────────
+    // Mounted automatically when a prebuilt Studio bundle exists on disk
+    // (`options.studioDir`, `REBASE_STUDIO_DIR`, or `/studio` in the Docker
+    // image) and `REBASE_STUDIO` is not explicitly `"false"`.
+    const studioEnabled = process.env.REBASE_STUDIO?.trim().toLowerCase() !== "false";
+    const studioCandidates = [
+        options.studioDir,
+        process.env.REBASE_STUDIO_DIR?.trim(),
+        "/studio",
+        path.resolve(process.cwd(), "packages/studio/dist-standalone"),
+        path.resolve(process.cwd(), "node_modules/@rebasepro/studio/dist-standalone")
+    ].filter((d): d is string => Boolean(d));
+    const resolvedStudioDir = studioEnabled
+        ? studioCandidates.find((dir) => fs.existsSync(path.join(dir, "index.html")))
+        : undefined;
+    if (resolvedStudioDir) {
+        logger.info("Serving built-in Studio console at /_studio", { path: resolvedStudioDir });
+        serveSPA(app, {
+            frontendPath: resolvedStudioDir,
+            basePath: "/_studio",
+            apiBasePath: env.REBASE_BASE_PATH,
+            excludePaths: ["/health", "/livez", "/metrics", "/.well-known"],
+            spa: true
+        });
+    }
+
     if (env.REBASE_SERVE_STATIC) {
         for (const shadowed of staticAppsShadowedByApi(bundle.staticApps, env.REBASE_BASE_PATH)) {
             logger.error(
@@ -671,10 +720,19 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
                 // verifier's fetch with index.html — a 200 of HTML, which
                 // reads as "this issuer has no keys" rather than as a routing
                 // mistake.
-                excludePaths: ["/health", "/livez", "/metrics", "/.well-known", ...siblingPaths],
+                excludePaths: [
+                    "/health",
+                    "/livez",
+                    "/metrics",
+                    "/.well-known",
+                    ...(resolvedStudioDir ? ["/_studio"] : []),
+                    ...siblingPaths
+                ],
                 owns,
                 spa: staticApp.spa,
-                frameAncestors: staticApp.frameAncestors
+                frameAncestors: staticApp.frameAncestors,
+                redirects: staticApp.redirects,
+                cleanUrls: staticApp.cleanUrls
             });
         }
     }
@@ -910,7 +968,9 @@ async function bootStaticApp(
             excludePaths: ["/health", "/livez", "/metrics", ...siblingPaths],
             owns,
             spa: staticApp.spa,
-            frameAncestors: staticApp.frameAncestors
+            frameAncestors: staticApp.frameAncestors,
+            redirects: staticApp.redirects,
+            cleanUrls: staticApp.cleanUrls
         });
     }
 

@@ -1,27 +1,10 @@
 import type { Env, Hono, MiddlewareHandler } from "hono";
 import { compareStaticRoutes, matchStaticRoute, type RebaseStaticRoute } from "@rebasepro/types";
-import { isUnderPath, nestedAppPaths, type StaticAppRequest } from "../serve-spa";
+import { isUnderPath, nestedAppPaths, normalizeRequestHost, type StaticAppRequest } from "../serve-spa";
 import { compareStaticApps, type LoadedStaticApp } from "./bundle";
 import { staticAppCsp } from "./security-headers";
 
-/**
- * A request's hostname in the form an app's `host` is written in: lowercase,
- * with no port and no trailing dot.
- *
- * All three are ways of naming the same host that a browser, a proxy or a
- * person with curl will send. `Admin.Example.com`, `admin.example.com:443` and
- * the fully-qualified `admin.example.com.` are one site, and an app that
- * answered only the first spelling would be down for whoever typed another.
- *
- * An IPv6 literal comes back as it arrived: its colons are not a port, and no
- * app is ever given one, so all it has to do here is not be mangled into
- * something that could match.
- */
-export function normalizeRequestHost(host: string): string {
-    const lower = host.trim().toLowerCase();
-    if (lower.startsWith("[")) return lower;
-    return lower.replace(/:\d*$/, "").replace(/\.$/, "");
-}
+export { normalizeRequestHost };
 
 /**
  * Which static app answers a request: the one rule, written once.

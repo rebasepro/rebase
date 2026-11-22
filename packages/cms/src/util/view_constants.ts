@@ -17,12 +17,14 @@ export const ENTITY_VIEW_TAB_BAR_CLASS = "bg-surface-sheet";
 /**
  * Every tab in that row, a custom `tabComponent` included.
  *
- * `h-full` over the variant's `h-9`: the row is 40px and the tab 36px, so a
- * centred tab floated ~2px clear of the row's bottom border and the active
- * tab's underline stopped short of the record it opens. Paired with
- * `items-stretch` on the Tabs root, which the variant leaves centred.
+ * A fixed `h-9`, and the row sizes itself to it: the boxy list adds `pt-1.5`
+ * above the tab and aligns it to the bottom, so the active tab's top border
+ * sits clear of the identity bar's line above (it used to touch it) and its
+ * bottom overlaps the row's own border, joining the record it opens. The row
+ * had a fixed `h-10` and the tab `h-full`, which put the two borders on top
+ * of each other.
  */
-export const ENTITY_VIEW_TAB_CLASS = "h-full";
+export const ENTITY_VIEW_TAB_CLASS = "h-9";
 
 /**
  * Added on top for the tabs this row labels itself — a custom `tabComponent`

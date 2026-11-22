@@ -340,9 +340,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
      * It used to reset to `defaultFilter`, which made "clear" unable to clear
      * whenever a collection defined one, and every caller here wanted the
      * opposite. `ClearFilterSortButton` is labelled "clear filter" and left one
-     * set. `EditorCollectionActionStart` calls this and then re-applies
-     * `collection.defaultFilter` on the next line — redundant under the old
-     * behaviour, and the clearest statement of what it expected.
+     * set.
      * `FilterPresetsButton` documents "clearing all filters deactivates all
      * chips", which was false: it derives a chip's active state from the
      * filters, so a preset whose values equalled `defaultFilter` switched

@@ -41,7 +41,7 @@ export const SQLEditorSidebar = ({
 
     return (
         <div className={cls("flex flex-col h-full w-full bg-surface-card border-r", defaultBorderMixin)}>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "schema" | "snippets" | "history")} variant="boxy" className="border-b border-hairline">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "schema" | "snippets" | "history")} variant="boxy" className="border-b border-hairline px-2 bg-surface-sheet shrink-0">
                 <Tab value="schema">{t("studio_sql_sidebar_schema")}</Tab>
                 <Tab value="snippets">{t("studio_sql_sidebar_snippets")}</Tab>
                 <Tab value="history">{t("studio_sql_sidebar_history")}</Tab>
@@ -64,7 +64,7 @@ export const SQLEditorSidebar = ({
 
                     return (
                         <div className="flex flex-col h-full">
-                            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
+                            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet h-10 shrink-0", defaultBorderMixin)}>
                                 <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_sidebar_snippets")}</Typography>
                             </div>
                             <div className="flex-grow overflow-y-auto p-2 space-y-2 no-scrollbar">
@@ -144,7 +144,7 @@ export const SQLEditorSidebar = ({
 
                 {activeTab === "history" && (
                     <div className="flex flex-col h-full">
-                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet h-10 shrink-0", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_sidebar_history")}</Typography>
                         </div>
                         <div className="flex-grow overflow-y-auto p-1 space-y-1 no-scrollbar">

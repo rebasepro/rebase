@@ -15,7 +15,6 @@ import chalk from "chalk";
 import {
     emit,
     fail,
-    getContextOrg,
     note,
     noteBlank,
     parseCloudArgs,
@@ -23,6 +22,7 @@ import {
     requireProject
 } from "./context";
 import { reportCallError, type Unserved } from "./not-served";
+import { requireOrg } from "./org-scope";
 
 /** What `activity` says on a control plane that has no `audit` function yet. */
 const AUDIT_UNSERVED: Unserved = {
@@ -137,10 +137,7 @@ export async function activityCommand(rawArgs: string[]): Promise<void> {
     }
 
     const { client, url } = await requireClient(rawArgs);
-    const org = flags["--org"] || getContextOrg(url);
-    if (!org) {
-        fail("No organization selected.", `Pass ${chalk.bold("--org <id>")} or run ${chalk.bold("rebase cloud use")}.`, "no_org");
-    }
+    const org = await requireOrg(client, url, flags["--org"]);
     // `--project` narrows to one project; without it, the whole organization.
     // Resolved only when given — a linked directory does not narrow the log —
     // and a project id is passed as it is: a deleted project no longer

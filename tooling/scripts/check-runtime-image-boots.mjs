@@ -290,16 +290,25 @@ check("backups", dump.status === 0,
     "the image cannot dump the Postgres it is shipped beside, so scheduled backups fail every run:\n" +
     `${(dump.stderr || dump.stdout || "").slice(-1200)}`);
 
-// ── 5. And the failure that should still fail ────────────────────────────────
+// ── 5. Zero-code BaaS boot (no bundle, no URL) AND explicit-missing refusal ─
 //
-// A gate that only proves things start can be satisfied by an entrypoint that
-// never refuses anything. The refusal is load-bearing: without a bundle and
-// without a URL there is nothing to serve, and starting anyway would produce a
-// pod that answers 404 to everything and reports itself healthy.
-console.log(`${DIM}booting with neither a bundle nor a URL (must refuse)…${NC}`);
-const neither = bootLogs("rebase-boot-neither", []);
-check("no bundle", /No bundle found at/.test(neither),
-    `started with no bundle and no URL — it must refuse:\n${neither.slice(-1200)}`);
+// Booting the image with neither a bundle nor a URL starts in zero-code BaaS
+// mode (PostgreSQL introspection + auth + storage + realtime + admin APIs).
+// Setting REBASE_BUNDLE to a nonexistent path must still refuse loudly, so a
+// broken deploy configuration never silently drops into zero-code mode.
+console.log(`${DIM}booting with neither a bundle nor a URL (zero-code BaaS mode)…${NC}`);
+const zeroCode = bootLogs("rebase-boot-zero-code", []);
+check("zero-code mode", /listening on port/i.test(zeroCode),
+    `failed to boot in zero-code BaaS mode with no bundle and no URL:\n${zeroCode.slice(-1200)}`);
+const studioCheck = docker(["exec", "rebase-boot-zero-code", "node", "-e",
+    "fetch('http://127.0.0.1:8080/_studio').then(async r => { const t = await r.text(); if (!r.ok || !t.includes('Rebase Studio')) { console.error(r.status, t.slice(0, 200)); process.exit(1); } })"]);
+check("zero-code studio", studioCheck.status === 0,
+    `GET /_studio did not serve the built-in Studio console:\n${studioCheck.stderr || studioCheck.stdout}`);
+
+console.log(`${DIM}booting with an explicit missing REBASE_BUNDLE (must refuse)…${NC}`);
+const missingExplicit = bootLogs("rebase-boot-missing-explicit", ["-e", "REBASE_BUNDLE=/does-not-exist"]);
+check("explicit missing bundle", /No bundle found at \/does-not-exist/.test(missingExplicit),
+    `started despite an explicit missing REBASE_BUNDLE — it must refuse:\n${missingExplicit.slice(-1200)}`);
 
 // ── Report ───────────────────────────────────────────────────────────────────
 for (const fn of cleanup) { try { fn(); } catch { /* best effort */ } }

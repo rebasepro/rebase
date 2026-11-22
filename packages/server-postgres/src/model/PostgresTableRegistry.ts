@@ -1,4 +1,4 @@
-import { RebaseApiError, type CompiledTable, type RelationDescriptor, type TableHooks, type TableRegistryInterface } from "@rebasepro/types";
+import { RebaseApiError, type CompiledTable, type RelationDescriptor, type TableHooks, type TableMutationListener, type TableRegistryInterface } from "@rebasepro/types";
 import { UNSERVED_TABLE, viaJoinTableNames, type RelatedTables } from "@rebasepro/common";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import { Relations } from "drizzle-orm";
@@ -27,6 +27,7 @@ export class PostgresTableRegistry implements TableRegistryInterface {
     private readonly enums = new Map<string, PgEnum<[string, ...string[]]>>();
     private readonly relations = new Map<string, Relations>();
     private globalTableHooks?: TableHooks;
+    private readonly postMutationListeners: TableMutationListener[] = [];
 
     // ── Runtime tables ──────────────────────────────────────────────────────
 
@@ -206,6 +207,16 @@ export class PostgresTableRegistry implements TableRegistryInterface {
     /** The global hooks, when any were set. */
     globalHooks(): TableHooks | undefined {
         return this.globalTableHooks;
+    }
+
+    /** Register a passive post-mutation listener (e.g. zero-code webhooks). */
+    addMutationListener(listener: TableMutationListener): void {
+        this.postMutationListeners.push(listener);
+    }
+
+    /** Passive post-mutation listeners registered on this registry. */
+    mutationListeners(): readonly TableMutationListener[] {
+        return this.postMutationListeners;
     }
 
     /**

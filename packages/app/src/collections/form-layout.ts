@@ -250,7 +250,10 @@ function buildField<M extends Record<string, unknown>>(
         return additional ? { key, span: GRID_COLUMNS, additional: true } : undefined;
     }
 
-    if (isHidden(property)) return undefined;
+    // `hidden` (`hideFromCollection`) keeps a field out of the record as well
+    // as out of the views: a reader who hid a column does not expect it on
+    // the page that opens from it. `hiddenInForm` is the narrower switch.
+    if (isHidden(property) || property.admin?.hideFromCollection) return undefined;
 
     return {
         key,

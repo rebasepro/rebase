@@ -8,6 +8,11 @@ description: Add computed/virtual columns to collection tables that derive value
 
 Additional columns let you display computed or derived data in the collection table without storing it in the database.
 
+A computed column is the table's. The record already shows the values it is
+computed from, so it is not on the record unless the form asks for it: name its
+`key` in `form.sections` or `form.sidebar` (see [Form layout](/docs/frontend/form-layout/)),
+or in the `fields` a `RecordForm` or `RecordDetail` is given.
+
 ## Defining Additional Columns
 
 ```tsx

@@ -29,8 +29,8 @@ const navigationState = {
     topLevelNavigation: {
         navigationEntries: [
             { id: "posts", url: "/c/posts", name: "Posts", type: "collection", group: "Content", collection: { slug: "posts", name: "Posts" } },
-            // The collection editor's route, as `RebaseNavigation` injects it.
-            { id: "schema", slug: "schema", url: "/schema", name: "Edit collections", type: "view", group: "Database" }
+            // A Studio tool's route, as `RebaseStudio` registers it.
+            { id: "sql", slug: "sql", url: "/sql", name: "SQL Console", type: "view", group: "Database" }
         ],
         groups: ["Content", "Database"]
     }
@@ -38,7 +38,7 @@ const navigationState = {
 
 jest.mock("@rebasepro/app", () => {
     const translation = { t: (key: string) => `t:${key}` };
-    const registry = { cmsConfig: {}, studioConfig: {} };
+    const registry = { cmsConfig: {}, studioConfig: { devViews: [{ slug: "sql", name: "SQL Console" }] } };
     const adminMode = { get mode() { return mockAdminMode.current; }, setMode: (mode: string) => setMode(mode) };
     const themeMode = { mode: "light", setMode: () => undefined };
     const auth = { user: null, initialLoading: false };
@@ -129,22 +129,20 @@ describe("the drawer's CMS / Studio switch", () => {
 });
 
 /**
- * The registry mocked above has a Studio and a CMS with no `collectionEditor`
- * prop, the app that showed "Edit collections" to everyone editing content:
- * the route was injected because a Studio was registered, and the drawer only
- * called it a Studio view when the prop was there too.
+ * A Studio tool is a Studio view: it is in the Studio drawer, and not in the
+ * one everyone editing content sees.
  */
-describe("the collection editor's drawer entry", () => {
+describe("a Studio tool's drawer entry", () => {
     test("is not in the CMS drawer", () => {
         render(<Shell drawerOpen={true} drawerHovered={false}/>);
         expect(screen.getByText("Posts")).toBeTruthy();
-        expect(screen.queryByText("Edit collections")).toBeNull();
+        expect(screen.queryByText("SQL Console")).toBeNull();
     });
 
     test("is in the Studio drawer", () => {
         mockAdminMode.current = "studio";
         render(<Shell drawerOpen={true} drawerHovered={false}/>);
-        expect(screen.getByText("Edit collections")).toBeTruthy();
+        expect(screen.getByText("SQL Console")).toBeTruthy();
         expect(screen.queryByText("Posts")).toBeNull();
     });
 });

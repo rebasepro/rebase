@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+const EXPLICIT_BUNDLE = Boolean(process.env.REBASE_BUNDLE?.trim());
 const BUNDLE = process.env.REBASE_BUNDLE || "/bundle";
 
 /**
@@ -97,6 +98,7 @@ const INSTALL_PENDING = fs.existsSync(path.join(BUNDLE, INSTALL_PENDING_FILE));
  */
 const STALE_ON_DISK = ON_DISK && Boolean(WANTED_URL) && (UNPACKED_FROM !== WANTED_URL || INSTALL_PENDING);
 const FETCH_MODE = Boolean(WANTED_URL) && (!ON_DISK || STALE_ON_DISK);
+const ZERO_CODE_MODE = !FETCH_MODE && !ON_DISK && !EXPLICIT_BUNDLE;
 
 if (FETCH_MODE) {
     // `shouldFetchBundle` treats REBASE_BUNDLE as "a bundle is already on disk"
@@ -136,12 +138,14 @@ function fail(message, hint) {
     process.exit(1);
 }
 
-// ── 1. The bundle must exist, unless one is being fetched ────────────────────
-if (!FETCH_MODE && !fs.existsSync(path.join(BUNDLE, "manifest.json"))) {
+// ── 1. The bundle must exist when explicitly named; otherwise zero-code BaaS ─
+if (ZERO_CODE_MODE) {
+    log(`no bundle found at ${BUNDLE}; starting in zero-code BaaS mode`);
+} else if (!FETCH_MODE && !fs.existsSync(path.join(BUNDLE, "manifest.json"))) {
     fail(
         `No bundle found at ${BUNDLE}.`,
         "Mount one built with `rebase build` (`docker run -v ./dist-bundle:/bundle …`), " +
-        "or set REBASE_BUNDLE_URL and the runtime will fetch one at boot."
+        "set REBASE_BUNDLE_URL to fetch one at boot, or unset REBASE_BUNDLE to run in zero-code BaaS mode."
     );
 }
 
@@ -172,7 +176,7 @@ if (!FETCH_MODE && !fs.existsSync(path.join(BUNDLE, "manifest.json"))) {
 //   - `NODE_PATH` does not apply to ESM, and a bundle is ESM;
 //   - installing to `/node_modules` (which Node's upward walk from `/bundle`
 //     does reach) leaves the stitch in step 2b still writing to the mount.
-if (!FETCH_MODE) {
+if (!FETCH_MODE && !ZERO_CODE_MODE) {
     // A real write, not `fs.accessSync(BUNDLE, W_OK)`.
     //
     // `access` is advisory, and here it is simply wrong: over a Docker Desktop
@@ -225,7 +229,7 @@ const bundleInstallPending = path.join(bundleDir, INSTALL_PENDING_FILE);
 // A `node_modules` left by an install that never finished is not a reason to
 // skip: it is started over.
 const installUnfinished = fs.existsSync(bundleInstallPending);
-if (!FETCH_MODE && fs.existsSync(bundlePackageJson) && (!fs.existsSync(bundleModules) || installUnfinished)) {
+if (!FETCH_MODE && !ZERO_CODE_MODE && fs.existsSync(bundlePackageJson) && (!fs.existsSync(bundleModules) || installUnfinished)) {
     let declared = {};
     try {
         declared = JSON.parse(fs.readFileSync(bundlePackageJson, "utf8")).dependencies ?? {};
@@ -367,7 +371,7 @@ const RUNTIME_PROVIDED = [
 
 const imageModules = path.join(path.dirname(fileURLToPath(import.meta.url)), "node_modules");
 
-for (const pkg of FETCH_MODE ? [] : RUNTIME_PROVIDED) {
+for (const pkg of (FETCH_MODE || ZERO_CODE_MODE) ? [] : RUNTIME_PROVIDED) {
     const provided = path.join(imageModules, pkg);
     const inBundle = path.join(bundleDir, "node_modules", pkg);
 
@@ -454,7 +458,9 @@ const { runFromBundle } = await import("@rebasepro/server");
 // throws. Passing the same path as `bundleDir` would suppress the fetch; this
 // keeps the fetch first and keeps the tree we already have as a last resort.
 await runFromBundle(
-    FETCH_MODE
-        ? (ON_DISK ? { bundleFallbackDir: bundleDir } : {})
-        : { bundleDir }
+    ZERO_CODE_MODE
+        ? { zeroCode: true }
+        : FETCH_MODE
+            ? (ON_DISK ? { bundleFallbackDir: bundleDir } : {})
+            : { bundleDir }
 );

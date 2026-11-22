@@ -30,6 +30,7 @@ import {
     requireCloudRow
 } from "./context";
 import { buildDialPatch } from "./resources";
+import { requireOrg } from "./org-scope";
 import { attachDatabaseRow } from "./databases";
 
 interface ProjectRow {
@@ -274,14 +275,7 @@ export async function createProject(rawArgs: string[]): Promise<void> {
     });
 
     const { client, url } = await requireClient(rawArgs);
-    const org = args["--org"] || getContextOrg(url);
-    if (!org) {
-        fail(
-            "No organization selected.",
-            `Pass ${chalk.bold("--org <id>")} or run ${chalk.bold("rebase cloud use")}.`,
-            "no_org"
-        );
-    }
+    const org = await requireOrg(client, url, args["--org"]);
 
     // Prompt only for the essentials, and only when attached to a terminal —
     // a headless `projects create --name X --subdomain Y` must never block.

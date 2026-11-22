@@ -1,13 +1,15 @@
 ---
-sourceHash: e275bf79725ed509
+sourceHash: 3c089e6c404f4635
 title: Colonnes supplémentaires
 sidebar_label: Colonnes supplémentaires
 description: Ajoutez des colonnes calculées/virtuelles aux tables de collection qui dérivent des valeurs à partir des données de l'entité.
 ---
 
-## Vue d'ensemble
+## Aperçu
 
 Les colonnes supplémentaires vous permettent d'afficher des données calculées ou dérivées dans la table de collection sans les stocker dans la base de données.
+
+Une colonne calculée appartient à la table. L'enregistrement affiche déjà les valeurs à partir desquelles elle est calculée, elle ne figure donc pas sur l'enregistrement à moins que le formulaire ne le demande : indiquez sa `key` dans `form.sections` ou `form.sidebar` (voir [Form layout](/docs/frontend/form-layout/)), ou dans les `fields` fournis à un `RecordForm` ou `RecordDetail`.
 
 ## Définir des colonnes supplémentaires
 
@@ -42,7 +44,7 @@ export const productsCms = customizeTable<typeof products>("products", {
 });
 ```
 
-| Clé | Description |
+| Clé | Ce qu'elle fait |
 |---|---|
 | `key` | Identifie la colonne. Spécifiez-la dans `fieldOrder` ou `listFields` sous la forme `"total" as AdditionalFieldKey`. |
 | `name` | L'en-tête. |
@@ -51,12 +53,12 @@ export const productsCms = customizeTable<typeof products>("products", {
 | `dependencies` | Les champs dont la modification déclenche un nouveau rendu de la cellule ; vérifiés par rapport à la table. |
 | `value` | La valeur de la cellule, pour l'exportation. |
 
-## Props du Builder
+## Props de Builder
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | L'enregistrement tel que le serveur envoie la ligne : dates sous forme de chaînes ISO, une relation belongsTo sous la forme de sa colonne de clé étrangère, `id` uniquement lorsque la table possède cette colonne. Une relation chargée par l'administrateur est imbriquée sous son nom sous la forme des propres colonnes de l'enregistrement associé |
-| `id` | `string` | L'identifiant de l'enregistrement : sa clé primaire sous forme de chaîne de caractères, les parties d'une clé composite jointes par `:::`. L'identifiant pris par `useSidePanel().open` et les routes |
+| `row` | `Record<string, unknown>` | L'enregistrement tel que le serveur envoie la ligne : les dates sous forme de chaînes ISO, un belongsTo sous sa colonne de clé étrangère, `id` uniquement lorsque la table possède cette colonne. Une relation chargée par l'administrateur est imbriquée sous son nom sous forme des propres colonnes de l'enregistrement associé |
+| `id` | `string` | L'identifiant de l'enregistrement : sa clé primaire sous forme de chaîne, les parties d'une clé composite étant jointes par `:::`. L'identifiant que prennent `useSidePanel().open` et une route |
 | `context` | `RebaseContext` | Contexte Rebase complet |
 
 `value({ row, id, context })` reçoit les mêmes props.

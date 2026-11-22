@@ -14,38 +14,38 @@ import { useTone } from "../../Plane";
  * typed into it. That order is the point of the beat — you did not write a
  * schema, you added a rule to a file that already described your table.
  *
- * THE FILE IS THE REAL ONE: the head of `config/collections/orders.ts` as
- * `rebase schema introspect` generated it for this table, with
- * `securityRules` inserted after `table`. It continues below the fold. THE
- * POLICY IS THE REAL ONE: the statements `db push` writes to
- * `drizzle/policies.sql` for that rule (generatePolicyStatements, the
- * name is the rule's hash), with the one long CREATE POLICY broken across
- * three lines so it fits the frame — whitespace only.
+ * THE FILE IS THE REAL ONE: the head of `backend/schema/orders.ts` as
+ * `rebase schema introspect` generated it for this table (captured
+ * 2026-11-20), with its two introspection comments left out and `rls`
+ * written at the top of the definition — where the generated
+ * `rls: "admin-only"` it replaces would be, had it been generated first;
+ * key order is free. It continues below the fold (the relations). THE
+ * POLICY IS THE REAL ONE: the statements `db push` wrote to
+ * `backend/.rebase/sql/policies.sql` for that rule against the same
+ * database (the name is the rule's hash), with the one long CREATE POLICY
+ * broken across three lines so it fits the frame — whitespace only — and
+ * the companion-policy lines around it left out.
  */
 
-const FILE = `import { PostgresCollectionConfig } from "@rebasepro/types";
-import customersCollection from "./customers";
-import orderItemsCollection from "./order_items";
+const FILE = `import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { customers } from "./customers";
+import { orderItems } from "./order_items";
 
-const ordersCollection: PostgresCollectionConfig = {
-    name: "Orders",
-    singularName: "Order",
-    slug: "orders",
-    table: "orders",
-    securityRules: [
+export const orders = defineTable("orders", {
+    rls: [
         { operation: "select",
-          using: "customer_id = rebase.uid()" }
+          using: "customer_id = rebase.uid()::uuid" }
     ],
-    properties: {
-        id: {
-            name: "Id",
-            columnName: "id",
-            type: "string",
-            isId: "uuid",
-        },`;
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        customerId: col.uuid().notNull(),
+        status: col.text().notNull().default("pending"),
+        total: col.numeric({ precision: 10, scale: 2 }).notNull().default(0),
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
+    },`;
 
-/* Lines 9-12 are what gets added; everything else is the generated file. */
-const ADDED = [9, 10, 11, 12];
+/* Lines 5-8 are what gets added; everything else is the generated file. */
+const ADDED = [5, 6, 7, 8];
 const GENERATED = FILE.split("\n").map((_, i) => i).filter((i) => !ADDED.includes(i));
 const FILE_AT = 0;
 const ADD_AT = 40;
@@ -54,10 +54,10 @@ const POLICY_AT = 100;
 
 const POLICY = `ALTER TABLE "public"."orders" ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "orders_select_4903a5a" ON "public"."orders";
-CREATE POLICY "orders_select_4903a5a" ON "public"."orders"
+DROP POLICY IF EXISTS "orders_select_b546ea4" ON "public"."orders";
+CREATE POLICY "orders_select_b546ea4" ON "public"."orders"
     AS PERMISSIVE FOR SELECT TO "public"
-    USING ((customer_id)::text = (SELECT rebase.uid()));`;
+    USING (customer_id = rebase.uid()::uuid);`;
 
 export const RuleWindows: React.FC<{ x: number; y: number; at: number }> = ({ x, y, at }) => (
     <div style={{ position: "absolute", left: x, top: y, width: 1520 }}>
@@ -78,7 +78,7 @@ const RuleBody: React.FC = () => {
         <>
             <div style={{ display: "flex", alignItems: "flex-start" }}>
                 <div style={{ width: 700, flexShrink: 0 }}>
-                    <CodeCaption delay={FILE_AT}>config/collections/orders.ts</CodeCaption>
+                    <CodeCaption delay={FILE_AT}>backend/schema/orders.ts</CodeCaption>
                     <Frame surface="well" delay={FILE_AT + 4} style={{ marginTop: 12 }} bodyStyle={{ padding: "24px 28px 0" }}>
                         {/* A window onto the file: it continues below the fold,
                             and the fold fades. The generated lines recede only
@@ -86,7 +86,7 @@ const RuleBody: React.FC = () => {
                             the whole file, and a file shown dimmed reads as
                             disabled. */}
                         <div style={{ position: "relative", maxHeight: 392, overflow: "hidden" }}>
-                            <Code code={FILE} delays={delays} emphasise={frame >= ADD_AT ? ADDED : undefined} size={17} lazy />
+                            <Code code={FILE} delays={delays} emphasise={frame >= ADD_AT ? ADDED : undefined} size={16} lazy />
                             <div
                                 style={{
                                     position: "absolute",
@@ -108,7 +108,7 @@ const RuleBody: React.FC = () => {
                 </svg>
 
                 <div style={{ flex: 1 }}>
-                    <CodeCaption delay={POLICY_AT - 4}>drizzle/policies.sql</CodeCaption>
+                    <CodeCaption delay={POLICY_AT - 4}>backend/.rebase/sql/policies.sql</CodeCaption>
                     <Frame surface="well" delay={POLICY_AT} style={{ marginTop: 12 }} bodyStyle={{ padding: "24px 28px" }}>
                         <Code code={POLICY} sql delay={POLICY_AT + 14} step={3.5} size={16} />
                     </Frame>

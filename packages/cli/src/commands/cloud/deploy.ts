@@ -40,6 +40,7 @@ import {
     billingAccountIdOf
 } from "./context";
 import { latestDeployment, fmtDate } from "./projects";
+import { deployFrameworkVersion, driftSentence, readFrameworkDrift } from "./framework-drift";
 import { appKeyPayload, mintMissingAppKey, reportMintedAppKey } from "./init";
 import {
     readBundleManifest,
@@ -500,16 +501,34 @@ export const STATIC_UNDO_HINT =
  * to boot such a bundle, and an older one would answer every routed path with
  * the app's index.html. Deploying the backend folds the app in, and that one
  * process serves the app, its routes and the functions together.
+ *
+ * `redirects` and `cleanUrls` are refused for the same reason from the other
+ * side: Rebase Cloud serves a static app deployed on its own from its static
+ * hosting, which applies neither, so the deploy would succeed and every old
+ * URL and clean address would answer 404. The runtime the backend's bundle
+ * boots applies both.
  */
 export function standaloneStaticRefusal(
     name: string,
     app: RebaseStaticAppConfig
 ): { message: string; hint: string } | undefined {
-    if (!app.routes?.length) return undefined;
+    if (app.routes?.length) {
+        return {
+            message: `"${name}" routes ${app.routes.map(route => route.path).join(", ")} to custom functions, ` +
+                "and a static app deployed on its own has no functions to call.",
+            hint: "Deploy the project's backend instead: its bundle folds this app in, and one process serves both."
+        };
+    }
+    const unserved = [
+        ...(app.redirects?.length ? ["redirects"] : []),
+        ...(app.cleanUrls === true ? ["cleanUrls"] : [])
+    ];
+    if (unserved.length === 0) return undefined;
     return {
-        message: `"${name}" routes ${app.routes.map(route => route.path).join(", ")} to custom functions, ` +
-            "and a static app deployed on its own has no functions to call.",
-        hint: "Deploy the project's backend instead: its bundle folds this app in, and one process serves both."
+        message: `"${name}" declares ${unserved.join(" and ")}, which Rebase Cloud's static hosting does not apply ` +
+            "to a static app deployed on its own.",
+        hint: "Deploy the project's backend instead: its bundle folds this app in, and the runtime serving it applies " +
+            `${unserved.join(" and ")}.`
     };
 }
 
@@ -1793,6 +1812,15 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
         }
         if (declaredManaged && !isJsonMode()) {
             console.log(chalk.gray("  rebase.json declares runtime: managed — deploying a bundle."));
+        }
+        // Before the build: a platform upgrade that moved the live app past
+        // this checkout has intake refuse the bundle, and that refusal used to
+        // arrive after the whole build and upload.
+        const drift = await readFrameworkDrift(client, projectId, deployFrameworkVersion(args["--bundle-dir"]));
+        if (drift) {
+            const said = driftSentence(drift);
+            if (args["--allow-downgrade"] !== true) fail(said.message, said.hint, FRAMEWORK_DOWNGRADE);
+            warn(said.message, `Deploying ${drift.local} anyway (--allow-downgrade).`);
         }
         await deployBundle({
             client,

@@ -302,7 +302,15 @@ export const App: React.FC = () => {
             .getUserMedia({
                 /* The phone's picture comes over the network: only the
                    microphone is opened here. */
-                video: camera === PHONE ? false : { deviceId: camera ? { exact: camera } : undefined, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+                video:
+                    camera === PHONE
+                        ? false
+                        : {
+                              deviceId: camera ? { exact: camera } : undefined,
+                              width: { ideal: 1920 },
+                              height: { ideal: 1080 },
+                              frameRate: { ideal: 30 },
+                          },
                 /* The voice as it is: no gain riding, no noise gate, no echo
                    cancellation — the take is the film's soundtrack. */
                 audio: { deviceId: mic ? { exact: mic } : undefined, autoGainControl: false, noiseSuppression: false, echoCancellation: false },
@@ -354,6 +362,47 @@ export const App: React.FC = () => {
         };
     }, [camera, mic, retry, phoneTrack]);
 
+    /* ── a camera that freezes ───────────────────────────────────────── */
+
+    const [stalled, setStalled] = useState(false);
+
+    /* A camera can stop delivering frames while its stream still reads as
+       live — the picture freezes, and so would a take. A hidden video counts
+       the frames that really arrive; two seconds without one is a freeze,
+       shown in the status bar (and said once during a take). Nothing is
+       changed about the camera: it keeps its full resolution. */
+    useEffect(() => {
+        const track = stream?.getVideoTracks()[0];
+        if (!track || camera === PHONE) return;
+        const video = document.createElement("video");
+        video.muted = true;
+        video.playsInline = true;
+        video.srcObject = new MediaStream([track]);
+        void video.play().catch(() => undefined);
+        let last = performance.now();
+        let handle = 0;
+        let warned = false;
+        const onFrame = () => {
+            last = performance.now();
+            setStalled(false);
+            handle = video.requestVideoFrameCallback(onFrame);
+        };
+        handle = video.requestVideoFrameCallback(onFrame);
+        const id = window.setInterval(() => {
+            if (track.readyState !== "live" || document.hidden || performance.now() - last < 2000) return;
+            setStalled(true);
+            if ((session.current || talk.current) && !warned) {
+                warned = true;
+                setNotice("The camera froze during this take — its picture will freeze too. Stop, and record it again once the picture moves.");
+            }
+        }, 500);
+        return () => {
+            window.clearInterval(id);
+            video.cancelVideoFrameCallback(handle);
+            video.srcObject = null;
+        };
+    }, [stream, camera]);
+
     /* A meter before the take starts, so the level can be checked. */
     useEffect(() => {
         if (!stream || phase !== "ready") return;
@@ -383,6 +432,17 @@ export const App: React.FC = () => {
     /* ── a take ──────────────────────────────────────────────────────── */
 
     const stopRef = useRef<(discard?: boolean) => Promise<void>>(async () => undefined);
+    /** The take being thrown away while it saves (its id). */
+    const throwing = useRef<string | null>(null);
+    /* A take that is saving — encoding can take a minute or two — can still
+       be thrown away: the server stops the encode and moves it aside. */
+    const throwAwaySaving = useCallback(() => {
+        const s = session.current;
+        if (!s || !s.stopping || throwing.current) return;
+        throwing.current = s.id;
+        setNotice("Throwing the take away…");
+        void post(`/api/takes/${s.id}/discard`, "").catch(() => undefined);
+    }, []);
 
     const loop = useCallback(() => {
         const s = session.current;
@@ -628,6 +688,14 @@ export const App: React.FC = () => {
             } catch (err) {
                 session.current = null;
                 setLiveTiming(null);
+                if (throwing.current === s.id) {
+                    /* Thrown away while it was saving: the server stopped the
+                       encode and moved it aside. Nothing went wrong. */
+                    throwing.current = null;
+                    setPhase("ready");
+                    setNotice("Take thrown away.");
+                    return;
+                }
                 setError(`Saving the take failed: ${String(err)}. What was recorded is in takes/${s.id}/.`);
                 /* Still ready to record: one take going wrong is no reason to
                    reload the page. */
@@ -949,7 +1017,9 @@ export const App: React.FC = () => {
                 audio.pause();
                 URL.revokeObjectURL(url);
                 testing.current = null;
-                setMicTest((m) => m && { ...m, state: "done" });
+                /* Played back: the box has said what it needed to — gone,
+                   unless recognition heard nothing, which is worth reading. */
+                setMicTest((m) => (m && !m.heard ? { ...m, state: "done" } : null));
             };
             audio.onended = done;
             current.stopPlayback = done;
@@ -997,6 +1067,9 @@ export const App: React.FC = () => {
                 /* A presenter's clicker sends PageDown. */
                 e.preventDefault();
                 s.follower.advanceLine(((performance.now() - s.t0) * FPS) / 1000);
+            } else if (e.code === "KeyR" && s && s.stopping && phase === "saving") {
+                e.preventDefault();
+                throwAwaySaving();
             } else if (e.code === "KeyR" && s && !s.stopping) {
                 e.preventDefault();
                 void stop(true);
@@ -1034,7 +1107,7 @@ export const App: React.FC = () => {
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [start, stop, testMic, stopReview, playChapter, playCut, chapter, review.playing, review.cut, takes, mode, startTalk, stopTalk, nextTalkChapter]);
+    }, [start, stop, testMic, stopReview, playChapter, playCut, chapter, review.playing, review.cut, takes, mode, startTalk, stopTalk, nextTalkChapter, phase, throwAwaySaving]);
 
     /* ── the page ────────────────────────────────────────────────────── */
 
@@ -1046,9 +1119,12 @@ export const App: React.FC = () => {
            chapter being talked about, the camera in it. */
         if (talking) return { timing: null, live: { stream } };
         if (recording) return { timing: liveTiming, live: { stream } };
-        if (assembled) return { timing: assembled.timing, clips: assembled.clips };
-        return { timing: null };
-    }, [recording, liveTiming, stream, assembled, talking]);
+        /* Between takes the window shows you, live, to frame the shot;
+           only a playback shows the recorded takes. */
+        const live = review.playing ? null : { stream };
+        if (assembled) return { timing: assembled.timing, clips: assembled.clips, live };
+        return { timing: null, live };
+    }, [recording, liveTiming, stream, assembled, talking, review.playing]);
 
     useEffect(() => {
         if (talkChapter === null) return;
@@ -1186,6 +1262,17 @@ export const App: React.FC = () => {
                           : `lines ${range.from + 1}–${range.to + 1} of ${SCRIPT.length}`}
                 </span>
                 <Meter level={status.level} threshold={status.threshold} speaking={status.speaking} />
+                {!SIMULATE && (
+                    <span title="The camera the page has open — change it with Camera below" style={{ color: stalled ? "#FF5A5F" : stream?.getVideoTracks()[0] ? "rgba(255,255,255,0.6)" : "#FFC600", maxWidth: 380, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {stalled
+                            ? "camera frozen — no new frames"
+                            : stream?.getVideoTracks()[0]
+                              ? cameraLabel(stream.getVideoTracks()[0])
+                              : camera === PHONE
+                                ? "waiting for the phone"
+                                : "no camera open"}
+                    </span>
+                )}
                 {phoneLink && phone && phoneTrack && <PhoneBadge link={phoneLink} state={phone} onSync={recording ? null : () => setSyncing(true)} />}
                 <span style={{ color: "rgba(255,255,255,0.45)" }}>{canRecognize() || SIMULATE ? status.recognition : "no speech recognition — use Chrome"}</span>
                 <span style={{ flex: 1, fontFamily: "JetBrains Mono, monospace", fontSize: 13, color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "right" }}>
@@ -1305,6 +1392,13 @@ export const App: React.FC = () => {
                     <span>Talk about the chapter in your own words, as if to a colleague. → or a clicker: next chapter · Space or Esc: stop and save the transcript</span>
                 ) : phase === "recording" && session.current?.rehearse ? (
                     <span>Say each line the way you would say it — change words freely. If the prompter stops following, → moves to the next line · Esc: stop and compare</span>
+                ) : phase === "saving" && session.current && !session.current.rehearse ? (
+                    <>
+                        <span>Saving the take: encoding it for the film can take a minute or two.</span>
+                        <button style={ghost} onClick={throwAwaySaving}>
+                            Throw it away — R
+                        </button>
+                    </>
                 ) : phase === "recording" ? (
                     <span>Read at your own pace. → or a clicker: next line · Esc: stop and keep · R: throw this take away</span>
                 ) : null}
@@ -1317,7 +1411,7 @@ export const App: React.FC = () => {
                 </div>
             )}
             {micTest && !recording && (
-                <div style={panel}>
+                <div style={{ ...panel, cursor: "pointer" }} title="Click to close" onClick={() => (testing.current ? undefined : setMicTest(null))}>
                     <div style={{ fontWeight: 600, marginBottom: 8 }}>
                         {micTest.state === "listening"
                             ? "Mic test: say a line of the script, then press M (it stops by itself after 15 s)"
@@ -2051,6 +2145,14 @@ function runSimulation(follower: Ear, t0: number, wpm: number, script: Script, o
     return () => {
         stopped = true;
     };
+}
+
+/** The open camera, as it really runs: its name, size and frame rate. */
+function cameraLabel(track: MediaStreamTrack): string {
+    const { width, height, frameRate } = track.getSettings();
+    const size = width && height ? ` · ${width}×${height}` : "";
+    const fps = frameRate ? ` · ${Math.round(frameRate)} fps` : "";
+    return `${track.label || "camera"}${size}${fps}`;
 }
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}.${Math.floor((seconds % 1) * 10)}`;

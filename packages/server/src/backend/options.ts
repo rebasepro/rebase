@@ -10,6 +10,7 @@
  * @module
  */
 import type {
+    AnyRpcDef,
     AnyTableDef,
     AnyViewDef,
     AuthAdapter,
@@ -461,6 +462,15 @@ export interface RebaseBackendOptions {
      * directory is what an edit writes to.
      */
     schemaDir?: string;
+    /**
+     * The SQL functions served at `POST <basePath>/rpc/<name>`: `defineRpc`
+     * results. Without it, the ones the {@link schemaDir} index exports, when
+     * the tables are loaded from there.
+     *
+     * Each runs as the caller, under row-level security, with the data
+     * surface: a process that does not serve `/data` does not serve `/rpc`.
+     */
+    rpc?: AnyRpcDef[];
 
     /**
      * What creating this backend may change in the database. Required, because

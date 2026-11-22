@@ -44,7 +44,7 @@ export const SchemaBrowser = ({
 
     return (
         <div className="flex flex-col h-full overflow-hidden">
-            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
+            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet h-10 shrink-0", defaultBorderMixin)}>
                 <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_schema_tables")}</Typography>
                 <IconButton aria-label={t("refresh")} size="small" onClick={onRetrySchema} title={t("refresh")}>
                     <RefreshCwIcon size={iconSize.smallest}/>

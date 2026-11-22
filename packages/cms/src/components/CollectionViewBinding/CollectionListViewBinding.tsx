@@ -17,6 +17,7 @@ import {
     useUiLabels
 } from "@rebasepro/ui";
 import { PropertyPreview } from "../../preview";
+import { isDocumentProperty } from "../../preview/document_summary";
 import {
     useAuthController,
     useCustomizationController
@@ -254,7 +255,6 @@ function hasOwnPreview(
 /**
  * Render a complex value as a compact, single-line string.
  * - Arrays  → "Item, Item +3"
- * - Maps    → "4 fields"
  * - Refs    → entity ID
  * - Relations → entity ID or name
  */
@@ -296,12 +296,6 @@ function compactValueSummary(value: unknown, property: Property): string | null 
         const shown = labels.slice(0, MAX_SHOWN).join(", ");
         const remaining = labels.length - MAX_SHOWN;
         return remaining > 0 ? `${shown} +${remaining}` : shown;
-    }
-
-    if (property.type === "map") {
-        if (typeof value !== "object" || value === null) return null;
-        const count = Object.keys(value).length;
-        return count === 0 ? null : `${count} field${count !== 1 ? "s" : ""}`;
     }
 
     if (property.type === "reference") {
@@ -1422,9 +1416,20 @@ function ListCell<M extends Record<string, unknown>>({
         );
     }
 
+    // A JSON document is its one-line summary, as in a table cell: its
+    // top-level keys, labelled. Unless the property draws itself.
+    if (isDocumentProperty(property) && !hasOwnPreview(property, column.key, propertyConfigs, authController)) {
+        if (value === undefined || value === null) return <EmptyCell/>;
+        return (
+            <div className="min-w-0">
+                <PropertyPreview propertyKey={column.key} value={value} property={property} size="small" compact={true}/>
+            </div>
+        );
+    }
+
     // Complex types → compact single-line summary, so a row keeps its height.
     // Unless the property draws itself: a `Preview` is the developer saying
-    // how this value reads, and "4 fields" in its place says nothing.
+    // how this value reads, and a count in its place says nothing.
     if (isComplexPropertyType(property) && !hasOwnPreview(property, column.key, propertyConfigs, authController)) {
         const summary = compactValueSummary(value, property);
         return (

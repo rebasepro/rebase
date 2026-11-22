@@ -39,7 +39,7 @@ These hold before you have opened ai-instructions.md, and in every session:
 - **Data goes through the SDK:** `rebase.dataAsAdmin.<table>` in functions and crons, `getDriver(c)` to act as the caller.
 - **A route in `backend/functions/` is public until you guard it** with `requireAuth` or `requireAdmin` from `@rebasepro/server/functions`.
 - **Never deploy, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`). In `.env`, change only a local setting the task needs (`AUTH_MAGIC_LINK`, `FRONTEND_URL`, `REBASE_FUNCTIONS_TIMEOUT_MS` and the like), one line at a time, and say which; never rewrite, print or rotate its secrets (`DATABASE_URL`, `JWT_SECRET`, `REBASE_SERVICE_KEY`).
-- **An admin, back-office or internal tool is built in the Rebase admin, never as a new app.** A dashboard, a review queue, a staff screen or a settings page is a custom view, the home page, a record tab or an action in `frontend/` (ai-instructions.md, "Admin UI", says how). A separate app is only for what the project's own users see.
+- **An admin, back-office or internal tool is built in the Rebase admin, never as a new app.** A dashboard, a review queue, a staff screen or a settings page is a custom view, the home page, a record tab or an action in `frontend/` (ai-instructions.md, "Admin UI", says how). A separate app is only for what the project's own users see. The admin derived from the tables is a draft: before calling an admin done, give every table it shows a `customizeTable` pass (a title, its columns, ids and raw JSON hidden, labels; ai-instructions.md, "Admin UI", has the checklist).
 - **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
 
@@ -145,14 +145,25 @@ memory and module-level state, timeouts, outbound ports, configuration and
 storage for generated files. It links to
 [Managed backend runtime](/docs/deployment/managed-runtime/), so an assistant
 plans a backend feature against real limits instead of guessing. **Admin UI**
-holds the `@rebasepro/ui` rules. They apply to views inside the admin panel, not
-to a public site or static app the project serves.
+holds the `@rebasepro/ui` rules, and the checklist for the `customizeTable` pass
+every table needs before an admin is done: a title, the columns it lists, ids,
+foreign keys and raw JSON hidden, labels, a summary for JSON columns, and a look
+at the running admin. The rules apply to views inside the admin panel, not to a
+public site or static app the project serves.
 
 ## Making it yours
 
 `ai-instructions.md` is your file. Nothing regenerates or overwrites it — unlike
 [installed skills](/docs/ai/skills), which are replaced on every
 `rebase skills install`. Project-specific conventions belong here.
+
+One exception, for a file nobody has touched: a headless project's
+`ai-instructions.md` says the database is the schema and that there is no
+`backend/schema/`, and `rebase schema introspect` writes exactly that
+directory. When the file is still byte for byte the one the scaffold wrote,
+introspection replaces it with the backend-only schema-in-code rules; once you
+have edited it, it is left as it is and the command says which of its rules no
+longer hold.
 
 What earns its place is what an assistant cannot infer from the code: which
 tables are legacy, which service owns which table, the naming convention

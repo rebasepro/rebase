@@ -50,6 +50,39 @@ describe("KpiTile", () => {
         expect(screen.getByText("boom")).toBeInTheDocument();
         expect(screen.getByText("—")).toBeInTheDocument();
     });
+
+    it("is neither a button nor a link without onClick or href", () => {
+        render(<KpiTile label="Orders" value={12}/>);
+        expect(screen.queryByRole("button")).not.toBeInTheDocument();
+        expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    });
+
+    it("is a button named by its label, figure and change when given onClick", () => {
+        const onClick = jest.fn();
+        render(<KpiTile label="Open orders" value={12} previous={10} onClick={onClick}/>);
+        const button = screen.getByRole("button", { name: "Open orders 12 Up 20%. Previous 30 days: 10" });
+        expect(button).toHaveAttribute("type", "button");
+        fireEvent.click(button);
+        expect(onClick).toHaveBeenCalledTimes(1);
+    });
+
+    it("is a link given href, which a plain click hands to onClick and a modified click leaves to the browser", () => {
+        const onClick = jest.fn();
+        render(<KpiTile label="Open orders" value={12} href="/orders?status=open" onClick={onClick}/>);
+        const link = screen.getByRole("link", { name: "Open orders 12" });
+        expect(link).toHaveAttribute("href", "/orders?status=open");
+        fireEvent.click(link, { metaKey: true });
+        expect(onClick).not.toHaveBeenCalled();
+        fireEvent.click(link);
+        expect(onClick).toHaveBeenCalledTimes(1);
+    });
+
+    it("is a plain link given only href", () => {
+        render(<KpiTile label="Open orders" value={12} href="/orders?status=open"/>);
+        const link = screen.getByRole("link", { name: "Open orders 12" });
+        // Nothing intercepts the click: the browser follows the link.
+        expect(fireEvent.click(link)).toBe(true);
+    });
 });
 
 describe("KpiChange", () => {

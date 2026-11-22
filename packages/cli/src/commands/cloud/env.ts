@@ -3,6 +3,7 @@
  *
  *   env list                Keys only — a value is NEVER printed here
  *   env set KEY=VALUE        Create/replace one variable (`--secret` ⇒ write-only)
+ *   env set KEY --prompt     The same, typed at a hidden prompt (stored as a secret)
  *   env unset KEY            Remove one variable
  *   env reveal KEY           Release one non-secret value (a secret var 403s)
  *   env pull [--out .env]    Write revealable values to a local dotenv file
@@ -23,6 +24,7 @@
  */
 import chalk from "chalk";
 import fs from "fs";
+import inquirer from "inquirer";
 import path from "path";
 import { isMissingRoute } from "./cron";
 import { previewNameArg, revealPreviewServiceKey } from "./service-key";
@@ -291,8 +293,67 @@ export const ENV_SET_FLAGS = {
        in its history. The MCP server's `rebase_cloud_env_set` sets values this
        way. */
     "--stdin": Boolean,
+    /* Type the value at a hidden prompt on this terminal: no echo, not on the
+       command line, never in a chat transcript. Stored as a secret. */
+    "--prompt": Boolean,
     ...ENV_PREVIEW_FLAGS
 } as const;
+
+/** Ask for one value without echoing it, and return what was typed. */
+export type HiddenAsk = (message: string) => Promise<string>;
+
+/**
+ * Inquirer's password prompt with no mask: nothing is echoed, not even a
+ * character count. On stderr, so the one JSON value `--json` promises stays
+ * the only thing on stdout.
+ */
+const askHidden: HiddenAsk = async (message) => {
+    const prompt = inquirer.createPromptModule({ output: process.stderr });
+    const { value } = await prompt<{ value: string }>([{
+        type: "password",
+        name: "value",
+        message,
+        validate: (typed: string) => typed.length > 0 || "Type the value, or press Ctrl-C to cancel."
+    }]);
+    return value;
+};
+
+/**
+ * The variable `env set KEY --prompt` names, or a refusal — before anything is
+ * asked or sent. Refuses a value on the line too, `--stdin` beside it, and a
+ * standard input that is not a terminal: nobody is there to type, and a pipe is
+ * what `--stdin` reads.
+ */
+export function envKeyForPrompt(
+    operands: string[],
+    flags: { "--stdin"?: boolean },
+    isTTY: boolean = process.stdin.isTTY === true
+): string {
+    const first = operands[0] ?? "";
+    if (flags["--stdin"]) {
+        fail("--prompt and --stdin are two ways to give the value; pass one.", "`rebase cloud env set KEY --prompt` on a terminal, or pipe it to `--stdin`.", "usage");
+    }
+    if (operands.length !== 1 || first.includes("=") || first.trim() === "") {
+        fail(
+            "With --prompt, name only the variable: `rebase cloud env set KEY --prompt`.",
+            "The value is typed at the prompt, so it cannot also be on the command line.",
+            "usage"
+        );
+    }
+    if (!isTTY) {
+        fail(
+            "--prompt asks for the value on a terminal, and standard input is not one.",
+            "Pipe it in instead: `printf %s \"$VALUE\" | rebase cloud env set KEY --stdin --secret`.",
+            "input_required"
+        );
+    }
+    return first.trim();
+}
+
+/** The value for `key`, typed at a hidden prompt. */
+export async function envValueFromPrompt(key: string, ask: HiddenAsk = askHidden): Promise<{ key: string; value: string }> {
+    return { key, value: await ask(`Value for ${key} (hidden, stored as a secret):`) };
+}
 
 /**
  * The value `env set KEY --stdin` was piped: everything on standard input,
@@ -353,8 +414,13 @@ assignment: parseEnvAssignment(positionals) };
 async function setEnv(rawArgs: string[]): Promise<void> {
     const resolved = resolveEnvSetArgs(rawArgs);
     const args = resolved.flags;
-    // Read before any request, so a refusal costs nothing.
-    const parsed = args["--stdin"] ? envValueFromStdin(resolved.positionals) : resolved.assignment;
+    // Refused before any request, so a refusal costs nothing. A prompted value
+    // is asked for last, once the project and the key have been accepted:
+    // nobody should type a secret into a command that is about to refuse.
+    const promptKey = args["--prompt"] ? envKeyForPrompt(resolved.positionals, args) : undefined;
+    const parsed = promptKey !== undefined
+        ? { key: promptKey, value: "" }
+        : args["--stdin"] ? envValueFromStdin(resolved.positionals) : resolved.assignment;
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -388,9 +454,11 @@ async function setEnv(rawArgs: string[]): Promise<void> {
         );
     }
 
-    const body: { key: string; value: string; secret?: boolean } = { key: parsed!.key,
-value: parsed!.value };
-    if (args["--secret"]) body.secret = true;
+    const value = promptKey !== undefined ? (await envValueFromPrompt(promptKey)).value : parsed!.value;
+    const body: { key: string; value: string; secret?: boolean } = { key: parsed!.key, value };
+    // A value typed at a hidden prompt is one nobody wanted shown, so it is
+    // stored write-only, exactly as `--stdin --secret` stores it.
+    if (args["--secret"] || promptKey !== undefined) body.secret = true;
 
     if (args["--preview"]) {
         let res: { var: PreviewEnvVarView } | undefined;
@@ -769,6 +837,7 @@ flags: [["--preview", "What previews run with instead of production's values"]] 
                     ["--secret", "Mark it write-only: it can be set and used, never read back"],
                     ["--force", "Set a build-time key anyway"],
                     ["--stdin", "Read the value from standard input (give only KEY), so it is not on the command line"],
+                    ["--prompt", "Type the value at a hidden prompt (give only KEY); stored as a secret. Needs a terminal"],
                     ["--preview", "Only for previews: production keeps its value"]
                 ]
             },

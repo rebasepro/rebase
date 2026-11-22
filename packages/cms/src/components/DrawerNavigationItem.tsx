@@ -64,7 +64,7 @@ export function DrawerNavigationItem({
     const iconWrap = indented
         ? <div className={cls("shrink-0 h-[30px]", iconSlot)} aria-hidden={true}/>
         : <div
-            className={cls("shrink-0 flex items-center justify-center h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4 group-hover/nav:text-primary transition-colors duration-150", iconSlot)}>
+            className={cls("shrink-0 flex items-center justify-center h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4 group-hover/nav:text-text-primary dark:group-hover/nav:text-text-primary-dark transition-colors duration-150", iconSlot)}>
             {icon}
         </div>;
 
@@ -110,7 +110,7 @@ export function DrawerNavigationItem({
                 "flex flex-row items-center",
                 drawerOpen ? "pr-4 h-[30px]" : "h-[30px] group-data-[expanded=true]/drawer:pr-4",
                 "font-medium text-[13px]",
-                isActive ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary [&_div]:text-primary" : ""
+                isActive ? "bg-surface-active text-text-primary dark:text-text-primary-dark [&_div]:text-text-primary dark:[&_div]:text-text-primary-dark" : ""
             )}
             to={url}
         >

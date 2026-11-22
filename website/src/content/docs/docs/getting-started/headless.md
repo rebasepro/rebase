@@ -186,11 +186,43 @@ Three things resolve it, in the order worth checking:
 
 ## Adding an admin panel later
 
-Nothing here locks you out of it. Add a `frontend/` that mounts `<RebaseCMS />`:
-it renders every table the backend serves, from `GET /api/schema/tables`, with
-no file per table. Write `backend/schema/` — by hand or with
-`rebase schema introspect` — when you want the tables in code; the panel's own
-customizations go in `frontend/src/cms/`. [Frontend Setup](/docs/frontend/) is where that starts.
+Nothing here locks you out of it. One command adds the `frontend/` that
+`rebase init` without `--headless` would have written, with its workspace and
+its app in `rebase.json`:
+
+```bash
+pnpm rebase apps add admin               # at /, or at /admin when another app is at /
+pnpm rebase apps add admin --path /admin
+pnpm install
+pnpm run dev
+```
+
+It writes what `rebase init` without `--headless` would have, from the same
+templates:
+
+- `frontend/`, with `rebaseBackendGuard()` in its Vite config. The admin renders
+  every table the backend serves, from `GET /api/schema/tables`, with no file per
+  table; the `users` customization comes with it only when
+  `backend/schema/users.ts` declares the auth table as the scaffold does. The
+  panel's own customizations go in `frontend/src/cms/`.
+- the `admin` app in `rebase.json`, with `cms` at its path and a build command
+  in the project's package manager. A project with no `rebase.json` gets one.
+- `frontend` in `package.json`'s `workspaces` and in `pnpm-workspace.yaml`.
+- with tables in code (`backend/schema/index.ts`, by hand or from
+  `rebase schema introspect`), the scaffold's `db:push`, `db:generate` and
+  `schema:generate` scripts, the backend build that runs
+  `rebase schema generate` first, and `ts-morph`. A script you changed is kept,
+  and named.
+
+Every `@rebasepro/*` package is pinned to the version the project already uses
+(its `@rebasepro/server` first), not the CLI's. A project that pins only
+`link:` or `workspace:` specs gets the CLI's version, and is told so.
+
+It refuses when `frontend/` exists, when an app is already named `admin` or
+declares the CMS, or when `--path` is taken or is not a path an app can be
+served at. A refusal changes nothing, and neither does a write that fails part
+way: every file is put back. With `--json` it prints what it wrote, or the
+error envelope. See [Frontend Setup](/docs/frontend/) for the frontend itself.
 
 ## Next steps
 

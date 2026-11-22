@@ -1,10 +1,10 @@
 import React, { Suspense, useLayoutEffect, useMemo } from "react";
-import { useRebaseEmbedHost, useRebaseRegistryDispatch, useTranslation } from "@rebasepro/app";
-import type { RebaseStudioConfig, AppView } from "@rebasepro/cms-types";
+import { useRebaseEmbedHost, useRebaseRegistryDispatch, useTranslation, type AppView, type RebaseStudioConfig } from "@rebasepro/app";
 import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
 // Lazy-loaded studio tools — each fetched only when its route is visited.
 // This keeps Monaco, @xyflow/react, dagre, pgsql-ast-parser etc. out of the initial bundle.
+const TableEditorView = lazyChunk(() => import("./TableEditor/TableEditorView").then(m => ({ default: m.TableEditorView })));
 const SQLEditor = lazyChunk(() => import("./SQLEditor/SQLEditor").then(m => ({ default: m.SQLEditor })));
 const JSEditor = lazyChunk(() => import("./JSEditor/JSEditor").then(m => ({ default: m.JSEditor })));
 const RLSEditor = lazyChunk(() => import("./RLSEditor/RLSEditor").then(m => ({ default: m.RLSEditor })));
@@ -14,7 +14,9 @@ const SchemaVisualizer = lazyChunk(() => import("./SchemaVisualizer/SchemaVisual
 const BranchesView = lazyChunk(() => import("./Branches/BranchesView").then(m => ({ default: m.BranchesView })));
 const BackupsView = lazyChunk(() => import("./Backups/BackupsView").then(m => ({ default: m.BackupsView })));
 const ApiExplorer = lazyChunk(() => import("./ApiExplorer/ApiExplorer").then(m => ({ default: m.ApiExplorer })));
+const WebhooksView = lazyChunk(() => import("./Webhooks/WebhooksView").then(m => ({ default: m.WebhooksView })));
 const LogsExplorer = lazyChunk(() => import("./LogsExplorer/LogsExplorer").then(m => ({ default: m.LogsExplorer })));
+const UsersAndRolesView = lazyChunk(() => import("./UsersAndRoles/UsersAndRolesView").then(m => ({ default: m.UsersAndRolesView })));
 const ApiKeysView = lazyChunk(() => import("./ApiKeys/ApiKeysView").then(m => ({ default: m.ApiKeysView })));
 
 import { StudioHomePage } from "./StudioHomePage";
@@ -22,13 +24,6 @@ import { StudioHomePage } from "./StudioHomePage";
 /**
  * Declarative component to configure the Studio in Rebase.
  * Renders nothing — purely registers config into the RebaseRegistry.
- *
- * The "schema" tool (collection editor view) is a Studio tool, but it is not
- * registered here: it ships from the panel package because it needs the project's
- * collection source to write back to. When `<RebaseCMS collectionEditor={...}>`
- * is used, the schema view is automatically injected into Studio — no manual
- * wiring needed. Where it is mounted from is an implementation detail; it is a
- * schema-editing tool and belongs beside SQL and RLS.
  */
 const DEFAULT_HOME_PAGE = <StudioHomePage/>;
 
@@ -67,9 +62,17 @@ function RebaseStudioRegistration({ tools, homePage, devViews: extraViews }: Reb
 
     const devViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
-        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "backups", "api", "logs", "api-keys"];
+        const activeTools = tools ?? ["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "backups", "api", "webhooks", "logs", "users", "api-keys"];
         const suspense = (el: React.ReactNode) => <Suspense fallback={<CircularProgressCenter/>}>{el}</Suspense>;
 
+        if (activeTools.includes("tables")) {
+            views.push({ slug: "tables",
+name: t("studio_tool_tables"),
+group: "Database",
+icon: "Table",
+description: t("studio_tool_tables_description"),
+view: suspense(<TableEditorView/>) });
+        }
         if (activeTools.includes("sql")) {
             views.push({ slug: "sql",
 name: t("studio_tool_sql"),
@@ -142,6 +145,14 @@ icon: "BookOpen",
 description: t("studio_tool_api_description"),
 view: suspense(<ApiExplorer/>) });
         }
+        if (activeTools.includes("webhooks")) {
+            views.push({ slug: "webhooks",
+name: t("studio_tool_webhooks"),
+group: "API",
+icon: "Webhook",
+description: t("studio_tool_webhooks_description"),
+view: suspense(<WebhooksView/>) });
+        }
         if (activeTools.includes("logs")) {
             views.push({ slug: "logs",
 name: t("studio_tool_logs"),
@@ -149,6 +160,14 @@ group: "Database",
 icon: "Activity",
 description: t("studio_tool_logs_description"),
 view: suspense(<LogsExplorer/>) });
+        }
+        if (activeTools.includes("users")) {
+            views.push({ slug: "users",
+name: t("studio_tool_users"),
+group: "Access Control",
+icon: "Users",
+description: t("studio_tool_users_description"),
+view: suspense(<UsersAndRolesView/>) });
         }
         if (activeTools.includes("api-keys")) {
             views.push({ slug: "api-keys",
@@ -158,7 +177,6 @@ icon: "KeyRound",
 description: t("studio_tool_api_keys_description"),
 view: suspense(<ApiKeysView/>) });
         }
-        // Note: "schema" tool is auto-injected by RebaseShell when collectionEditor is enabled.
         // It is NOT registered here anymore.
         return views;
         // Keyed by the tool list's *contents*; see `toolsKey`. `tools` itself is

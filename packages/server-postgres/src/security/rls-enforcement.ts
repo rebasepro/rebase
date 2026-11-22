@@ -1836,7 +1836,7 @@ export async function validatePolicyPgRoles(
     for (const table of tables) {
         for (const rule of table.rls.rules) {
             for (const role of rule.pgRoles ?? []) {
-                if (role === "public" || candidates.includes(role)) continue;
+                if (role === "public" || role === REBASE_ADMIN_ROLE || role === REBASE_ADMIN_REQUEST_ROLE || candidates.includes(role)) continue;
                 wanted.set(role, [...(wanted.get(role) ?? []), table.slug]);
             }
         }

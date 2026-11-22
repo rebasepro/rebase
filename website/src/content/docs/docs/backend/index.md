@@ -77,6 +77,7 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 |---|---|
 | `basePath` | `REBASE_BASE_PATH` (default `/api`) |
 | `tables`, `schemaDir`, `defaultRls` | the `backend/schema/` directory (the `tables` key of `rebase.json`): the tables and the `defaultRls` its `index.ts` exports |
+| `rpc` | <span class="since-badge" data-since="0.35">Since 0.35</span> the `defineRpc` declarations `backend/schema/index.ts` exports — see [SQL functions as RPC](/docs/backend/rpc/) |
 | `functions`, `functionsDir` | `backend/functions/` |
 | `functionsTimeoutMs` | `REBASE_FUNCTIONS_TIMEOUT_MS` |
 | `crons`, `cronsDir` | `backend/crons/` |
@@ -132,6 +133,7 @@ After initialization, these routes are mounted:
 | `/api/schema/tables` | The tables this backend serves, as the caller may see them — see [Endpoints](/docs/backend/endpoints/#schema) |
 | `/api/meta/contract` | The schema version, the runtime and every table as an administrator sees it (needs `schema:read`) |
 | `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
+| `/api/rpc/:name` | <span class="since-badge" data-since="0.35">Since 0.35</span> The SQL functions declared with `defineRpc`, called as the caller — see [SQL functions as RPC](/docs/backend/rpc/) |
 | `/api/functions/*` | Custom function routes (when `functions` or `functionsDir` is set) |
 | `/api/push/*` | [Push notification](/docs/backend/push-notifications/) subscriptions (when `push` is on) |
 | `/api/admin/cron/*` | Cron job management (`cron:read` / `cron:write`, when `crons` or `cronsDir` is set) |
@@ -211,6 +213,8 @@ no `/livez` until you add one.
 
 ## Configuration Reference
 
+<span class="since-badge" data-since="0.35">Since 0.35</span> The `rpc` option below.
+
 ```typescript
 interface RebaseBackendConfig {
     // HTTP framework
@@ -238,6 +242,10 @@ interface RebaseBackendConfig {
 
     // OpenAPI/Swagger
     enableSwagger?: boolean;
+
+    // SQL functions served at /api/rpc/<name> (defineRpc). Read from the
+    // schemaDir index when the tables are; pass them as values otherwise.
+    rpc?: AnyRpcDef[];
 
     // Custom API endpoints: values, or a directory of files (not both)
     functions?: Record<string, FunctionApp>;  // { "send-invoice": app } → /api/functions/send-invoice
@@ -408,6 +416,7 @@ async function setPrice(id: string, price: number) {
 - **[Table hooks](/docs/collections/callbacks)** — Lifecycle hooks and the `context.data` API
 - **[Entity History](/docs/backend/history)** — Audit trail
 - **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
+- **[SQL functions as RPC](/docs/backend/rpc)** — Call a Postgres function at `/api/rpc/<name>`, as the caller
 - **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks
 - **[Database Branching](/docs/backend/branching)** — Instant database copies for dev/staging
 - **[Deployment](/docs/getting-started/deployment)** — Take the backend to production

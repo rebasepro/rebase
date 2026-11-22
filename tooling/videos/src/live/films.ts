@@ -1,6 +1,4 @@
 import type React from "react";
-import { RebaseDesk } from "../desk/DeskFilm";
-import { DESK_NARRATION } from "../desk/script";
 import { SERIES_FILMS } from "../series";
 import { EXPLAINER_FILMS, explainerCompositions, shortComposition } from "../explainers";
 import { EIC_SCRIPT, EicFilm } from "../eic/EicFilm";
@@ -45,23 +43,9 @@ const WIDE = { width: 1920, height: 1080 };
 const TALL = { width: 1080, height: 1920 };
 
 export const FILMS: RecordableFilm[] = [
-    {
-        id: "desk",
-        title: "The desk film",
-        script: DESK_NARRATION,
-        chapters: wholeScript(DESK_NARRATION),
-        cuts: [{ id: "film", label: "Film", script: DESK_NARRATION, component: RebaseDesk, ...WIDE, compositions: ["RebaseDesk"], assembles: false }],
-    },
-    {
-        id: "eic",
-        title: "EIC Accelerator · Francesco & Marian",
-        script: EIC_SCRIPT,
-        chapters: wholeScript(EIC_SCRIPT),
-        cuts: [{ id: "film", label: "Film", script: EIC_SCRIPT, component: EicFilm, ...WIDE, compositions: ["EIC"], assembles: false }],
-    },
     ...SERIES_FILMS.map(({ spec, component }) => ({
         id: spec.id,
-        title: `${String(spec.number).padStart(2, "0")} · ${spec.title}`,
+        title: spec.number === 0 ? spec.title : `${String(spec.number).padStart(2, "0")} · ${spec.title}`,
         script: spec.script,
         chapters: wholeScript(spec.script),
         cuts: [
@@ -76,6 +60,13 @@ export const FILMS: RecordableFilm[] = [
             },
         ],
     })),
+    {
+        id: "eic",
+        title: "EIC Accelerator · Francesco & Marian",
+        script: EIC_SCRIPT,
+        chapters: wholeScript(EIC_SCRIPT),
+        cuts: [{ id: "film", label: "Film", script: EIC_SCRIPT, component: EicFilm, ...WIDE, compositions: ["EIC"], assembles: false }],
+    },
     ...EXPLAINER_FILMS.map(({ spec, component, lines, chapters, short }) => {
         const [wide, tall] = explainerCompositions(spec.id);
         const script = lines ?? spec.script;

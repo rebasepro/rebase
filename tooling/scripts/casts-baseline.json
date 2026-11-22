@@ -7,7 +7,7 @@
     "as never": 13
   },
   "packages/cms": {
-    "as unknown as": 5
+    "as unknown as": 3
   },
   "packages/cms (tests)": {
     "as never": 5,

@@ -25,6 +25,7 @@ vi.mock("./context", async (importOriginal) => {
 import * as context from "./context";
 import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { domainsCommand } from "./domains";
+import { setCertificateCheckerForTest, type CertificateCheck } from "./certificate";
 
 class Exited extends Error {
     constructor(readonly code: number) {
@@ -53,6 +54,9 @@ const shop = {
 const www = { ...shop, id: "dom-2", host: "www.example.com", primary: false, status: "pending", verifiedAt: null };
 
 let invoke: ReturnType<typeof vi.fn<Invoke>>;
+/** What each verified host's HTTPS answers; a test sets the ones it is about. Never a real socket. */
+let certificates: Map<string, CertificateCheck>;
+let certificateChecks: string[];
 let update: Mock<(id: string, values: Record<string, unknown>) => Promise<unknown>>;
 let stdout: string[];
 let said: string[];
@@ -101,6 +105,12 @@ function writes(): Array<Parameters<Invoke>> {
 }
 
 beforeEach(() => {
+    certificates = new Map();
+    certificateChecks = [];
+    setCertificateCheckerForTest(async (host) => {
+        certificateChecks.push(host);
+        return certificates.get(host) ?? { state: "ready" };
+    });
     stdout = [];
     said = [];
     vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
@@ -118,6 +128,7 @@ beforeEach(() => {
 
 afterEach(() => {
     context.setJsonModeForTest(false);
+    setCertificateCheckerForTest();
     vi.restoreAllMocks();
 });
 
@@ -254,5 +265,169 @@ describe("domains on a control plane without the domains function", () => {
         await domainsCommand("list", argv("list"));
 
         expect(json()).toMatchObject({ domains: [{ id: null, host: "www.example.com", status: "verified" }] });
+    });
+});
+
+/**
+ * A host already on the project — a deploy registers the hosts `rebase.json`
+ * names — answers `add` with its records and state, as a fresh add does, and a
+ * flag. It used to be refused with a bare conflict, and the records were only
+ * in the deploy's log.
+ */
+describe("domains add for a host the project already has", () => {
+    it("prints a pending host's DNS records and sends no write", async () => {
+        controlPlane({ rows: [shop, www] });
+
+        await domainsCommand("add", argv("add", "WWW.example.com"));
+
+        expect(writes()).toEqual([]);
+        expect(json()).toMatchObject({
+            success: true,
+            projectId: "proj_1",
+            host: "www.example.com",
+            status: "pending",
+            instructions,
+            certificate: null,
+            alreadyRegistered: true
+        });
+    });
+
+    it("says so in words, with the records to publish", async () => {
+        context.setJsonModeForTest(false);
+        controlPlane({ rows: [shop, www] });
+
+        await domainsCommand("add", argv("add", "www.example.com"));
+
+        const text = said.join("\n");
+        expect(text).toContain("www.example.com is already on this project — not yet verified");
+        expect(text).toContain("_rebase-challenge.www.example.com");
+        expect(text).toContain("rebase cloud domains verify www.example.com");
+    });
+
+    it("reports a verified host with whether its certificate is issued", async () => {
+        certificates.set("shop.example.com", { state: "pending", reason: "the ingress still serves its placeholder certificate" });
+        controlPlane({ rows: [shop] });
+
+        await domainsCommand("add", argv("add", "shop.example.com"));
+
+        expect(writes()).toEqual([]);
+        expect(json()).toMatchObject({
+            host: "shop.example.com",
+            status: "verified",
+            alreadyRegistered: true,
+            certificate: { state: "pending" }
+        });
+    });
+
+    it("reports the host a deploy registered between the read and the write", async () => {
+        let rows: unknown[] = [shop];
+        controlPlane({
+            handle: async (name, _body, o) => {
+                if (name === "domains" && o?.method === "GET") return { tenantHost: "shop.rebase.website", domains: rows };
+                if (name === "domains" && o?.path === "proj_1") {
+                    rows = [shop, www];
+                    throw Object.assign(new Error("www.example.com is already on this project."), { status: 409, code: "conflict" });
+                }
+                return undefined;
+            }
+        });
+
+        await domainsCommand("add", argv("add", "www.example.com"));
+
+        expect(json()).toMatchObject({ host: "www.example.com", status: "pending", instructions, alreadyRegistered: true });
+    });
+
+    it("still refuses a host another project holds", async () => {
+        controlPlane({
+            rows: [shop],
+            handle: async (name, _body, o) => {
+                if (name === "domains" && o?.method === undefined && o?.path === "proj_1") {
+                    throw Object.assign(new Error("www.example.com is claimed by another project."), { status: 409, code: "conflict" });
+                }
+                return undefined;
+            }
+        });
+
+        await expect(domainsCommand("add", argv("add", "www.example.com"))).rejects.toMatchObject({ code: 1 });
+
+        expect(json().error.message).toContain("claimed by another project");
+    });
+
+    it("marks a fresh add as not already registered", async () => {
+        controlPlane({
+            rows: [shop],
+            handle: async (name, body, o) =>
+                name === "domains" && o?.method === undefined && o?.path === "proj_1" ? { ...www, ...(body as object) } : undefined
+        });
+
+        await domainsCommand("add", argv("add", "www.example.com"));
+
+        expect(json()).toMatchObject({ host: "www.example.com", alreadyRegistered: false });
+    });
+});
+
+/**
+ * Verified is the DNS; the certificate is issued after it, and for those
+ * minutes the ingress answers with its placeholder. The rows carry no
+ * certificate state, so the CLI asks each verified host over TLS.
+ */
+describe("domains and their certificates", () => {
+    it("list says `verified, certificate pending` for a verified host without its certificate", async () => {
+        context.setJsonModeForTest(false);
+        certificates.set("shop.example.com", { state: "pending", reason: "the ingress still serves its placeholder certificate" });
+        controlPlane({ rows: [shop, www] });
+
+        await domainsCommand("list", argv("list"));
+
+        const text = said.join("\n");
+        expect(text).toContain("shop.example.com  verified, certificate pending");
+        expect(text).toContain("placeholder certificate");
+        // A pending host is not on the Ingress: nothing to ask.
+        expect(certificateChecks).toEqual(["shop.example.com"]);
+    });
+
+    it("list carries each verified host's certificate in --json, and null for a pending one", async () => {
+        certificates.set("shop.example.com", { state: "pending", reason: "placeholder" });
+        controlPlane({ rows: [shop, www] });
+
+        await domainsCommand("list", argv("list"));
+
+        expect(json().domains).toEqual([
+            expect.objectContaining({ host: "shop.example.com", status: "verified", certificate: { state: "pending", reason: "placeholder" } }),
+            expect.objectContaining({ host: "www.example.com", status: "pending", certificate: null })
+        ]);
+    });
+
+    it("verify does not call a host live until its certificate is", async () => {
+        context.setJsonModeForTest(false);
+        certificates.set("www.example.com", { state: "pending", reason: "the ingress still serves its placeholder certificate" });
+        controlPlane({
+            rows: [shop, www],
+            handle: async (name, _b, o) =>
+                name === "domains" && o?.path === "proj_1/dom-2/verify"
+                    ? { ...www, status: "verified", verified: true, checks: { ownership: { ok: true, expected: [], observed: [] }, pointing: { ok: true, expected: [], observed: [] } } }
+                    : undefined
+        });
+
+        await domainsCommand("verify", argv("verify", "www.example.com"));
+
+        const text = said.join("\n");
+        expect(text).not.toContain("verified and live");
+        expect(text).toContain("www.example.com is verified, certificate pending — not live until HTTPS works");
+    });
+
+    it("verify says live once the certificate is issued", async () => {
+        context.setJsonModeForTest(false);
+        controlPlane({
+            rows: [shop, www],
+            handle: async (name, _b, o) =>
+                name === "domains" && o?.path === "proj_1/dom-2/verify"
+                    ? { ...www, status: "verified", verified: true, checks: { ownership: { ok: true, expected: [], observed: [] }, pointing: { ok: true, expected: [], observed: [] } } }
+                    : undefined
+        });
+
+        await domainsCommand("verify", argv("verify", "www.example.com"));
+
+        expect(said.join("\n")).toContain("www.example.com is verified and live");
     });
 });

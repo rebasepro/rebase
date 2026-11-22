@@ -76,43 +76,63 @@ the tables and before the policies, and records each by hash in
 `rebase.sql_files`, so a file runs again only when it changes. A deploy applies
 them the same way (step 8).
 
-A function the browser called with `supabase.rpc('fn')` is reached through a
-custom function that validates its input and calls it, as the caller under
-row-level security:
+A function the browser called with `supabase.rpc('fn')` is declared with
+<span class="since-badge" data-since="0.35">Since 0.35</span> [`defineRpc`](/docs/backend/rpc/), beside the tables. It is then served at
+`POST /api/rpc/<name>` and runs as the caller under row-level security, so a
+`SECURITY DEFINER` function behaves as it did on Supabase:
 
 ```ts
-// backend/functions/rpc.ts
-import { defineFunction, getSql } from "@rebasepro/server/functions";
+// backend/schema/rpc.ts, exported from backend/schema/index.ts
+import { defineRpc, json } from "@rebasepro/server/schema";
 
-export default defineFunction((app) => {
-    app.post("/get_public_proposal", async (c) => {
-        const { token } = await c.req.json<{ token: string }>();
-        const sql = getSql(c);
-        const [row] = await sql("select public.get_public_proposal($1::uuid) as result", { params: [token] });
-        return c.json(row?.result ?? null);
-    });
+export const getPublicProposal = defineRpc("get_public_proposal", {
+    access: "public",                         // supabase's anon key; "authenticated" for signed-in only
+    args: { token: json.string().required() } // validated before the function runs
 });
 ```
+
+```ts
+// in the browser: supabase.rpc("get_public_proposal", { token })
+const proposal = await rebase.rpc("get_public_proposal", { token });
+```
+
+Only declared functions are callable, and every `public` one is rate-limited.
+One that writes needs `write: true`.
 
 ## 4. Copy the data, keeping user ids
 
 Keep the Supabase user ids, so every `owner_id` still points at its user:
-insert the users first, with their ids, then the application tables. With
-`pg_dump` against the source and the target. `TARGET_URL` is the new
-database's connection string: your `DATABASE_URL`, or on Rebase Cloud the
-`connectionString` that `rebase cloud db connect --reveal` prints while it runs.
+import the users first, with their ids, then the application tables.
+`rebase users import` creates the accounts under the ids they had, with no
+password and no email sent, and skips one whose id or email is already there,
+so it can be run again. It reaches Rebase Cloud like every other `rebase users`
+command (`--project <slug>`, or `--cloud` in a linked directory).
+
+```bash
+SUPABASE_DB_URL="postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
+psql "$SUPABASE_DB_URL" -c "\copy (select id, email, created_at, email_confirmed_at is not null as email_verified from auth.users) to users.csv csv header"
+rebase users import users.csv --dry-run
+rebase users import users.csv
+```
+
+It reports each account as created, skipped or failed with the reason, and
+exits 1 when any failed. See [Importing accounts](/docs/cli/project/#importing-accounts)
+for the columns it reads (`display_name` and `roles` too).
+
+Then the application tables, with `pg_dump` against the source and the
+target. `TARGET_URL` is the new database's connection string: your
+`DATABASE_URL`, or on Rebase Cloud the `connectionString` that
+`rebase cloud db connect --reveal` prints while it runs.
 
 ```bash
 SUPABASE_DB_URL="postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
 TARGET_URL="postgresql://…"   # the new database: your DATABASE_URL, or the tunnel's URL on Rebase Cloud
-psql "$SUPABASE_DB_URL" -c "\copy (select id::text, email, created_at from auth.users) to users.csv csv"
-psql "$TARGET_URL" -c "\copy rebase.users (id, email, created_at) from users.csv csv"
 pg_dump "$SUPABASE_DB_URL" --data-only --schema=public --no-owner > data.sql
 psql "$TARGET_URL" -f data.sql
 ```
 
-Passwords do not move. Users sign in again with a magic link or a password
-reset.
+Passwords do not move. An imported user signs in with a magic link, an email
+code or a password reset, under the same id as before.
 
 ## 5. Storage
 
@@ -133,8 +153,18 @@ in `backend/functions/`. The usual substitutions:
 | a client with the user's JWT | `getSql(c)`: SQL as the caller, under row-level security |
 | `EdgeRuntime.waitUntil(p)` | `waitUntil(c, p)` ([background work](/docs/backend/background-work/)) |
 
-Supabase lets an edge function run for 150 s; Rebase's default is 30 s. Raise
-`REBASE_FUNCTIONS_TIMEOUT_MS` for one that calls an LLM.
+Supabase lets an edge function run for 150 s; Rebase's default is 30 s. A
+function that calls an LLM declares its own timeout, which the server caps at
+`REBASE_FUNCTIONS_MAX_TIMEOUT_MS` (300 s by default):
+
+```ts
+export default defineFunction((app) => {
+    app.post("/", handler);
+}, { timeoutMs: 150_000 });
+```
+
+Pass `getSignal(c)` to the `fetch` that calls the model, so the call stops
+when the request does. See [a function's own timeout](/docs/backend/custom-functions/#timeouts-and-rate-limits).
 
 ## 7. Sign-in email
 

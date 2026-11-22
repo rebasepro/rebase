@@ -1,6 +1,6 @@
 import React, { useContext, useLayoutEffect, useRef, useState } from "react";
 
-import { CircularProgress, cls, SearchBar } from "@rebasepro/ui";
+import { CircularProgress, cls, defaultBorderMixin, SearchBar } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
 import { useCollectionLargeLayout } from "../../CollectionViewBinding/useCollectionLargeLayout";
 
@@ -118,7 +118,7 @@ export function CollectionTableToolbar({
     return (
         <div
             ref={containerRef}
-            className={cls("no-scrollbar min-h-[52px] overflow-x-auto bg-surface-sheet flex w-full")}>
+            className={cls("no-scrollbar min-h-[44px] overflow-x-auto bg-surface-sheet border-b flex w-full", defaultBorderMixin)}>
 
             {/* At least as wide as the toolbar, and never narrower than its
                 controls: the two groups cannot be squeezed into each other.

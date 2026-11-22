@@ -23,6 +23,7 @@ export type {
 // are lazy-loaded by RebaseStudio.tsx — DO NOT re-export them here
 // or they'll be pulled into the main bundle, defeating code splitting.
 export * from "./components/RebaseStudio";
+export * from "./components/RebaseStudioApp";
 export * from "./components/StudioHomePage";
 
 // ─── The tools themselves are not importable ────────────────────────

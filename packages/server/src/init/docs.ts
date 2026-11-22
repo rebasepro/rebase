@@ -52,8 +52,9 @@ export interface OpenApiDocsOptions {
      * The descriptors of the tables the REST routes serve, in route order.
      * Only those: documenting a table the routes do not serve publishes a full
      * set of CRUD paths that 404, with a Try-It button next to each.
+     * May be a getter so live DDL / schema reloads update `/docs` without restarting.
      */
-    serverTables: readonly TableDescriptor[];
+    serverTables: readonly TableDescriptor[] | (() => readonly TableDescriptor[]);
     requireAuth: boolean;
     /** The runtime's admin gate — the middlewares every admin surface sits behind — for the spec when it is not public. */
     adminGate: MiddlewareHandler<HonoEnv>[];
@@ -65,45 +66,40 @@ export interface OpenApiDocsOptions {
      * Tables the driver skipped for having row-level security disabled, which
      * the answer names when there are no collections to document.
      */
-    unprotectedTables?: readonly { schema: string; table: string }[];
+    unprotectedTables?: readonly { schema: string; table: string }[] | (() => readonly { schema: string; table: string }[]);
+    /**
+     * Schema revision counter: when provided and its value changes, cached
+     * OpenAPI documents are invalidated automatically.
+     */
+    revision?: () => number;
 }
 
 /**
  * Serve the OpenAPI document, and Swagger UI outside production when swagger is on.
  */
 export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: OpenApiDocsOptions): void {
-    const { enableSwagger, serverTables, requireAuth, adminGate, generate, audience, unprotectedTables = [] } = options;
-    if (serverTables.length === 0) {
-        // Still routed, and still a 404 — but one that says which 404 it is.
-        //
-        // A bare `404 Not Found` here is indistinguishable from a wrong URL, a
-        // broken install, or a server that is not running, and the generated
-        // headless README sends every new project straight at this path. The
-        // dev banner already explains it ("no tables served yet, so no data API
-        // and no docs"); this is the same sentence for anyone who arrives by
-        // URL instead, and the same code and remedy `/api/data` answers with,
-        // so the two surfaces cannot start disagreeing about why.
-        const explain = (c: { json: (v: unknown, s: number) => Response }) => c.json({
-            error: {
-                message: "This project serves no tables yet, so there is no API to document. " +
-                    noCollectionsCause(unprotectedTables),
-                code: "NO_TABLES"
-            }
-        }, 404);
-        app.get(`${basePath}/docs`, explain);
-        app.get(`${basePath}/swagger`, explain);
+    const { enableSwagger, serverTables: serverTablesInput, requireAuth, adminGate, generate, audience, unprotectedTables: unprotectedInput = [], revision } = options;
+    const isDynamic = typeof serverTablesInput === "function";
+    const getTables = (): readonly TableDescriptor[] =>
+        typeof serverTablesInput === "function" ? serverTablesInput() : serverTablesInput;
+    const getUnprotected = (): readonly { schema: string; table: string }[] =>
+        typeof unprotectedInput === "function" ? unprotectedInput() : unprotectedInput;
+
+    const noTablesResponse = (c: { json: (v: unknown, s: number) => Response }) => c.json({
+        error: {
+            message: "This project serves no tables yet, so there is no API to document. " +
+                noCollectionsCause(getUnprotected()),
+            code: "NO_TABLES"
+        }
+    }, 404);
+
+    if (!isDynamic && getTables().length === 0) {
+        // Static zero-table mount (e.g. unit tests passing `serverTables: []`).
+        app.get(`${basePath}/docs`, noTablesResponse);
+        app.get(`${basePath}/swagger`, noTablesResponse);
         return;
     }
 
-    // Who reads the document. It lists every served table, its columns, their
-    // descriptions and enum values: what `GET /schema/tables` withholds from a
-    // caller it does not describe a table to. So by default it is served to
-    // the same callers, each the document of the tables that endpoint
-    // describes to them (an administrator — Rebase Cloud's API Explorer — the
-    // whole of it). Publishing it to everyone is the explicit
-    // `enableSwagger: true` (`REBASE_ENABLE_SWAGGER=true`); `false` keeps it
-    // behind the admin gate. It is always ROUTED: a 404 would read as a
-    // project with no API.
     const isPublic = enableSwagger === true;
 
     if (!generate) {
@@ -111,36 +107,27 @@ export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: 
     }
     const generateSpec = generate;
 
-    /**
-     * The document, generated and encoded on the first request and served
-     * as those bytes after: generating it took 39 ms of CPU and a 10.8 MB
-     * string at 200 collections, per request, on a route that is public
-     * whenever Swagger is on.
-     *
-     * Key: this mount — `serverTables`, `basePath`, `requireAuth`. The
-     * document says nothing about the caller, so one copy serves every
-     * request; whether a caller may read it is still the gate's question,
-     * asked per request. Invalidation: none within the mount, because nothing
-     * changes what it was given — every request already read the collections
-     * the server booted with, and a live schema edit builds new collection
-     * objects (copy-on-write, `applyCollectionPatch`) that reach `/api/docs`
-     * through the restart that mounts it again.
-     */
+    let cachedRevision: number | undefined;
     let serialized: Uint8Array<ArrayBuffer> | undefined;
-    const spec = (c: { body: (data: Uint8Array<ArrayBuffer>, status: 200, headers: Record<string, string>) => Response }) => {
-        serialized ??= new TextEncoder().encode(JSON.stringify(generateSpec(serverTables, { basePath, requireAuth })));
+    const spec = (c: {
+        body: (data: Uint8Array<ArrayBuffer>, status: 200, headers: Record<string, string>) => Response;
+        json: (v: unknown, s: number) => Response;
+    }) => {
+        const tables = getTables();
+        if (tables.length === 0) return noTablesResponse(c);
+        const rev = revision?.();
+        if (serialized === undefined || rev !== cachedRevision) {
+            serialized = new TextEncoder().encode(JSON.stringify(generateSpec(tables, { basePath, requireAuth })));
+            cachedRevision = rev;
+        }
         return c.body(serialized, 200, { "Content-Type": "application/json" });
     };
 
     if (isPublic) {
         app.get(`${basePath}/docs`, (c) => spec(c));
     } else if (enableSwagger === undefined && audience) {
-        mountAudienceDocs(app, basePath, audience, (tables) => generateSpec(tables, { basePath, requireAuth }), serverTables);
+        mountAudienceDocs(app, basePath, audience, (tables) => generateSpec(tables, { basePath, requireAuth }), getTables, noTablesResponse, revision);
     } else {
-        // The gate every other admin surface sits behind, so "admin" means
-        // one thing across the runtime — including that it is read from the
-        // database: a demoted admin, or one who signed out everywhere, is not
-        // one for the rest of their token's hour.
         app.use(`${basePath}/docs`, ...adminGate);
         app.get(`${basePath}/docs`, (c) => spec(c));
     }
@@ -150,6 +137,7 @@ export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: 
     // left up in development fetched a spec only an admin could read.
     if (isPublic && process.env.NODE_ENV !== "production") {
         app.get(`${basePath}/swagger`, (c) => {
+            if (getTables().length === 0) return noTablesResponse(c);
             return c.html(`<!DOCTYPE html>
 <html>
 <head>
@@ -179,27 +167,33 @@ const MAX_CACHED_DOCUMENTS = 64;
  * (401 anonymous unless `schemaTables.public`, 403 for a credential with no
  * schema or data scope, 404 without authentication), and served the document
  * of exactly the tables, columns and relations that endpoint describes to it.
- * One document per view, cached: two callers with the same view get the same
- * bytes.
+ * One document per view, cached per schema revision: two callers with the same
+ * view get the same bytes.
  */
 function mountAudienceDocs(
     app: Hono<HonoEnv>,
     basePath: string,
     audience: OpenApiDocsAudience,
     generate: (tables: readonly TableDescriptor[]) => unknown,
-    serverTables: readonly TableDescriptor[]
+    getTables: () => readonly TableDescriptor[],
+    noTablesResponse: (c: { json: (v: unknown, s: number) => Response }) => Response,
+    revision?: () => number
 ): void {
     if (!audience.available) {
-        app.get(`${basePath}/docs`, (c) => c.json({
-            error: {
-                code: "DOCS_UNAVAILABLE",
-                message: "The API document is served to the callers GET /schema/tables describes the tables to, and no " +
-                    "authentication is configured, so there is none. Configure auth, or publish the document to " +
-                    "everyone with `enableSwagger: true` (REBASE_ENABLE_SWAGGER=true)."
-            }
-        }, 404));
+        app.get(`${basePath}/docs`, (c) => {
+            if (getTables().length === 0) return noTablesResponse(c);
+            return c.json({
+                error: {
+                    code: "DOCS_UNAVAILABLE",
+                    message: "The API document is served to the callers GET /schema/tables describes the tables to, and no " +
+                        "authentication is configured, so there is none. Configure auth, or publish the document to " +
+                        "everyone with `enableSwagger: true` (REBASE_ENABLE_SWAGGER=true)."
+                }
+            }, 404);
+        });
         return;
     }
+    let cachedRevision: number | undefined;
     const documents = new Map<string, Uint8Array<ArrayBuffer>>();
     const viewOf = (c: Context<HonoEnv>): SchemaView => {
         const caller = schemaCallerOf(c);
@@ -212,11 +206,18 @@ function mountAudienceDocs(
     };
     app.use(`${basePath}/docs`, ...audience.authenticate);
     app.get(`${basePath}/docs`, (c) => {
+        const tables = getTables();
+        if (tables.length === 0) return noTablesResponse(c);
+        const rev = revision?.();
+        if (rev !== cachedRevision) {
+            documents.clear();
+            cachedRevision = rev;
+        }
         const view = viewOf(c);
         const key = schemaViewKey(view);
         let document = documents.get(key);
         if (!document) {
-            document = new TextEncoder().encode(JSON.stringify(generate(serializeTables(serverTables, view))));
+            document = new TextEncoder().encode(JSON.stringify(generate(serializeTables(tables, view))));
             if (documents.size >= MAX_CACHED_DOCUMENTS) documents.clear();
             documents.set(key, document);
         }

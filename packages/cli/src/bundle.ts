@@ -29,6 +29,7 @@ import {
     type RebaseBundleManifest,
     type RebaseBundleFunction,
     type RebaseBackendAppConfig,
+    type RebaseStaticRedirect,
     type RebaseStaticRoute
 } from "@rebasepro/types";
 import { compareMountOrder, resolveBackendPaths } from "./manifest";
@@ -2137,8 +2138,12 @@ export function foldStaticIntoBundle(options: {
     routes?: RebaseStaticRoute[];
     /** Origins besides its own that may frame it. */
     frameAncestors?: string[];
+    /** Requests it answers with a redirect before its files. */
+    redirects?: RebaseStaticRedirect[];
+    /** Serve `x.html` at `/x`. */
+    cleanUrls?: boolean;
 }): { fileCount: number; dir: string } {
-    const { bundleDir, assetsDir, appName, path: basePath, host, spa, cms, routes, frameAncestors } = options;
+    const { bundleDir, assetsDir, appName, path: basePath, host, spa, cms, routes, frameAncestors, redirects, cleanUrls } = options;
     const manifestPath = path.join(bundleDir, "manifest.json");
     if (!fs.existsSync(manifestPath)) {
         throw new Error(`No manifest at ${manifestPath} — build the backend bundle first.`);
@@ -2187,7 +2192,9 @@ spa,
 name: appName,
 ...(cms ? { cms } : {}),
 ...(routes?.length ? { routes } : {}),
-...(frameAncestors?.length ? { frameAncestors } : {}) }].sort(compareMountOrder)
+...(frameAncestors?.length ? { frameAncestors } : {}),
+...(redirects?.length ? { redirects } : {}),
+...(cleanUrls ? { cleanUrls } : {}) }].sort(compareMountOrder)
     };
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
@@ -2244,6 +2251,10 @@ export function buildStaticBundle(options: {
     routes?: RebaseStaticRoute[];
     /** Origins besides its own that may frame it. */
     frameAncestors?: string[];
+    /** Requests it answers with a redirect before its files. */
+    redirects?: RebaseStaticRedirect[];
+    /** Serve `x.html` at `/x`. */
+    cleanUrls?: boolean;
 }): { outDir: string; manifest: RebaseBundleManifest; fileCount: number } {
     const { projectRoot, appName, assetsDir, outDir, runtimeRange } = options;
     const basePath = options.path ?? "/";
@@ -2288,7 +2299,9 @@ spa: options.spa ?? true,
 name: appName,
 ...(options.cms ? { cms: options.cms } : {}),
 ...(options.routes?.length ? { routes: options.routes } : {}),
-...(options.frameAncestors?.length ? { frameAncestors: options.frameAncestors } : {}) }] },
+...(options.frameAncestors?.length ? { frameAncestors: options.frameAncestors } : {}),
+...(options.redirects?.length ? { redirects: options.redirects } : {}),
+...(options.cleanUrls ? { cleanUrls: true } : {}) }] },
         hooks: { native: false },
         // Nothing to install beside a static bundle — it is just files.
         deps: { declared: {} },

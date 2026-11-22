@@ -197,10 +197,10 @@ export function UIReferenceView() {
                                                 "hover:bg-surface-hover text-surface-700 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white",
                                                 "flex flex-row items-center pr-4 h-[30px]",
                                                 "font-medium text-[13px] cursor-pointer",
-                                                active ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary [&_div]:text-primary" : ""
+                                                active ? "bg-surface-active text-text-primary dark:text-text-primary-dark [&_div]:text-text-primary dark:[&_div]:text-text-primary-dark" : ""
                                             )}
                                         >
-                                            <div className="shrink-0 flex items-center justify-center w-[44px] h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4 group-hover/nav:text-primary transition-colors duration-150">
+                                            <div className="shrink-0 flex items-center justify-center w-[44px] h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4 group-hover/nav:text-text-primary dark:group-hover/nav:text-text-primary-dark transition-colors duration-150">
                                                 <IconComponent size={iconSize.smallest}/>
                                             </div>
                                             <div className="text-text-primary dark:text-surface-200 font-inherit truncate">
@@ -473,9 +473,9 @@ export function UIReferenceView() {
                                             ].map(({ label, icon, active }) => (
                                                 <div key={label} className={cls(
                                                     "rounded-lg truncate hover:bg-surface-hover text-surface-700 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white flex flex-row items-center pr-4 h-[30px] font-medium text-[13px] cursor-pointer",
-                                                    active ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary [&_div]:text-primary" : ""
+                                                    active ? "bg-surface-active text-text-primary dark:text-text-primary-dark [&_div]:text-text-primary dark:[&_div]:text-text-primary-dark" : ""
                                                 )}>
-                                                    <div className={cls("shrink-0 flex items-center justify-center w-[44px] h-[30px] [&>svg]:size-4 transition-colors duration-150", active ? "text-primary dark:text-primary" : "text-surface-500 dark:text-text-secondary-dark")}>
+                                                    <div className={cls("shrink-0 flex items-center justify-center w-[44px] h-[30px] [&>svg]:size-4 transition-colors duration-150", active ? "text-text-primary dark:text-text-primary-dark" : "text-surface-500 dark:text-text-secondary-dark")}>
                                                         {icon}
                                                     </div>
                                                     <div className="text-text-primary dark:text-surface-200 font-inherit truncate">
@@ -735,7 +735,6 @@ selected: true }, { name: "Tags" }].map(c => (
                     <Typography variant="body2" color="secondary" className="mb-4">
                         All empty / placeholder states share the same layout: a centered <code className="font-mono text-xs">flex-col</code> container
                         with <code className="font-mono text-xs">Typography variant=&quot;label&quot;</code> for the message and a <code className="font-mono text-xs">Button</code> with <code className="font-mono text-xs">PlusIcon</code> for the primary action.
-                        Sources: <code className="font-mono text-xs">CollectionPropertiesEditorForm</code>, <code className="font-mono text-xs">CollectionsStudioView</code>, <code className="font-mono text-xs">CollectionStudioView</code>.
                     </Typography>
 
                     <div className="flex gap-6 flex-wrap">
@@ -874,7 +873,9 @@ selected: true }, { name: "Tags" }].map(c => (
                         A field is a filled box with no edge. <code className="font-mono text-xs">TextField</code>,{" "}
                         <code className="font-mono text-xs">DateTimeField</code> and a labelled switch carry their label{" "}
                         <em>inside</em> — the floating <code className="font-mono text-xs">label</code> prop, shrunk into the top edge
-                        once there is a value; a standalone <code className="font-mono text-xs">Select</code> labels above. A record
+                        once there is a value. A <code className="font-mono text-xs">Select</code> does the same at the TextField&apos;s
+                        height, except at <code className="font-mono text-xs">smallest</code>, where it labels above
+                        (<code className="font-mono text-xs">labelPlacement=&quot;above&quot;</code> asks for that at any size). A record
                         form sets every one-line field at <code className="font-mono text-xs">large</code> with the label inside,
                         single selects included: 64px and a 16px value. A multi-select, whose chips wrap, keeps its label{" "}
                         <em>above</em> (<code className="font-mono text-xs">FieldBlock</code>: 13px, primary ink, muted type icon)

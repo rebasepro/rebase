@@ -543,6 +543,24 @@ export interface RealtimeSocketTotals {
 // =============================================================================
 
 /**
+ * Passive post-mutation observer attached by framework services (such as
+ * zero-code webhooks) without wrapping or replacing the project's declared
+ * `globalHooks`.
+ *
+ * @group Backend
+ */
+export interface TableMutationListener {
+    afterSave?: TableHooks["afterSave"];
+    afterDelete?: TableHooks["afterDelete"];
+    /**
+     * Whether this listener wants the writes of the table `slug` at all.
+     * Asked per write, so a table nobody listens to keeps the driver's fast
+     * paths (batched inserts, the single-statement delete). Absent: every table.
+     */
+    watches?(slug: string): boolean;
+}
+
+/**
  * The table registry a data driver builds for itself and returns on
  * `InitializedDriver.tableRegistry`: the compiled tables it serves, by
  * slug. The backend hands it the global hooks and later table hooks through
@@ -561,6 +579,12 @@ export interface TableRegistryInterface {
      * it is refused at boot.
      */
     setGlobalHooks?(hooks: TableHooks): void;
+
+    /**
+     * Register a passive post-mutation listener (e.g. zero-code webhooks)
+     * that runs alongside global/table hooks without altering `globalHooks`.
+     */
+    addMutationListener?(listener: TableMutationListener): void;
 
     /**
      * Replace one table's own hooks after boot (`backend.setTableHooks`).
@@ -755,6 +779,16 @@ export interface SQLAdmin {
      * `EXECUTE_SQL` door sets it for every caller.
      */
     executeSql(sql: string, options?: { database?: string; role?: string; params?: unknown[]; isolateSession?: boolean; maxResultBytes?: number }): Promise<Record<string, unknown>[]>;
+
+    /**
+     * Run a sequence of SQL statements inside a single database transaction on
+     * one dedicated connection, rolling back atomically if any statement fails.
+     *
+     * Calling `executeSql("BEGIN")` / `executeSql(stmt)` / `executeSql("COMMIT")`
+     * separately checks out a different pooled connection per call on `pg.Pool`;
+     * multi-statement DDL transactions must use this method instead.
+     */
+    executeSqlTransaction?(statements: readonly string[]): Promise<void>;
 
     /**
      * Ask the database whether it answers, on a connection of its own.
@@ -1771,6 +1805,17 @@ export interface InitializedDriver {
      */
     refreshTables?(tables: readonly CompiledTable[]): Promise<TableRefreshOutcome>;
 
+    /**
+     * Re-introspect the live database schema and swap it in without a restart.
+     *
+     * Used in zero-code / database-first BaaS mode whenever DDL runs (through
+     * `/api/admin/db/*`, Studio's SQL console, `POST /api/admin/schema/reload`,
+     * or a PostgreSQL `NOTIFY rebase_schema_changed` event): newly created or
+     * altered tables become reachable on REST, Realtime, OpenAPI, MCP and
+     * `GET /api/schema/tables` immediately.
+     */
+    reintrospectTables?(): Promise<ReintrospectOutcome>;
+
     /** The underlying database connection (for lifecycle management). */
     connection?: DatabaseConnection;
 
@@ -1795,6 +1840,20 @@ export interface InitializedDriver {
 export type TableRefreshOutcome =
     | { status: "served" }
     | { status: "restart"; reason: string };
+
+/**
+ * Outcome of {@link InitializedDriver.reintrospectTables}.
+ *
+ * @group Backend
+ */
+export type ReintrospectOutcome =
+    | {
+        status: "served";
+        tables: CompiledTable[];
+        descriptors: import("../schema/descriptor").TableDescriptor[];
+        unprotectedTables: { schema: string; table: string }[];
+    }
+    | { status: "unsupported"; reason: string };
 
 /**
  * Result of `BackendBootstrapper.initializeAuth()`.

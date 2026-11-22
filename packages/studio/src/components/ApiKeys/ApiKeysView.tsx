@@ -149,7 +149,7 @@ export function ApiKeysView() {
             value={kind}
             onValueChange={(value) => setKind(value === "personal" ? "personal" : "service")}
             variant="boxy"
-            className="border-b border-hairline"
+            className="border-b border-hairline px-4 bg-surface-sheet shrink-0"
         >
             <Tab value="service">{t("studio_api_keys_tab_service")}</Tab>
             <Tab value="personal">{t("studio_api_keys_tab_personal")}</Tab>
@@ -266,86 +266,90 @@ function KeysPane({
 
     return (
         <>
-            <div className="flex h-full w-full overflow-hidden bg-surface-card">
-                {/* ── Key List ── */}
-                <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
-                    {tabs}
-                    <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
-                        <div className="flex items-center gap-2">
-                            <KeyRoundIcon size={iconSize.smallest} className="text-primary"/>
-                            <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_api_keys")}</Typography>
-                            <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{activeKeys.length}</Chip>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <IconButton aria-label={t("studio_api_keys_refresh")} size="small" onClick={loadKeys} title={t("studio_api_keys_refresh")}><RefreshCwIcon size={iconSize.smallest}/></IconButton>
-                            <Button
-                                size="small"
-                                color="primary"
-                                disabled={personalOff}
-                                onClick={() => setShowCreate(true)}
-                                startIcon={<AddIcon size={iconSize.smallest}/>}
-                            >
-                                {t("studio_api_keys_new")}
-                            </Button>
-                        </div>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                        {loading && (
-                            <div className="flex items-center justify-center h-full"><CircularProgress/></div>
-                        )}
-                        {!loading && failure && (
-                            <LoadFailureView
-                                failure={failure}
-                                title={kind === "service" ? t("studio_api_keys_read_failed") : t("studio_api_keys_personal_read_failed")}
-                                deniedTitle={kind === "service" ? t("studio_api_keys_denied_title") : t("studio_api_keys_personal_denied_title")}
-                                deniedHint={kind === "service" ? t("studio_api_keys_denied_hint") : t("studio_api_keys_personal_denied_hint")}
-                                onRetry={loadKeys}
-                            />
-                        )}
-                        {!loading && personalOff && <PersonalKeysOff/>}
-                        {!loading && !failure && !personalOff && activeKeys.length === 0 && inactiveKeys.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-full gap-3 text-center p-6">
-                                <KeyRoundIcon size={iconSize.medium} className="text-surface-300 dark:text-surface-600"/>
-                                <Typography variant="body2" color="secondary">
-                                    {kind === "service" ? t("studio_api_keys_empty_title") : t("studio_api_keys_personal_empty_title")}
-                                </Typography>
-                                <Typography variant="caption" color="disabled">
-                                    {kind === "service" ? t("studio_api_keys_empty_hint") : t("studio_api_keys_personal_empty_hint")}
-                                </Typography>
+            {/* The tabs span both panes, as the Cron view's do, so the list's
+                header and the key's header start on the same line. */}
+            <div className="flex flex-col h-full w-full overflow-hidden bg-surface-card">
+                {tabs}
+                <div className="flex flex-1 min-h-0 w-full overflow-hidden">
+                    {/* ── Key List ── */}
+                    <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-4 h-14 shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
+                            <div className="flex items-center gap-2">
+                                <KeyRoundIcon size={iconSize.smallest} className="text-primary"/>
+                                <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_api_keys")}</Typography>
+                                <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{activeKeys.length}</Chip>
                             </div>
-                        )}
-                        {!loading && activeKeys.map(key => (
-                            <KeyListItem key={key.id} apiKey={key} catalogue={catalogue} selected={selectedId === key.id} onClick={() => setSelectedId(key.id)}/>
-                        ))}
-                        {!loading && inactiveKeys.length > 0 && (
-                            <>
-                                <div className="px-2 pt-3 pb-1">
-                                    <Typography variant="caption" color="disabled" className="text-[10px] uppercase tracking-wider font-medium">{t("studio_api_keys_inactive_heading")}</Typography>
+                            <div className="flex items-center gap-1">
+                                <IconButton aria-label={t("studio_api_keys_refresh")} size="small" onClick={loadKeys} title={t("studio_api_keys_refresh")}><RefreshCwIcon size={iconSize.smallest}/></IconButton>
+                                <Button
+                                    size="small"
+                                    color="primary"
+                                    disabled={personalOff}
+                                    onClick={() => setShowCreate(true)}
+                                    startIcon={<AddIcon size={iconSize.smallest}/>}
+                                >
+                                    {t("studio_api_keys_new")}
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                            {loading && (
+                                <div className="flex items-center justify-center h-full"><CircularProgress/></div>
+                            )}
+                            {!loading && failure && (
+                                <LoadFailureView
+                                    failure={failure}
+                                    title={kind === "service" ? t("studio_api_keys_read_failed") : t("studio_api_keys_personal_read_failed")}
+                                    deniedTitle={kind === "service" ? t("studio_api_keys_denied_title") : t("studio_api_keys_personal_denied_title")}
+                                    deniedHint={kind === "service" ? t("studio_api_keys_denied_hint") : t("studio_api_keys_personal_denied_hint")}
+                                    onRetry={loadKeys}
+                                />
+                            )}
+                            {!loading && personalOff && <PersonalKeysOff/>}
+                            {!loading && !failure && !personalOff && activeKeys.length === 0 && inactiveKeys.length === 0 && (
+                                <div className="flex flex-col items-center justify-center h-full gap-3 text-center p-6">
+                                    <KeyRoundIcon size={iconSize.medium} className="text-surface-300 dark:text-surface-600"/>
+                                    <Typography variant="body2" color="secondary">
+                                        {kind === "service" ? t("studio_api_keys_empty_title") : t("studio_api_keys_personal_empty_title")}
+                                    </Typography>
+                                    <Typography variant="caption" color="disabled">
+                                        {kind === "service" ? t("studio_api_keys_empty_hint") : t("studio_api_keys_personal_empty_hint")}
+                                    </Typography>
                                 </div>
-                                {inactiveKeys.map(key => (
-                                    <KeyListItem key={key.id} apiKey={key} catalogue={catalogue} selected={selectedId === key.id} onClick={() => setSelectedId(key.id)}/>
-                                ))}
-                            </>
-                        )}
-                    </div>
-                </div>
-
-                {/* ── Detail Panel ── */}
-                <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                    {!selectedKey ? (
-                        <div className="flex items-center justify-center h-full">
-                            {!personalOff && (
-                                <Typography variant="body2" color="disabled">{t("studio_api_keys_select_hint")}</Typography>
+                            )}
+                            {!loading && activeKeys.map(key => (
+                                <KeyListItem key={key.id} apiKey={key} catalogue={catalogue} selected={selectedId === key.id} onClick={() => setSelectedId(key.id)}/>
+                            ))}
+                            {!loading && inactiveKeys.length > 0 && (
+                                <>
+                                    <div className="px-2 pt-3 pb-1">
+                                        <Typography variant="caption" color="disabled" className="text-[10px] uppercase tracking-wider font-medium">{t("studio_api_keys_inactive_heading")}</Typography>
+                                    </div>
+                                    {inactiveKeys.map(key => (
+                                        <KeyListItem key={key.id} apiKey={key} catalogue={catalogue} selected={selectedId === key.id} onClick={() => setSelectedId(key.id)}/>
+                                    ))}
+                                </>
                             )}
                         </div>
-                    ) : (
-                        <KeyDetail
-                            apiKey={selectedKey}
-                            catalogue={catalogue}
-                            revoking={revoking === selectedKey.id}
-                            onRevoke={() => setConfirmRevoke(selectedKey)}
-                        />
-                    )}
+                    </div>
+
+                    {/* ── Detail Panel ── */}
+                    <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+                        {!selectedKey ? (
+                            <div className="flex items-center justify-center h-full">
+                                {!personalOff && (
+                                    <Typography variant="body2" color="disabled">{t("studio_api_keys_select_hint")}</Typography>
+                                )}
+                            </div>
+                        ) : (
+                            <KeyDetail
+                                apiKey={selectedKey}
+                                catalogue={catalogue}
+                                revoking={revoking === selectedKey.id}
+                                onRevoke={() => setConfirmRevoke(selectedKey)}
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -514,7 +518,7 @@ function KeyDetail({ apiKey, catalogue, revoking, onRevoke }: {
     return (
         <>
             {/* Header */}
-            <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-surface-card min-h-[56px]", defaultBorderMixin)}>
+            <div className={cls("flex items-center justify-between px-5 h-14 shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
                 <div className="flex items-center gap-3 min-w-0">
                     <KeyRoundIcon size={iconSize.small} className="text-primary shrink-0"/>
                     <div className="min-w-0">

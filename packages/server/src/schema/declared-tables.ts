@@ -1,4 +1,5 @@
 import {
+    type AnyRpcDef,
     type AnyTableDef,
     type AnyViewDef,
     type CompiledTable,
@@ -21,6 +22,12 @@ export interface DeclaredTables {
     descriptors: TableDescriptor[];
     /** Where they came from, for the boot log. */
     source: "tables" | "schemaDir" | "none";
+    /**
+     * The `defineRpc` declarations the `backend/schema` index exports, when
+     * the tables were loaded from it. Absent otherwise: a backend given
+     * `tables` as values is given its RPCs as values too (`rpc`).
+     */
+    rpc?: AnyRpcDef[];
 }
 
 /**
@@ -42,6 +49,7 @@ export async function resolveDeclaredTables(options: {
     let defs: (AnyTableDef | AnyViewDef)[] = [];
     let defaultRls: DefaultRls | undefined;
     let source: DeclaredTables["source"] = "none";
+    let rpc: AnyRpcDef[] | undefined;
     if (options.tables && options.tables.length > 0) {
         defs = [...options.tables];
         defaultRls = options.defaultRls;
@@ -50,10 +58,12 @@ export async function resolveDeclaredTables(options: {
         const loaded = await loadBackendSchema(options.schemaDir, options.load);
         defs = loaded.defs;
         defaultRls = loaded.defaultRls;
+        rpc = loaded.rpc;
         if (defs.length > 0) source = "schemaDir";
     }
-    if (defs.length === 0) return { defs: [], tables: [], descriptors: [], source: "none" };
+    const declaredRpc = rpc ? { rpc } : {};
+    if (defs.length === 0) return { defs: [], tables: [], descriptors: [], source: "none", ...declaredRpc };
 
     const { tables, descriptors } = compileSchemaDefs(defs, defaultRls);
-    return { defs, tables, descriptors, source };
+    return { defs, tables, descriptors, source, ...declaredRpc };
 }

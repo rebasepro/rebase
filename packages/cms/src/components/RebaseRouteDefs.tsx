@@ -14,7 +14,6 @@ import { ContentHomePage as DefaultHomePage } from "./HomePage/ContentHomePage";
 import { RebaseRoute } from "../routes/RebaseRoute";
 import { CustomViewRoute } from "../routes/CustomViewRoute";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
-import { CollectionEditorDialogs } from "./CollectionEditorDialogs";
 import { useEffect } from "react";
 import { useTranslation } from "@rebasepro/app";
 import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
@@ -125,7 +124,6 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
                     : routeContents
                 }
             </RebaseRoutes>
-            <CollectionEditorDialogs/>
         </>
     );
 }

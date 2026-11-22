@@ -121,6 +121,7 @@
 - [Custom Functions](https://rebase.pro/docs/backend/custom-functions.md): Add custom Hono API endpoints alongside your Rebase CRUD routes. Auto-discovered from a directory, with full access to the backend instance.
 - [Background Work](https://rebase.pro/docs/backend/background-work.md): Run work after a custom function has answered: waitUntil, what the host does with it at shutdown, and what is lost without it.
 - [Rate limits in functions](https://rebase.pro/docs/backend/function-rate-limits.md): rateLimit and checkRateLimit for custom functions: 429s with Retry-After, counted in the backend's own store so replicas share one allowance.
+- [SQL functions as RPC](https://rebase.pro/docs/backend/rpc.md): Expose a Postgres function at POST /api/rpc/<name> with defineRpc: declared per function, arguments validated, run as the caller under row-level security, public ones rate-limited.
 - [Runtime portability](https://rebase.pro/docs/backend/runtime-portability.md): What a custom function imports decides whether it could run outside a Node process — what is portable, what is Node-only, and how rebase build and rebase doctor report it.
 - [Typed server-side data](https://rebase.pro/docs/backend/typed-server-data.md): Register your generated Database type once, and context.data, rebase.dataAsAdmin and the rebase a function or cron receives are typed from it: rows, filters, sorts, includes and write inputs.
 - [Global Backend Hooks](https://rebase.pro/docs/backend/hooks.md): Apply cross-cutting lifecycle hooks to every table at the server level: export hooks from backend/hooks.ts, in the same TableHooks shape a table's own hooks use.
@@ -150,7 +151,7 @@
 - [Data Import & Export](https://rebase.pro/docs/frontend/data-import-export.md): Import data from CSV, JSON, and Excel files into your collections, and export collection data to CSV or JSON with optional computed fields.
 - [Plugin System](https://rebase.pro/docs/plugins.md): Extend Rebase with plugins — inject UI components, modify collections, add toolbar actions, and create custom field builders.
 - [Hooks Reference](https://rebase.pro/docs/hooks.md): React hooks provided by Rebase for accessing auth, data, navigation, side panels, storage, and UI state.
-- [Studio Tools](https://rebase.pro/docs/studio.md): Rebase Studio provides developer tools for visual schema editing, SQL queries, JavaScript scripting, RLS policy management, and storage browsing.
+- [Studio Tools](https://rebase.pro/docs/studio.md): Rebase Studio provides developer tools for SQL queries, JavaScript scripting, RLS policy management, a schema diagram, and storage browsing.
 - [Components](https://rebase.pro/docs/ui/components.md): Components in @rebasepro/ui — the component library Rebase CMS and Rebase Studio are built from.
 - [Alert](https://rebase.pro/docs/ui/components/alert.md): Alert — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [Autocomplete](https://rebase.pro/docs/ui/components/autocomplete.md): Autocomplete — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
@@ -281,6 +282,7 @@
 - [Schema as Code](https://rebase.pro/docs/architecture/schema-as-code.md): How Rebase uses the TypeScript tables in backend/schema as the single source of truth for your database schema, API, SDK and admin panel.
 - [Runtime and Bundles](https://rebase.pro/docs/architecture/runtime-and-bundles.md): How a Rebase project separates into a project bundle and a versioned runtime, and why that separation is what makes upgrades, multi-repo apps and managed hosting possible.
 - [Apps and Repositories](https://rebase.pro/docs/architecture/apps-and-repositories.md): A project is a backend plus the apps that talk to it, which can each live in their own repository.
+- [Redirects and clean URLs](https://rebase.pro/docs/architecture/redirects-and-clean-urls.md): A static app in rebase.json can answer requests with redirects (Vercel-style :param matching, host and query conditions) and serve x.html at /x with cleanUrls.
 - [Deployment](https://rebase.pro/docs/deployment.md): Where a Rebase project can run — Rebase Cloud, your own server, Kubernetes, or a managed container platform — and which guide to open for each.
 - [Deployment](https://rebase.pro/docs/getting-started/deployment.md): Deploy your Rebase project to production using Docker, cloud platforms, or manual setups.
 - [Rebase Cloud](https://rebase.pro/docs/deployment/cloud.md): Rebase Cloud is the same Rebase, operated for you. What it is, how a project links and deploys, and what the private beta does not include yet.

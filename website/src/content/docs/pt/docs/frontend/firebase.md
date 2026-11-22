@@ -1,24 +1,24 @@
 ---
-sourceHash: fd678be79444f91f
+sourceHash: ce9fefc61944ee85
 title: Firestore ao lado do Postgres
 sidebar_label: Firebase
 description: "Exiba coleções do Firestore no CMS ao lado das suas tabelas Postgres: defineFirestoreCollection, useFirestoreDataSource, externalCollections e referências que cruzam documentos do Firestore e linhas do Postgres em ambas as direções."
 ---
 
-O `@rebasepro/firebase` permite que o CMS leia e escreva em coleções do Firestore
-no navegador, por meio do Firebase SDK, ao lado das tabelas que seu backend Rebase
-disponibiliza. Uma única navegação, uma única busca, um único seletor de referências: o
-operador não precisa saber em qual engine um registro reside.
+O `@rebasepro/firebase` permite que o CMS leia e escreva em coleções do Firestore no
+navegador, por meio do Firebase SDK, ao lado das tabelas que seu backend Rebase
+fornece. Uma única navegação, uma única busca, um único seletor de referências: o operador
+não precisa saber em qual mecanismo o registro reside.
 
-O Firestore é uma preocupação exclusiva do frontend aqui. O backend não sabe nada sobre ele, e
-uma coleção do Firestore é declarada em `frontend/src/cms/`, nunca em
+O Firestore aqui é uma responsabilidade do frontend. O backend não sabe nada sobre ele, e uma
+coleção do Firestore é declarada em `frontend/src/cms/`, nunca em
 `backend/schema`.
 
-:::caution[As coleções do Firestore são lidas diretamente do navegador]
-Nada entre o navegador e o Firestore pertence ao Rebase: segurança em nível de linha (RLS), a
-API REST, o SDK gerado, funções, crons e o modelo de acesso ao storage não
+:::caution[Coleções do Firestore são lidas diretamente do navegador]
+Nada entre o navegador e o Firestore pertence ao Rebase: row-level security, a
+API REST, o SDK gerado, functions, crons e o modelo de acesso ao storage não
 se aplicam a uma coleção do Firestore. Quem pode ler e escrever seus documentos é
-definido pelas **Firebase Security Rules**, escritas e implantadas no Firebase.
+decidido pelas **Firebase Security Rules**, escritas e publicadas no Firebase.
 :::
 
 ## Instalação
@@ -64,28 +64,28 @@ export const firestoreEvents = defineFirestoreCollection({
 
 | Chave | O que faz |
 |---|---|
-| `slug` | O nome da coleção no painel: sua URL e o alvo que outras referências nomeiam. Deve ser diferente do slug de qualquer tabela. |
-| `path` | Onde os documentos residem no Firestore, quando não for o mesmo que o slug. |
-| `name` | O rótulo exibido na navegação. |
-| `dataSource` | A chave da entrada `<Rebase dataSources>` que a lê: a `key` fornecida a `useFirestoreDataSource`. Omita apenas quando o Firestore for a fonte padrão. |
+| `slug` | O nome da coleção no painel: sua URL e o destino apontado por outras referências. Deve ser diferente do slug de todas as tabelas. |
+| `path` | Onde os documentos residem no Firestore, quando não for o slug. |
+| `name` | O rótulo na navegação. |
+| `dataSource` | A chave da entrada `<Rebase dataSources>` que a lê: a `key` fornecida para `useFirestoreDataSource`. Omita apenas quando o Firestore for a fonte padrão. |
 | `databaseId` | Um banco de dados do Firestore diferente do padrão. |
 | `fields` | Os campos do documento, por chave. |
 | `subcollections` | Coleções aninhadas sob cada documento, exibidas como abas do documento e armazenadas em `<path>/<id>/<child path>`. Cada uma também é um `defineFirestoreCollection`. |
 
 O `type` de um campo é um dos tipos suportados pelo Firestore: `string`, `number`, `boolean`,
 `date`, `geopoint`, `map`, `array`, `reference` ou `binary`. `required: true`
-é a abreviação para um campo obrigatório. Uma `reference` define a coleção para a qual aponta
-com `target`, em qualquer fonte de dados. Uma `relation` ou um `vector` pertence a uma
-tabela Postgres e é recusado aqui, assim como `properties` e `engine`.
+é o atalho para um campo obrigatório. Uma `reference` indica a coleção para a qual aponta
+usando `target`, em qualquer fonte de dados. Uma `relation` ou um `vector` pertence a uma
+tabela Postgres e é rejeitado aqui, assim como `properties` e `engine`.
 
-O tipo do documento é inferido a partir de `fields`, portanto, as opções da própria
-coleção são validadas contra suas chaves. As opções de apresentação aceitas por uma coleção do
-Firestore (ícone, grupo, visualizações) são as do modelo de coleção do painel, não
+O tipo do documento é inferido a partir de `fields`, portanto, as opções da própria coleção são
+verificadas em relação às suas chaves. As opções de apresentação que uma coleção do Firestore aceita
+(icon, group, views) são as do modelo de coleção do painel, não do
 `customizeTable`, que é destinado a tabelas.
 
-## Montar ao lado das tabelas
+## Montá-la ao lado das tabelas
 
-Duas etapas: registrar o Firestore como fonte de dados em `<Rebase>` e passar a
+Dois passos: registre o Firestore como fonte de dados no `<Rebase>` e passe a
 coleção para `<RebaseCMS externalCollections>`.
 
 ```tsx
@@ -126,55 +126,51 @@ export function App() {
 }
 ```
 
-O painel exibe todas as tabelas servidas pelo backend, com `postsCms` e
-`customersCms` aplicados, e então `fs_events`, na mesma navegação. Um slug
-identifica apenas uma coleção: uma coleção externa com o mesmo slug de uma tabela é recusada,
-apontando o conflito (veja [colisões](/docs/frontend/#rebasecms-props)).
+O painel exibe todas as tabelas fornecidas pelo backend, com `postsCms` e
+`customersCms` aplicados, e depois `fs_events`, na mesma navegação. Um slug
+identifica exclusivamente uma coleção: uma coleção externa com o mesmo slug de uma tabela é recusada,
+indicando ambos (consulte [collisions](/docs/frontend/#rebasecms-props)).
 
-`useFirestoreDataSource` retorna o mesmo objeto em todas as renderizações enquanto suas
-opções forem as mesmas, podendo assim ser definido inline em `dataSources`. Suas opções:
+O `useFirestoreDataSource` retorna o mesmo objeto em cada renderização enquanto suas
+opções forem as mesmas, para que possa ser definido diretamente em `dataSources`. Suas opções:
 
 | Opção | O que faz |
 |---|---|
-| `key` | **Obrigatório.** O identificador que o `dataSource` de uma coleção referencia. |
-| `firebaseApp` | A instância inicializada do app Firebase. Até ser definida, a fonte reporta que não está pronta. |
-| `databaseId` | O banco de dados do Firestore, quando não for o padrão do app. O `databaseId` definido na própria coleção tem precedência. |
-| `label` | Um rótulo para a fonte, onde o painel exibe nomes de fontes de dados. |
-| `textSearchControllerBuilder` | Responde a buscas textuais com IDs de documentos (Algolia, Typesense, Pinecone, busca do Rebase). |
+| `key` | **Obrigatório.** O nome correspondente a `dataSource` da coleção. |
+| `firebaseApp` | O app Firebase inicializado. Até que seja definido, a fonte reporta que não está pronta. |
+| `databaseId` | O banco de dados Firestore, quando não for o padrão do app. O `databaseId` da própria coleção tem precedência. |
+| `label` | Um rótulo para a fonte, onde o painel exibe o nome das fontes de dados. |
+| `textSearchControllerBuilder` | Responde a buscas de texto com IDs de documentos (Algolia, Typesense, Pinecone, Rebase search). |
 | `localTextSearchEnabled` | Busca no navegador diretamente nos próprios documentos quando nenhum controlador cobre a coleção. Lê todos os documentos: adequado para coleções pequenas. |
-| `firestoreIndexesBuilder` | Os índices compostos que o banco possui, permitindo que o painel ofereça apenas os filtros e ordenações que o Firestore pode atender. |
+| `firestoreIndexesBuilder` | Os índices compostos que o banco de dados possui, para que o painel ofereça apenas os filtros e ordenações que o Firestore suporta. |
 
-Ele também registra os recursos que o Firestore suporta, de modo que suas coleções nunca
-recebam abas de relacionamento ou filtros que o Firestore não consiga executar.
+Ele também registra o que o Firestore suporta, de modo que suas coleções nunca exibam
+abas de relações ou filtros que o Firestore não consiga executar.
 
-## Editando no editor de coleções
+## Editando-a
 
-Em ambiente de desenvolvimento, o [editor de coleções](/docs/studio/#collection-editor) edita
-coleções do Firestore também: salvar reescreve a chamada
-`defineFirestoreCollection({...})` da coleção diretamente em `frontend/src/cms`,
-alterando apenas o que você editou. Funções, componentes customizados, comentários e
-imports permanecem inalterados; campos definidos via código aparecem como somente leitura. Em
-produção, as coleções do Firestore são somente leitura no editor. Para excluir uma,
-remova seu arquivo e sua entrada em `externalCollections`.
+Uma coleção do Firestore é definida por sua chamada `defineFirestoreCollection({...})` em
+`frontend/src/cms`: edite-a lá. Para excluir uma, remova o seu arquivo e sua
+entrada em `externalCollections`.
 
 ## Do Firestore para uma tabela
 
 `customerId: { type: "reference", target: "customers" }` aponta para a
 tabela `customers`. Quando um operador abre um evento e clica no chip do cliente,
-ou seleciona um cliente, a busca é roteada pela fonte de dados do alvo: a
-coleção `customers` é uma tabela, portanto vai para o backend Rebase, sob a
-segurança em nível de linha (RLS) do chamador.
+ou seleciona um cliente, a consulta é roteada pela fonte de dados de destino: como a
+coleção `customers` é uma tabela, ela vai para o backend do Rebase, sob a
+segurança em nível de linha (RLS) de quem faz a requisição.
 
 Uma referência a um registro em outra fonte de dados é armazenada no documento como o
-**id** do registro, uma string, de forma que uma consulta no Firestore por `customerId == "42"`
-corresponda a ele. Uma referência a um documento no mesmo banco de dados do Firestore é armazenada
-como uma `DocumentReference` do Firestore, conforme esperado pela plataforma.
+**id** do registro (uma string), para que uma consulta no Firestore por `customerId == "42"`
+encontre o registro correspondente. Já uma referência a um documento no mesmo banco de dados do Firestore
+é armazenada como um `DocumentReference` do Firestore, como esperado por ele.
 
 ## De uma tabela para o Firestore
 
-Uma coluna de tabela que armazena o id de um documento do Firestore é uma coluna de texto simples
-no backend. O `referenceTo` em seu `customizeTable` transforma essa coluna em uma referência no
-painel:
+Uma coluna de tabela que armazena o id de um documento do Firestore é uma coluna de
+texto simples no backend. O uso de `referenceTo` no seu `customizeTable` a transforma em uma referência
+no painel:
 
 ```ts
 // backend/schema/customers.ts
@@ -203,16 +199,16 @@ export const customersCms = customizeTable<typeof customers>("customers", {
 });
 ```
 
-O campo é renderizado e selecionado como uma referência para `fs_events`, e abri-lo
-faz a leitura do documento por meio de `firestoreSource`. A coluna continua armazenando o id como
+O campo é renderizado e selecionado como uma referência a `fs_events`, e abri-lo
+lê o documento por meio de `firestoreSource`. A coluna continua armazenando o id como
 texto, e o backend continua enxergando uma coluna de texto. `referenceTo` se aplica a colunas
-de texto e uuid; em qualquer outro tipo ele é ignorado, emitindo um aviso em
-desenvolvimento.
+de tipo text e uuid; em qualquer outro tipo, ele é ignorado com um aviso em
+ambiente de desenvolvimento.
 
-## Um painel exclusivo para Firestore
+## Um painel apenas com Firestore
 
-`RebaseFirebaseApp` é um painel completo construído unicamente sobre o Firebase: login via
-Firebase Auth, roteamento e as coleções que você passar, sem a necessidade de um backend Rebase.
+O `RebaseFirebaseApp` é um painel completo baseado exclusivamente no Firebase: login com
+Firebase Auth, roteamento e as coleções que você passar, sem a necessidade de nenhum backend Rebase.
 
 ```tsx
 import React from "react";
@@ -240,14 +236,14 @@ export default function App() {
 
 Um exemplo funcional está disponível em
 [`examples/firebase`](https://github.com/rebasepro/rebase/tree/main/examples/firebase).
-Nessa configuração, nada das páginas de backend desta documentação se aplica: as
-Firebase Security Rules substituem o RLS (row-level security), o Firebase SDK substitui a API
-REST e o SDK gerado, Cloud Functions substituem funções e crons, e o
-Studio e o `rls-check` não têm nada a inspecionar.
+Nessa configuração, nada nas páginas de backend deste site se aplica: as Firebase
+Security Rules substituem o row-level security, o Firebase SDK substitui a API REST
+e o SDK gerado, Cloud Functions substituem functions e crons, e o
+Studio e `rls-check` não têm nada para inspecionar.
 
 ## Relacionados
 
-- [Tabelas no CMS](/docs/collections/): o que a parte Postgres exibe sem nenhuma configuração
-- [customizeTable](/docs/frontend/customize-table/): `referenceTo` e todas as outras opções de tabelas
-- [Visão Geral do Frontend](/docs/frontend/): propriedades de `<Rebase dataSources>` e `<RebaseCMS>`
-- [Autenticação e Login](/docs/frontend/authentication/): a interface de login
+- [Tabelas no CMS](/docs/collections/): o que o lado do Postgres exibe sem nenhuma configuração
+- [customizeTable](/docs/frontend/customize-table/): `referenceTo` e todas as outras opções de tabela
+- [Visão geral do frontend](/docs/frontend/): propriedades de `<Rebase dataSources>` e `<RebaseCMS>`
+- [Autenticação e Login](/docs/frontend/authentication/): a interface de autenticação

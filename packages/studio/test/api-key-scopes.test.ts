@@ -19,7 +19,7 @@ import {
     summarizeScopes,
     type ScopeSummary
 } from "@rebasepro/types";
-import type { RebaseTranslations } from "@rebasepro/cms-types";
+import type { RebaseTranslations } from "@rebasepro/app";
 import { de } from "../../app/src/locales/de";
 import { en } from "../../app/src/locales/en";
 import { es } from "../../app/src/locales/es";

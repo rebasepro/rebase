@@ -1,5 +1,5 @@
 ---
-sourceHash: 535fb9801df93ad9
+sourceHash: 231870126ca746bf
 title: Comandos de base de datos
 sidebar_label: Comandos de base de datos
 description: Los comandos de rebase db — push, generate y migrate, copias de seguridad y restauraciones, extracción de copias, la cadena de conexión, la base de datos de desarrollo administrada y ramas.
@@ -42,6 +42,10 @@ vistas, índices que haya escrito, y las restricciones CHECK y EXCLUDE en una ta
 declarada, las cuales una declaración no puede expresar. Consulte
 [`rebase db push`](/docs/cli/schema/#rebase-db-push) para conocer qué aplica y
 ante qué se detiene.
+
+El SQL que una declaración de tabla no puede expresar (funciones, disparadores, restricciones CHECK, permisos) va en `backend/sql/*.sql`. El push aplica esos archivos por orden de nombre, después de las tablas y vistas y antes de las políticas, de modo que una política puede llamar a una función que define un archivo. Cada archivo se registra por nombre y hash en `rebase.sql_files` y se ejecuta de nuevo solo cuando cambia, en su propia transacción: un archivo que falla se revierte y detiene el push. Escribe archivos que sean seguros de ejecutar otra vez (`CREATE OR REPLACE FUNCTION`, `DROP TRIGGER IF EXISTS` antes de `CREATE TRIGGER`). Un archivo cuyo nombre empieza por `_` es un borrador y no se aplica. Eliminar un archivo no deshace nada de lo que hizo. `--dry-run` enumera los archivos que aplicaría.
+
+Un despliegue aplica los mismos archivos: `rebase build` los incluye en el bundle, y el arranque del servidor ejecuta cada uno nuevo o modificado después de las tablas y la autenticación y antes de las políticas, registrados en el mismo `rebase.sql_files`. La transacción de cada archivo toma primero un bloqueo advisory único, de modo que varias instancias que arrancan a la vez, o un push durante un despliegue, ejecutan cada archivo una sola vez. Un archivo puede ejecutarse durante 15 minutos. Un archivo que falla detiene el arranque y nombra el archivo. `rebase dev` también los aplica al arrancar. Una aplicación que construye su propio backend indica el directorio con `createPostgresAdapter({ sqlDir: "backend/sql" })`. No se aplica nada con `REBASE_PROVISION=false` ni `REBASE_MIGRATE_ON_BOOT=none`.
 
 :::caution
 `db push` modifica la base de datos directamente sin archivos de migración. Use `db generate` + `db migrate` para producción.

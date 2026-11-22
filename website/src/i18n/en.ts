@@ -28,6 +28,9 @@ export const en = {
   "copy.command": "Copy",
   "copy.command.done": "Copied",
   "social.title": "From the makers of FireCMS, the open-source CMS in 10,000+ projects.",
+  "trust.europe":
+    "Made in Madrid by a company under European law. Run Rebase on your own servers — Hetzner, OVHcloud, Scaleway or bare metal — or have us operate it in Europe.",
+  "trust.europe.link": "Sovereignty in Europe",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.
   "recognition.badge": "Where the rule lives today",
@@ -101,10 +104,10 @@ export const en = {
   "modes.full.desc": "SQL editor, schema visualizer, RLS policy simulator, database branches, logs and API explorer. Studio is the developer half of the same panel your team already uses.",
   "modes.full.tag": "The developer half of the panel",
   "showcase.badge": "Built for real products",
-  "showcase.title.part1": "Dozens of products.",
-  "showcase.title.part2": "All of them in production.",
+  "showcase.title.part1": "Seven products.",
+  "showcase.title.part2": "Every one built on Rebase.",
   "showcase.subtitle":
-    "A <b>certified medical device</b>, a <b>retail loyalty programme</b>, a <b>two-sided marketplace</b>, a <b>living-room music quiz</b>, an outbound sales agent, a design tool and a CRM \u2014 some of them ours, some of them our customers'.",
+    "A <b>retail loyalty programme</b>, a <b>two-sided marketplace</b>, a <b>living-room music quiz</b>, the back office of a <b>certified medical device</b>, an outbound sales agent, a design tool and a CRM \u2014 built by the team that makes Rebase, some for ourselves and some for our customers.",
   "showcase.nolink": "Internal tool — no public site",
   "showcase.case0.badge": "Vector Design Tool · Built by the Rebase team",
   "showcase.case0.title": "Dadaki",
@@ -114,10 +117,10 @@ export const en = {
   "showcase.case.title": "SustenTalent",
   "showcase.case.desc":
     "A two-sided marketplace connecting sustainability professionals with green companies. Rebase powers both sides of the market: role-based auth, typed matching APIs, and the moderation back office.",
-  "showcase.case2.badge": "Digital Pain Therapy",
+  "showcase.case2.badge": "Digital Pain Therapy · Back office",
   "showcase.case2.title": "MedicalMotion",
   "showcase.case2.desc":
-    "A certified digital medical device delivering AI-personalized pain therapy. Rebase runs the entire backend — patient records, therapy plans, the exercise content library, and the clinical dashboards on top of them.",
+    "The back office behind a certified digital medical device for AI-personalized pain therapy. Staff manage companies, subscriptions, billing and onboarding directly on the product's existing Postgres, whose schema Rebase never touches, with the medical content library in Firestore alongside. It replaced two older admin tools.",
   "showcase.case7.badge": "Party game · Built by the Rebase team",
   "showcase.case7.title": "SongBuzz",
   "showcase.case7.desc":

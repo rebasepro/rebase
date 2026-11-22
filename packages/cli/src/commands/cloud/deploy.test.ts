@@ -531,4 +531,18 @@ describe("deploying a static app on its own", () => {
         );
         expect(refusal?.hint).toMatch(/Deploy the project's backend instead/);
     });
+
+    it("refuses an app with redirects or cleanUrls, which static hosting would ignore, and says what to deploy", () => {
+        expect(standaloneStaticRefusal("site", { ...site, redirects: [], cleanUrls: false })).toBeUndefined();
+        const refusal = standaloneStaticRefusal("site", {
+            ...site,
+            redirects: [{ from: "/old", to: "/new" }],
+            cleanUrls: true
+        });
+        expect(refusal?.message).toBe(
+            '"site" declares redirects and cleanUrls, which Rebase Cloud\'s static hosting does not apply to a static app deployed on its own.'
+        );
+        expect(refusal?.hint).toMatch(/Deploy the project's backend instead.*applies redirects and cleanUrls/);
+        expect(standaloneStaticRefusal("site", { ...site, cleanUrls: true })?.message).toMatch(/declares cleanUrls,/);
+    });
 });

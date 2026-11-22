@@ -63,10 +63,10 @@ A static app in `rebase.json` with no build step (no `build`, and `output` is
 its `root`, such as a plain HTML site) is served by the backend from that
 directory, at its `path`, as `rebase start` serves it from the bundle, and
 `FRONTEND_URL` is set to it (on the backend's port) so emailed links land there.
+<span class="since-badge" data-since="0.35">Since 0.35</span> Its [`redirects` and `cleanUrls`](/docs/architecture/redirects-and-clean-urls/) are served too, and an app that declares redirects needs no `index.html`.
 An app with a build runs in Vite on its own port, and `FRONTEND_URL` is Vite's.
 
-An edit to `.env`
-restarts the backend, which reads the file again, as the admin panel does. What
+An edit to `.env` restarts the backend, which reads the file again, as the admin panel does. What
 `rebase dev` sets itself is kept until you restart it: `PORT`, and
 `DATABASE_URL` when it is on the managed database or on Docker.
 
@@ -272,6 +272,15 @@ For a
 checkout not linked to a Cloud project, `apps config` says it is not linked,
 whether or not `rebase dev` is running, and gives the backend's URL as
 `rebase dev` serves it.
+
+### `rebase apps add admin`
+
+```bash
+rebase apps add admin                  # at /, or at /admin when another app is at /
+rebase apps add admin --path /console  # anywhere else, or an https URL of its own
+```
+
+Adds the admin panel to a headless or ported project, as `rebase init` would have written it. What it writes, which version it pins and when it refuses: [Adding an admin panel later](/docs/getting-started/headless/#adding-an-admin-panel-later).
 
 ### `rebase status`
 

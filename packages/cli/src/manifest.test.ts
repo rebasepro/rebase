@@ -814,6 +814,115 @@ describe("static.routes", () => {
     });
 });
 
+describe("static.redirects and static.cleanUrls", () => {
+    const site = (over: Record<string, unknown> = {}) => ({ type: "static", root: "site", output: "site", ...over });
+    const validate = (apps: Record<string, unknown>) => validateManifest({ rebase: "^1", apps });
+
+    it("accepts redirects and cleanUrls, and carries them onto the app", () => {
+        const redirects = [
+            { from: "/old", to: "/new" },
+            { from: "/blog/:slug", to: "/posts/:slug", status: 301 },
+            { from: "/", to: "/es", query: { lang: "es" }, status: 302 }
+        ];
+        const { manifest, issues } = validate({ site: site({ path: "https://www.example.com", redirects, cleanUrls: true }) });
+        expect(issues).toEqual([]);
+        expect(manifest?.apps.site).toMatchObject({ redirects, cleanUrls: true });
+    });
+
+    it("accepts the apex app whose only job is sending a domain to www", () => {
+        const { issues } = validate({
+            apex: site({
+                root: "apex", output: "apex", path: "https://example.com",
+                redirects: [{ from: "/:path*", to: "https://www.example.com/:path*" }]
+            }),
+            www: site({ path: "https://www.example.com", cleanUrls: true })
+        });
+        expect(issues).toEqual([]);
+    });
+
+    it("leaves an app without them without the keys, so it is written back as it was", () => {
+        const { manifest } = validate({ site: site() });
+        expect(manifest?.apps.site).not.toHaveProperty("redirects");
+        expect(manifest?.apps.site).not.toHaveProperty("cleanUrls");
+    });
+
+    it("writes them back as declared", () => {
+        const redirects = [{ from: "/old", to: "/new" }];
+        const { manifest } = validate({ site: site({ redirects, cleanUrls: false }) });
+        writeManifest(scratch, manifest!);
+        const written = JSON.parse(fs.readFileSync(path.join(scratch, "rebase.json"), "utf8"));
+        expect(written.apps.site).toMatchObject({ redirects, cleanUrls: false });
+    });
+
+    it.each([
+        [{ from: "old", to: "/b" }, "apps.site.redirects[0].from", /absolute path/],
+        [{ from: "/api/v1/:path*", to: "/b" }, "apps.site.redirects[0].from", /backend answers that path/],
+        [{ from: "/a", to: "/b", status: 303 }, "apps.site.redirects[0].status", /301, 302, 307 or 308/],
+        [{ from: "/blog/:slug", to: "/posts/:id" }, "apps.site.redirects[0].to", /":id", which "from" does not declare/],
+        [{ from: "/a", to: "//evil.example" }, "apps.site.redirects[0].to", /without its scheme/],
+        [{ from: "/:path*", to: "/new/:path*" }, "apps.site.redirects[0].to", /redirected forever/],
+        [{ from: "/a", to: "/b", query: { lang: 1 } }, "apps.site.redirects[0].query", /exact string/],
+        ["/old -> /new", "apps.site.redirects[0]", /must be an object/]
+    ])("refuses %j at %s", (redirect, issuePath, message) => {
+        const { issues } = validate({ site: site({ redirects: [redirect] }) });
+        expect(issues.find(i => i.path === issuePath)?.message).toMatch(message);
+    });
+
+    it("refuses redirects that are not a list, and cleanUrls that is not a boolean", () => {
+        const { issues } = validate({ site: site({ redirects: { from: "/a", to: "/b" }, cleanUrls: "true" }) });
+        expect(issues.find(i => i.path === "apps.site.redirects")?.message).toMatch(/must be a list/);
+        expect(issues.find(i => i.path === "apps.site.cleanUrls")?.message).toBe("must be a boolean");
+    });
+
+    it("refuses a host the app never answers on", () => {
+        const { issues } = validate({
+            site: site({ path: "https://www.example.com", redirects: [{ from: "/a", to: "/b", host: "example.com" }] })
+        });
+        expect(issues).toEqual([{ path: "apps.site.redirects[0].host", message: 'can never match: this app answers only on "www.example.com"' }]);
+    });
+
+    it("refuses a second redirect matching the same requests, which would never fire", () => {
+        const { issues } = validate({
+            site: site({
+                redirects: [
+                    { from: "/a", to: "/b", query: { x: "1", y: "2" } },
+                    { from: "/a", to: "/c", query: { y: "2", x: "1" } },
+                    { from: "/a", to: "/d", query: { x: "2" } }
+                ]
+            })
+        });
+        expect(issues).toEqual([{
+            path: "apps.site.redirects[1].from",
+            message: "matches the same requests as apps.site.redirects[0], which answers first — this one would never fire"
+        }]);
+    });
+
+    it("refuses a redirect another app answers, and names it", () => {
+        const { issues } = validate({
+            site: site({ redirects: [{ from: "/docs/old", to: "/new" }] }),
+            docs: site({ root: "docs", output: "docs/dist", path: "/docs" })
+        });
+        expect(issues).toEqual([{
+            path: "apps.site.redirects[0].from",
+            message: '"/docs/old" is answered by "docs", at "/docs" — declare the redirect on that app instead'
+        }]);
+    });
+
+    it("warns about a field a redirect does not have, naming Vercel's spelling", () => {
+        const warnings: string[] = [];
+        const original = console.warn;
+        console.warn = (message: string) => { warnings.push(message); };
+        try {
+            const { issues } = validate({ site: site({ redirects: [{ from: "/a", to: "/b", destination: "/c", permanent: true }] }) });
+            expect(issues).toEqual([]);
+        } finally {
+            console.warn = original;
+        }
+        expect(warnings.join("\n")).toMatch(/redirects\[0\]\.destination is not a field of a redirect — it is ignored — write "to"/);
+        expect(warnings.join("\n")).toMatch(/redirects\[0\]\.permanent .* "status": 308/);
+    });
+});
+
 describe("static.frameAncestors", () => {
     const site = (frameAncestors: unknown) => ({ type: "static", root: "site", output: "site/dist", frameAncestors });
     const validate = (frameAncestors: unknown) => validateManifest({ rebase: "^1", apps: { site: site(frameAncestors) } });

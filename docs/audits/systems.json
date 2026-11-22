@@ -61,6 +61,7 @@
       "title": "Collection definition to database",
       "paths": [
         "packages/server/src/schema/**",
+        "packages/server/src/baas/**",
         "packages/server/src/boot/**",
         "packages/server-postgres/src/schema/**",
         "packages/server-postgres/src/model/**",
@@ -109,7 +110,6 @@
         "packages/server/src/api/table-source-editor.ts",
         "packages/server/src/api/live-schema-routes.ts",
         "packages/server/src/api/schema-editor-routes.ts",
-        "packages/server/src/api/frontend-source-routes.ts",
         "packages/server/src/api/logs-routes.ts",
         "packages/server/src/api/sql-export-routes.ts"
       ],
@@ -258,9 +258,10 @@
     },
     {
       "id": "server-logic",
-      "title": "Callbacks, functions, cron, jobs, webhooks, email, push, history",
+      "title": "Callbacks, functions, RPC, cron, jobs, webhooks, email, push, history",
       "paths": [
         "packages/server/src/functions/**",
+        "packages/server/src/rpc/**",
         "packages/server/src/cron/**",
         "packages/server/src/jobs/**",
         "packages/server/src/queues/**",

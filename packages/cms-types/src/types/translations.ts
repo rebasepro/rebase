@@ -158,8 +158,6 @@ export interface RebaseTranslations {
     add_below: string;
     /** Label when a fieldName is provided — "Add to {fieldName}" */
     add_to_field: string;
-    /** Collection editor: an enum value whose id another value already has — "{id}" */
-    enum_id_duplicate: string;
     /** Placeholder for the 'value' input in a KeyValue field */
     value: string;
     /** Placeholder for the 'key' input in a KeyValue field */
@@ -389,16 +387,13 @@ export interface RebaseTranslations {
     create_first_collection: string;
     define_collections_programmatically: string;
 
-    edit_collection: string;
     no_permissions_edit_collection: string;
     no_permissions_create_collection: string;
     create_collection: string;
     update_collection: string;
 
     new_collection: string;
-    add_new_collection: string;
     collection_with_name: string;
-    change_icon: string;
     is_subcollection_of: string;
     name: string;
     collection_name_description: string;
@@ -426,7 +421,6 @@ export interface RebaseTranslations {
     config_doc_id_generation: string;
     enable_text_search: string;
     text_search_description: string;
-    database_id: string;
     default_text: string;
 
     custom_actions: string;
@@ -471,7 +465,6 @@ export interface RebaseTranslations {
     imported_data_preview: string;
     entities_with_same_id_overwritten: string;
     collection_editor: string;
-    properties_in_this_group: string;
     data_property_mapping: string;
     property_edit_view: string;
     all_of_these: string;
@@ -633,6 +626,15 @@ export interface RebaseTranslations {
     no_enum_values_configured: string;
     items_need_backfill: string;
     kanban_order_not_configured: string;
+    /** A list in a one-line preview (a table cell, a card): `{{count}} items`. */
+    preview_items_count?: string;
+    preview_items_count_one?: string;
+    /** A nested object in a one-line preview: `{{count}} fields`. */
+    preview_fields_count?: string;
+    preview_fields_count_one?: string;
+    /** A list of typed blocks in a one-line preview: `{{count}} blocks`. */
+    preview_blocks_count?: string;
+    preview_blocks_count_one?: string;
     initialize: string;
     confirm_multiple_delete: string;
     delete_entity_confirm_title: string;
@@ -779,8 +781,6 @@ export interface RebaseTranslations {
     /** AI Collection Generator Popover */
     generate_collection_with_ai: string;
     modify_collection_with_ai: string;
-    describe_collection_to_create: string;
-    describe_changes_to_make: string;
     ai_placeholder_create: string;
     ai_placeholder_modify: string;
     ai_assist: string;
@@ -928,26 +928,13 @@ export interface RebaseTranslations {
     // ─── Collection Editor — Validation ──────────────────────────
     validation: string;
     unique: string;
-    required_message: string;
-    required_tooltip: string;
-    unique_tooltip: string;
     lowercase: string;
     uppercase: string;
     trim: string;
-    exact_length: string;
     min_length: string;
     max_length: string;
-    varchar_narrowing_warning: string;
-    matches_regex: string;
-    not_valid_regexp: string;
-    regex_helper: string;
-    min_value: string;
-    max_value: string;
     less_than: string;
     more_than: string;
-    positive_value: string;
-    negative_value: string;
-    integer_value: string;
 
     // ─── Collection Editor — Property Edit ───────────────────────
     invalid_regular_expression: string;
@@ -955,7 +942,6 @@ export interface RebaseTranslations {
     need_specify_repeat_field: string;
     need_specify_block_properties: string;
     incomplete_condition: string;
-    field_name: string;
 
     // ─── Collection Editor — Display & Config ────────────────────
     kanban_column_property: string;
@@ -1169,26 +1155,6 @@ export interface RebaseTranslations {
     studio_rls_edit_not_declared?: string;
     studio_rls_edit_several_operations?: string;
     studio_rls_edit_redacted?: string;
-    studio_rls_rule_defined_on_server?: string;
-    studio_rls_rule_edit_in_code?: string;
-    studio_rls_rule_who_public?: string;
-    studio_rls_rule_who_authenticated?: string;
-    studio_rls_rule_who_registered?: string;
-    studio_rls_rule_rows?: string;
-    studio_rls_rule_writes?: string;
-    studio_rls_rule_redacted?: string;
-    /** Button that reloads the tables after the schema file changed on disk */
-    schema_edit_reload?: string;
-    /** Shown when a schema file changed on disk after the edit was prepared */
-    schema_edit_file_changed?: string;
-    /** Shown above the problems when a schema edit would leave a schema that does not compile */
-    schema_edit_does_not_compile?: string;
-    /** Shown for a field the schema editor reads as written in code */
-    schema_field_edited_in_code?: string;
-    /** Caption of the slug and table fields of an existing table */
-    schema_rename_is_a_migration?: string;
-    /** Why a Firestore collection is read-only in the collection editor; {{slug}} is its slug */
-    schema_external_collection_read_only?: string;
     /** Title of the confirmation before a table's inherited rules are replaced by its own */
     schema_rules_detach_title?: string;
     /** Body of that confirmation; {{table}} is the table slug */
@@ -1254,60 +1220,24 @@ export interface RebaseTranslations {
     studio_policy_help_got_it?: string;
 
     // ─── Studio: UI Actions ──────────────────────────────────────
-    studio_add_kanban_column?: string;
-    studio_add_kanban_column_title?: string;
-    studio_add_kanban_column_name?: string;
     studio_add_kanban_column_name_placeholder?: string;
-    studio_add_kanban_column_add?: string;
-    studio_add_kanban_column_cancel?: string;
     studio_collection_view_sql?: string;
     studio_collection_view_admin?: string;
     studio_editor_collection_tooltip?: string;
-    studio_editor_collection_no_permission?: string;
     studio_editor_collection_start_tooltip?: string;
     studio_editor_collection_start_no_permission?: string;
     studio_editor_collection_start_copied?: string;
     studio_editor_entity_tooltip?: string;
-    studio_editor_entity_no_permission?: string;
     studio_home_edit_collection?: string;
     studio_home_delete_collection?: string;
-    studio_home_confirm_delete_title?: string;
     studio_home_confirm_delete_body?: string;
     studio_kanban_setup?: string;
     studio_missing_reference?: string;
-    studio_missing_reference_create?: string;
-    studio_new_collection?: string;
     studio_new_collection_card?: string;
-    studio_new_collection_no_permission?: string;
-    studio_property_add_column?: string;
     studio_property_add_column_no_permission?: string;
-    studio_add_kanban_column_desc?: string;
-    studio_add_kanban_column_adding?: string;
-    studio_add_kanban_column_exists?: string;
-    studio_add_kanban_column_not_enum?: string;
     studio_collection_view_edit?: string;
-    studio_editor_collection_disabled?: string;
-    studio_editor_collection_edit?: string;
-    studio_editor_entity_save_first?: string;
-    studio_editor_entity_edit_schema?: string;
-    studio_editor_collection_start_save_filter?: string;
-    studio_editor_collection_start_clear_filter?: string;
-    studio_editor_collection_start_reset_filter?: string;
-    studio_editor_collection_start_saved?: string;
-    studio_home_duplicate_collection?: string;
-    studio_home_delete?: string;
-    studio_home_confirm_delete_no_data?: string;
-    studio_home_collection_deleted?: string;
-    studio_kanban_configure?: string;
-    studio_missing_reference_error?: string;
-    studio_new_collection_add?: string;
-    studio_tool_schema?: string;
     studio_tool_schema_description?: string;
     studio_js_tables_tab?: string;
-    studio_collections_editor_empty?: string;
-    studio_collections_editor_pick?: string;
-    studio_collections_editor_read_only?: string;
-    studio_collections_editor_unsaved?: string;
 
     // ─── Schema change dialog ────────────────────────────────
     schema_change_title_review?: string;
@@ -1356,58 +1286,20 @@ export interface RebaseTranslations {
     studio_api_explorer_spec_failed_body?: string;
 
     // ─── Property field labels ──────────────────────────────────
-    db_column_type?: string;
-    primary_key_unique_id?: string;
-    spread_children_as_columns?: string;
     mode?: string;
     timezone?: string;
-    target_collection?: string;
 
     // ─── Column type and primary key selects ─────────────────
-    column_type_default?: string;
-    column_type_uuid_forced?: string;
-    column_type_varchar?: string;
-    column_type_text?: string;
-    column_type_char?: string;
-    column_type_timestamp?: string;
-    column_type_caption_string?: string;
-    column_type_caption_number?: string;
-    column_type_caption_date?: string;
-    primary_key_manual?: string;
-    primary_key_generated_string?: string;
-    primary_key_identity?: string;
-    primary_key_increment?: string;
-    primary_key_strategy?: string;
-    primary_key_caption?: string;
 
     // ─── Storage property ───────────────────────────────────────
-    storage_file_name?: string;
-    storage_path?: string;
-    storage_max_size?: string;
-    storage_resize_mode?: string;
-    storage_output_format?: string;
-    storage_max_width?: string;
-    storage_max_height?: string;
-    storage_quality?: string;
     storage_file_upload_config?: string;
     storage_image_resize_config?: string;
     storage_all_file_types?: string;
     storage_allowed_file_types?: string;
-    storage_include_bucket_url?: string;
-    storage_save_url?: string;
 
     // ─── DateTime property ──────────────────────────────────────
-    datetime_automatic_value?: string;
 
     // ─── Date property selects ───────────────────────────────
-    datetime_mode_date_time?: string;
-    datetime_mode_date?: string;
-    datetime_auto_value_none?: string;
-    datetime_auto_value_on_create?: string;
-    datetime_auto_value_on_update?: string;
-    datetime_auto_value_caption?: string;
-    datetime_timezone_local?: string;
-    datetime_timezone_caption?: string;
 
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior?: string;
@@ -1484,6 +1376,12 @@ export interface RebaseTranslations {
     studio_tool_logs_description?: string;
     studio_tool_api_keys?: string;
     studio_tool_api_keys_description?: string;
+    studio_tool_tables?: string;
+    studio_tool_tables_description?: string;
+    studio_tool_webhooks?: string;
+    studio_tool_webhooks_description?: string;
+    studio_tool_users?: string;
+    studio_tool_users_description?: string;
     studio_backups_denied_title?: string;
     studio_backups_denied_hint?: string;
     studio_backups_read_failed?: string;
@@ -1935,5 +1833,4 @@ export interface RebaseTranslations {
     select_row?: string;
     relation_open_record?: string;
     select?: string;
-    open_view?: string;
 }

@@ -41,17 +41,22 @@ ${chalk.bold("Usage")}
   rebase apps list             List declared apps and their build outputs
   rebase apps init             Write a rebase.json inferred from this project
   rebase apps config <app>     Print the client configuration for an app
+  rebase apps add admin        Add the admin panel to a project that has none: frontend/,
+                               its workspace and its app in rebase.json, as rebase init
+                               scaffolds them, pinned to the project's @rebasepro version
 
 ${chalk.bold("Options")}
   --json                       Machine-readable output
   --force                      Replace an existing rebase.json (apps init), keeping
                                each app's name, path and cms
+  --path <path>                Where the admin is served (apps add): a path or an https URL.
+                               Default /, or /admin when another app is at /
   -h, --help                   Show this help
 `.trim());
 }
 
 /** Everything the switch below dispatches, for the did-you-mean. */
-export const APPS_SUBCOMMANDS = ["list", "init", "config"] as const;
+export const APPS_SUBCOMMANDS = ["list", "init", "config", "add"] as const;
 
 export async function appsCommand(subcommand: string | undefined, rawArgs: string[] = []): Promise<void> {
     // Help is answered before parsing, so `rebase apps config --help` prints the
@@ -67,7 +72,8 @@ export async function appsCommand(subcommand: string | undefined, rawArgs: strin
     const { flags: args, positionals } = parseCommandArgs({
         spec: {
             "--json": Boolean,
-            "--force": Boolean
+            "--force": Boolean,
+            "--path": String
         },
         rawArgs,
         commandWords: 1,
@@ -85,7 +91,7 @@ export async function appsCommand(subcommand: string | undefined, rawArgs: strin
                 // whole manifest inferred, which is not what the reader asked for.
                 console.error(chalk.red(`✗ rebase apps init takes no app name (got "${positionals[1]}").`));
                 console.error(chalk.dim("  It infers every app from this project and writes the whole rebase.json."));
-                console.error(chalk.dim("  To add one app, declare it under \"apps\" in rebase.json."));
+                console.error(chalk.dim("  To add one app, declare it under \"apps\" in rebase.json; to add the admin panel, run rebase apps add admin."));
                 process.exit(1);
             }
             await initManifest(Boolean(args["--force"]));
@@ -93,6 +99,13 @@ export async function appsCommand(subcommand: string | undefined, rawArgs: strin
         case "config":
             await printAppConfig(positionals[1], Boolean(args["--json"]));
             break;
+        case "add": {
+            // Loaded here: it builds from init's templates, and `apps list`
+            // should not pay for loading the scaffolder.
+            const { addApp } = await import("./apps-add");
+            await addApp(positionals[1], { path: args["--path"], json: Boolean(args["--json"]) });
+            break;
+        }
         default:
             unknownCommand(subcommand, APPS_SUBCOMMANDS, "apps");
     }
@@ -190,12 +203,13 @@ function sameRoot(a: string, b: string): boolean {
  *
  * An inferred app takes the name the file gives the app it matches — the
  * backend, or the static app with the same `root` — and that app's `path`,
- * `cms`, `routes` and `frameAncestors`. The name is the app's identity on a
- * deployed project, so renaming it would deploy a second app beside the first.
- * `path` can carry the hostname the app is registered on. `cms` is a client-side
- * route that nothing in the project shows, and the routes and the origins that
- * may frame the app are decisions nothing in the project records. Everything
- * else is inferred again, which is what `--force` asks for.
+ * `cms`, `routes`, `frameAncestors`, `redirects` and `cleanUrls`. The name is
+ * the app's identity on a deployed project, so renaming it would deploy a
+ * second app beside the first. `path` can carry the hostname the app is
+ * registered on. `cms` is a client-side route that nothing in the project
+ * shows, and the routes, redirects and the origins that may frame the app are
+ * decisions nothing in the project records. Everything else is inferred
+ * again, which is what `--force` asks for.
  *
  * A declared app the inference does not find is returned in `removed`, so the
  * command can say so rather than drop it in silence.
@@ -230,7 +244,9 @@ function keepDeclaredIdentity(
             ...(address !== undefined ? { path: address } : {}),
             ...(declaredApp.cms !== undefined ? { cms: declaredApp.cms } : {}),
             ...(declaredApp.routes !== undefined ? { routes: declaredApp.routes } : {}),
-            ...(declaredApp.frameAncestors !== undefined ? { frameAncestors: declaredApp.frameAncestors } : {})
+            ...(declaredApp.frameAncestors !== undefined ? { frameAncestors: declaredApp.frameAncestors } : {}),
+            ...(declaredApp.redirects !== undefined ? { redirects: declaredApp.redirects } : {}),
+            ...(declaredApp.cleanUrls !== undefined ? { cleanUrls: declaredApp.cleanUrls } : {})
         };
     }
 

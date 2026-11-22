@@ -12,6 +12,7 @@ import {
     lazyChunk,
     Tab,
     Tabs,
+    Typography,
     XIcon
 } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
@@ -120,8 +121,8 @@ export function EntityInspector({
         role={"complementary"}
         aria-label={t("inspect_record") ?? "Inspect record"}>
 
-            <div className={cls("h-11 shrink-0 flex items-center gap-2 pl-4 pr-1.5 border-b", defaultBorderMixin)}>
-                <span className={"text-sm font-semibold"}>{t("inspect") ?? "Inspect"}</span>
+            <div className={cls("h-10 shrink-0 flex items-center gap-2 pl-4 pr-1.5 border-b", defaultBorderMixin)}>
+                <Typography variant="body2" className="font-semibold">{t("inspect") ?? "Inspect"}</Typography>
 
                 <div className={"flex-1"}/>
 

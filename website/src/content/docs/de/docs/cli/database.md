@@ -1,5 +1,5 @@
 ---
-sourceHash: 535fb9801df93ad9
+sourceHash: 231870126ca746bf
 title: Datenbankbefehle
 sidebar_label: Datenbankbefehle
 description: Die rebase db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, Abrufen einer Kopie, der Verbindungs-String, die verwaltete Entwicklungsdatenbank und Branches.
@@ -39,6 +39,25 @@ Views, selbst geschriebene Indizes sowie die CHECK- und EXCLUDE-Constraints auf 
 Tabelle, die eine Deklaration nicht ausdrücken kann. Siehe
 [`rebase db push`](/docs/cli/schema/#rebase-db-push) für Details darüber, was angewendet wird und
 wovor gestoppt wird.
+
+Das SQL, das eine Tabellendeklaration nicht ausdrücken kann (Funktionen, Trigger, CHECK-Constraints,
+Grants), gehört in `backend/sql/*.sql`. Der Push wendet diese Dateien in Namensreihenfolge an, nach den
+Tabellen und Views und vor den Policies, sodass eine Policy eine Funktion aufrufen kann, die eine Datei
+definiert. Jede Datei wird mit Namen und Hash in `rebase.sql_files` erfasst und läuft nur erneut, wenn
+sie sich ändert, jeweils in einer eigenen Transaktion: Eine Datei, die fehlschlägt, wird zurückgerollt
+und stoppt den Push. Schreiben Sie Dateien, die sich gefahrlos erneut ausführen lassen
+(`CREATE OR REPLACE FUNCTION`, `DROP TRIGGER IF EXISTS` vor `CREATE TRIGGER`). Eine Datei, deren Name mit
+`_` beginnt, ist ein Entwurf und wird nicht angewendet. Das Entfernen einer Datei macht nichts rückgängig,
+was sie getan hat. `--dry-run` listet die Dateien auf, die es anwenden würde.
+
+Ein Deploy wendet dieselben Dateien an: `rebase build` legt sie ins Bundle, und der Boot des Servers
+führt jede neue oder geänderte Datei nach den Tabellen und der Authentifizierung und vor den Policies aus,
+erfasst in derselben `rebase.sql_files`. Die Transaktion jeder Datei nimmt zuerst einen Advisory Lock,
+sodass mehrere gemeinsam startende Instanzen oder ein Push während eines Deploys jede Datei einmal
+ausführen. Eine Datei darf 15 Minuten laufen. Eine Datei, die fehlschlägt, stoppt den Boot und nennt die
+Datei. `rebase dev` wendet sie ebenfalls beim Boot an. Eine Anwendung, die ihr eigenes Backend baut,
+benennt das Verzeichnis mit `createPostgresAdapter({ sqlDir: "backend/sql" })`. Mit
+`REBASE_PROVISION=false` oder `REBASE_MIGRATE_ON_BOOT=none` wird nichts angewendet.
 
 :::caution
 `db push` ändert die Datenbank direkt ohne Migrationsdateien. Verwende `db generate` + `db migrate` für die Produktion.

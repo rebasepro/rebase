@@ -12,7 +12,7 @@
  * hands you the original as `OriginalComponent`.
  */
 import React, { useState } from "react";
-import type { AuthControllerExtended } from "@rebasepro/cms-types";
+import type { AuthControllerExtended } from "@rebasepro/cms";
 import { Button, Card, TextField, Typography } from "@rebasepro/ui";
 
 export function BrandedLoginView({ authController }: { authController: AuthControllerExtended }) {

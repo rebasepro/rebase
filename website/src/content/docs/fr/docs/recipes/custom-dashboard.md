@@ -1,19 +1,19 @@
 ---
-sourceHash: a9c03468852b95e3
+sourceHash: d60e60304904c8c2
 title: "Recette : Tableau de bord personnalisé"
 sidebar_label: Tableau de bord personnalisé
-description: "Créer une page de tableau de bord avec des KPI et des graphiques — chiffres calculés en SQL, dessinés avec les briques de @rebasepro/ui."
+description: "Créez une page de tableau de bord avec des tuiles KPI et des graphiques — chiffres calculés en SQL, affichés avec les blocs de @rebasepro/ui."
 ---
 
-## Aperçu
+## Vue d'ensemble
 
-Un tableau de bord tient en trois pièces : une fonction backend qui calcule les chiffres en SQL, un composant qui les charge avec `useInsightData` et les dessine avec les briques de `@rebasepro/ui`, et un endroit où l'afficher — ici, une page à part dans le menu latéral.
+Un tableau de bord se compose de trois éléments : une fonction backend qui calcule les chiffres en SQL, un composant qui les charge avec `useInsightData` et les affiche à l'aide des blocs de `@rebasepro/ui`, et un emplacement pour le présenter — ici, une page dédiée dans le volet latéral.
 
-Comptez sur le serveur. Charger les lignes dans le navigateur pour les additionner n'est juste que tant que la table tient dans une page de résultats ; au-delà, le total est faux sans prévenir.
+Effectuez les calculs sur le serveur. Récupérer les lignes dans le navigateur pour les additionner n'est approprié que tant que la table tient sur une seule page de résultats ; au-delà, le total sera silencieusement erroné.
 
 ## Calculer les chiffres sur le serveur
 
-Une route par élément dessiné, exécutée en tant qu'utilisateur connecté, pour que les permissions et la sécurité au niveau des lignes s'appliquent aussi aux chiffres :
+Une route par élément affiché par la page, exécutée en tant qu'utilisateur connecté, afin que les permissions et la sécurité au niveau des lignes s'appliquent également aux chiffres :
 
 ```ts
 // functions/dashboard.ts
@@ -55,9 +55,9 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-## Les dessiner
+## Les afficher
 
-`useInsightData(key, load)` charge une fois par clé et par utilisateur, et chaque composant qui lit la même clé partage le résultat. Les briques dessinent elles-mêmes leurs états de chargement, d'erreur et vide :
+`useInsightData(key, load)` effectue le chargement une seule fois par clé et par utilisateur connecté, et chaque composant lisant la même clé partage le résultat. Les blocs gèrent d'eux-mêmes leurs états de chargement, d'erreur et de données vides :
 
 ```tsx
 import { useRebaseClient } from "@rebasepro/app";
@@ -111,7 +111,7 @@ function DashboardView() {
 }
 ```
 
-Les mêmes composants peuvent aussi se placer au-dessus de la liste d'une collection ou en haut de la page d'accueil via `<Rebase slots>` — `collection.widgets`, `home.children.start` — plutôt que sur une page à part.
+Ces mêmes composants peuvent être placés au-dessus de la liste d'une collection ou en haut de la page d'accueil via `<Rebase slots>` — `collection.widgets`, `home.children.start` — au lieu d'avoir leur propre page.
 
 ## Enregistrer en tant que vue personnalisée
 
@@ -146,17 +146,17 @@ Le tableau de bord apparaît désormais dans la barre latérale sous « Analytic
 
 ### Épingler le groupe en bas
 
-Les groupes nommés `"Admin"` ou `"Settings"` se placent sous les autres dans le volet latéral, par comparaison de chaînes sur le nom. Cela peut facilement être perdu — traduisez le libellé et l'agencement cesse silencieusement de s'appliquer — indiquez-le donc plutôt explicitement :
+Les groupes nommés `"Admin"` ou `"Settings"` sont relégués sous les autres dans le volet, par comparaison de chaînes sur le nom. Cela peut facilement être perdu — traduisez le libellé et le tri cesse silencieusement de s'appliquer — indiquez-le donc explicitement à la place :
 
 ```tsx
 { slug: "dashboard", name: "Dashboard", view: <DashboardView />, group: "Ajustes", pinToBottom: true }
 ```
 
-Définir `pinToBottom` sur n'importe quelle vue d'un groupe épingle l'ensemble du groupe, puisque le volet ordonne les groupes plutôt que les vues individuelles.
+Définir `pinToBottom` sur l'une des vues d'un groupe épingle l'ensemble du groupe, puisque le volet ordonne les groupes plutôt que les vues individuelles.
 
 ## Naviguer depuis une vue personnalisée
 
-Un composant de vue ne reçoit aucune prop. Pour naviguer vers un autre emplacement — une autre vue personnalisée, une collection, une entité — faites appel à `useUrlController`, qui est exporté depuis `@rebasepro/cms` :
+Un composant de vue ne reçoit aucune prop. Pour naviguer vers un autre endroit — une autre vue personnalisée, une collection, une entité — faites appel à `useUrlController`, exporté depuis `@rebasepro/cms` :
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
@@ -184,9 +184,9 @@ Construisez le chemin plutôt que de le coder en dur : les URL de collection son
 
 `useSidePanel` ouvre une entité dans le panneau latéral au lieu de naviguer, ce qui correspond généralement au comportement souhaité pour une ligne dans une liste.
 
-## Des graphiques qui ouvrent leurs enregistrements
+## Graphiques et indicateurs qui ouvrent leurs enregistrements
 
-`BarChart` dessine des catégories en barres, avec leur valeur à côté. Avec `onBarClick`, chaque ligne devient un bouton : ouvrez la liste filtrée sur ce que compte la barre, ou un enregistrement dans le panneau latéral.
+`BarChart` affiche les catégories sous forme de barres avec leurs valeurs à côté. En fournissant `onBarClick`, chaque ligne devient un bouton : ouvrez la liste filtrée selon ce que la barre comptabilise, ou un enregistrement individuel dans le panneau latéral.
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
@@ -209,10 +209,27 @@ function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; 
 }
 ```
 
-Les graphiques sont en SVG, avec les tokens de l'admin, en clair et en sombre, avec une lecture au survol et aux flèches du clavier, et un tableau pour les lecteurs d'écran ; aucune bibliothèque de graphiques n'est nécessaire. Pour une forme qu'ils ne dessinent pas, n'importe quelle bibliothèque de graphiques React fonctionne dans une `ChartCard`.
+Une tuile `KpiTile` ouvre ses enregistrements de la même manière. Avec `onClick`, l'ensemble de la tuile devient un bouton ; avec `href`, il s'agit d'un lien, qu'un clic avec touche modificatrice ouvre dans un nouvel onglet et qu'un clic simple transmet à `onClick`, de sorte que le routeur d'administration navigue sans recharger la page :
+
+```tsx
+const pending = `${urls.buildUrlCollectionPath("orders")}?status_op=${encodeURIComponent("==")}&status_value=pending`;
+
+<KpiTile
+    label="Pending orders"
+    icon="Inbox"
+    value={counts?.pending}
+    loading={loading}
+    href={pending}
+    onClick={() => urls.navigate(pending)}
+/>
+```
+
+Sans l'un ou l'autre, la tuile est une simple carte. N'englobez pas une tuile dans votre propre `<button>` ou `<a>` : le contrôle de la tuile est nommé par son libellé, sa valeur et son évolution, et gère le contour de focus.
+
+Les graphiques sont en SVG utilisant les tokens de l'interface d'administration, en mode clair et sombre, avec une lecture au survol et aux touches fléchées, ainsi qu'un tableau pour les lecteurs d'écran ; aucune bibliothèque de graphiques n'est nécessaire. Pour un format qu'ils ne prennent pas en charge, n'importe quelle bibliothèque de graphiques React fonctionne à l'intérieur d'un `ChartCard`.
 
 ## Prochaines étapes
 
-- **[Vues personnalisées](/docs/frontend)** — Aperçu du frontend
+- **[Vues personnalisées](/docs/frontend)** — Vue d'ensemble du frontend
 - **[Référence des hooks](/docs/hooks)** — Hooks disponibles
 - **[Slots](/docs/frontend/slots)** — Placer les mêmes composants sur la page d'accueil ou au-dessus d'une collection

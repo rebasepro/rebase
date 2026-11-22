@@ -219,6 +219,14 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 render the same key above their walls; the home wall had none. */}
             <p class="mb-8 text-center text-sm text-tone-400">{t("social.title")}</p>
             <ClientLogos />
+            {/* Where the company and the servers are: the sovereignty argument
+                in one line, on the page every visitor sees. /europe argues it. */}
+            <div class="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-3 px-6 text-center">
+                <p class="text-sm leading-relaxed text-tone-400">{t("trust.europe")}</p>
+                <a href={translatePath("/europe")} class="accent-link">
+                    {t("trust.europe.link")} <ArrowRight size={14} />
+                </a>
+            </div>
         </div>
 
         <!-- No divider between the wall and chapter 01, in either arm of the

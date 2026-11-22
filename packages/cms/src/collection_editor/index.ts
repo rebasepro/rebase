@@ -9,9 +9,6 @@
 
 
 export {
-    useCollectionEditorController
-} from "./useCollectionEditorController";
-export {
     useCollectionsConfigController
 } from "./useCollectionsConfigController";
 export {
@@ -50,54 +47,5 @@ export type {
 } from "./serializable_types";
 
 export type {
-    PropertyTypePreset,
-    PropertyType,
-    CollectionEditorTab,
-    CollectionEditorExtensionProps,
-    ExtraPropertyFieldsParams,
-    ExtraCollectionFieldsParams,
-} from "./extensibility_types";
-
-export {
-    validateCollectionJson,
-    type CollectionValidationError,
-    type CollectionValidationResult
-} from "./validateCollectionJson";
-
-export type {
     CollectionsConfigController, DeleteCollectionParams, SaveCollectionParams, UpdateCollectionParams, CollectionsSetupInfo, UpdatePropertiesOrderParams, UpdateKanbanColumnsOrderParams, ImportedTable
 } from "./types/config_controller";
-export type {
-    CollectionEditorController
-} from "./types/collection_editor_controller";
-
-export type {
-    CollectionInference
-} from "./types/collection_inference";
-
-export {
-    buildCollectionGenerationCallback,
-    CollectionGenerationApiError,
-    DEFAULT_COLLECTION_GENERATION_ENDPOINT
-} from "./api/generateCollectionApi";
-
-export type {
-    CollectionGenerationCallback,
-    GenerateCollectionRequest,
-    GenerateCollectionResult,
-    CollectionOperation,
-    CollectionOperationType,
-    BuildCollectionGenerationCallbackProps
-} from "./api/generateCollectionApi";
-
-export { MissingReferenceWidget } from "./ui/MissingReferenceWidget";
-
-export * from "./ui/collection_editor/util";
-
-// Re-export types only from heavy UI components (runtime code is in the separate chunk)
-export type { CollectionEditorDialogProps } from "./ui/collection_editor/CollectionEditorDialog";
-export type { CollectionStudioViewProps } from "./ui/collection_editor/CollectionStudioView";
-export type { CollectionsStudioViewProps } from "./ui/collection_editor/CollectionsStudioView";
-export type { RouterCollectionStudioViewProps } from "./ui/collection_editor/RouterCollectionStudioView";
-export type { RouterCollectionsStudioViewProps } from "./ui/collection_editor/RouterCollectionsStudioView";
-export type { PropertyFormProps, OnPropertyChangedParams } from "./ui/collection_editor/PropertyEditView";

@@ -46,9 +46,9 @@ import {
     requireProject,
     requireSessionClient,
     success,
-    TOKEN_ENV,
-    type CloudClient
+    TOKEN_ENV
 } from "./context";
+import { announceOrgScope, linkedProjectOrg, NO_ORG_HINT, projectOrganization } from "./org-scope";
 
 /** Every action the group dispatches. */
 export const TOKENS_ACTIONS = ["list", "create", "revoke"] as const;
@@ -114,18 +114,6 @@ export function parseCapabilities(values: readonly string[] | undefined): Reques
     return { project: words.filter(isTokenCapability), org: words.filter(isOrgCapability) };
 }
 
-/** The organization a project belongs to, or undefined when its row does not say. */
-async function projectOrganization(client: CloudClient, projectId: string): Promise<string | undefined> {
-    try {
-        const row = (await client.data.table("projects").findById(projectId)) as Record<string, unknown> | undefined;
-        const raw = row?.organization ?? row?.organizationId ?? row?.organization_id;
-        if (raw && typeof raw === "object" && "id" in raw) return String((raw as { id: unknown }).id);
-        return raw == null || raw === "" ? undefined : String(raw);
-    } catch {
-        return undefined;
-    }
-}
-
 /**
  * `--expires-in <days>` as an ISO timestamp, or null for a token that does not
  * expire.
@@ -159,16 +147,24 @@ async function createToken(rawArgs: string[]): Promise<void> {
     // organization's billing alone needs none.
     const projectId = capabilities.length > 0 ? await requireProject(rawArgs, client) : undefined;
     const projectRef = projectId ? displayProjectRef(rawArgs) || projectId : undefined;
-    // The organization: --org, else the project's own, else the selected one.
+    // The organization: --org, else the project's own, else the selected one,
+    // else the linked project's.
     let organizationId: string | undefined;
     if (orgCapabilities.length > 0) {
         organizationId = flags["--org"]?.trim()
             || (projectId ? await projectOrganization(client, projectId) : undefined)
             || getContextOrg(url);
         if (!organizationId) {
+            const linked = await linkedProjectOrg(client, url);
+            if (linked) {
+                announceOrgScope({ org: linked.org, source: "linked_project", project: linked.project });
+                organizationId = linked.org;
+            }
+        }
+        if (!organizationId) {
             fail(
                 `Say which organization ${orgCapabilities.join(", ")} ${orgCapabilities.length === 1 ? "is" : "are"} for.`,
-                "Pass --org <id>, or select one with `rebase cloud use`.",
+                NO_ORG_HINT,
                 "no_org"
             );
         }

@@ -1,34 +1,35 @@
 ---
-sourceHash: b26bc6f688a4ec9b
+sourceHash: 10e6c0404ca260a3
 title: Estructura del proyecto
 sidebar_label: Estructura del proyecto
-description: "La estructura de un proyecto Rebase: las tablas en backend/schema, los módulos del backend que lee el runtime y las personalizaciones del panel de administración en frontend/src/cms, con y sin el panel."
+description: "La estructura de un proyecto Rebase: las tablas en backend/schema, los módulos de backend que lee el runtime y las personalizaciones del panel de administración en frontend/src/cms, con y sin el panel."
 ---
 
-:::note[Seis palabras que utiliza esta página]
-Cada una de ellas significa algo específico aquí, y la mayoría significa algo diferente en otros lugares de la industria.
+:::note[Seis términos que utiliza esta página]
+Cada uno de ellos significa algo específico aquí, y la mayoría significa algo
+diferente en otros lugares de la industria.
 
 - **Table** — una tabla de Postgres, declarada en TypeScript con `defineTable` en
-  `backend/schema/`. El SQL, las políticas de seguridad a nivel de fila (row-level security), la API, los
-  tipos del SDK y los valores predeterminados del panel de administración provienen de ella.
+  `backend/schema/`. El SQL, las políticas de seguridad a nivel de fila, la API,
+  los tipos del SDK y los valores predeterminados del panel de administración provienen de ella.
 - **Collection** — lo que muestra el panel de administración: una tabla renderizada como una lista y un
   formulario, personalizada en `frontend/src/cms/`, o una colección de Firestore que el panel
   lee directamente.
-- **Studio** — la parte para desarrolladores del panel de administración: editor de esquemas, consola SQL,
-  explorador de políticas. La misma aplicación que utiliza tu equipo de contenido, detrás de un interruptor.
-- **Managed runtime** — la imagen publicada `rebasepro/server` inicia tu
-  proyecto. No escribes ningún archivo de servidor y obtienes actualizaciones del runtime sin necesidad de
-  recompilar. La alternativa es `rebase eject`, más abajo.
-- **Bundle** — lo que produce `rebase build`: tus tablas, funciones y crons,
-  compilados, con un manifiesto que indica dónde se encuentra cada uno. Es lo que inicia el
-  runtime administrado.
-- **Resource** — algo que el proyecto necesita del lugar donde se ejecuta: una base de datos,
-  un bucket, un topic. Declarado en `backend/resources.ts`, vinculado mediante variables de
-  entorno.
+- **Studio** — la mitad para desarrolladores del panel de administración: editor de esquemas, consola
+  SQL, explorador de políticas. La misma aplicación que utiliza su equipo de contenido, detrás de un selector.
+- **Managed runtime** — la imagen publicada `rebasepro/server` arranca su
+  proyecto. No escribe ningún archivo de servidor y obtiene actualizaciones de runtime sin necesidad
+  de reconstruir. La alternativa es `rebase eject`, más abajo.
+- **Bundle** — lo que produce `rebase build`: sus tablas, funciones y crons,
+  compilados, con un manifiesto que indica dónde se encuentra cada uno. Es lo que arranca el
+  runtime gestionado.
+- **Resource** — algo que el proyecto necesita de dondequiera que se ejecute: una base de datos,
+  un bucket, un topic. Declarado en `backend/resources.ts`, vinculado mediante
+  variables de entorno.
 :::
 
-`rebase init` genera una de dos estructuras iniciales. Ambas tienen el mismo `backend/`; la
-diferencia radica en si el proyecto incluye o no el panel de administración.
+`rebase init` genera una estructura inicial con uno de dos diseños. Ambos tienen el mismo `backend/`; la
+diferencia radica en si el proyecto incluye el panel de administración o no.
 
 **Con el panel de administración** (por defecto):
 
@@ -64,8 +65,8 @@ my-app/
 ```
 
 **Solo backend** (`rebase init --headless`): el mismo `backend/`, sin
-`frontend/` — y tampoco `backend/schema/`. El servidor lee las tablas de la
-propia base de datos al arrancar y sirve cada una que tenga habilitada la seguridad a nivel de fila. Consulta
+`frontend/` y tampoco `backend/schema/`. El servidor lee las tablas de la
+propia base de datos al arrancar y sirve cada una que tenga habilitada la seguridad a nivel de fila. Consulte
 [Solo backend](/docs/getting-started/headless/).
 
 ```
@@ -78,37 +79,37 @@ my-api/
     └── functions/
 ```
 
-Aparecen dos archivos más cuando los necesitas, y el runtime lee ambos:
+Aparecen dos archivos más cuando los necesita, y el runtime lee ambos:
 `backend/hooks.ts`, cuya exportación `hooks` se ejecuta para cada tabla
 ([Hooks globales](/docs/backend/hooks/)), y `backend/crons/`, para tareas
 programadas. `rebase generate-sdk --register` añade `backend/generated/`.
 
-`tsc --noEmit` en la raíz comprueba `scripts/`; en `backend/` o `frontend/`
-comprueba ese workspace específico. No hay un paquete `config/` separado: el frontend
-importa una tabla de `backend/schema` solo como un tipo (`import type`). Una importación
-de valor de cualquier cosa bajo `backend/` enviaría código del servidor —hooks y los
-secretos que leen— al navegador, por lo que `rebaseBackendGuard()` de
-`@rebasepro/app/vitePlugin`, en el `frontend/vite.config.ts` del scaffold, hace fallar
-`vite build` y `vite dev` cuando cualquier cosa resuelve hacia `backend/`, indicando el
+`tsc --noEmit` en la raíz verifica `scripts/`; en `backend/` o `frontend/`
+verifica ese workspace. No hay un paquete `config/` separado: el frontend
+importa una tabla de `backend/schema` únicamente como tipo (`import type`). Una
+importación por valor de cualquier elemento bajo `backend/` enviaría código del servidor —hooks
+y los secretos que leen— al navegador, por lo que `rebaseBackendGuard()` de
+`@rebasepro/app/vitePlugin`, en el `frontend/vite.config.ts` inicial, hace que fallen
+`vite build` y `vite dev` cuando algo resuelve hacia `backend/`, indicando el
 importador, la importación y el archivo. `rebase build` rechaza un frontend que no lo
-incluya. Para añadirlo a un proyecto existente, impórtalo y agrega `rebaseBackendGuard()`
+tenga. Para agregarlo a un proyecto existente, impórtelo y añada `rebaseBackendGuard()`
 a `plugins` en `frontend/vite.config.ts`.
 
-:::note[No existe `backend/src/index.ts`]
+:::note[No hay un `backend/src/index.ts`]
 Y ningún `Dockerfile`. Un proyecto generado declara `runtime: "managed"` en
-`rebase.json`, lo que significa que la **imagen publicada de `rebasepro/server` arranca tu
-proyecto como un bundle** —el mismo artefacto tanto si lo autoalojas como si lo despliegas
-en Rebase Cloud. Configuras el servidor mediante `rebase.json`, los archivos en
+`rebase.json`, lo que significa que la **imagen publicada de `rebasepro/server` arranca su
+proyecto como un bundle** —el mismo artefacto tanto si lo aloja usted mismo como si lo despliega
+en Rebase Cloud. Configura el servidor a través de `rebase.json`, los archivos en
 `backend/` y variables de entorno en lugar de escribir un punto de entrada.
 
-Si deseas tener el control total del proceso —tus propios middlewares, tus propias rutas, tu
-propia configuración de autenticación—, `rebase eject` genera el punto de entrada, un Dockerfile y un
-archivo compose que los construye. Consulta [Integración de servidor personalizado](/docs/backend/custom-server).
+Si desea tener el control total del proceso —su propio middleware, sus propias rutas, su propia
+configuración de autenticación— `rebase eject` escribe el punto de entrada, un Dockerfile y un
+archivo compose que los compila. Consulte [Integración de servidor personalizado](/docs/backend/custom-server).
 :::
 
 ## Tablas (`backend/schema/`)
 
-Las tablas son la **única fuente de verdad** para tu modelo de datos:
+Las tablas son la **única fuente de verdad** para su modelo de datos:
 
 ```typescript title="backend/schema/products.ts"
 import { defineTable, col } from "@rebasepro/server/schema";
@@ -125,13 +126,13 @@ export const products = defineTable("products", {
 
 El nombre se convierte en el endpoint REST (`/api/data/products`), el nombre de la tabla en
 Postgres y la ruta del panel; `table` y `slug` los sobrescriben. `rls` es
-obligatorio. Una tabla se toma en cuenta una vez que `backend/schema/index.ts` la exporta — un
-`defineTable` que el índice omita impedirá el arranque. [Tablas](/docs/schema/)
+obligatorio. Una tabla se toma en cuenta una vez que `backend/schema/index.ts` la exporta; un
+`defineTable` que el index omita impedirá el arranque. [Tablas](/docs/schema/)
 cubre todas las opciones.
 
 ## Frontend (`frontend/`)
 
-El frontend es una aplicación estándar de **Vite + React + TypeScript**. El archivo clave es `App.tsx`, el cual conecta todos los controladores de Rebase:
+El frontend es una aplicación estándar de **Vite + React + TypeScript**. El archivo clave es `App.tsx`, que conecta todos los controladores de Rebase:
 
 ```tsx title="frontend/src/App.tsx"
 import "@fontsource/jetbrains-mono";
@@ -147,7 +148,7 @@ import { postsCms } from "./cms/posts";
 import { authorsCms } from "./cms/authors";
 import { tagsCms } from "./cms/tags";
 import { usersCms } from "./cms/users";
-// How the collection editor laid out the tables in development (labels, columns, views).
+// The admin panel's shared layout for each table (labels, columns, views).
 import uiConfig from "./cms/ui-config.json";
 
 // `rebase dev` injects VITE_API_URL with the port it actually bound, and that
@@ -196,78 +197,78 @@ export function App() {
 ```
 
 `main.tsx` lo monta bajo un `basename` de `react-router` tomado de
-`import.meta.env.BASE_URL`, el cual `rebase build` establece a partir del `path` que
-declara esta aplicación en `rebase.json` — de modo que los assets, el enrutador y el servidor
-coincidan en un único valor sin necesidad de escribirlo tres veces.
+`import.meta.env.BASE_URL`, el cual `rebase build` establece a partir del `path` que esta aplicación
+declara en `rebase.json`, de modo que los assets, el enrutador y el servidor coincidan en
+un único valor sin tener que escribirlo tres veces.
 
 ### Conceptos clave
 
-- **`createRebaseClient`** — Crea el cliente SDK que gestiona las solicitudes HTTP, las conexiones WebSocket y la administración de tokens de autenticación. Llámalo una sola vez, en el alcance del módulo: dentro de un componente, incluso en un `useMemo`, `<React.StrictMode>` construye un segundo cliente en desarrollo
-- **`<RebaseCMS tableCustomizations>`** — el panel renderiza cada tabla que el backend sirve en `GET /api/schema/tables`; los objetos `customizeTable` de `frontend/src/cms/` modifican la apariencia de algunas de ellas, y `uiConfig` traslada lo que el editor de colecciones guardó en desarrollo. Consulta [Personalización de una tabla](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
-- **`useRebaseAuthController`** — Contiene el usuario autenticado y el ciclo de vida del token, y es lo que `<Rebase>` distribuye a todos los componentes que están debajo
+- **`createRebaseClient`** — Crea el cliente del SDK que gestiona las solicitudes HTTP, las conexiones WebSocket y la administración de tokens de autenticación. Llámelo una sola vez, a nivel de módulo: dentro de un componente, incluso en un `useMemo`, `<React.StrictMode>` crea un segundo cliente en desarrollo
+- **`<RebaseCMS tableCustomizations>`** — el panel renderiza cada tabla que el backend sirve en `GET /api/schema/tables`; los objetos `customizeTable` de `frontend/src/cms/` cambian la apariencia de algunas de ellas, y `uiConfig` transporta el diseño compartido desde `frontend/src/cms/ui-config.json`. Consulte [Personalizar una tabla](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
+- **`useRebaseAuthController`** — Mantiene el usuario autenticado y el ciclo de vida del token, y es lo que `<Rebase>` distribuye a todo lo que esté debajo de él
 
 ## Backend (`backend/`)
 
-No hay un archivo de servidor que leer, y así es por diseño: un proyecto generado
-declara `runtime: "managed"`, por lo que la imagen publicada de `rebasepro/server` arranca
-tu proyecto. Lo que contiene `backend/` es el código que el runtime recoge:
+No hay ningún archivo de servidor que leer, y así está diseñado: un proyecto generado
+declara `runtime: "managed"`, por lo que la imagen publicada `rebasepro/server` arranca
+su proyecto. Lo que contiene `backend/` es el código que el runtime utiliza:
 
 | Ruta | Qué es |
 |---|---|
-| `backend/schema/` | Las tablas y el `defaultRls` que exporta su índice |
-| `backend/resources.ts`, `backend/storage.ts`, `backend/hooks.ts` | Recursos declarados, `storageAuthorize` y hooks globales de tablas |
-| `backend/functions/` | Rutas personalizadas, montadas automáticamente en `/api/functions/<filename>` |
-| `backend/crons/` | Tareas programadas, descubiertas de la misma manera (créalo cuando necesites uno) |
-| `backend/src/schema.generated.ts` | El esquema de Drizzle de tus tablas: escrito por `rebase init` y regenerado en cada `rebase dev` y `rebase build` |
+| `backend/schema/` | Las tablas y el `defaultRls` que exporta su index |
+| `backend/resources.ts`, `backend/storage.ts`, `backend/hooks.ts` | Recursos declarados, `storageAuthorize` y hooks globales de tabla |
+| `backend/functions/` | Rutas personalizadas, automontadas en `/api/functions/<filename>` |
+| `backend/crons/` | Tareas programadas, detectadas de la misma manera (créela cuando necesite una) |
+| `backend/src/schema.generated.ts` | El esquema de Drizzle de sus tablas: generado por `rebase init` y regenerado en cada `rebase dev` y `rebase build` |
 
 El runtime configura:
 
 - **API REST** en `/api/data/*` — CRUD generado para cada tabla
-- **Autenticación (Auth)** en `/api/auth/*` — registro, inicio de sesión, refresco de token, OAuth
-- **Almacenamiento (Storage)** en `/api/storage/*` — subida y descarga de archivos
+- **Autenticación (Auth)** en `/api/auth/*` — registro, inicio de sesión, refresco, OAuth
+- **Almacenamiento (Storage)** en `/api/storage/*` — subida y descarga
 - **WebSocket** — sincronización en tiempo real mediante LISTEN/NOTIFY de Postgres
-- **Tus funciones y crons**, a partir de los directorios anteriores
+- **Sus funciones y crons**, desde los directorios anteriores
 
-La configuración proviene de `rebase.json`, los archivos en `backend/` y variables de
-entorno. Consulta [Entorno y configuración](/docs/getting-started/configuration).
+La configuración proviene de `rebase.json`, los archivos en `backend/` y las variables de
+entorno. Consulte [Entorno y configuración](/docs/getting-started/configuration).
 
 `rebase build` convierte todo esto en un **bundle** —las tablas, funciones y crons
-compilados junto con un manifiesto— que el runtime administrado arranca. Nada del bundle
-se escribe a mano; si deseas ver uno, [Runtime y bundles](/docs/architecture/runtime-and-bundles/)
-explica lo que contiene.
+compilados junto con un manifiesto— que el runtime gestionado arranca. Nada
+en el bundle se escribe a mano; si desea ver uno,
+[Runtime y bundles](/docs/architecture/runtime-and-bundles/) muestra su contenido.
 
 El panel que sirve el frontend tiene dos partes. **Studio** es la parte para desarrolladores —el
-editor de esquemas, la consola SQL, el explorador de políticas RLS— y se encuentra detrás del
-selector en el menú lateral desplegable, no como un despliegue independiente. Consulta [Studio](/docs/studio/).
+editor de esquemas, la consola SQL, el explorador de políticas RLS— y se encuentra detrás
+del selector en el menú lateral, no como un despliegue independiente. Consulte [Studio](/docs/studio/).
 
-Para tomar el control del proceso en su lugar —tus propios middlewares, rutas y
-configuración de autenticación—, ejecuta `rebase eject`. **Todo lo que se describe a continuación de este párrafo aplica únicamente a proyectos con "eject"**:
+Para tomar el control del proceso en su lugar —su propio middleware, rutas y configuración
+de autenticación—, ejecute `rebase eject`. **Todo lo que sigue a continuación de este párrafo es solo para proyectos con eject**:
 un proyecto generado inicialmente no tiene ninguno de esos archivos y nada en él llama a
-`initializeRebaseBackend`. Escribe un punto de entrada que llama a
-`initializeRebaseBackend` directamente, además de un Dockerfile y un archivo compose que lo
-construye; a partir de ese momento, tú mantienes el servidor y las actualizaciones del runtime
-de la plataforma ya no llegarán al proyecto. Dicha interfaz está documentada en
+`initializeRebaseBackend`. Este comando escribe un punto de entrada que llama directamente a
+`initializeRebaseBackend`, además de un Dockerfile y un archivo compose que lo construye;
+a partir de ese momento, usted mantiene el servidor y las actualizaciones del runtime de la plataforma ya no
+llegarán al proyecto. Toda esa superficie está documentada en
 [Integración de servidor personalizado](/docs/backend/custom-server).
 
 ## Cómo se conectan
 
-1. **Tú declaras** las tablas en `backend/schema/`
-2. **El backend** las compila, crea las tablas y políticas, y monta las rutas REST, de tiempo real y MCP
-3. **El panel de administración** las lee desde `GET /api/schema/tables` y renderiza una vista para cada una, modificada por los archivos en `frontend/src/cms/`
+1. **Usted declara** tablas en `backend/schema/`
+2. **El backend** las compila, crea las tablas y políticas, y monta rutas REST, en tiempo real y MCP
+3. **El panel de administración** las lee de `GET /api/schema/tables` y renderiza una vista para cada una, modificada por los archivos en `frontend/src/cms/`
 4. **La CLI** las lee para generar el esquema de Drizzle (`rebase schema generate`), los tipos del SDK (`rebase generate-sdk`) y, a partir de ese esquema, los archivos de migración (`rebase db generate`)
 
-Mientras `rebase dev` está en ejecución, guardar un archivo bajo `backend/schema/`
+Mientras `rebase dev` se está ejecutando, guardar un archivo bajo `backend/schema/`
 regenera `backend/src/schema.generated.ts` y los tipos del SDK en
 `generated/sdk/`, reinicia el backend y, al arrancar, crea las tablas y columnas
-faltantes. Fuera de `rebase dev`, los mismos pasos se realizan con `rebase schema generate`
+que falten. Fuera de `rebase dev`, los mismos pasos son `rebase schema generate`
 y `rebase generate-sdk`.
 
-Un proyecto anterior a la versión 0.31 tiene en su lugar un directorio `config/collections/`.
-Todos los comandos lo rechazarán y sugerirán ejecutar `rebase migrate collections-to-tables`,
-que lo migra — consulta [la guía de actualización](/docs/upgrading/0-30-to-0-31/).
+Un proyecto anterior a la versión 0.31 tiene en su lugar un directorio `config/collections/`. Todos
+los comandos lo rechazarán e indicarán ejecutar `rebase migrate collections-to-tables`, que lo
+traslada; consulte [la guía de actualización](/docs/upgrading/0-30-to-0-31/).
 
 ## Próximos pasos
 
-- **[Inicio rápido](/docs/getting-started/quickstart)** — Comienza con un nuevo proyecto de Rebase
-- **[Tablas](/docs/schema/)** — Declara tu modelo de datos
+- **[Inicio rápido](/docs/getting-started/quickstart)** — Comience con un nuevo proyecto de Rebase
+- **[Tablas](/docs/schema/)** — Declare su modelo de datos
 - **[Configuración](/docs/getting-started/configuration)** — Todas las variables de entorno y opciones

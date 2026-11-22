@@ -110,8 +110,9 @@ msOverflowStyle: "none" }}
                     // A segmented track is a region, not an object: an inset fill and no border.
                     variant === "standard" && "inline-flex h-9 items-center justify-start rounded-md bg-surface-field p-1 text-surface-600 dark:text-surface-400 gap-2",
                     // Folder tabs sit on the strip's bottom edge, so the list aligns
-                    // them to the end; the active tab overlaps that edge by 1px.
-                    variant === "boxy" && "flex items-end h-full",
+                    // them to the end with a top gap above the tab's top border; the
+                    // active tab overlaps the strip's bottom edge by 1px.
+                    variant === "boxy" && "flex items-end h-full pt-1.5",
                     variant === "pill" && "flex items-center gap-0.5",
                     innerClassName)
                 }>

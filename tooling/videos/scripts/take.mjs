@@ -53,9 +53,18 @@ const LEAD_IN = 15;
 const RATE = 16000;
 const HOP = 160; // 10 ms
 
-function run(args, { capture = false } = {}) {
+/** A take thrown away while it was being processed: not an error. */
+export class Discarded extends Error {
+    constructor(id) {
+        super(`${id}: thrown away while it was being processed`);
+        this.name = "Discarded";
+    }
+}
+
+/** ffmpeg, killed when `signal` aborts (a take thrown away mid-encode). */
+function run(args, { capture = false, signal } = {}) {
     return new Promise((resolve, reject) => {
-        const child = spawn(FFMPEG, args, { stdio: ["ignore", capture ? "pipe" : "ignore", "pipe"] });
+        const child = spawn(FFMPEG, args, { stdio: ["ignore", capture ? "pipe" : "ignore", "pipe"], signal });
         const chunks = [];
         let err = "";
         if (capture) child.stdout.on("data", (c) => chunks.push(c));
@@ -214,7 +223,10 @@ async function synthesize(live, file) {
     ]);
 }
 
-export async function processTake(id, { log = console.log } = {}) {
+export async function processTake(id, { log = console.log, signal } = {}) {
+    const check = () => {
+        if (signal?.aborted) throw new Discarded(id);
+    };
     if (!/^take-\d{8}-\d{6}$/.test(id)) throw new Error(`not a take id: ${id}`);
     const dir = path.join(ROOT, "takes", id);
     const live = JSON.parse(await readFile(path.join(dir, "live.json"), "utf8"));
@@ -240,9 +252,17 @@ export async function processTake(id, { log = console.log } = {}) {
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-movflags", "+faststart",
         video,
-    ]);
+    ], { signal }).catch((err) => {
+        check();
+        throw err;
+    });
+    check();
     log(`${id}: finding the speech in it…`);
-    const pcm = await run(["-i", video, "-vn", "-ac", "1", "-ar", String(RATE), "-f", "s16le", "pipe:1"], { capture: true });
+    const pcm = await run(["-i", video, "-vn", "-ac", "1", "-ar", String(RATE), "-f", "s16le", "pipe:1"], { capture: true, signal }).catch((err) => {
+        check();
+        throw err;
+    });
+    check();
     const { segments, floor, voice, threshold } = speech(levels(pcm));
     const seconds = pcm.length / 2 / RATE;
     /* A take with no voice in it cannot be measured, and measuring it anyway
@@ -282,6 +302,7 @@ export async function processTake(id, { log = console.log } = {}) {
         }),
     };
     const props = { take: { src: `takes/${id}.mp4`, startFrom }, timing };
+    check();
     await writeFile(path.join(dir, "props.json"), JSON.stringify(props, null, 1));
 
     /* The report: each line where the recording put it, and where the page

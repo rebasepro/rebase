@@ -28,9 +28,6 @@ jest.mock("@rebasepro/app", () => {
     });
 });
 jest.mock("../../src/hooks/useAdminContext", () => ({ useAdminContext: () => ({}) }));
-jest.mock("../../src/collection_editor/useCollectionEditorController", () => ({
-    useCollectionEditorController: () => undefined
-}));
 jest.mock("../../src/data_export/export", () => ({ ExportCollectionAction: () => <button>export</button> }));
 jest.mock("../../src/data_import/import", () => ({ ImportCollectionAction: () => <button>import</button> }));
 

@@ -25,6 +25,9 @@ export const es = {
   "copy.command": "Copiar",
   "copy.command.done": "Copiado",
   "social.title": "De los creadores de FireCMS, el CMS open source de más de 10.000 proyectos Firebase.",
+  "trust.europe":
+    "Hecho en Madrid por una empresa sujeta al derecho europeo. Ejecuta Rebase en tus propios servidores — Hetzner, OVHcloud, Scaleway o bare metal — o deja que lo operemos nosotros en Europa.",
+  "trust.europe.link": "Soberanía en Europa",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.
   "recognition.badge": "Dónde vive la regla hoy",
@@ -87,10 +90,10 @@ export const es = {
   "modes.full.desc": "Editor SQL, visualizador de esquema, simulador de políticas RLS, ramas de base de datos, logs y explorador de API. Studio es la mitad de desarrollo del mismo panel que ya usa tu equipo.",
   "modes.full.tag": "La mitad de desarrollo del panel",
   "showcase.badge": "Construido para productos reales",
-  "showcase.title.part1": "Docenas de productos.",
-  "showcase.title.part2": "Todos en producción.",
+  "showcase.title.part1": "Siete productos.",
+  "showcase.title.part2": "Todos construidos con Rebase.",
   "showcase.subtitle":
-    "Un <b>producto sanitario certificado</b>, un <b>programa de fidelización en retail</b>, un <b>marketplace de dos caras</b>, un <b>concurso musical para el salón</b>, un agente de ventas outbound, una herramienta de diseño y un CRM — algunos nuestros, otros de nuestros clientes.",
+    "Un <b>programa de fidelización en retail</b>, un <b>marketplace de dos caras</b>, un <b>concurso musical para el salón</b>, el back office de un <b>producto sanitario certificado</b>, un agente de ventas outbound, una herramienta de diseño y un CRM — construidos por el equipo que hace Rebase, unos para nosotros y otros para nuestros clientes.",
   "showcase.nolink": "Herramienta interna — sin web pública",
   "showcase.case0.badge": "Editor Vectorial · Creado por el equipo de Rebase",
   "showcase.case0.title": "Dadaki",
@@ -98,9 +101,9 @@ export const es = {
   "showcase.case.badge": "Marketplace & Portal de Empleo",
   "showcase.case.title": "SustenTalent",
   "showcase.case.desc": "Un marketplace bilateral que conecta a profesionales de la sostenibilidad con empresas verdes. Rebase impulsa ambos lados del mercado: auth por roles, APIs de matching tipadas y el back office de moderación.",
-  "showcase.case2.badge": "Terapia Digital del Dolor",
+  "showcase.case2.badge": "Terapia Digital del Dolor · Back office",
   "showcase.case2.title": "MedicalMotion",
-  "showcase.case2.desc": "Un dispositivo médico digital certificado que ofrece terapia del dolor personalizada con IA. Rebase ejecuta todo el backend: historiales de pacientes, planes de terapia, la biblioteca de ejercicios y los dashboards clínicos sobre ellos.",
+  "showcase.case2.desc": "El back office de un dispositivo médico digital certificado de terapia del dolor personalizada con IA. El equipo gestiona empresas, suscripciones, facturación y onboarding directamente sobre el Postgres que ya tenía el producto, cuyo esquema Rebase nunca toca, con la biblioteca de contenido médico en Firestore al lado. Sustituyó a dos herramientas de administración anteriores.",
   "showcase.case7.badge": "Juego de fiesta · Creado por el equipo de Rebase",
   "showcase.case7.title": "SongBuzz",
   "showcase.case7.desc":

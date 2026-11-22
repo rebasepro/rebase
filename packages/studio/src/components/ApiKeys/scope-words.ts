@@ -66,7 +66,7 @@ export function planeHint(t: Translate, plane: ScopePlane): string {
     }
 }
 
-/** "Every collection", "Every storage source", "Every function", "Any project". */
+/** "Every table", "Every storage source", "Every function", "Any project". */
 export function everyTargetLabel(t: Translate, targetKind: string): string {
     switch (targetKind) {
         case "collection": return t("studio_api_keys_target_all_collection");

@@ -98,7 +98,7 @@ export const JSEditorSidebar = ({
 
     return (
         <div className={cls("flex flex-col h-full w-full bg-surface-card border-r", defaultBorderMixin)}>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "collections" | "snippets" | "history" | "reference")} variant="boxy" className="border-b border-hairline">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "collections" | "snippets" | "history" | "reference")} variant="boxy" className="border-b border-hairline px-2 bg-surface-sheet shrink-0">
                 <Tab value="collections">
                     <Tooltip title="Browse tables">
                         <span className="text-xs">{t("studio_js_tables_tab")}</span>
@@ -121,7 +121,7 @@ export const JSEditorSidebar = ({
                 {/* Collections browser */}
                 {activeTab === "collections" && (
                     <div className="flex flex-col h-full">
-                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet h-10 shrink-0", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                 {t("studio_js_tables_tab")}
                             </Typography>
@@ -149,7 +149,7 @@ export const JSEditorSidebar = ({
                 {/* Quick reference */}
                 {activeTab === "reference" && (
                     <div className="flex flex-col h-full">
-                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet h-10 shrink-0", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                 SDK Reference
                             </Typography>
@@ -189,7 +189,7 @@ export const JSEditorSidebar = ({
 
                     return (
                         <div className="flex flex-col h-full">
-                            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
+                            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet h-10 shrink-0", defaultBorderMixin)}>
                                 <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">Snippets</Typography>
                             </div>
                             <div className="flex-grow overflow-y-auto p-2 space-y-2 no-scrollbar">
@@ -238,7 +238,7 @@ export const JSEditorSidebar = ({
                 {/* History */}
                 {activeTab === "history" && (
                     <div className="flex flex-col h-full">
-                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet h-10 shrink-0", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">History</Typography>
                         </div>
                         <div className="flex-grow overflow-y-auto p-1 space-y-1 no-scrollbar">

@@ -110,7 +110,7 @@ top: midY });
                 )}
             >
                 {icon && !isJunction && (
-                    <div className="text-primary shrink-0">
+                    <div className="text-text-secondary dark:text-text-secondary-dark shrink-0">
                         <IconForView
                             collectionOrView={{ slug: tableName,
 name: collectionName,

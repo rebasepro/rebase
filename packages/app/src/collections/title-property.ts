@@ -13,14 +13,7 @@ import { isStorageProperty } from "./summary-property";
  */
 const SCORE = {
     DISQUALIFIED: -1,
-    /**
-     * Points at another entity. Only readable once the target resolves, and it
-     * renders as the raw key until then — last resort, for collections (like
-     * junction tables) that hold no text of their own.
-     */
-    REFERENCE: 5,
-    RELATION: 10,
-    /** A user picker: resolves to a person's name, like a relation does */
+    /** A user picker: resolves to a person's name. Last resort. */
     USER: 10,
     /** Long form text — readable, but a description, not a name */
     LONG_TEXT: 20,
@@ -131,14 +124,12 @@ function scoreTitleCandidate(property: Property, key: string, idKeys: Set<string
     if (isIdentifierProperty(property, key, idKeys, foreignKeys)) return SCORE.DISQUALIFIED;
     if (isStorageProperty(property)) return SCORE.DISQUALIFIED;
 
-    if (property.type === "relation") {
-        const isMany = property.resolvedRelation
-            ? property.resolvedRelation.cardinality === "many"
-            : property.relation?.kind === "hasMany" || property.relation?.kind === "manyToMany";
-        return isMany ? SCORE.DISQUALIFIED : SCORE.RELATION;
-    }
-    if (property.type === "reference") {
-        return SCORE.REFERENCE;
+    // A relation or a reference names *another* record. As a derived title it
+    // labels every client of one agency with that agency's name, so a table
+    // with no text column of its own is titled by its id instead; a
+    // `display.title` naming the relation still makes it the title.
+    if (property.type === "relation" || property.type === "reference") {
+        return SCORE.DISQUALIFIED;
     }
     if (property.type !== "string") {
         // Numbers, dates, booleans, maps and arrays never read as a title.
@@ -159,13 +150,15 @@ function scoreTitleCandidate(property: Property, key: string, idKeys: Set<string
  * All properties that could serve as the entity title, best first.
  *
  * Candidates are ranked from the property *schema* — identifiers (primary
- * keys, foreign keys, UUID columns, user pickers), images and hidden fields are
- * excluded structurally, so a collection whose id column is called something
- * other than `id` is handled the same as one where it isn't.
+ * keys, foreign keys, UUID columns), relations, references, images and hidden
+ * fields are excluded structurally, so a collection whose id column is called
+ * something other than `id` is handled the same as one where it isn't. A
+ * collection with no candidate is titled by its id, wherever it is shown.
  *
  * When the collection declares `propertiesOrder` the developer has already
  * stated what comes first, so qualifying candidates keep that order; otherwise
- * they are ranked (a name beats a description beats a relation).
+ * they are ranked (a name beats other short text, which beats an email, an
+ * enum, a description and a user picker).
  *
  * @group Collections
  */
@@ -209,22 +202,27 @@ index });
     return scored.map(candidate => candidate.key);
 }
 
+/** A relation that points at one row: a `belongsTo`, a `hasOne`, a to-one `via`. */
+function isSingleRelation(property: Property): boolean {
+    if (property.type !== "relation") return false;
+    const isMany = property.resolvedRelation
+        ? property.resolvedRelation.cardinality === "many"
+        : property.relation?.kind === "hasMany" || property.relation?.kind === "manyToMany";
+    return !isMany;
+}
+
 /**
- * The relation a collection *leads* with, if it leads with one.
+ * The relation a collection *leads* with, if it leads with one: the first
+ * property, in the order the developer declared (or ordered) them, that is a
+ * single-cardinality relation, where every property before it is an
+ * identifier, an image or hidden.
  *
- * A junction-shaped collection — a pipeline entry, a membership, a booking —
- * holds no label of its own: it is "this candidate, for that vacancy". The
- * general ranking puts relations last (they only read once the target
- * resolves), so the title slot would otherwise fall to whatever free text
- * happens to follow: a note, a comment. Preview surfaces that render one row
- * per entity (list, cards, board) prefer the leading relation instead.
+ * The panel does not title a row by it: a relation names another record, and
+ * a derived title never comes from one (see {@link getTitlePropertyCandidates}).
+ * A collection that should be called by its relation says so in
+ * `display.title`.
  *
- * The decision is structural — the first property that could be a title, in the
- * order the developer declared (or ordered) them. Declaration order is a
- * statement about what the collection is about; property *names* are not
- * consulted here.
- *
- * Returns `undefined` when that first property is anything but a
+ * Returns `undefined` when the first such property is anything but a
  * single-cardinality relation, or when the collection states its own
  * `display.title`.
  *
@@ -234,8 +232,7 @@ export function getLeadingRelationTitleKey<M extends Record<string, unknown>>(
     collection: AdminCollection<M>
 ): string | undefined {
     if (!collection.properties) return undefined;
-    // The collection states what it is called, in one form or the other; either
-    // way it is not asking for the leading-relation heuristic.
+    // The collection states what it is called, in one form or the other.
     if (hasDeclaredDisplay(collection, "title")) return undefined;
 
     const idKeys = new Set<string>(getPrimaryKeys(collection) as string[]);
@@ -243,10 +240,17 @@ export function getLeadingRelationTitleKey<M extends Record<string, unknown>>(
     const order = (collection.propertiesOrder as string[] | undefined) ?? Object.keys(collection.properties);
 
     for (const key of order) {
-        const property = collection.properties[key];
-        if (!property || isPropertyBuilder(property)) continue;
-        if (scoreTitleCandidate(property as Property, key, idKeys, foreignKeys) === SCORE.DISQUALIFIED) continue;
-        return (property as Property).type === "relation" ? key : undefined;
+        const raw = collection.properties[key];
+        if (!raw || isPropertyBuilder(raw)) continue;
+        const property = raw as Property;
+        if (property.type === "relation" || property.type === "reference") {
+            if (isHidden(property)) continue;
+            if (property.type === "reference") return undefined;
+            if (isSingleRelation(property)) return key;
+            continue;
+        }
+        if (scoreTitleCandidate(property, key, idKeys, foreignKeys) === SCORE.DISQUALIFIED) continue;
+        return undefined;
     }
 
     return undefined;

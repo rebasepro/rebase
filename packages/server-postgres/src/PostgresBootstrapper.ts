@@ -23,6 +23,7 @@ import {
     type RealtimeChannelsConfig,
     type RealtimeSocketOptions,
     type CompiledTable,
+    type ReintrospectOutcome,
     type TableDescriptor,
     type TableRefreshOutcome,
     type SqlFilesOutcome
@@ -45,6 +46,7 @@ import { ensureHistoryIndexes, ensureHistoryTableExists, historyUnavailableReaso
 import { patchPgNumericToNumber } from "./utils/pg-numeric-number-patch";
 import { compileIntrospectedTables, introspectSchema } from "./schema/introspect-runtime";
 import { introspectTables } from "./schema/introspect-tables";
+import { applyTableMetaOverlays, readTableMetaOverlays } from "./schema/table-meta-overlay";
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
@@ -796,8 +798,13 @@ export async function openPostgresDriver(
             );
         }
 
+        // Overlay any BaaS-level table metadata stored in `rebase.table_meta`
+        // (description, softDelete, history, tenant, search, column access, exposed).
+        const metaOverlays = await readTableMetaOverlays(rawClient, pgSchemaName);
+        const overlaidDescriptors = applyTableMetaOverlays(introspected.tables, metaOverlays);
+
         // The tables the runtime runs on, compiled from the descriptors.
-        const servable = compileIntrospectedTables(introspected.tables);
+        const servable = compileIntrospectedTables(overlaidDescriptors);
         for (const { table, reason } of servable.dropped) {
             logger.warn(`[PostgresRegistry] BaaS mode: not serving table "${table}": ${reason}`);
         }
@@ -818,6 +825,7 @@ export async function openPostgresDriver(
         }
         ({ tables: introspectedTables, relations: introspectedRelations } =
             buildBaasSchema(schema.tablesMap, pgSchemaName, introspectedDescriptors));
+        if (introspectedTables) patchPgNumericToNumber(introspectedTables);
         logger.info(
             `🔍 [PostgresRegistry] BaaS mode: derived ${servable.tables.length} tables from schema "${pgSchemaName}" [${servable.tables.map(t => t.slug).join(", ")}]`
         );
@@ -1954,6 +1962,92 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         return { status: "served" };
     };
 
+    const reintrospectDatabaseTables = async (): Promise<ReintrospectOutcome> => {
+        const pgSchemaName = pgConfig.introspectionSchema ?? "public";
+        const introspected = await introspectTables(rawClient, pgSchemaName, { unprotectedTables });
+        const metaOverlays = await readTableMetaOverlays(rawClient, pgSchemaName);
+        const overlaid = applyTableMetaOverlays(introspected.tables, metaOverlays);
+        const servable = compileIntrospectedTables(overlaid);
+        for (const { table, reason } of servable.dropped) {
+            logger.warn(`[PostgresRegistry] BaaS reload: not serving table "${table}": ${reason}`);
+        }
+        const nextUnprotected = introspected.skipped.map((s) => ({ schema: pgSchemaName, table: s.table }));
+        const schema = await introspectSchema(rawClient, pgSchemaName);
+        const keep = new Set([
+            ...servable.tables.map((t) => t.table),
+            ...introspected.junctions.filter((j) => j.rlsEnabled).map((j) => j.table)
+        ]);
+        for (const table of [...schema.tablesMap.keys()]) {
+            if (!keep.has(table)) schema.tablesMap.delete(table);
+        }
+        const { tables: nextTables, relations: nextRelations } =
+            buildBaasSchema(schema.tablesMap, pgSchemaName, servable.tables);
+        patchPgNumericToNumber(nextTables);
+        const next = buildTableRegistry({
+            compiledTables: servable.compiled,
+            tables: nextTables,
+            relations: nextRelations
+        });
+
+        const servedBefore = new Set(tablesOnThisSource().map(table => table.slug));
+        const added = next.tables().filter(table => table.pg && !servedBefore.has(table.slug));
+        if (provision && added.length > 0) {
+            const runSql: RawSqlRunner = async (text) => {
+                const res = await schemaAwareDb.execute(sql.raw(text));
+                return (res.rows ?? []) as Record<string, unknown>[];
+            };
+            if (driver.rlsUserRole) {
+                const schemas = ["public", "rebase", pgSchemaName];
+                try {
+                    for (const role of rls.roles) {
+                        await ensureAppRoleGrants(runSql, schemas, { role, mode: rls.grants, managedTables: managedTablesOf(next) });
+                    }
+                } catch (err) {
+                    logger.warn(
+                        `⚠️ RLS enforcement: could not grant ${rls.roles.map((r) => `"${r}"`).join(", ")} on reloaded tables ` +
+                        `(${added.map(t => t.slug).join(", ")}): ${err instanceof Error ? err.message : String(err)}`
+                    );
+                }
+            }
+            const captured = added.filter(table => table.descriptor.kind !== "view");
+            if (provisionCdcForTables && captured.length > 0) {
+                try {
+                    await provisionCdcForTables(captured.map(table => ({
+                        schema: table.descriptor.schema,
+                        table: table.descriptor.table,
+                        identityColumns: tableKeyColumns(table).map((k) => k.columnName)
+                    })));
+                } catch (err) {
+                    logger.warn(
+                        `⚠️ [CDC] Could not attach change-capture to reloaded tables (${captured.map(t => t.slug).join(", ")})`,
+                        { detail: err instanceof Error ? err.message : String(err) }
+                    );
+                }
+            }
+        }
+
+        const relational = { ...nextTables, ...nextRelations };
+        registry.replaceWith(next);
+        refreshRelationalSchema(schemaAwareDb, relational);
+        if (readDb) refreshRelationalSchema(readDb, relational);
+        realtimeService.refreshTableMaps();
+        logger.info(
+            `🔍 [PostgresRegistry] BaaS live reload on "${sourceKey}": serving ${servable.tables.length} table(s) [${servable.tables.map(t => t.slug).join(", ")}]`
+        );
+        return {
+            status: "served",
+            tables: servable.compiled,
+            descriptors: servable.tables,
+            unprotectedTables: nextUnprotected
+        };
+    };
+
+    const reintrospectTables = async (): Promise<ReintrospectOutcome> => {
+        const run = refreshInFlight.then(() => reintrospectDatabaseTables());
+        refreshInFlight = run.catch(() => undefined);
+        return run;
+    };
+
     const internals: PostgresDriverInternals = {
         db: schemaAwareDb,
         readDb,
@@ -1981,6 +2075,7 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         tables: introspectedDescriptors,
         ...(skippedUnprotected && { unprotectedTables: skippedUnprotected }),
         refreshTables,
+        reintrospectTables,
         internals
     };
 }

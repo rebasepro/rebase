@@ -36,7 +36,6 @@ jest.mock("../../src/hooks/navigation/contexts/NavigationStateContext", () => ({
 jest.mock("../../src/hooks/useBreadcrumbsController", () => ({
     useBreadcrumbsController: () => ({ set: () => undefined })
 }));
-jest.mock("../../src/components/CollectionEditorDialogs", () => ({ CollectionEditorDialogs: () => null }));
 jest.mock("../../src/components/HomePage/ContentHomePage", () => ({ ContentHomePage: () => <div>home page</div> }));
 jest.mock("../../src/routes/RebaseRoute", () => ({ RebaseRoute: () => <div>collection route</div> }));
 jest.mock("../../src/routes/CustomViewRoute", () => ({ CustomViewRoute: () => <div>custom view</div> }));

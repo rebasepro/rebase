@@ -45,7 +45,7 @@ import { AuthSimulationSelector } from "../AuthSimulationSelector";
 import { useRunAsUsers } from "../useRunAsUsers";
 import { toCsv } from "../../utils/sql_utils";
 import { slugOfProperty, tableInfosOf, type TableInfo } from "./table_access";
-import type { AdminCollection } from "@rebasepro/cms-types";
+type StudioBridgeCollection = NonNullable<ReturnType<ReturnType<typeof useStudioCollectionRegistry>["getCollection"]>>;
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -155,7 +155,7 @@ function formatJSON(value: unknown): string {
 interface MatchedJSCollection {
     collectionSlug: string;
     /** The CMS collection the record is opened with. */
-    collection: AdminCollection;
+    collection: StudioBridgeCollection;
     /** The row key that holds the table's (single-column) primary key. */
     pkColumn: string;
 }
@@ -179,7 +179,7 @@ function detectCollectionsInResult(
     executedCode: string,
     resultValue: unknown,
     tables: readonly TableInfo[],
-    collectionFor: (slug: string) => AdminCollection | undefined
+    collectionFor: (slug: string) => StudioBridgeCollection | undefined
 ): MatchedJSCollection[] {
     if (!resultValue || tables.length === 0) return [];
     const code = withoutComments(executedCode);
@@ -239,7 +239,7 @@ export function JSEditor() {
     const descriptors = useTableDescriptors();
     const collectionRegistry = useStudioCollectionRegistry();
     const collectionFor = useCallback(
-        (slug: string): AdminCollection | undefined => collectionRegistry.getCollection(slug),
+        (slug: string): StudioBridgeCollection | undefined => collectionRegistry.getCollection(slug),
         [collectionRegistry]
     );
     const sidePanelController = useStudioSidePanelController();
@@ -787,22 +787,25 @@ message: t("studio_sql_markdown_copy_failed") });
                     secondPanel={
                         <div className="flex flex-col h-full overflow-hidden">
                             {/* Toolbar: matching SQL Editor layout */}
-                            <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-card", defaultBorderMixin)}>
+                            <div className={cls("flex items-center justify-between pl-2 pr-2 border-b bg-surface-sheet shrink-0", defaultBorderMixin)}>
                                 <div className="flex items-center flex-grow overflow-hidden mr-4">
                                     <div className="flex items-center no-scrollbar overflow-x-auto min-w-0">
-                                        <Tabs value={activeTabId} onValueChange={setActiveTabId} variant="boxy" className="w-[unset] flex-shrink-0" innerClassName="bg-surface-card">
+                                        <Tabs value={activeTabId} onValueChange={setActiveTabId} variant="boxy" className="w-[unset] flex-shrink-0">
                                             {tabs.map(tab => (
                                                 <Tab key={tab.id} value={tab.id} className="flex items-center justify-between group max-w-[200px]">
                                                     <TerminalIcon size={iconSize.smallest} className="text-amber-500 mr-1.5 flex-shrink-0"/>
                                                     <span className="truncate">{tab.name}</span>
                                                     {tabs.length > 1 && (
-                                                        <IconButton aria-label={t("close_tab")}
-                                                            size="smallest"
+                                                        <span
+                                                            role="button"
+                                                            tabIndex={-1}
+                                                            aria-label={t("close_tab")}
+                                                            title={t("close_tab")}
                                                             onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
-                                                            className="ml-1 !p-0.5 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
+                                                            className="ml-1 p-0.5 rounded inline-flex items-center opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity cursor-pointer"
                                                         >
                                                             <XIcon size={iconSize.smallest}/>
-                                                        </IconButton>
+                                                        </span>
                                                     )}
                                                 </Tab>
                                             ))}
@@ -861,7 +864,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                     firstPanel={
                                         <div className="h-full w-full overflow-hidden flex flex-col">
                                             {/* Auth Simulation UI */}
-                                            <div className="p-2 px-3 border-b border-hairline bg-surface-sheet flex items-center shrink-0">
+                                            <div className="h-10 px-3 border-b border-hairline bg-surface-sheet flex items-center shrink-0">
                                                 <AuthSimulationSelector
                                                     authMode={authMode}
                                                     setAuthMode={setAuthMode}
@@ -964,7 +967,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                                     {matchedCollections.map(mc => (
                                                                         <Tooltip key={mc.collectionSlug} title={`${mc.collection.name} (${mc.collectionSlug})`}>
                                                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 dark:bg-primary-dark/15 text-primary dark:text-primary-dark whitespace-nowrap border border-primary/20 dark:border-primary-dark/20">
-                                                                                {typeof mc.collection.icon === "string" && (
+                                                                                {"icon" in mc.collection && typeof mc.collection.icon === "string" && (
                                                                                     <IconForView collectionOrView={{ icon: mc.collection.icon, slug: mc.collectionSlug, name: mc.collection.name }} className="text-[12px]"/>
                                                                                 )}
                                                                                 {mc.collection.name}

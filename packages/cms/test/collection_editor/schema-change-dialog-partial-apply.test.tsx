@@ -10,7 +10,7 @@ import { describe, expect, it } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 import { RebaseI18nProvider } from "@rebasepro/app";
 
-import { SchemaChangeDialog } from "../../src/collection_editor/ui/collection_editor/SchemaChangeDialog";
+import { SchemaChangeDialog } from "../../src/collection_editor/SchemaChangeDialog";
 import type { LiveSchemaResult } from "../../src/collection_editor/liveSchemaClient";
 
 const STATEMENTS = [

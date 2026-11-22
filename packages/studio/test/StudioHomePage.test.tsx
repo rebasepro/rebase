@@ -36,6 +36,9 @@ jest.mock("@rebasepro/app", () => ({
     useRebaseRegistry: () => mockRegistry,
     // The address the panel talks to — never the 3001 of the docs' examples.
     useApiConfig: () => ({ apiUrl: "http://localhost:3755", apiPath: "/api" }),
+    // The overview's schema card reads through the admin client.
+    useApiBase: () => "http://localhost:3755/api",
+    useAuthController: () => ({ getAuthToken: async () => "test-token" }),
     useRestoreScroll: () => ({
         containerRef: React.createRef()
     }),
@@ -73,25 +76,10 @@ describe("StudioHomePage Component", () => {
         expect(screen.getByText("Create and manage scoped API keys")).toBeInTheDocument();
     });
 
-    it("renders the collection editor card when the CMS enables one", () => {
+    it("has no Collections card: the collection editor is gone", () => {
         render(<StudioHomePage />);
-
-        expect(screen.getByText("Collections")).toBeInTheDocument();
-        expect(screen.getByText("Define and manage your data model and collection schemas")).toBeInTheDocument();
-    });
-
-    it("omits the collection editor card when the Studio's tools leave out \"schema\"", () => {
-        // `<RebaseStudio tools={[...]}>` without "schema" registers no
-        // collection editor route, so a card for it would lead nowhere.
-        const studioConfig = mockRegistry.studioConfig;
-        mockRegistry.studioConfig = { devViews, tools: ["sql", "js", "storage"] };
-        try {
-            render(<StudioHomePage />);
-            expect(screen.queryByText("Collections")).not.toBeInTheDocument();
-            expect(screen.getByText("SQL Console")).toBeInTheDocument();
-        } finally {
-            mockRegistry.studioConfig = studioConfig;
-        }
+        expect(screen.queryByText("Collections")).not.toBeInTheDocument();
+        expect(screen.getByText("SQL Console")).toBeInTheDocument();
     });
 
     it("renders a card for a registered view that the old static list omitted", () => {

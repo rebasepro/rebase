@@ -1,22 +1,37 @@
-import { TYPED } from "./films/01-typed";
-import { SECURITY } from "./films/02-security";
-import { AGENTS } from "./films/03-agents";
-import { OWN } from "./films/04-own";
-import { ONE_DEFINITION } from "./films/05-one-definition";
-import { ZERO } from "./films/06-zero";
-import { REALTIME } from "./films/07-realtime";
-import { PANEL } from "./films/08-panel";
-import { BACKEND } from "./films/09-backend";
-import { EXISTING } from "./films/10-existing";
+import { INTRO_FILM } from "./v2/00-intro";
+import { CLAIM } from "./v2/01-claim";
+import { REVIEW_QUEUE } from "./v2/02-review-queue";
+import { CLAUDE_PANEL } from "./v2/03-claude-panel";
+import { DB_BRANCH } from "./v2/04-db-branch";
+import { TIME_MACHINE } from "./v2/05-time-machine";
+import { RLS_SIMULATE } from "./v2/06-rls-simulate";
+import { LEAVE_SUPABASE } from "./v2/07-leave-supabase";
+import { SAFE_PREVIEWS } from "./v2/08-safe-previews";
+import { ONE_CLI } from "./v2/09-one-cli";
+import { HONEST_CLOUD } from "./v2/10-honest-cloud";
 import { seriesDuration, seriesFilm, type FilmSpec, type SeriesProps } from "./kit";
 
 /**
- * Every film in the series, in release order. Each renders as two
- * compositions — `Series-<id>` at 1920x1080 and `Series-<id>-Tall` at
- * 1080x1920 — from the same take, and the recording page reads it with
- * `?film=<id>`.
+ * The flagship product introduction plus ten short films in the 2026 series.
+ * Each renders as two compositions — `Series-<id>` at 1920x1080 and
+ * `Series-<id>-Tall` at 1080x1920 — from the same take, and the recording
+ * page reads it with `?film=<id>`.
+ *
+ * The earlier boilerplate-era films remain archived in `./films/`.
  */
-export const SERIES: FilmSpec[] = [TYPED, SECURITY, AGENTS, OWN, ONE_DEFINITION, ZERO, REALTIME, PANEL, BACKEND, EXISTING];
+export const SERIES: FilmSpec[] = [
+    INTRO_FILM,
+    CLAIM,
+    REVIEW_QUEUE,
+    CLAUDE_PANEL,
+    DB_BRANCH,
+    TIME_MACHINE,
+    RLS_SIMULATE,
+    LEAVE_SUPABASE,
+    SAFE_PREVIEWS,
+    ONE_CLI,
+    HONEST_CLOUD,
+];
 
 export interface SeriesEntry {
     spec: FilmSpec;

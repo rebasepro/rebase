@@ -80,6 +80,12 @@ export function MetricsSection() {
                 <KpiTile label="Open tickets" icon="LifeBuoy" value={undefined} error={new Error("The insights function returned 500")}/>
             </KpiGrid>
 
+            <SpecimenLabel>KpiTile · onClick (a button) and href (a link: a modified click opens a new tab)</SpecimenLabel>
+            <KpiGrid className="mb-8">
+                <KpiTile label="Pending review" icon="Inbox" value={7} previous={4} goodWhen="down" onClick={() => setOpened("pending review")}/>
+                <KpiTile label="Late orders" icon="Clock" value={3} href="#metrics" onClick={() => setOpened("late orders")}/>
+            </KpiGrid>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                 <div>
                     <SpecimenLabel>KpiReadout · one line, for a home-page card</SpecimenLabel>

@@ -79,6 +79,8 @@ export interface AuthModuleConfig {
     allowUserLookup?: boolean;
     /** Default role ID to assign to new users (default: none). Must NOT be "admin". */
     defaultRole?: string;
+    /** Dynamic fallback default role (e.g. a role marked `isDefault` in `rebase.roles`). */
+    resolveDefaultRole?: () => string | undefined;
     /** Optional array of OAuth providers */
     oauthProviders?: OAuthProvider<unknown>[];
     /**
@@ -713,9 +715,10 @@ refreshToken };
                 logger.warn("[Auth] First account registered in production without promotion; " +
                     "set REBASE_ADMIN_EMAIL/REBASE_ADMIN_PASSWORD or use the service key to assign admin.");
             }
-            if (config.defaultRole) {
+            const roleToAssign = config.defaultRole ?? config.resolveDefaultRole?.();
+            if (roleToAssign) {
                 // Assign configured default role (never auto-assign admin via registration)
-                await authRepo.assignDefaultRole(user.id, config.defaultRole);
+                await authRepo.assignDefaultRole(user.id, roleToAssign);
             }
         }
 
@@ -1036,9 +1039,12 @@ displayName: user.displayName });
 
                         if (isFirstUser && isBootstrapWindowOpen()) {
                             await authRepo.setUserRoles(user.id, ["admin"]);
-                        } else if (config.defaultRole) {
-                            // Assign configured default role (never auto-assign admin via registration)
-                            await authRepo.assignDefaultRole(user.id, config.defaultRole);
+                        } else {
+                            const roleToAssign = config.defaultRole ?? config.resolveDefaultRole?.();
+                            if (roleToAssign) {
+                                // Assign configured default role (never auto-assign admin via registration)
+                                await authRepo.assignDefaultRole(user.id, roleToAssign);
+                            }
                         }
 
                         // Send welcome email for new OAuth users (fire-and-forget)

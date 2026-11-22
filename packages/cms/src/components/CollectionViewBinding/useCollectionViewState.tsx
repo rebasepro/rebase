@@ -755,15 +755,33 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         return resolvedCollection;
     }, [resolvedCollection, localPropertiesOrder]);
 
+    // The table's `listFields` (`customizeTable`), when it names any: the
+    // table draws those columns and no others, as the list does. Ordered by
+    // `fieldOrder` or the order the visitor dragged them to, and by
+    // `listFields` itself when there is neither.
+    const listColumns = useMemo(() => {
+        const listed = collectionWithLocalOrder.listProperties as string[] | undefined;
+        return listed && listed.length > 0 ? listed : undefined;
+    }, [collectionWithLocalOrder.listProperties]);
+
     // `fields` lays the columns out in its own order, over the saved one, and
     // drops the rest.
-    const columnsCollection = useMemo(() => stableFields
-        ? { ...collectionWithLocalOrder, propertiesOrder: stableFields as typeof collectionWithLocalOrder.propertiesOrder }
-        : collectionWithLocalOrder, [collectionWithLocalOrder, stableFields]);
+    // Same widening as `stableFields` above; named here rather than read off
+    // `collectionWithLocalOrder` inside the memo, where the check below
+    // narrows that one's `propertiesOrder` to `undefined`.
+    type ColumnOrder = typeof collectionWithLocalOrder.propertiesOrder;
+    const columnsCollection = useMemo(() => {
+        if (stableFields) return { ...collectionWithLocalOrder, propertiesOrder: stableFields as ColumnOrder };
+        if (listColumns && !collectionWithLocalOrder.propertiesOrder) {
+            return { ...collectionWithLocalOrder, propertiesOrder: listColumns as ColumnOrder };
+        }
+        return collectionWithLocalOrder;
+    }, [collectionWithLocalOrder, stableFields, listColumns]);
     const laidOutColumnIds = useColumnIds(columnsCollection, true);
-    const displayedColumnIds = useMemo(
-        () => stableFields ? columnsForFields(laidOutColumnIds, stableFields) : laidOutColumnIds,
-        [laidOutColumnIds, stableFields]);
+    const displayedColumnIds = useMemo(() => {
+        const shown = stableFields ?? listColumns;
+        return shown ? columnsForFields(laidOutColumnIds, shown) : laidOutColumnIds;
+    }, [laidOutColumnIds, stableFields, listColumns]);
 
     // What the list, the cards and the kanban cards are drawn from: the
     // collection, or only its `fields`.

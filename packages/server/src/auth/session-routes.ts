@@ -418,8 +418,9 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const user = await authRepo.createUser(createData);
 
         // Assign default role (follow register route pattern, but never auto-admin)
-        if (config.defaultRole) {
-            await authRepo.assignDefaultRole(user.id, config.defaultRole);
+        const roleToAssign = config.defaultRole ?? config.resolveDefaultRole?.();
+        if (roleToAssign) {
+            await authRepo.assignDefaultRole(user.id, roleToAssign);
         }
 
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(

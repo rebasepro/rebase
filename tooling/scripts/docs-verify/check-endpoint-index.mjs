@@ -109,8 +109,6 @@ const MOUNTS = new Map([
     ["packages/server/src/backup/backup-routes.ts#router", "/api/admin/backups"],
     ["packages/server/src/storage/maintenance-routes.ts#router", "/api/admin/storage"],
     ["packages/server/src/api/schema-editor-routes.ts#router", "/api/admin/schema-editor"],
-    // The frontend source editor, routed inside the schema editor at `/frontend`.
-    ["packages/server/src/api/frontend-source-routes.ts#router", "/api/admin/schema-editor/frontend"],
     ["packages/server/src/api/live-schema-routes.ts#router", "/api/admin/schema"],
     ["packages/server/src/ui-config/ui-config-routes.ts#router", "/api/admin/ui-config"],
     ["packages/server/src/api/logs-routes.ts#app", "/api/admin/logs"],
@@ -156,6 +154,13 @@ const MOUNTS = new Map([
     ["packages/server/src/mcp/mcp-routes.ts#router", "/mcp"],
     ["packages/server/src/mcp/oauth-routes.ts#router", "/api/oauth"],
 
+    // Zero-code BaaS admin surfaces (`packages/server/src/baas/*`).
+    ["packages/server/src/baas/db-admin-routes.ts#router", "/api/admin/db"],
+    ["packages/server/src/baas/roles-and-crons-store.ts#rolesRouter", "/api/admin/roles"],
+    ["packages/server/src/baas/roles-and-crons-store.ts#cronJobsRouter", "/api/admin/cron/jobs"],
+    ["packages/server/src/baas/storage-policies-store.ts#router", "/api/admin/storage/policies"],
+    ["packages/server/src/baas/webhooks-store.ts#router", "/api/admin/webhooks"],
+
     // ── backend/create-backend.ts, one line per router ────────────────────
     // `createRebaseBackend` builds them; `mount()` puts them where
     // `initializeRebaseBackend` always did, which is the layout this index
@@ -167,6 +172,12 @@ const MOUNTS = new Map([
     ["packages/server/src/backend/create-backend.ts#uiConfigRouter", "/api/admin/ui-config"],
     ["packages/server/src/backend/create-backend.ts#storageRouter", "/api/storage"],
     ["packages/server/src/backend/create-backend.ts#dataRouter", "/api/data"],
+    ["packages/server/src/backend/create-backend.ts#dataSurface", null],
+    ["packages/server/src/backend/create-backend.ts#reloadRouter", "/api/admin/schema/reload"],
+    ["packages/server/src/backend/create-backend.ts#dbRouter", "/api/admin/db"],
+    ["packages/server/src/backend/create-backend.ts#rRouter", "/api/admin/roles"],
+    ["packages/server/src/backend/create-backend.ts#spRouter", "/api/admin/storage/policies"],
+    ["packages/server/src/backend/create-backend.ts#whRouter", "/api/admin/webhooks"],
     ["packages/server/src/backend/create-backend.ts#functionsRouter", "/api/functions"],
     ["packages/server/src/backend/create-backend.ts#cronRouter", "/api/admin/cron"],
     ["packages/server/src/backend/create-backend.ts#backupRouter", "/api/admin/backups"],
@@ -195,6 +206,8 @@ const MOUNTS = new Map([
     // row for each family instead; enumerating them would mean enumerating
     // somebody's collections.
     ["packages/server/src/functions/function-routes.ts#router", null],
+    // `POST /api/rpc/<name>`: one route per `defineRpc` the project declares.
+    ["packages/server/src/rpc/rpc-routes.ts#router", null],
     ["packages/server/src/api/rest/api-generator.ts#this.router", null],
     // Live schema editing's stand-in for the data group: it re-mounts the
     // regenerated per-table routes above, so it has no path of its own.
@@ -202,6 +215,8 @@ const MOUNTS = new Map([
     // The router a *project's* own `defineFunction` returns, and the proxy that
     // forwards to a functions process. Neither has a path of its own.
     ["packages/server/src/functions/define-function.ts#app", null],
+    // The same, wrapped to declare the function's own `timeoutMs`.
+    ["packages/server/src/functions/define-function.ts#declared", null],
     ["packages/server/src/functions/proxy.ts#router", null],
     // `deprecatedAlias`'s forwarder, and the adapter's optional extra
     // router: both re-serve routes that are already counted where they are
@@ -295,7 +310,7 @@ const DATA_FAMILY = {
  * The data API is checked against the source by the OpenAPI parity gate
  * instead; this one only has to stop treating those rows as fiction.
  */
-const DATA_DRIVEN_PREFIXES = ["/api/data", "/api/functions"];
+const DATA_DRIVEN_PREFIXES = ["/api/data", "/api/functions", "/api/rpc"];
 
 /**
  * A docs table row that names an endpoint: `| \`GET\` | \`/api/…\` | … |`.
