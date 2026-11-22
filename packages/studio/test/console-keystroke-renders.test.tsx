@@ -116,6 +116,7 @@ const dataLayer = { table: () => ({ find: async () => posts }) };
 const appClient = { admin: { listUsersPaginated: async () => ({ users: [], total: 0, limit: 50, offset: 0 }) }, data: dataLayer };
 
 jest.mock("@rebasepro/app", () => ({
+    useStudioCapabilities: () => ({ codebase: true }),
     useTranslation: () => translation,
     useRebaseContext: () => rebaseContext,
     useRebaseClient: () => appClient,

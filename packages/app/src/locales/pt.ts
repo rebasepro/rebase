@@ -1746,6 +1746,8 @@ export const pt: RebaseTranslations = {
     studio_schema_no_tables_declared_body: "Ainda não há nada para desenhar. Declare uma tabela com defineTable em backend/schema/ e exporte-a a partir de backend/schema/index.ts.",
     studio_schema_introspect_hint: "Numa base de dados que já tem tabelas, rebase schema introspect escreve as definições delas por si.",
     studio_schema_visualizer_source: "Desenhado a partir das tabelas que o seu backend serve: tabelas, colunas, tipos e relações tal como as declara. Só os indicadores de RLS são lidos da base de dados.",
+    studio_auth_service_key: "Chave de serviço",
+    studio_auth_service_key_hint: "Cada pedido aqui é executado com a chave de serviço do projeto. Não há um utilizador com sessão iniciada em nome de quem executá-lo, e não pode ser enviado sem credencial.",
     studio_schema_visualizer_fit_view: "Ajustar à vista",
     studio_schema_visualizer_history_enabled: "Histórico ativado",
     studio_rls_served_tables: "Tabelas servidas",

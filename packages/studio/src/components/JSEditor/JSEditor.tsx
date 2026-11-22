@@ -34,7 +34,7 @@ import {
     VirtualTableColumn,
     XIcon
 } from "@rebasepro/ui";
-import { useStudioUrlController, useStudioCollectionRegistry, useStudioSidePanelController, useTableDescriptors } from "@rebasepro/app";
+import { useStudioUrlController, useStudioCollectionRegistry, useStudioSidePanelController, useStudioCapabilities, useTableDescriptors } from "@rebasepro/app";
 import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig, useTranslation, useModeController, ErrorView, SelectableUser, IconForView } from "@rebasepro/app";
 
 import { createMemoryStorage, createRebaseClient, type CreateAuthOptions } from "@rebasepro/client";
@@ -272,9 +272,15 @@ code: DEFAULT_CODE }])
     const [snippetName, setSnippetName] = useState("");
     const [resultView, setResultView] = useState<"json" | "table" | "console">("json");
 
-    // "Run as" user state — null means "self" (current admin)
-    const [selectedUser, setSelectedUser] = useState<SelectableUser | null>(null);
-    const [authMode, setAuthMode] = useState<"jwt" | "none">("jwt");
+    // "Run as" user state — null means "self" (current admin). Under a host
+    // whose requests all run as a service key there is no choice to make: the
+    // proxy refuses a request with no credential, and the server refuses
+    // impersonation from a service key.
+    const serviceIdentity = useStudioCapabilities().requestIdentity !== undefined;
+    const [chosenUser, setSelectedUser] = useState<SelectableUser | null>(null);
+    const [chosenAuthMode, setAuthMode] = useState<"jwt" | "none">("jwt");
+    const selectedUser = serviceIdentity ? null : chosenUser;
+    const authMode = serviceIdentity ? "jwt" : chosenAuthMode;
 
     const [sidebarSize, setSidebarSize] = useState<number>(() => {
         try {
@@ -875,6 +881,8 @@ message: t("studio_sql_markdown_copy_failed") });
                                                     onUserSearchTextChange={onUserSearchTextChange}
                                                     userTotalCount={userTotalCount}
                                                     currentUser={currentSelectableUser}
+                                                    fixedIdentityLabel={serviceIdentity ? t("studio_auth_service_key") : undefined}
+                                                    fixedIdentityHint={serviceIdentity ? t("studio_auth_service_key_hint") : undefined}
                                                 />
                                             </div>
                                             <div className="flex-1 min-h-0">

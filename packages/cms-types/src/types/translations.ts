@@ -1897,6 +1897,8 @@ export interface RebaseTranslations {
     studio_schema_no_tables_declared_body?: string;
     studio_schema_introspect_hint?: string;
     studio_schema_visualizer_source?: string;
+    studio_auth_service_key?: string;
+    studio_auth_service_key_hint?: string;
     studio_schema_visualizer_fit_view?: string;
     studio_schema_visualizer_history_enabled?: string;
     studio_rls_served_tables?: string;

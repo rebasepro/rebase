@@ -28,6 +28,7 @@ const registry = { getCollection: () => undefined };
 import { NO_TABLES } from "./helpers/tableDescriptors";
 
 jest.mock("@rebasepro/app", () => ({
+    useStudioCapabilities: () => ({ codebase: true }),
     useRebaseContext: () => appContext,
     useRebaseClient: () => appClient,
     useApiConfig: () => apiConfig,

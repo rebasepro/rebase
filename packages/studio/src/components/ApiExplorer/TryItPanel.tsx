@@ -1,4 +1,4 @@
-import { useTranslation } from "@rebasepro/app";
+import { toPublicApiUrl, useStudioCapabilities, useTranslation } from "@rebasepro/app";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
     Button,
@@ -35,8 +35,17 @@ interface TryItPanelProps {
  * own token and the {@link IMPERSONATE_HEADER} header, and the server runs it
  * as that user — their uid and roles, under row-level security — or refuses
  * it. It never runs as the administrator instead.
+ *
+ * Under a host whose requests all run as a service key
+ * ({@link StudioCapabilities.requestIdentity}, the hosted console), neither
+ * choice exists: a request without a credential is refused by the proxy, and
+ * the server refuses impersonation from a service key. The panel says what the
+ * request runs as instead, and shows the project's public URL.
  */
 export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = "" }: TryItPanelProps) {
+    const { t } = useTranslation();
+    const capabilities = useStudioCapabilities();
+    const serviceIdentity = capabilities.requestIdentity !== undefined;
     const storageKey = `rebase_apiexplorer_${endpoint.method}_${endpoint.path}`;
 
     const [pathParams, setPathParams] = useState<Record<string, string>>(() => {
@@ -60,14 +69,16 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
         null
     );
     const [loading, setLoading] = useState(false);
-    const [authMode, setAuthMode] = useState<"jwt" | "none">("jwt");
+    const [chosenAuthMode, setAuthMode] = useState<"jwt" | "none">("jwt");
+    const authMode = serviceIdentity ? "jwt" : chosenAuthMode;
     const [validationError, setValidationError] = useState<string | null>(null);
 
     // An administrator is offered the project's users; anyone else, only
     // themselves — the server lets nobody else run a request as someone.
     const { users, currentUser, loading: usersLoading, onSearchTextChange, totalCount: userTotalCount } = useRunAsUsers();
 
-    const [selectedUser, setSelectedUser] = useState<SelectableUser | null>(null);
+    const [chosenUser, setSelectedUser] = useState<SelectableUser | null>(null);
+    const selectedUser = serviceIdentity ? null : chosenUser;
 
     useEffect(() => {
         localStorage.setItem(`${storageKey}_path`, JSON.stringify(pathParams));
@@ -92,6 +103,10 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
         }
         return url;
     }, [apiUrl, basePath, endpoint.path, pathParams, queryParams]);
+
+    // What the URL preview shows: the project's own address when the request
+    // goes through a host's proxy, so a copied URL works outside it.
+    const displayedUrl = toPublicApiUrl(resolvedUrl, apiUrl, capabilities);
 
     const pathParamDefs = endpoint.parameters.filter((p) => p.in === "path");
     const queryParamDefs = endpoint.parameters.filter((p) => p.in === "query");
@@ -174,6 +189,8 @@ time: elapsed });
                     onUserSearchTextChange={onSearchTextChange}
                     userTotalCount={userTotalCount}
                     currentUser={currentUser}
+                    fixedIdentityLabel={serviceIdentity ? t("studio_auth_service_key") : undefined}
+                    fixedIdentityHint={serviceIdentity ? t("studio_auth_service_key_hint") : undefined}
                 />
 
                 {/* Path Params */}
@@ -254,7 +271,7 @@ value: "" }])}
                         Request URL
                     </Typography>
                     <code className="text-xs font-mono text-text-primary dark:text-text-primary-dark break-all">
-                        {resolvedUrl}
+                        {displayedUrl}
                     </code>
                 </div>
 

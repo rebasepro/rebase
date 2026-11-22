@@ -89,6 +89,55 @@ export interface StudioCapabilities {
      * `collectionsDir` has always assumed.
      */
     codebase: boolean;
+    /**
+     * Set when every request the tools make runs as one fixed service
+     * identity, whoever is looking at them.
+     *
+     * The hosted console is the case: it reaches a project through a proxy
+     * that swaps the console's session for the project's service key, and
+     * the tools hold no user session of their own. There, a request cannot
+     * be sent without a credential (the proxy refuses it), cannot be run as
+     * another user (the server refuses impersonation from a service key),
+     * and there is no signed-in account to own personal keys. Tools read
+     * this to stop offering those, and to say what a request runs as.
+     *
+     * Unset — an admin panel beside its own backend — requests run as the
+     * signed-in user, who may send one with no credential or as another user.
+     */
+    requestIdentity?: StudioServiceIdentity;
+}
+
+/**
+ * A fixed identity every Studio request runs as — see
+ * {@link StudioCapabilities.requestIdentity}.
+ */
+export interface StudioServiceIdentity {
+    /** Requests carry the project's service key. */
+    kind: "service-key";
+    /**
+     * The project's public API origin, such as `https://my-app.example.com`.
+     *
+     * The tools' requests go to whatever `apiUrl` the client was built with,
+     * which behind a proxy is the proxy's address. A URL or snippet shown to
+     * be copied names this origin instead, so it works outside the host.
+     * Unset, the URLs shown are the ones requested.
+     */
+    publicApiOrigin?: string;
+}
+
+/**
+ * `url` with its origin swapped for the host's public API origin, when
+ * {@link StudioCapabilities.requestIdentity} names one; otherwise `url` as is.
+ *
+ * For display only — the request itself still goes to `url`. `apiUrl` is the
+ * base `url` was built from: only a `url` under it is rewritten.
+ */
+export function toPublicApiUrl(url: string, apiUrl: string, capabilities: StudioCapabilities): string {
+    const origin = capabilities.requestIdentity?.publicApiOrigin;
+    if (!origin) return url;
+    const base = apiUrl.replace(/\/+$/, "");
+    if (!url.startsWith(base)) return url;
+    return origin.replace(/\/+$/, "") + url.slice(base.length);
 }
 
 // ─── Noop defaults ──────────────────────────────────────────────────

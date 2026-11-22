@@ -951,6 +951,8 @@
     "studio_app_setup_subtitle": ["89b819fa","4afbbcb2","8cd71947","a04805a3","a05e8f90","02df170c","9775bf9b"],
     "studio_app_sign_out": ["48f0d3d3","545f8be3","c6e69603","b18aeed1","41fdf91c","58025f36","1e4e5e9c"],
     "studio_app_signin_subtitle": ["53af4a93","8ad40ab7","1de02bf9","cb6813c7","448bcce5","74ad86d4","8a7c964b"],
+    "studio_auth_service_key": ["f86d3fc8","6fb1b015","525c84d2","b60b7a73","aafba711","e4f70b7d","923df95b"],
+    "studio_auth_service_key_hint": ["54b8abd3","ad37acac","1571babd","80e25839","6a877a25","272e067d","0bea753a"],
     "studio_backups_denied_hint": ["b69ca13c","e096f79f","17a69a09","77b7012e","5ca365a4","9fece685","4e4739d4"],
     "studio_backups_denied_title": ["74e9cc06","5fca15e9","c67dfaf7","93ea27f3","94547fa3","5a5ec5e2","1184a277"],
     "studio_backups_downloading": ["a778d349","f5284528","6f5e3883","ec615205","615cf351","7d0c748f","ba7ce9aa"],

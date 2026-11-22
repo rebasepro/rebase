@@ -1741,6 +1741,8 @@ export const hi: RebaseTranslations = {
     studio_schema_no_tables_declared_body: "अभी बनाने के लिए कुछ नहीं है। backend/schema/ में defineTable से एक टेबल घोषित करें और उसे backend/schema/index.ts से export करें।",
     studio_schema_introspect_hint: "जिस डेटाबेस में पहले से टेबल हैं, वहाँ rebase schema introspect आपके लिए उनकी परिभाषाएँ लिख देता है।",
     studio_schema_visualizer_source: "आपके बैकएंड द्वारा दी गई टेबलों से बनाया गया: टेबल, कॉलम, टाइप और रिलेशन वैसे ही जैसे वह घोषित करता है। केवल RLS चिह्न डेटाबेस से पढ़े जाते हैं।",
+    studio_auth_service_key: "सर्विस कुंजी",
+    studio_auth_service_key_hint: "यहाँ हर अनुरोध प्रोजेक्ट की सर्विस कुंजी से चलता है। ऐसा कोई साइन-इन उपयोगकर्ता नहीं है जिसके रूप में इसे चलाया जाए, और इसे बिना क्रेडेंशियल के नहीं भेजा जा सकता।",
     studio_schema_visualizer_fit_view: "व्यू में फ़िट करें",
     studio_schema_visualizer_history_enabled: "इतिहास सक्षम",
     studio_rls_served_tables: "सर्व की गई टेबल्स",

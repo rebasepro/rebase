@@ -41,6 +41,7 @@ const databaseAdmin = {
 let translate = (key: string): string => en[key as keyof typeof en] ?? key;
 
 jest.mock("@rebasepro/app", () => ({
+    useStudioCapabilities: () => ({ codebase: true }),
     useTranslation: () => ({
         t: (key: string) => translate(key),
         i18n: { language: "en" }

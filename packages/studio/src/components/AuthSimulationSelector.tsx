@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, cls, iconSize, KeyRoundIcon, Typography } from "@rebasepro/ui";
+import { Button, Chip, iconSize, KeyRoundIcon, Typography } from "@rebasepro/ui";
 import { UserSelectPopover, SelectableUser } from "@rebasepro/app";
 
 export interface AuthSimulationSelectorProps {
@@ -14,6 +14,14 @@ export interface AuthSimulationSelectorProps {
     /** How many users that search matched, when `users` is only its first page — see `UserSelectPopover`. */
     userTotalCount?: number;
     currentUser: SelectableUser | null;
+    /**
+     * What every request runs as, when the host fixes it (a service key, in
+     * the hosted console). Set, the selector shows this instead of the auth
+     * modes and the "Run as" picker: neither choice exists there.
+     */
+    fixedIdentityLabel?: string;
+    /** Why the identity is fixed, shown on hover over {@link fixedIdentityLabel}. */
+    fixedIdentityHint?: string;
 }
 
 export function AuthSimulationSelector({
@@ -25,8 +33,24 @@ export function AuthSimulationSelector({
     loading,
     onUserSearchTextChange,
     userTotalCount,
-    currentUser
+    currentUser,
+    fixedIdentityLabel,
+    fixedIdentityHint
 }: AuthSimulationSelectorProps) {
+    if (fixedIdentityLabel !== undefined) {
+        return (
+            <div className="flex flex-wrap items-center gap-3" title={fixedIdentityHint}>
+                <KeyRoundIcon size={iconSize.small} className="text-text-secondary dark:text-text-secondary-dark" />
+                <Typography
+                    variant="caption"
+                    className="text-text-secondary dark:text-text-secondary-dark text-xs font-medium"
+                >
+                    Auth:
+                </Typography>
+                <Chip size="smallest">{fixedIdentityLabel}</Chip>
+            </div>
+        );
+    }
     return (
         <div className="flex flex-wrap items-center gap-3">
             <KeyRoundIcon size={iconSize.small} className="text-text-secondary dark:text-text-secondary-dark" />

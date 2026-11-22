@@ -26,7 +26,7 @@ import {
     AlertCircleIcon,
     CheckCircleIcon
 } from "@rebasepro/ui";
-import { useRebaseClient, useSnackbarController, useTranslation } from "@rebasepro/app";
+import { useRebaseClient, useSnackbarController, useStudioCapabilities, useTranslation } from "@rebasepro/app";
 import {
     ADMIN_ROLE,
     hasAdminRole,
@@ -141,10 +141,14 @@ function useScopeListing(client: RebaseClient | undefined): [ScopeListingState, 
 export function ApiKeysView() {
     const client = useRebaseClient<RebaseClient>();
     const { t } = useTranslation();
-    const [kind, setKind] = useState<ApiKeyKind>("service");
+    // Under a host whose requests all run as a service key there is no
+    // signed-in account to own personal keys: only service keys are shown.
+    const serviceIdentity = useStudioCapabilities().requestIdentity !== undefined;
+    const [chosenKind, setKind] = useState<ApiKeyKind>("service");
+    const kind: ApiKeyKind = serviceIdentity ? "service" : chosenKind;
     const [scopeListing, retryScopes] = useScopeListing(client);
 
-    const tabs = (
+    const tabs = serviceIdentity ? null : (
         <Tabs
             value={kind}
             onValueChange={(value) => setKind(value === "personal" ? "personal" : "service")}

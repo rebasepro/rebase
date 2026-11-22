@@ -42,6 +42,7 @@ const apiConfig = { apiUrl: "http://api.test", apiPath: "/api", getAuthToken: as
 import { NO_TABLES } from "./helpers/tableDescriptors";
 
 jest.mock("@rebasepro/app", () => ({
+    useStudioCapabilities: () => ({ codebase: true }),
     useRebaseContext: () => appContext,
     useRebaseClient: () => appClient,
     useApiConfig: () => apiConfig,

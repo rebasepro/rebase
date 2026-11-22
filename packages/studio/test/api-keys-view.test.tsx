@@ -8,6 +8,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { col, defineTable, summarizeScopes, type ApiKeyMasked } from "@rebasepro/types";
 import { compileTables } from "@rebasepro/common";
 import { readyTables } from "./helpers/tableDescriptors";
+import type { StudioCapabilities } from "@rebasepro/app";
 
 /**
  * The key panel speaks scopes: what a key may call is its scopes, which rows
@@ -44,7 +45,11 @@ const translate = (key: string, vars?: Record<string, string | number>): string 
     return text;
 };
 
+/** What the host says about the tools — per test; the admin panel's default unless set. */
+const host: { capabilities: StudioCapabilities } = { capabilities: { codebase: true } };
+
 jest.mock("@rebasepro/app", () => ({
+    useStudioCapabilities: () => host.capabilities,
     useTranslation: () => ({ t: translate, i18n: { language: "en" } }),
     useRebaseClient: () => client,
     useSnackbarController: () => ({ open: jest.fn() }),
@@ -114,6 +119,7 @@ beforeEach(() => {
     listPersonalKeys.mockResolvedValue({ keys: [] });
     listScopes.mockResolvedValue({ scopes: summarizeScopes(), held: everyScope });
     listRoles.mockResolvedValue({ roles: [] });
+    host.capabilities = { codebase: true };
 });
 
 describe("a key's detail", () => {
@@ -250,5 +256,25 @@ describe("my keys", () => {
         expect(createPersonalKey.mock.calls[0][0]).toEqual({ name: "My laptop", scopes: ["data:read"], expires_at: null });
         expect(createKey).not.toHaveBeenCalled();
         expect(await screen.findByText("rk_live_mine")).toBeTruthy();
+    });
+});
+
+describe("under a host whose requests all run as a service key", () => {
+    // The hosted console: no signed-in account stands behind the tools, so
+    // there is nobody to own a personal key.
+    it("shows service keys only, with no tab for personal keys", async () => {
+        host.capabilities = { codebase: false, requestIdentity: { kind: "service-key" } };
+        listKeys.mockResolvedValue({ keys: [serviceKey({})] });
+        render(<ApiKeysView/>);
+
+        expect(await screen.findByText("Nightly export")).toBeTruthy();
+        expect(screen.queryByText(en.studio_api_keys_tab_personal!)).toBeNull();
+        expect(screen.queryByText(en.studio_api_keys_tab_service!)).toBeNull();
+        expect(listPersonalKeys).not.toHaveBeenCalled();
+    });
+
+    it("keeps both tabs when the host leaves the identity to the signed-in user", async () => {
+        render(<ApiKeysView/>);
+        expect(await screen.findByText(en.studio_api_keys_tab_personal!)).toBeTruthy();
     });
 });

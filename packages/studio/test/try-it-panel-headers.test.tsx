@@ -18,7 +18,14 @@ const session: { user: { uid: string; email: string; roles: string[] } | null; c
     client: undefined
 };
 
+/** What the host says about the tools — per test; the admin panel's default unless set. */
+const host: { capabilities: StudioCapabilities } = { capabilities: { codebase: true } };
+
 jest.mock("@rebasepro/app", () => ({
+    useStudioCapabilities: () => host.capabilities,
+    toPublicApiUrl: jest.requireActual<typeof import("../../app/src/hooks/useStudioBridge")>(
+        "../../app/src/hooks/useStudioBridge"
+    ).toPublicApiUrl,
     useRebaseContext: () => ({ authController: { user: session.user } }),
     useTranslation: () => ({ t: (key: string) => key }),
     useRebaseClient: () => session.client,
@@ -37,6 +44,7 @@ jest.mock("@rebasepro/app", () => ({
 
 import { TryItPanel } from "../src/components/ApiExplorer/TryItPanel";
 import type { ParsedEndpoint } from "../src/components/ApiExplorer/types";
+import type { StudioCapabilities } from "@rebasepro/app";
 
 const listPosts: ParsedEndpoint = {
     id: "get-data-posts",
@@ -59,6 +67,7 @@ beforeEach(() => {
     global.fetch = fetchMock;
     session.user = null;
     session.client = undefined;
+    host.capabilities = { codebase: true };
 });
 
 describe("a fresh Try-it request", () => {
@@ -72,6 +81,9 @@ describe("a fresh Try-it request", () => {
             />
         );
 
+        // The admin panel's own choices, which the service-key host drops.
+        expect(screen.getByRole("button", { name: /No Auth/ })).toBeTruthy();
+        expect(screen.getByText("http://api.test/data/posts")).toBeTruthy();
         fireEvent.click(screen.getByRole("button", { name: /Send Request/ }));
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalled());
@@ -134,5 +146,77 @@ describe("running a request as another user", () => {
 
         expect(await screen.findByRole("button", { name: "Run as member@example.test" })).toBeTruthy();
         expect(listUsersPaginated).not.toHaveBeenCalled();
+    });
+});
+
+describe("under a host whose requests all run as a service key", () => {
+    /*
+     * The hosted console: a proxy swaps the console's session for the
+     * project's service key. A request with no credential is refused there,
+     * and the server refuses x-rebase-impersonate from a service key, so
+     * neither "No Auth" nor "Run as" may be offered.
+     */
+    beforeEach(() => {
+        host.capabilities = {
+            codebase: false,
+            requestIdentity: { kind: "service-key", publicApiOrigin: "https://my-app.example.com" }
+        };
+    });
+
+    it("says it runs as the service key and offers neither No Auth nor Run as", async () => {
+        session.user = { uid: "admin-1", email: "admin@example.test", roles: ["admin"] };
+        session.client = { admin: { listUsersPaginated: jest.fn(async () => ({ users: [], total: 0, limit: 50, offset: 0 })) } };
+
+        render(
+            <TryItPanel
+                endpoint={listPosts}
+                apiUrl="https://console.test/api/functions/studio/p1/proxy"
+                getAuthToken={async () => "console-session"}
+                user={null}
+                basePath="/api"
+            />
+        );
+
+        expect(screen.getByText("studio_auth_service_key")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: /No Auth/ })).toBeNull();
+        expect(screen.queryByRole("button", { name: /JWT Token/ })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Run as / })).toBeNull();
+    });
+
+    it("sends the host's credential and no impersonation header, to the proxy", async () => {
+        render(
+            <TryItPanel
+                endpoint={listPosts}
+                apiUrl="https://console.test/api/functions/studio/p1/proxy"
+                getAuthToken={async () => "console-session"}
+                user={null}
+                basePath="/api"
+            />
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: /Send Request/ }));
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+        const [url, init] = fetchMock.mock.calls[0];
+        expect(String(url)).toBe("https://console.test/api/functions/studio/p1/proxy/api/data/posts");
+        expect(init?.headers).toEqual({
+            "Content-Type": "application/json",
+            Authorization: "Bearer console-session"
+        });
+    });
+
+    it("shows the project's public URL, not the proxy's", () => {
+        render(
+            <TryItPanel
+                endpoint={listPosts}
+                apiUrl="https://console.test/api/functions/studio/p1/proxy"
+                getAuthToken={async () => "console-session"}
+                user={null}
+                basePath="/api"
+            />
+        );
+
+        expect(screen.getByText("https://my-app.example.com/api/data/posts")).toBeTruthy();
+        expect(screen.queryByText(/console\.test/)).toBeNull();
     });
 });

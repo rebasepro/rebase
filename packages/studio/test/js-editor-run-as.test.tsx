@@ -28,10 +28,15 @@ const listUsersPaginated = jest.fn(async (_options?: { search?: string; limit?: 
 const built: Array<Record<string, unknown>> = [];
 /** How many of those clients were released after their run. */
 let closed = 0;
+/** What the host says about the tools — per test; the admin panel's default unless set. */
+const host: { capabilities: { codebase: boolean; requestIdentity?: { kind: "service-key"; publicApiOrigin?: string } } } = {
+    capabilities: { codebase: true }
+};
 
 import { NO_TABLES } from "./helpers/tableDescriptors";
 
 jest.mock("@rebasepro/app", () => ({
+    useStudioCapabilities: () => host.capabilities,
     useRebaseContext: () => ({
         authController: { user: { uid: "admin-1", email: "admin@example.test", displayName: null, roles: session.roles } }
     }),
@@ -90,6 +95,7 @@ beforeEach(() => {
     closed = 0;
     listUsersPaginated.mockClear();
     session.roles = ["admin"];
+    host.capabilities = { codebase: true };
 });
 
 describe("the JS editor's Run as", () => {
@@ -128,5 +134,23 @@ describe("the JS editor's Run as", () => {
         expect(await screen.findByRole("button", { name: "Run as admin@example.test" })).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Run as b@example.test" })).toBeNull();
         expect(listUsersPaginated).not.toHaveBeenCalled();
+    });
+});
+
+describe("the JS editor under a host whose requests all run as a service key", () => {
+    // The hosted console: the server refuses impersonation from a service
+    // key, so a "Run as" would only ever answer 403.
+    it("offers no Run as, says it runs as the service key, and runs through the app's own client", async () => {
+        host.capabilities = { codebase: false, requestIdentity: { kind: "service-key" } };
+        render(<JSEditor/>);
+
+        expect(await screen.findByText("studio_auth_service_key")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: /^Run as / })).toBeNull();
+        expect(screen.queryByRole("button", { name: /No Auth/ })).toBeNull();
+
+        runScript("return client.data.whoami;");
+
+        expect(await screen.findByText(/the administrator's own client/)).toBeTruthy();
+        expect(built).toHaveLength(0);
     });
 });

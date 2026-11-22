@@ -52,6 +52,7 @@ const cmsCollections: Record<string, { slug: string; name: string }> = {
 const registry = { getCollection: (slug: string) => cmsCollections[slug] };
 
 jest.mock("@rebasepro/app", () => ({
+    useStudioCapabilities: () => ({ codebase: true }),
     useRebaseContext: () => appContext,
     useRebaseClient: () => appClient,
     useApiConfig: () => apiConfig,
