@@ -1,8 +1,8 @@
 ---
-sourceHash: 51ad2b8ffc5dc3c7
+sourceHash: 8250c897b7861c24
 title: Redirecionamentos e URLs limpas
 sidebar_label: Redirecionamentos e URLs Limpas
-description: "Um app estático no rebase.json pode responder a requisições com redirecionamentos (correspondência :param estilo Vercel, condições de host e query) e servir x.html em /x com cleanUrls."
+description: "Um app estático no rebase.json pode responder a requisições com redirecionamentos (correspondência :param estilo Vercel, condições de host, host negado e query) e servir x.html em /x com cleanUrls."
 ---
 
 <span class="since-badge" data-since="0.35">Desde 0.35</span>
@@ -33,9 +33,25 @@ Um app estático pode responder a algumas requisições com um redirecionamento 
 - **`to`** é um caminho no mesmo endereço ou uma URL absoluta `http://` ou `https://`. Cada `:name` nele é substituído pelo que `from` capturou, em seu caminho ou query. Um parâmetro no hostname de uma URL é recusado.
 - **`status`** é `301`, `302`, `307` ou `308`. Se omitido, é `308`: permanente, e o método é mantido.
 - **`host`** limita um redirecionamento a requisições para um hostname. Em um app cujo `path` especifica um hostname, ele só pode ser esse.
+- **`notHost`** o limita a requisições para qualquer hostname exceto um. Não pode ser usado junto com `host`, e em um app cujo `path` especifica um hostname ele não pode ser esse, já que o redirecionamento nunca corresponderia.
 - **`query`** o limita a requisições cuja query string contenha cada parâmetro exatamente com aquele valor, comparado após a decodificação. `""` corresponde a um parâmetro presente sem valor (`?preview` ou `?preview=`); não há caractere curinga.
 
 A query string da requisição é repassada a menos que `to` tenha uma própria. Os redirecionamentos são verificados na ordem em que estão escritos, antes de qualquer arquivo do build, e o primeiro que corresponder responde. Um caminho que uma das [`routes`](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) do app envia para uma função pertence à função, e os caminhos do backend (`/api`, `/health` e os demais) nunca são redirecionados. O `rebase.json` é recusado quando um redirecionamento nunca puder corresponder (um `from` fora do app, ou sob o caminho de outro app), quando dois redirecionamentos corresponderem às mesmas requisições, e quando um redirecionamento enviar uma requisição para um caminho com o qual seu próprio `from` coincida novamente, o que causaria um loop infinito.
+
+## Um caminho, uma página diferente por hostname
+
+<span class="since-badge" data-since="0.35">Desde 0.35</span>
+
+Um app servido em vários hostnames pode enviar o mesmo caminho para uma página diferente em cada um. Aqui `/` abre o app em `app.example.com` e a demo em todos os outros hostnames:
+
+```json
+"redirects": [
+  { "from": "/", "host": "app.example.com", "to": "/app.html", "status": 307 },
+  { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
+]
+```
+
+Sem `notHost`, o segundo redirecionamento pode não ter nenhuma condição: a primeira correspondência responde, então ele só vê o que o primeiro deixou passar. `notHost` faz cada redirecionamento dizer por conta própria onde se aplica, como faz uma condição `missing` do `vercel.json`, de modo que a ordem deixa de importar.
 
 ## Enviando um domínio para outro
 
@@ -72,7 +88,8 @@ Com `"cleanUrls": true`, `/privacidad` serve `privacidad.html` e `/legal/terms` 
   "redirects": [
     { "source": "/blog/:slug", "destination": "/posts/:slug", "permanent": true },
     { "source": "/:path*", "has": [{ "type": "host", "value": "example.com" }], "destination": "https://www.example.com/:path*" },
-    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false }
+    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false },
+    { "source": "/", "missing": [{ "type": "host", "value": "app.example.com" }], "destination": "/demo.html", "permanent": false }
   ]
 }
 ```
@@ -85,7 +102,8 @@ torna-se, no app estático em `rebase.json`:
   "redirects": [
     { "from": "/blog/:slug", "to": "/posts/:slug" },
     { "from": "/:path*", "host": "example.com", "to": "https://www.example.com/:path*" },
-    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 }
+    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 },
+    { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
   ]
 }
 ```
@@ -99,9 +117,10 @@ torna-se, no app estático em `rebase.json`:
 | `statusCode` | `status` |
 | `has` de `"type": "host"` | `host` |
 | `has` de `"type": "query"` com um `value` | `query` |
+| `missing` de `"type": "host"` | `notHost` |
 | `cleanUrls` | `cleanUrls` |
 
-Um projeto da Vercel por domínio se torna um app estático por hostname, como em [Enviando um domínio para outro](#enviando-um-domínio-para-outro). Condições em um cabeçalho ou cookie, e expressões regulares em `source`, são lógica: uma [rota](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) encaminha tal caminho para uma função, que pode responder com qualquer redirecionamento que decidir.
+Um projeto da Vercel por domínio se torna um app estático por hostname, como em [Enviando um domínio para outro](#enviando-um-domínio-para-outro). Condições em um cabeçalho ou cookie, um parâmetro de query `missing` e expressões regulares em `source`, são lógica: uma [rota](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) encaminha tal caminho para uma função, que pode responder com qualquer redirecionamento que decidir.
 
 ## Onde eles se aplicam
 

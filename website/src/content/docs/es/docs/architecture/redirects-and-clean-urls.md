@@ -1,8 +1,8 @@
 ---
-sourceHash: 51ad2b8ffc5dc3c7
+sourceHash: 8250c897b7861c24
 title: Redirecciones y URLs limpias
 sidebar_label: Redirecciones y URLs limpias
-description: "Una aplicación estática en rebase.json puede responder solicitudes con redirecciones (coincidencia de :param al estilo Vercel, condiciones de host y consulta) y servir x.html en /x con cleanUrls."
+description: "Una aplicación estática en rebase.json puede responder solicitudes con redirecciones (coincidencia de :param al estilo Vercel, condiciones de host, host negado y consulta) y servir x.html en /x con cleanUrls."
 ---
 
 <span class="since-badge" data-since="0.35">Desde 0.35</span>
@@ -33,9 +33,25 @@ Una aplicación estática puede responder a ciertas solicitudes con una redirecc
 - **`to`** es una ruta en la misma dirección o una URL absoluta `http://` o `https://`. Cada `:name` en ella se reemplaza por lo que capturó `from`, en su ruta o consulta. Se rechaza un parámetro en el nombre de host de una URL.
 - **`status`** es `301`, `302`, `307` o `308`. Si se omite, es `308`: permanente y se mantiene el método.
 - **`host`** limita una redirección a solicitudes para un único nombre de host. En una aplicación cuyo `path` especifica un nombre de host, solo puede ser ese.
+- **`notHost`** la limita a solicitudes para cualquier nombre de host salvo uno. No puede combinarse con `host`, y en una aplicación cuyo `path` especifica un nombre de host no puede ser ese, ya que la redirección nunca coincidiría.
 - **`query`** la limita a solicitudes cuya cadena de consulta contenga cada parámetro exactamente con ese valor, comparado después de decodificar. `""` coincide con un parámetro presente sin valor (`?preview` o `?preview=`); no hay comodín.
 
 La cadena de consulta de la solicitud se transfiere a menos que `to` tenga una propia. Las redirecciones se evalúan en el orden en que están escritas, antes de cualquier archivo de la compilación, y responde la primera que coincida. Una ruta que una de las [`routes`](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) de la aplicación envía a una función pertenece a la función, y las rutas del backend (`/api`, `/health` y el resto) nunca se redirigen. `rebase.json` se rechaza cuando una redirección nunca podría coincidir (un `from` fuera de la aplicación o bajo la ruta de otra aplicación), cuando dos redirecciones coinciden con las mismas solicitudes y cuando una redirección envía una solicitud a una ruta con la que su propio `from` vuelve a coincidir, lo que crearía un bucle infinito.
+
+## Una ruta, una página distinta por nombre de host
+
+<span class="since-badge" data-since="0.35">Desde 0.35</span>
+
+Una aplicación servida en varios nombres de host puede enviar la misma ruta a una página distinta en cada uno. Aquí `/` abre la aplicación en `app.example.com` y la demo en cualquier otro nombre de host:
+
+```json
+"redirects": [
+  { "from": "/", "host": "app.example.com", "to": "/app.html", "status": 307 },
+  { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
+]
+```
+
+Sin `notHost`, la segunda redirección podría no tener ninguna condición: responde la primera que coincida, así que solo ve lo que la primera dejó pasar. `notHost` hace que cada redirección diga por sí sola dónde se aplica, como lo hace una condición `missing` de `vercel.json`, de modo que el orden deja de importar.
 
 ## Enviar un dominio a otro
 
@@ -72,7 +88,8 @@ Con `"cleanUrls": true`, `/privacidad` sirve `privacidad.html` y `/legal/terms` 
   "redirects": [
     { "source": "/blog/:slug", "destination": "/posts/:slug", "permanent": true },
     { "source": "/:path*", "has": [{ "type": "host", "value": "example.com" }], "destination": "https://www.example.com/:path*" },
-    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false }
+    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false },
+    { "source": "/", "missing": [{ "type": "host", "value": "app.example.com" }], "destination": "/demo.html", "permanent": false }
   ]
 }
 ```
@@ -85,7 +102,8 @@ se convierte, en la aplicación estática en `rebase.json`, en:
   "redirects": [
     { "from": "/blog/:slug", "to": "/posts/:slug" },
     { "from": "/:path*", "host": "example.com", "to": "https://www.example.com/:path*" },
-    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 }
+    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 },
+    { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
   ]
 }
 ```
@@ -99,9 +117,10 @@ se convierte, en la aplicación estática en `rebase.json`, en:
 | `statusCode` | `status` |
 | `has` de `"type": "host"` | `host` |
 | `has` de `"type": "query"` con un `value` | `query` |
+| `missing` de `"type": "host"` | `notHost` |
 | `cleanUrls` | `cleanUrls` |
 
-Un proyecto de Vercel por dominio se convierte en una aplicación estática por nombre de host, como en [Enviar un dominio a otro](#enviar-un-dominio-a-otro). Las condiciones sobre un encabezado o una cookie, y las expresiones regulares en `source`, son lógica: una [ruta](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) entrega dicha ruta a una función, que puede responder con cualquier redirección que decida.
+Un proyecto de Vercel por dominio se convierte en una aplicación estática por nombre de host, como en [Enviar un dominio a otro](#enviar-un-dominio-a-otro). Las condiciones sobre un encabezado o una cookie, un parámetro de consulta `missing` y las expresiones regulares en `source`, son lógica: una [ruta](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) entrega dicha ruta a una función, que puede responder con cualquier redirección que decida.
 
 ## Dónde se aplican
 

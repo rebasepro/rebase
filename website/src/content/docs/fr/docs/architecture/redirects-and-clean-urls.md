@@ -1,8 +1,8 @@
 ---
-sourceHash: 51ad2b8ffc5dc3c7
+sourceHash: 8250c897b7861c24
 title: Redirections et URLs propres
 sidebar_label: Redirections & URLs propres
-description: "Une application statique dans rebase.json peut répondre aux requêtes par des redirections (correspondance :param façon Vercel, conditions d'hôte et de requête) et servir x.html à l'adresse /x avec cleanUrls."
+description: "Une application statique dans rebase.json peut répondre aux requêtes par des redirections (correspondance :param façon Vercel, conditions d'hôte, d'hôte exclu et de requête) et servir x.html à l'adresse /x avec cleanUrls."
 ---
 
 <span class="since-badge" data-since="0.35">Depuis 0.35</span>
@@ -41,6 +41,9 @@ Une application statique peut répondre à certaines requêtes par une redirecti
   et la méthode est conservée.
 - **`host`** limite une redirection aux requêtes destinées à un seul nom d'hôte. Sur une application dont
   le `path` spécifie un nom d'hôte, il ne peut s'agir que de celui-ci.
+- **`notHost`** la limite aux requêtes destinées à tous les noms d'hôte sauf un. Il ne peut pas être
+  combiné avec `host`, et sur une application dont le `path` spécifie un nom d'hôte, il ne peut pas s'agir de
+  celui-ci, puisque la redirection ne correspondrait jamais.
 - **`query`** la limite aux requêtes dont la chaîne de requête (query string) contient chaque paramètre
   avec exactement cette valeur, comparée après décodage. `""` correspond à un paramètre
   présent sans valeur (`?preview` ou `?preview=`) ; il n'y a pas de caractère générique.
@@ -54,6 +57,21 @@ redirigés. `rebase.json` est refusé lorsqu'une redirection ne pourrait jamais 
 `from` en dehors de l'application, ou sous le chemin d'une autre application), lorsque deux redirections correspondent
 aux mêmes requêtes, et lorsqu'une redirection envoie une requête vers un chemin auquel son propre
 `from` correspond à nouveau, ce qui provoquerait une boucle infinie.
+
+## Un chemin, une page différente par nom d'hôte
+
+<span class="since-badge" data-since="0.35">Depuis 0.35</span>
+
+Une application servie sur plusieurs noms d'hôte peut envoyer le même chemin vers une page différente sur chacun. Ici, `/` ouvre l'application sur `app.example.com` et la démo sur tous les autres noms d'hôte :
+
+```json
+"redirects": [
+  { "from": "/", "host": "app.example.com", "to": "/app.html", "status": 307 },
+  { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
+]
+```
+
+Sans `notHost`, la seconde redirection peut n'avoir aucune condition : la première qui correspond répond, donc elle ne voit que ce que la première a laissé passer. `notHost` fait que chaque redirection dit d'elle-même où elle s'applique, comme le fait une condition `missing` de `vercel.json`, si bien que l'ordre n'a plus d'importance.
 
 ## Rediriger un domaine vers un autre
 
@@ -103,7 +121,8 @@ avec `spa: false` répond par une 404.
   "redirects": [
     { "source": "/blog/:slug", "destination": "/posts/:slug", "permanent": true },
     { "source": "/:path*", "has": [{ "type": "host", "value": "example.com" }], "destination": "https://www.example.com/:path*" },
-    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false }
+    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false },
+    { "source": "/", "missing": [{ "type": "host", "value": "app.example.com" }], "destination": "/demo.html", "permanent": false }
   ]
 }
 ```
@@ -116,7 +135,8 @@ devient, sur l'application statique dans `rebase.json` :
   "redirects": [
     { "from": "/blog/:slug", "to": "/posts/:slug" },
     { "from": "/:path*", "host": "example.com", "to": "https://www.example.com/:path*" },
-    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 }
+    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 },
+    { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
   ]
 }
 ```
@@ -130,11 +150,12 @@ devient, sur l'application statique dans `rebase.json` :
 | `statusCode` | `status` |
 | `has` avec `"type": "host"` | `host` |
 | `has` avec `"type": "query"` et une `value` | `query` |
+| `missing` avec `"type": "host"` | `notHost` |
 | `cleanUrls` | `cleanUrls` |
 
 Un projet Vercel par domaine devient une application statique par nom d'hôte, comme dans
 [Rediriger un domaine vers un autre](#rediriger-un-domaine-vers-un-autre). Les conditions sur un
-en-tête ou un cookie, ainsi que les expressions régulières dans `source`, relèvent de la logique : une
+en-tête ou un cookie, un paramètre de requête `missing`, ainsi que les expressions régulières dans `source`, relèvent de la logique : une
 [route](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) confie un tel chemin à une
 fonction, qui peut répondre avec la redirection de son choix.
 
