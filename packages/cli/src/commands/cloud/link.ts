@@ -29,8 +29,9 @@ import {
     cloudRows,
     grantForLink
 } from "./context";
+import { createProject } from "./projects";
 
-interface ProjectRow {
+export interface ProjectRow {
     id: string | number;
     name?: string;
     subdomain?: string;
@@ -115,6 +116,35 @@ async function linkDirect(target: string, rawArgs: string[]): Promise<void> {
     void rawArgs;
 }
 
+/** The picker's value for "make a new project and link it", beside the project rows. */
+export const CREATE_NEW_PROJECT = "__create_new_project__";
+
+/**
+ * The choices `rebase cloud link` offers, with creating a project first and
+ * therefore the default. With only the existing projects listed, one Enter on
+ * a fresh scaffold linked it to whichever project came first (a live one), and
+ * the next `rebase cloud deploy` would have sent this app there.
+ */
+export function linkPickerChoices(projects: ProjectRow[]): Array<{ name: string; value: ProjectRow | typeof CREATE_NEW_PROJECT }> {
+    return [
+        { name: `${chalk.bold("Create a new project")}  ${chalk.gray("for this directory")}`, value: CREATE_NEW_PROJECT },
+        ...projects.map((p) => ({
+            name: `${p.name ?? "(unnamed)"}  ${chalk.gray(String(p.subdomain ?? ""))}`,
+            value: p
+        }))
+    ];
+}
+
+/**
+ * The line `projects create --link` is run with from the picker: the same
+ * process and the same control plane (`--url`, when it was named).
+ */
+export function createFromLinkArgs(launcher: readonly string[], url: string | undefined): string[] {
+    // Only the interpreter and script words are kept: the rest of the link line
+    // was already parsed by `linkCommand`.
+    return [launcher[0] ?? "node", launcher[1] ?? "rebase", "cloud", "projects", "create", "--link", ...(url ? ["--url", url] : [])];
+}
+
 export async function linkCommand(rawArgs: string[]): Promise<void> {
     // `--project` is a global, so the spec is empty: declaring it here would
     // replace the global in the merge while the global's other readers went on
@@ -172,25 +202,23 @@ export async function linkCommand(rawArgs: string[]): Promise<void> {
                 limit: 100
             })).data);
 
-            if (projects.length === 0) {
-                fail(
-                    "No projects found for your account.",
-                    `Create one with ${chalk.bold("rebase cloud projects create")}.`,
-                    "no_projects"
-                );
+            // No projects is not a dead end: there is one thing to do, so do it.
+            const { picked } = projects.length === 0
+                ? { picked: CREATE_NEW_PROJECT }
+                : await inquirer.prompt([
+                    {
+                        type: "select",
+                        name: "picked",
+                        message: "Link this directory to:",
+                        choices: linkPickerChoices(projects),
+                        default: CREATE_NEW_PROJECT
+                    }
+                ] as Parameters<typeof inquirer.prompt>[0]);
+            if (picked === CREATE_NEW_PROJECT) {
+                if (projects.length === 0) note(chalk.gray("No projects in this organization yet: creating one."));
+                await createProject(createFromLinkArgs(rawArgs.slice(0, 2), args["--url"]));
+                return;
             }
-
-            const { picked } = await inquirer.prompt([
-                {
-                    type: "select",
-                    name: "picked",
-                    message: "Select a project to link:",
-                    choices: projects.map((p) => ({
-                        name: `${p.name ?? "(unnamed)"}  ${chalk.gray(String(p.subdomain ?? ""))}`,
-                        value: p
-                    }))
-                }
-            ] as Parameters<typeof inquirer.prompt>[0]);
             project = picked as ProjectRow;
         }
 

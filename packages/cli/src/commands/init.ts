@@ -184,6 +184,10 @@ export interface BuildQuestionsParams {
     hasGitFlag: boolean;
     hasInstallFlag: boolean;
     pm: PackageManager;
+    /** `--database-url`, already checked: its question is not asked. */
+    databaseUrlArg?: string;
+    /** `--introspect`: its question is not asked, and neither is the template's. */
+    introspectArg?: boolean;
 }
 
 /**
@@ -236,8 +240,24 @@ function scaffoldConflictLine(dir: string): string | null {
     return `"${path.basename(dir)}" already holds files a new project would overwrite or mix with (${shown}). Choose another name.`;
 }
 
+/**
+ * The database an interactive `init` scaffolds against: a flag wins over the
+ * prompt, which is not asked when the flag was passed. Introspection needs a
+ * database to read, so `--introspect` with a blank answer introspects nothing.
+ */
+export function resolveInteractiveDatabase(params: {
+    databaseUrlArg?: string;
+    introspectArg?: boolean;
+    answers: { databaseUrl?: unknown; introspect?: unknown };
+}): { databaseUrl?: string; introspect: boolean } {
+    const { databaseUrlArg, introspectArg, answers } = params;
+    const answered = typeof answers.databaseUrl === "string" ? answers.databaseUrl.trim() : "";
+    const databaseUrl = databaseUrlArg || answered || undefined;
+    return { databaseUrl, introspect: !!databaseUrl && (introspectArg === true || answers.introspect === true) };
+}
+
 export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[] {
-    const { nameArg, templateArg, headlessArg, hasGitFlag, hasInstallFlag, pm } = params;
+    const { nameArg, templateArg, headlessArg, hasGitFlag, hasInstallFlag, pm, databaseUrlArg, introspectArg } = params;
     const questions: InitQuestion[] = [];
 
     if (!nameArg) {
@@ -271,8 +291,9 @@ export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[]
             message: "Choose a starter template:",
             choices: PRESET_CHOICES,
             default: "blog",
-            // A headless project has no schema files, so a preset is moot.
-            when: (answers: Record<string, unknown>) => !(headlessArg ?? answers.headless)
+            // A headless project has no schema files, so a preset is moot; and
+            // `--introspect` takes its tables from the database (it implies blank).
+            when: (answers: Record<string, unknown>) => !(headlessArg ?? answers.headless) && !introspectArg
         });
     }
 
@@ -294,7 +315,10 @@ export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[]
         });
     }
 
-    questions.push({
+    // A flag that was passed is never asked again: `init --database-url … --introspect`
+    // on a terminal used to ask for the connection string anyway, and the blank
+    // default replaced the flag with the managed database.
+    if (!databaseUrlArg) questions.push({
         type: "input",
         name: "databaseUrl",
         message: "PostgreSQL connection string (blank = a managed database for this project, no setup):",
@@ -311,12 +335,12 @@ export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[]
         }
     });
 
-    questions.push({
+    if (!introspectArg) questions.push({
         type: "confirm",
         name: "introspect",
         message: "Would you like to introspect this database to generate backend/schema from its tables?",
         default: true,
-        when: (answers: Record<string, unknown>) => !!(answers.databaseUrl as string)?.trim()
+        when: (answers: Record<string, unknown>) => !!(databaseUrlArg || (answers.databaseUrl as string)?.trim())
     });
 
     return questions;
@@ -549,11 +573,14 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         headlessArg,
         hasGitFlag: !!args["--git"],
         hasInstallFlag,
-        pm
+        pm,
+        databaseUrlArg,
+        introspectArg: args["--introspect"] === true
     });
 
 
     const answers = await inquirer.prompt(questions);
+    const database = resolveInteractiveDatabase({ databaseUrlArg, introspectArg: args["--introspect"] === true, answers });
     const agents = namedAgents ?? await promptForAgents();
 
     const targetDirectory = path.resolve(process.cwd(), nameArg || answers.projectName);
@@ -567,8 +594,8 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         installDeps: noInstall ? false : (args["--install"] || answers.installDeps || false),
         targetDirectory,
         templateDirectory,
-        databaseUrl: (answers.databaseUrl as string)?.trim() || undefined,
-        introspect: answers.introspect || false,
+        databaseUrl: database.databaseUrl,
+        introspect: database.introspect,
         preset: templateArg || (answers.preset as TemplatePreset) || "blog",
         // Only a flag is "explicit" here: the interactive path never asks for a
         // preset once baas is chosen, so it can't produce a conflicting answer.

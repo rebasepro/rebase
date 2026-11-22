@@ -44,6 +44,8 @@
 
 ### Fixed
 
+- **`rebase cloud link` offers to create a project, and that is the default.** The picker listed only existing projects with the first one selected, so one Enter on a fresh scaffold linked it to a live project, and the next `rebase cloud deploy` would have shipped the scaffold there. "Create a new project" now comes first and runs `rebase cloud projects create --link`, billing confirmation included; an organization with no projects goes straight to it instead of failing.
+- **`rebase init --database-url <url> --introspect` on a terminal uses that database.** The interactive path asked for a template and a connection string anyway, and the blank default replaced the flag: the project got the Blog template on the managed database, and nothing was introspected. A flag that was passed is no longer asked for, and `--introspect` skips the template question.
 - **`rebase cloud link <slug>` links that project.** The slug was dropped: on a terminal the picker opened, and without one the command asked for `--project`.
 - **Every command that looks for the local backend asks the `rebase dev` that is running.** A backend left behind by a killed `rebase dev` rewrote `.rebase/state.json` with its own port, so `rebase auth emails` asked 3083 while `rebase dev` served 3082 and reported an empty mailbox. `rebase dev` records its pid and port in `.rebase/dev.json`, read first, and each record counts only while its process is alive. When the mailbox is empty, `rebase auth emails` names the server it asked.
 - **`rebase db push` says when a `rebase dev` on the same database is running.** That server applies new tables and columns as you save, so a dry run beside it said "No changes" for columns added a minute earlier.
