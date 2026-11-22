@@ -1,5 +1,5 @@
 ---
-sourceHash: 073c10d60856c91c
+sourceHash: daa75b0f6ab9dbdf
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist das gleiche Rebase, für Sie betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die Private Beta noch nicht enthält.
@@ -27,7 +27,8 @@ Ein Cloud-**Projekt** besteht aus drei Komponenten, die die Plattform für Sie b
 | **Datenbank** | Ein verwaltetes PostgreSQL mit automatisierten Backups und Point-in-Time-Recovery |
 | **Storage** | Ein eigener Bucket, falls Ihr Projekt Dateispeicher verwendet |
 
-Jede Komponente wird beim ersten Deployment bereitgestellt und nach der reservierten
+App und Datenbank werden beim ersten Deployment bereitgestellt, ein Bucket nur,
+wenn Sie einen anfordern ([Dateispeicher](#dateispeicher)). Alles wird nach der reservierten
 Kapazität abgerechnet, nicht pro Arbeitsplatz (Seat).
 
 **An Ihrem Projekt ändert sich nichts, um dort zu laufen.** Dasselbe Repository
@@ -234,6 +235,28 @@ E-Mails für Ihre App: Setzen Sie `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_P
 mit `rebase cloud env set` und führen Sie anschließend das Deployment durch. `status` liest dies
 über das app-eigene `GET /api/auth/config` (Feld `unavailable`) aus, und `deploy` weist im Rahmen
 seines Live-Checks ebenfalls darauf hin.
+
+## Dateispeicher
+
+Ein neues Projekt hat keinen Bucket: Uploads werden mit `501 STORAGE_NOT_CONFIGURED`
+abgelehnt, und die Deploy-Zusammenfassung sagt es, statt auf eine Festplatte zu schreiben, die jedes Deployment ersetzt.
+
+Geben Sie ihm eine der beiden Arten und deployen Sie erneut, damit die App sie übernimmt:
+
+```bash
+# Ein Bucket, den Rebase für Sie betreibt. Die Storage-Seite der Konsole macht dasselbe.
+rebase cloud storage create
+
+# Oder Ihr eigener S3-kompatibler Bucket: AWS S3, Cloudflare R2, Backblaze B2, MinIO…
+rebase cloud storage attach --bucket <name> \
+  --access-key-id <id> --secret-access-key <secret> \
+  --endpoint <url>        # für AWS weglassen; für MinIO --force-path-style hinzufügen
+
+rebase cloud deploy
+```
+
+`rebase cloud storage` listet die Buckets des Projekts. Ein Projekt mit mehreren
+hängt jeden mit `--source <key>` an; eines, das Speicher im Code konfiguriert, braucht keins von beiden.
 
 ## Vorschau einer Änderung (Preview)
 

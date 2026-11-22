@@ -1,5 +1,5 @@
 ---
-sourceHash: 073c10d60856c91c
+sourceHash: daa75b0f6ab9dbdf
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -23,7 +23,7 @@ Um **projeto** Cloud são três coisas que a plataforma opera para você:
 | **Database** | Um PostgreSQL gerenciado, com backups automatizados e point-in-time recovery |
 | **Storage** | Um bucket próprio, se o seu projeto usar armazenamento de arquivos |
 
-Cada um é provisionado quando você faz o primeiro deploy, e cada um é faturado pelo que reserva, em vez de por usuário.
+O app e o banco de dados são provisionados quando você faz o primeiro deploy; um bucket, só quando você pede um ([Armazenamento de arquivos](#armazenamento-de-arquivos)). Cada um é faturado pelo que reserva, em vez de por usuário.
 
 **Nada no seu projeto muda para rodar lá.** O mesmo repositório pode ser auto-hospedado com `docker compose`, e a rota de escape é real: `rebase build` produz um bundle que inicializa em qualquer lugar onde a imagem de runtime execute.
 
@@ -131,6 +131,28 @@ rebase cloud status             # what the platform thinks the project is doing
 O `status` relata `blockedOn` e `nextAction`. Quando `blockedOn` for `null`, a plataforma está trabalhando ativamente e fazer polling é a atitude correta; quando indicar algo, esse algo está esperando por você.
 
 Um deles é `email_not_configured`: o aplicativo ativou o login por magic-link ou código por e-mail (`AUTH_MAGIC_LINK`, `AUTH_EMAIL_OTP`) e não possui serviço de e-mail configurado, de modo que o deployment está ativo mas ninguém consegue fazer login. O Rebase Cloud não envia e-mails para o seu aplicativo: configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` e `SMTP_FROM` com `rebase cloud env set` e depois faça o deploy. O `status` lê isso a partir do próprio `GET /api/auth/config` do app (seu campo `unavailable`), e o `deploy` informa o mesmo em sua verificação de disponibilidade (live check).
+
+## Armazenamento de arquivos
+
+Um projeto novo não tem bucket: os uploads são recusados com `501 STORAGE_NOT_CONFIGURED`,
+e o resumo do deploy diz isso, em vez de serem gravados num disco que cada deploy substitui.
+
+Dê a ele um dos dois tipos e faça o deploy de novo para que o app o use:
+
+```bash
+# Um bucket que o Rebase opera para você. A página Storage do console faz o mesmo.
+rebase cloud storage create
+
+# Ou o seu próprio bucket compatível com S3: AWS S3, Cloudflare R2, Backblaze B2, MinIO…
+rebase cloud storage attach --bucket <name> \
+  --access-key-id <id> --secret-access-key <secret> \
+  --endpoint <url>        # omita para a AWS; adicione --force-path-style para o MinIO
+
+rebase cloud deploy
+```
+
+`rebase cloud storage` lista os buckets do projeto. Um projeto com vários
+anexa cada um com `--source <key>`; um que configura o armazenamento no código não precisa de nenhum.
 
 ## Pré-visualizar uma alteração
 

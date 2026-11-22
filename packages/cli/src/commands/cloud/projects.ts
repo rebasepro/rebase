@@ -455,7 +455,11 @@ orgId: String(org) });
                     ["URL", host],
                     ["Provider", provider],
                     ["Branch", gitBranch],
-                    ["Database", database.line]
+                    ["Database", database.line],
+                    // A new project has no bucket, so uploads answer 501 until
+                    // one is attached. Said here, where the project is first
+                    // described, not only after a deploy has shipped without it.
+                    ["Files", `off ${chalk.gray("· turn on with")} ${chalk.bold("rebase cloud storage create")}`]
                 ]);
                 if (linked) note(chalk.gray("Linked this directory to the new project."));
                 noteBlank();

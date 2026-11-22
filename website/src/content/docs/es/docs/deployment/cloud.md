@@ -1,5 +1,5 @@
 ---
-sourceHash: 073c10d60856c91c
+sourceHash: daa75b0f6ab9dbdf
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud es el mismo Rebase, operado para ti. Qué es, cómo se vincula y despliega un proyecto, y qué no incluye aún la beta privada.
@@ -27,7 +27,8 @@ Un **proyecto** de Cloud son tres cosas que la plataforma opera para ti:
 | **Database** | Un PostgreSQL gestionado, con copias de seguridad automatizadas y recuperación a un punto en el tiempo (point-in-time recovery) |
 | **Storage** | Un bucket propio, si tu proyecto utiliza almacenamiento de archivos |
 
-Cada uno se aprovisiona cuando despliegas por primera vez, y cada uno se factura por lo que
+La aplicación y la base de datos se aprovisionan cuando despliegas por primera vez; un bucket,
+solo cuando lo pides ([Almacenamiento de archivos](#almacenamiento-de-archivos)). Cada uno se factura por lo que
 reserva en lugar de por usuario (seat).
 
 **Nada en tu proyecto cambia para ejecutarse allí.** El mismo repositorio
@@ -232,6 +233,28 @@ correos para tu app: configura `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS
 `SMTP_FROM` con `rebase cloud env set`, y luego despliega. `status` lo lee desde el
 `GET /api/auth/config` de la propia aplicación (su campo `unavailable`), y `deploy` muestra
 lo mismo bajo su comprobación de disponibilidad (live check).
+
+## Almacenamiento de archivos
+
+Un proyecto nuevo no tiene bucket: las subidas se rechazan con `501 STORAGE_NOT_CONFIGURED`,
+y el resumen del despliegue lo dice, en lugar de escribirse en un disco que cada despliegue reemplaza.
+
+Dale uno de los dos tipos y vuelve a desplegar para que la aplicación lo use:
+
+```bash
+# Un bucket que Rebase gestiona por ti. La página Storage de la consola hace lo mismo.
+rebase cloud storage create
+
+# O tu propio bucket compatible con S3: AWS S3, Cloudflare R2, Backblaze B2, MinIO…
+rebase cloud storage attach --bucket <name> \
+  --access-key-id <id> --secret-access-key <secret> \
+  --endpoint <url>        # omítelo para AWS; añade --force-path-style para MinIO
+
+rebase cloud deploy
+```
+
+`rebase cloud storage` lista los buckets del proyecto. Un proyecto con varios
+adjunta cada uno con `--source <key>`; uno que configura el almacenamiento en código no necesita ninguno.
 
 ## Previsualizar un cambio
 

@@ -26,7 +26,8 @@ A Cloud **project** is three things the platform operates for you:
 | **Database** | A managed PostgreSQL, with automated backups and point-in-time recovery |
 | **Storage** | A bucket of your own, if your project uses file storage |
 
-Each is provisioned when you first deploy, and each is billed for what it
+The app and the database are provisioned when you first deploy; a bucket only
+when you ask for one ([File storage](#file-storage)). Each is billed for what it
 reserves rather than per seat.
 
 **Nothing about your project changes to run there.** The same repository
@@ -231,6 +232,28 @@ mail for your app: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and
 `SMTP_FROM` with `rebase cloud env set`, then deploy. `status` reads it from the
 app's own `GET /api/auth/config` (its `unavailable` field), and `deploy` says the
 same under its live check.
+
+## File storage
+
+A new project has no bucket: uploads are refused with `501 STORAGE_NOT_CONFIGURED`,
+and the deploy summary says so, rather than written to a disk every deploy replaces.
+
+Give it one of two kinds, then deploy again so the app picks it up:
+
+```bash
+# A bucket Rebase runs for you. The console's Storage page does the same.
+rebase cloud storage create
+
+# Or your own S3-compatible bucket: AWS S3, Cloudflare R2, Backblaze B2, MinIO…
+rebase cloud storage attach --bucket <name> \
+  --access-key-id <id> --secret-access-key <secret> \
+  --endpoint <url>        # omit for AWS; add --force-path-style for MinIO
+
+rebase cloud deploy
+```
+
+`rebase cloud storage` lists the project's buckets. A project with several
+attaches each with `--source <key>`; one that configures storage in code needs neither.
 
 ## Preview a change
 

@@ -245,6 +245,21 @@ rebase cloud db query --file backend/sql/extras.sql  # a file of functions, trig
 rebase cloud db connect                              # a local port for psql or a GUI, while it runs
 ```
 
+### File storage
+
+A new Cloud project has no bucket, so uploads are refused with
+`501 STORAGE_NOT_CONFIGURED` until you give it one. Nothing is written to the
+container's disk, which every deploy replaces. Pick one, then deploy again:
+
+```bash
+rebase cloud storage create            # a bucket Rebase runs for you (the console's Storage page does the same)
+rebase cloud storage attach --bucket <name> --access-key-id <id> --secret-access-key <secret> [--endpoint <url>]
+                                       # your own S3-compatible bucket: AWS, R2, B2, MinIO…
+rebase cloud deploy                    # the tenant picks the bucket up on its next deploy
+```
+
+`rebase cloud storage` lists what the project has.
+
 ### Cloning this project
 
 The link to the cloud project is `.rebase/cloud.json`, and `.rebase/` is not
