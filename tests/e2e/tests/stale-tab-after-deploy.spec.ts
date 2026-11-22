@@ -21,7 +21,9 @@ import { AUTH_STATE, freshSession } from "../auth";
 test.use({ storageState: AUTH_STATE });
 test.beforeEach(({ context }) => freshSession(context));
 
-const STUDIO_CHUNK = /\/SQLEditor-[^/]*\.js/;
+// `rebase dev` serves the packages from source, so the lazy view arrives as
+// `…/SQLEditor/SQLEditor.tsx`; a production build names it `SQLEditor-<hash>.js`.
+const STUDIO_CHUNK = /\/SQLEditor(?:\/SQLEditor\.tsx|-[^/]*\.js)(?:\?|$)/;
 
 test.describe("a tab left open across a deploy", () => {
 
