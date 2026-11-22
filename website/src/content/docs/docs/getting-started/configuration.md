@@ -176,12 +176,12 @@ Tables are protected by Postgres RLS. Object storage has no equivalent —
 keys share one flat namespace — so with a bucket configured and no access model
 the server **refuses to boot in production**. Satisfy it with exactly one of:
 a `storageAuthorize` hook exported from `backend/storage.ts` (what the scaffold
-ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
+ships), `STORAGE_POLICIES`, `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 :::
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `STORAGE_TYPE` | Storage backend: `local`, `s3` or `gcs`. In production `local` disables storage unless `FORCE_LOCAL_STORAGE=true` | `local` |
+| `STORAGE_TYPE` | Storage backend: `local`, `s3`, `gcs`, or `platform` (files in a prefix the hosting platform owns, moved over URLs its storage broker signs; set by the platform). In production `local` disables storage unless `FORCE_LOCAL_STORAGE=true` | `local` |
 | `STORAGE_PATH` | Base path for local storage. A relative path is read from the directory the server runs in: the project root under `rebase dev`, `backend/` in a server `rebase eject` wrote | `<project>/uploads` |
 | `FORCE_LOCAL_STORAGE` | Allow local storage in production — only with a durable volume holding `STORAGE_PATH` and the `<STORAGE_PATH>__<key>` directories of named local buckets beside it | `false` |
 | `STORAGE_DOWNLOAD_TOKEN_TTL` | Seconds a private file's download URL works — the token `getSignedUrl()` puts in it. At most `604800` (a week) | `300` |
@@ -195,8 +195,11 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `GCS_BUCKET` | GCS bucket name (when `STORAGE_TYPE=gcs`) | — |
 | `GCS_PROJECT_ID` | GCP project. Usually inferred from the credentials. | — |
 | `GCS_KEY_FILENAME` | Path to a service-account key file. Omit on GCP, where Workload Identity supplies credentials. | — |
-| `STORAGE_PUBLIC_READ` | Serve every object to anyone, no token. Only for a bucket that genuinely is a public CDN. One of the three ways to satisfy the boot guard below. | `false` |
+| `STORAGE_PUBLIC_READ` | Serve every object to anyone, no token. Only for a bucket that genuinely is a public CDN. One of the ways to satisfy the boot guard above. | `false` |
 | `STORAGE_ALLOW_ANY_AUTHENTICATED` | Let any signed-in caller read, write, list and delete every object. Named `INSECURE` in the config object for a reason: it is only defensible in a single-tenant app where every account is trusted with every file. | `false` |
+| `STORAGE_POLICIES` | Storage access rules as JSON: `[{ "path", "operations"?, "allow" }]`, `allow` being `"public"`, `"authenticated"`, `"owner"` or `{ "roles": [...] }`. Deny by default, and satisfies the boot guard. An invalid list refuses the boot. See [Storage authorization](/docs/backend/storage-authorization/#as-data-storage_policies). | — |
+| `STORAGE_BROKER_URL` | The platform's storage broker, for `STORAGE_TYPE=platform`. Set by the platform that runs the broker. | — |
+| `STORAGE_BROKER_PROJECT` | The project id the broker scopes this deployment's files to, for `STORAGE_TYPE=platform`. Set by the platform. | — |
 | `STORAGE_RENDITION_CACHE` | Cache generated image renditions (resizes, format conversions) instead of producing them per request. | `false` |
 
 ### Email (Optional)
