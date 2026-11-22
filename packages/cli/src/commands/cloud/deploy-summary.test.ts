@@ -18,6 +18,9 @@ import {
     checkLive,
     liveVerdict,
     deploySummaryLines,
+    consoleSignInUrl,
+    signInLine,
+    storageOffNotice,
     failureReason,
     failureLine,
     formatDuration,
@@ -356,5 +359,45 @@ status: "failed",
 deploymentId: "d1",
 logs: log }))
             .toBe("backend + game failed to deploy: Managed deploy failed: The new version did not become ready: CrashLoopBackOff (exit 1)");
+    });
+});
+
+/**
+ * A deploy printed its live URLs and nothing about getting in. The deployed
+ * admin's login says owners sign in from the project's page in the console,
+ * with no password, and that page was left for the reader to find; the build
+ * log's "File storage is OFF" line scrolled past above the summary.
+ */
+describe("what the summary says about signing in and storage", () => {
+    const backend = { name: "backend", type: "backend" as const, url: "https://shop.rebase.website/api" };
+    const site = { name: "web", type: "static" as const, url: "https://shop.rebase.website/" };
+
+    it("links the project's console page, opened onto the admin", () => {
+        expect(consoleSignInUrl("https://app.rebase.pro/", "35e08cdc-1"))
+            .toBe("https://app.rebase.pro/projects/35e08cdc-1?open=admin");
+    });
+
+    it("prints the sign-in line when a backend shipped, and not for a static site alone", () => {
+        expect(signInLine([site, backend], "https://app.rebase.pro", "p1")).toContain("https://app.rebase.pro/projects/p1?open=admin");
+        expect(signInLine([site], "https://app.rebase.pro", "p1")).toBeUndefined();
+    });
+
+    it("repeats the build log's storage-off line, cut to its first sentence", () => {
+        const log = "Building...\n"
+            + "ℹ️ File storage is OFF: no bucket is configured, so uploads are refused with 501 STORAGE_NOT_CONFIGURED. "
+            + "Nothing is written to the container filesystem, which would be erased on every redeploy anyway. "
+            + "To enable file storage, set STORAGE_TYPE=s3 plus S3_BUCKET.\nDone\n";
+        expect(storageOffNotice(log))
+            .toBe("File storage is OFF: no bucket is configured, so uploads are refused with 501 STORAGE_NOT_CONFIGURED.");
+    });
+
+    it("names a named bucket's storage-off line too", () => {
+        expect(storageOffNotice("⚠️ File storage for \"media\" is OFF: STORAGE_TYPE__MEDIA=ftp is not a value the stock Rebase backend acts on. Ignore this.\n"))
+            .toBe("File storage for \"media\" is OFF: STORAGE_TYPE__MEDIA=ftp is not a value the stock Rebase backend acts on.");
+    });
+
+    it("says nothing when storage is configured, or there is no log", () => {
+        expect(storageOffNotice("📦 File storage is configured: shop on Google Cloud Storage.\n")).toBeUndefined();
+        expect(storageOffNotice(undefined)).toBeUndefined();
     });
 });

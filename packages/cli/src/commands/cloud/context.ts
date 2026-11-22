@@ -1090,17 +1090,52 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * for old scripts and link files, a raw project UUID.
  */
 export function requireProjectRef(rawArgs: string[]): string {
-    const parsed = arg({ "--project": String,
-"-p": "--project" }, { argv: rawArgs.slice(2),
-permissive: true });
-    if (parsed["--project"]) return parsed["--project"];
-    const link = readLink();
-    if (link?.projectId) return link.projectId;
+    const ref = projectRefIfAny(rawArgs);
+    if (ref) return ref;
     fail(
         "No project specified and this directory is not linked.",
         `Pass ${chalk.bold("--project <slug>")} or run ${chalk.bold("rebase cloud link")}.`,
         "no_project"
     );
+}
+
+/**
+ * The project `--project` names, else the linked one, else undefined: what
+ * {@link requireProjectRef} returns, for a caller with something better to do
+ * than refuse when there is neither (`deploy` offers to create one).
+ */
+export function projectRefIfAny(rawArgs: string[]): string | undefined {
+    const parsed = arg({ "--project": String,
+"-p": "--project" }, { argv: rawArgs.slice(2),
+permissive: true });
+    if (parsed["--project"]) return parsed["--project"];
+    const link = readLink();
+    return link?.projectId ? link.projectId : undefined;
+}
+
+/**
+ * Whether anything could authenticate a control-plane call: `REBASE_TOKEN`,
+ * or a stored `cloud login` session for the control plane this line targets
+ * (an expired one still counts — `requireClient` refreshes it, or says it
+ * expired). Asked before offering something that needs one, so a signed-out
+ * user hears "log in" first rather than after choosing.
+ */
+export function hasCredentials(rawArgs: string[]): boolean {
+    if (envToken()) return true;
+    try {
+        return Boolean(createCloudClient(resolveCloudUrl(rawArgs)).auth.getSession()?.accessToken);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Whether there is somebody to answer a prompt: the same test
+ * {@link requireInteractive} refuses on, for a caller that takes another path
+ * instead of refusing.
+ */
+export function canPrompt(): boolean {
+    return !JSON_MODE && process.stdin.isTTY === true;
 }
 
 /**

@@ -1,6 +1,8 @@
 /**
  * `rebase cloud projects` — list / create / info / delete.
  */
+import fs from "fs";
+import path from "path";
 import chalk from "chalk";
 import inquirer from "inquirer";
 import {
@@ -30,7 +32,9 @@ import {
     requireCloudRow
 } from "./context";
 import { buildDialPatch } from "./resources";
-import { requireOrg } from "./org-scope";
+import { organizationLabel, requireOrg } from "./org-scope";
+import { findProjectRoot } from "../../utils/project";
+import { detectPackageManager, getPMCommands } from "../../utils/package-manager";
 import { attachDatabaseRow } from "./databases";
 
 interface ProjectRow {
@@ -261,7 +265,40 @@ export const CREATE_PROJECT_FLAGS = {
     "--storage": String
 } as const;
 
-export async function createProject(rawArgs: string[]): Promise<void> {
+/**
+ * The line `projects create` ends on: how to deploy what it just made.
+ *
+ * `--project <slug>` only when the directory was not linked to it. Linked, the
+ * bare command acts on it, and a scaffold's own `deploy` script (`pnpm run
+ * deploy`, which is `rebase cloud deploy`) is what its README says to run, so
+ * that is named when the project root's package.json has one.
+ */
+export function deployHint(opts: { linked: boolean; slug: string; projectRoot?: string | null }): string {
+    if (!opts.linked) return `rebase cloud deploy --project ${opts.slug}`;
+    const root = opts.projectRoot;
+    if (root && hasDeployScript(root)) {
+        return getPMCommands(detectPackageManager(root)).run("deploy").join(" ");
+    }
+    return "rebase cloud deploy";
+}
+
+function hasDeployScript(root: string): boolean {
+    try {
+        const pkg: unknown = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+        if (!pkg || typeof pkg !== "object" || !("scripts" in pkg)) return false;
+        const scripts = pkg.scripts;
+        return Boolean(scripts && typeof scripts === "object" && "deploy" in scripts && typeof scripts.deploy === "string");
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * @param opts.thenDeploying set when `rebase cloud deploy` created the project
+ *   for an unlinked directory and goes on to deploy it: the closing "Deploy it
+ *   with" line would name the command already running, so it is left out.
+ */
+export async function createProject(rawArgs: string[], opts: { thenDeploying?: boolean } = {}): Promise<void> {
     // Strict: every value here ends up in the project record, and the permissive
     // parse dropped a mistyped one silently — `--subdomian shop` created a
     // project on a generated subdomain, and a subdomain is not editable in
@@ -361,9 +398,10 @@ message: "Subdomain:" });
     // passing afterwards, so it is confirmed: `--yes` for scripts and agents,
     // and off a terminal without it the command refuses rather than assume.
     const databaseLabel = dbChoice === "managed" ? "a managed database" : dbChoice === "byodb" ? "your own database" : "no database";
+    const orgLabel = await organizationLabel(client, org);
     await confirmDestructive({
         yes: Boolean(args["--yes"]),
-        prompt: `Create project ${name} at ${subdomain} in org ${org}, with ${databaseLabel}? `
+        prompt: `Create project ${name} at ${subdomain} in org ${orgLabel}, with ${databaseLabel}? `
             + "Its compute and managed database are billed from its first deploy."
     });
 
@@ -422,7 +460,12 @@ orgId: String(org) });
                 if (linked) note(chalk.gray("Linked this directory to the new project."));
                 noteBlank();
                 for (const line of database.notes) note(chalk.gray(line));
-                note(chalk.gray(`Deploy it with:  ${chalk.bold(`rebase cloud deploy --project ${created.subdomain ?? created.id}`)}`));
+                if (opts.thenDeploying) {
+                    note(chalk.gray("Deploying it now."));
+                } else {
+                    const command = deployHint({ linked, slug: String(created.subdomain ?? created.id), projectRoot: findProjectRoot() });
+                    note(chalk.gray(`Deploy it with:  ${chalk.bold(command)}`));
+                }
                 noteBlank();
             },
             {

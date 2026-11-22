@@ -180,6 +180,27 @@ describe("a followed deploy that succeeded", () => {
         expect(out).toContain("⚠ Not confirmed live after 0s: backend (health check answered 503).");
     });
 
+    it("says where to sign in to the admin, and repeats a storage-off build line", async () => {
+        deployment.logs = "[10:00:00] 📦 Managed deploy\n"
+            + "ℹ️ File storage is OFF: no bucket is configured, so uploads are refused with 501 STORAGE_NOT_CONFIGURED. "
+            + "Nothing is written to the container filesystem.\n✅ Live\n";
+
+        await deploy();
+
+        const out = plain(stdout.join("\n"));
+        const summary = out.slice(out.indexOf("✓ Deployed songbuzz"));
+        expect(summary).toMatch(/Sign in to the admin from the console: https:\/\/cp-report-\d+\.example\/projects\/proj_1\?open=admin/);
+        expect(summary).toContain("⚠ File storage is OFF: no bucket is configured, so uploads are refused with 501 STORAGE_NOT_CONFIGURED.");
+    });
+
+    it("says nothing about storage when the build did not report it off", async () => {
+        await deploy();
+
+        const out = plain(stdout.join("\n"));
+        expect(out).not.toContain("File storage is OFF");
+        expect(out).toContain("Sign in to the admin from the console:");
+    });
+
     it("skips the check on --live-timeout 0, and says so", async () => {
         await deploy("--live-timeout", "0");
 
