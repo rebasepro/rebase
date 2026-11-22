@@ -25,6 +25,9 @@ export const de = {
   "copy.command": "Kopieren",
   "copy.command.done": "Kopiert",
   "social.title": "Von den Machern von FireCMS, dem Open-Source-CMS in über 10.000 Firebase-Projekten.",
+  "trust.europe":
+    "Gebaut in Madrid, von einem Unternehmen unter europäischem Recht. Betreibe Rebase auf deinen eigenen Servern — Hetzner, OVHcloud, Scaleway oder Bare Metal — oder lass es uns in Europa für dich betreiben.",
+  "trust.europe.link": "Souveränität in Europa",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.
   "recognition.badge": "Wo die Regel heute lebt",
@@ -86,10 +89,10 @@ export const de = {
   "modes.full.desc": "SQL-Editor, Schema-Visualisierung, RLS-Policy-Simulator, Datenbank-Branches, Logs und API-Explorer. Studio ist die Entwicklerhälfte desselben Panels, das dein Team ohnehin schon nutzt.",
   "modes.full.tag": "Die Entwicklerhälfte des Panels",
   "showcase.badge": "Gebaut für echte Produkte",
-  "showcase.title.part1": "Dutzende Produkte.",
-  "showcase.title.part2": "Alle in Production.",
+  "showcase.title.part1": "Sieben Produkte.",
+  "showcase.title.part2": "Alle auf Rebase gebaut.",
   "showcase.subtitle":
-    "Ein <b>zertifiziertes Medizinprodukt</b>, ein <b>Retail-Loyalty-Programm</b>, ein <b>zweiseitiger Marktplatz</b>, ein <b>Musikquiz fürs Wohnzimmer</b>, ein Outbound-Sales-Agent, ein Design-Tool und ein CRM — teils von uns, teils von unseren Kunden.",
+    "Ein <b>Retail-Loyalty-Programm</b>, ein <b>zweiseitiger Marktplatz</b>, ein <b>Musikquiz fürs Wohnzimmer</b>, das Backoffice eines <b>zertifizierten Medizinprodukts</b>, ein Outbound-Sales-Agent, ein Design-Tool und ein CRM — gebaut vom Team hinter Rebase, teils für uns selbst, teils für unsere Kunden.",
   "showcase.nolink": "Internes Tool — keine öffentliche Website",
   "showcase.case0.badge": "Vektor-Design-Tool · Vom Rebase-Team gebaut",
   "showcase.case0.title": "Dadaki",
@@ -97,9 +100,9 @@ export const de = {
   "showcase.case.badge": "Marketplace & Jobportal",
   "showcase.case.title": "SustenTalent",
   "showcase.case.desc": "Ein zweiseitiger Marktplatz, der Nachhaltigkeits-Profis mit grünen Unternehmen verbindet. Rebase treibt beide Seiten an: rollenbasierte Auth, typisierte Matching-APIs und das Moderations-Backoffice.",
-  "showcase.case2.badge": "Digitale Schmerztherapie",
+  "showcase.case2.badge": "Digitale Schmerztherapie · Backoffice",
   "showcase.case2.title": "MedicalMotion",
-  "showcase.case2.desc": "Ein zertifiziertes digitales Medizinprodukt für KI-personalisierte Schmerztherapie. Rebase betreibt das komplette Backend — Patientendaten, Therapiepläne, die Übungsbibliothek und die klinischen Dashboards darüber.",
+  "showcase.case2.desc": "Das Backoffice eines zertifizierten digitalen Medizinprodukts für KI-personalisierte Schmerztherapie. Das Team verwaltet Unternehmen, Abos, Abrechnung und Onboarding direkt auf dem bestehenden Postgres des Produkts, dessen Schema Rebase nie anfasst, mit der medizinischen Inhaltsbibliothek in Firestore daneben. Es hat zwei ältere Admin-Tools abgelöst.",
   "showcase.case7.badge": "Partyspiel · Vom Rebase-Team gebaut",
   "showcase.case7.title": "SongBuzz",
   "showcase.case7.desc":
