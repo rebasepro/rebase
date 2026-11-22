@@ -74,3 +74,8 @@ done
 for p in "$WORKTREE"/examples/*/; do
     [ -d "$p" ] && link_importer "examples/$(basename "$p")"
 done
+# `examples/hybrid/*` in pnpm-workspace.yaml: its backend and frontend are
+# importers of their own, and unlinked they resolve no `@rebasepro/*` at all.
+for p in "$WORKTREE"/examples/hybrid/*/; do
+    [ -f "$p/package.json" ] && link_importer "examples/hybrid/$(basename "$p")"
+done

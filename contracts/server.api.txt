@@ -17,6 +17,7 @@ class McpToolError
 class MetricsRegistry { incrementCounter, observe, onRender, recordRequest, render, requestTotalsBySurface, setCounter, setGauge, startedAt }
 class ObjectTooLargeError { maxBytes }
 class PermanentJobError
+class PlatformStorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, sign, statObject, storageLocation }
 class RawHtml { toString, value }
 class S3StorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
 class SMTPEmailService { close, isConfigured, send, verifyConnection }
@@ -28,6 +29,7 @@ class TusHandler { create, delete, head, options, patch, startCleanup }
 class UnknownStorageSourceError { knownKeys, storageId }
 class WebhookDispatcher { deliverQueuedJob, enqueueEntityChange, flush, onEntityChange, sendTest, setWebhooks, watchesTable }
 const ACCOUNT_SCOPED_STORAGE_BASES
+const BACKGROUND_WORKERS_METRIC
 const BATCH_REF_KEY
 const CONCURRENT_DDL_SQLSTATES
 const CORS_EXPOSED_HEADERS
@@ -44,6 +46,8 @@ const IF_MATCH_HEADER
 const IMAGE_MIME_TYPES
 const MCP_APP_URI
 const MCP_VIEW_TOOLS
+const PROBE_HEADER
+const PROBE_REQUESTS_METRIC
 const RUNTIME_BUNDLE_MOUNT
 const RUNTIME_DEFAULT_MAX_BODY_SIZE
 const RUNTIME_HEALTH_PATH
@@ -52,12 +56,14 @@ const RUNTIME_MIN_TERMINATION_GRACE_SECONDS
 const RUNTIME_PRESTOP_DRAIN_SECONDS
 const RUNTIME_PROBE_PATHS { liveness, readiness, startup }
 const RUNTIME_STARTUP_BUDGET_SECONDS
+const SCHEDULED_JOBS_METRIC
 const SHOW_APP_CODE_GUIDE
 const SHOW_APP_ESSENTIALS
 const SHOW_APP_GUIDE_TOOL
 const TOPOLOGY_ENV_VARS
 const UPLOAD_COLUMN_FIELD
 const UPLOAD_TABLE_FIELD
+const UPTIME_MONITOR_AGENTS
 const WEBHOOK_DELIVERY_TASK
 const authJwt
 const authRoles
@@ -97,6 +103,7 @@ function backupStorageFromEnv
 function blockedAddressReason
 function bootFromBundle
 function callerScopes
+function classifyProbe
 function classifySurface { collection, surface }
 function cleanupDevPortFile
 function clearActiveDevEmailSink
@@ -239,6 +246,7 @@ function loadEnv
 function loadFunctions
 function loadFunctionsFromDirectory
 function loadFunctionsWithDiagnostics
+function matchUptimeMonitor
 function mcpAppBaseUri
 function mcpViewToolInputSchema
 function oauthCodeFlowSchema
@@ -428,6 +436,7 @@ interface PasswordValidationResult { errors, valid }
 interface PendingEmailChange { email, sentAt }
 interface PgEnum { enumName, enumValues }
 interface PgLikeError { address, code, column, constraint, detail, hint, message, port, schema, table }
+interface PlatformStorageConfig { allowedMimeTypes, brokerUrl, maxFileSize, projectId, serviceKey, source, type }
 interface ProvisionOptions { realtime, tables }
 interface PushDelivery { body, statusCode }
 interface PushOptions { allowedHosts, sender, vapid }
@@ -560,6 +569,7 @@ type PolicyCondition
 type PolicyExpression
 type PolicyOperand
 type PolicyShorthand
+type ProbeKind
 type PublicJwk
 type PushPayload
 type PushPayloadInput
@@ -1095,7 +1105,7 @@ interface RebaseProjectManifest { $schema, apps, rebase, telemetry }
 interface RebaseServerClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, push, resolveToken, rpc, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, sqlAsAdmin, storage, storageRegistry, ws }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RebaseStaticAppConfig { build, cleanUrls, cms, frameAncestors, output, path, redirects, root, routes, spa, type }
-interface RebaseStaticRedirect { from, host, query, status, to }
+interface RebaseStaticRedirect { from, host, notHost, query, status, to }
 interface RebaseStaticRoute { function, path }
 interface RebaseStorageSourceConfig { engine, label, transport }
 interface RebaseWebSocket { authenticate, disconnect, on, onStateChange, setAuthTokenGetter, state }
