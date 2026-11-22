@@ -66,6 +66,19 @@ it out keeps it open, since a role exists as soon as a user is given it.
 Rules on other tables may name the users table's columns as usual. A rule on
 the users table itself may also name every auth column, declared or not.
 
+## Without a users table
+
+Declaring one is optional. Auth runs either way: with no `defineAuthTable`,
+it keeps its users in `rebase.users`, and accounts and roles are managed in the
+Studio's **Users & Roles**. The admin shows Users as a table only when the
+project declares one, so leaving the file out keeps it out of the admin.
+
+To declare it, start from the scaffold's `backend/schema/users.ts`, or run
+`rebase schema introspect --users` against a database that already has
+`rebase.users`. Both match the table auth creates (a `text` key and every
+auth column), so `db push` changes nothing in it, and a migration from
+`db generate` creates it with `IF NOT EXISTS`. Then add your own columns.
+
 ## The `auth` block
 
 | Key | What it does |

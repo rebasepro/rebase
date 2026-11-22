@@ -10,7 +10,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { finishNewMigration } from "../src/schema/migration-post-process";
+import { finishNewMigration, makeAuthTableCreateIdempotent } from "../src/schema/migration-post-process";
 
 describe("finishNewMigration", () => {
     let dir: string;
@@ -56,5 +56,21 @@ describe("finishNewMigration", () => {
         );
 
         expect(outcome).toEqual({ ok: false, error: "boom", removed: true, rehashError: "atlas not found" });
+    });
+});
+
+describe("makeAuthTableCreateIdempotent", () => {
+    it("skips creating rebase.users when auth already made it", () => {
+        const migration = 'CREATE TABLE "rebase"."users" (\n  "id" text NOT NULL\n);\nCREATE TABLE "public"."posts" ("id" uuid);';
+        expect(makeAuthTableCreateIdempotent(migration)).toBe(
+            'CREATE TABLE IF NOT EXISTS "rebase"."users" (\n  "id" text NOT NULL\n);\nCREATE TABLE "public"."posts" ("id" uuid);'
+        );
+    });
+
+    it("leaves a migration that already says IF NOT EXISTS, or another users table, alone", () => {
+        const already = 'CREATE TABLE IF NOT EXISTS "rebase"."users" ("id" text);';
+        expect(makeAuthTableCreateIdempotent(already)).toBe(already);
+        const mine = 'CREATE TABLE "public"."users" ("id" uuid);';
+        expect(makeAuthTableCreateIdempotent(mine)).toBe(mine);
     });
 });

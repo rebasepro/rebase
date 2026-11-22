@@ -9,7 +9,8 @@
  */
 import type { LeftBehind } from "./introspect-foreign";
 import { columnTypeLabel, type ColumnType, type TableDescriptor } from "@rebasepro/types";
-import { printIndexModule, printTableModule, tableIdentifier } from "@rebasepro/common";
+import { compileSchema, printIndexModule, printTableModule, tableIdentifier } from "@rebasepro/common";
+import { defaultAuthTable } from "./default-auth-table";
 import { toWireKey } from "@rebasepro/utils";
 import { inferColumnHints } from "./introspect-db-inference";
 import { mapPgType } from "./introspect-db-types";
@@ -911,4 +912,65 @@ export function describeRlsOffTables(tableNames: readonly string[]): string | un
  */
 export function safeHostFromUrl(url: string): string {
     return url.includes("@") ? url.split("@")[1] : "(local connection)";
+}
+
+/** The schema and table auth creates its users in when no `defineAuthTable` says otherwise. */
+export const DEFAULT_AUTH_TABLE = { schema: "rebase", table: "users" } as const;
+
+/**
+ * `backend/schema/users.ts` for the `rebase.users` a database already has —
+ * what `schema introspect --users` writes beside the tables of the
+ * introspected schema, for a project that wants Users in the admin as a table
+ * (to add columns to, or to list its roles in).
+ *
+ * `defaultAuthTable` written out: the columns auth
+ * owns exactly as auth creates them, a `text` key included, so the first
+ * `db push` changes nothing. A column the live table has on top of those
+ * (one a project added by hand) is described from the catalogue and kept: a
+ * file without it would have the push drop it.
+ *
+ * `undefined` when `metadata` (read from the `rebase` schema) holds no
+ * `users` table.
+ */
+export function generateAuthTableModule(metadata: SchemaMetadata, options: { specifier?: string } = {}): GeneratedTable | undefined {
+    const { table } = DEFAULT_AUTH_TABLE;
+    if (metadata.schema !== DEFAULT_AUTH_TABLE.schema || !metadata.tables.some(row => row.table_name === table)) return undefined;
+    const [defaults] = compileSchema([defaultAuthTable]);
+    const owned = new Set(defaults.descriptor.columns.map(column => column.column));
+
+    // Only the users table, and nothing that points away from it: the other
+    // tables in `rebase` are auth's and Rebase's own, never a project's.
+    const mine = <T extends { table_name: string }>(rows: readonly T[] | undefined): T[] => (rows ?? []).filter(row => row.table_name === table);
+    const usersOnly: SchemaMetadata = {
+        ...metadata,
+        tables: mine(metadata.tables),
+        columns: mine(metadata.columns),
+        pks: mine(metadata.pks),
+        fks: [],
+        uniques: mine(metadata.uniques),
+        checks: mine(metadata.checks),
+        comments: mine(metadata.comments),
+        policies: [],
+        externalFks: [],
+        objects: [],
+        rowCounts: {},
+        ...(metadata.indexes ? { indexes: mine(metadata.indexes) } : {}),
+        ...(metadata.indexDefinitions ? { indexDefinitions: mine(metadata.indexDefinitions) } : {})
+    };
+    const described = describeTables(usersOnly, { purpose: "generate", joinTables: new Set() }).tables.find(t => t.table === table);
+    const extra = (described?.columns ?? []).filter(column => !owned.has(column.column) && column.foreignKeyOf === undefined);
+
+    const descriptor: TableDescriptor = { ...defaults.descriptor, columns: [...defaults.descriptor.columns, ...extra] };
+    const notes = extra.length > 0
+        ? [`kept ${extra.map(column => `"${column.column}"`).join(", ")} from the live table: auth does not read ${extra.length === 1 ? "it" : "them"}.`]
+        : [];
+    let schemaModule = printTableModule(descriptor, options.specifier ? { specifier: options.specifier } : {});
+    const header = [
+        "The accounts auth signs in, as `rebase.users` holds them. This file shows them in the admin as a table;",
+        "delete it to leave them to the Studio's Users & Roles. Add columns here, or list the project's roles.",
+        ...(notes.length > 0 ? ["Introspection notes:", ...notes.map(note => `  - ${note}`)] : [])
+    ];
+    const split = schemaModule.indexOf("\n\nexport const ");
+    schemaModule = `${schemaModule.slice(0, split)}\n\n${commentLines(header)}${schemaModule.slice(split + 1)}`;
+    return { table, identifier: tableIdentifier(defaults.descriptor.slug), schemaModule, notes: [], remarks: notes };
 }

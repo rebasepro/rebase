@@ -39,7 +39,31 @@ export const usersCms = customizeTable<typeof users>("users", {
             hidden: true,
             hiddenInForm: true
         },
+        isAnonymous: {
+            hidden: true,
+            hiddenInForm: true
+        },
         metadata: {
+            hidden: true,
+            hiddenInForm: true
+        },
+        tokensValidAfter: {
+            hidden: true,
+            hiddenInForm: true
+        },
+        disabledAt: {
+            name: "Disabled",
+            readOnly: true
+        },
+        pendingEmail: {
+            hidden: true,
+            hiddenInForm: true
+        },
+        emailChangeToken: {
+            hidden: true,
+            hiddenInForm: true
+        },
+        emailChangeSentAt: {
             hidden: true,
             hiddenInForm: true
         },

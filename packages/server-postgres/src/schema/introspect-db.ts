@@ -11,6 +11,8 @@ import { printIndexModule, tableIdentifier } from "@rebasepro/common";
 import {
     buildTablesMap,
     describeRlsOffTables,
+    DEFAULT_AUTH_TABLE,
+    generateAuthTableModule,
     generateSchemaModules,
     mergeIndexModule,
     safeHostFromUrl
@@ -41,6 +43,8 @@ async function main() {
             "--data-inference": Boolean,
             "--no-data-inference": Boolean,
             "--from": String,
+            // Also write `backend/schema/users.ts` for `rebase.users`.
+            "--users": Boolean,
             "-f": "--force"
         },
         { permissive: true }
@@ -55,6 +59,7 @@ async function main() {
     const force = args["--force"] || false;
     const pgSchema = args["--schema"] || "public";
     const from = args["--from"];
+    const writeUsers = args["--users"] === true;
     if (from !== undefined && from !== "supabase") {
         outError(chalk.red(`✗ --from takes "supabase", not "${from}".`));
         process.exit(1);
@@ -234,6 +239,40 @@ async function main() {
                 fs.writeFileSync(cmsPath, generated.customization, "utf-8");
                 customizations.push(generated.table);
                 out(chalk.green(`  ✓ ${cmsPath}`));
+            }
+        }
+
+        // The users table auth created (`rebase.users`), written as the
+        // project's `defineAuthTable` — only when asked (`--users`). The file
+        // is what puts Users in the admin, as a table of its own, and that is
+        // the project's choice: accounts are managed in the Studio's Users &
+        // Roles without it. Never `rebase` itself: that schema is auth's.
+        if (pgSchema !== DEFAULT_AUTH_TABLE.schema && !generatedFiles.some((file) => file.table === DEFAULT_AUTH_TABLE.table)) {
+            const usersPath = path.join(outDir, `${DEFAULT_AUTH_TABLE.table}.ts`);
+            // A project has at most one auth table: one already declared under
+            // another file name is the project's, and a second would refuse the boot.
+            const declaresAuthTable = fs.readdirSync(outDir).some((file) => /\.[mc]?[jt]s$/.test(file)
+                && fs.readFileSync(path.join(outDir, file), "utf-8").includes("defineAuthTable("));
+            if (declaresAuthTable) {
+                // Nothing to write or suggest: the project has its auth table.
+            } else if (!writeUsers) {
+                const authMetadata = await readSchemaMetadata(client, DEFAULT_AUTH_TABLE.schema, { forGeneration: true });
+                if (authMetadata.tables.some((row) => row.table_name === DEFAULT_AUTH_TABLE.table)) {
+                    out(chalk.gray("  rebase.users is not written: accounts are managed in the Studio's Users & Roles."));
+                    out(chalk.gray("  To show it in the admin as a table, and add columns to it, run again with --users."));
+                }
+            } else if (fs.existsSync(usersPath) && !force) {
+                if (!skippedFiles.includes(DEFAULT_AUTH_TABLE.table)) skippedFiles.push(DEFAULT_AUTH_TABLE.table);
+            } else {
+                const authMetadata = await readSchemaMetadata(client, DEFAULT_AUTH_TABLE.schema, { forGeneration: true });
+                const usersModule = generateAuthTableModule(authMetadata);
+                if (usersModule) {
+                    fs.writeFileSync(usersPath, usersModule.schemaModule, "utf-8");
+                    generatedFiles.push({ identifier: usersModule.identifier, table: usersModule.table });
+                    out(chalk.green(`  ✓ ${usersPath}`));
+                } else {
+                    outWarn(chalk.yellow("⚠ --users: this database has no rebase.users, so there is no users table to write."));
+                }
             }
         }
 

@@ -75,7 +75,7 @@ import { describeBlocked, findPolicyBlockedStatements } from "./schema/policy-co
 import { draftSqlFiles, sqlFilesDir, type SqlFilesPlan } from "./schema/sql-files";
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import type { ExistingConstraint } from "./schema/undeclarable-constraints";
-import { finishNewMigration } from "./schema/migration-post-process";
+import { finishNewMigration, makeAuthTableCreateIdempotent } from "./schema/migration-post-process";
 import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, readsRevisions, takesDevUrl } from "./schema/atlas-argv";
 import { ensureAtlasRevisionsTable } from "./schema/atlas-revisions";
 import { createApplyReportFilter } from "./schema/atlas-apply-report";
@@ -602,6 +602,8 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     /CREATE SCHEMA (?!IF NOT EXISTS)("[^"]+");/g,
                     "CREATE SCHEMA IF NOT EXISTS $1;"
                 );
+                // And the users table, which auth may have created already.
+                migrationContent = makeAuthTableCreateIdempotent(migrationContent);
                 // Atlas never writes the search or vector objects into a
                 // migration — it is not shown them — so a migration
                 // replayed against a fresh database would build every table
@@ -2970,6 +2972,7 @@ async function schemaCommand(
                 "--data-inference": Boolean,
                 "--no-data-inference": Boolean,
                 "--from": String,
+                "--users": Boolean,
                 "-f": "--force"
             },
             {
@@ -3001,6 +3004,7 @@ async function schemaCommand(
             // The introspector reads these itself; without one it asks.
             ...(argsList["--data-inference"] ? ["--data-inference"] : []),
             ...(argsList["--no-data-inference"] ? ["--no-data-inference"] : []),
+            ...(argsList["--users"] ? ["--users"] : []),
             ...(argsList["--from"] ? [`--from=${argsList["--from"]}`] : [])
         ];
 
