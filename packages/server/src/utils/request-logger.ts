@@ -2,8 +2,9 @@
  * Structured HTTP request logging middleware for Hono.
  *
  * Logs every request with method, path, status code, latency, and
- * content-length. In production, outputs JSON for Cloud Logging; in
- * development, emits a coloured one-liner.
+ * content-length. In production, outputs JSON for Cloud Logging, one INFO line
+ * per request; in development, a one-liner for failures and slow requests only
+ * (the rest at debug: `LOG_LEVEL=debug` shows them).
  *
  * @example
  * ```ts
@@ -14,14 +15,24 @@
 import type { MiddlewareHandler } from "hono";
 import type { HonoEnv } from "../api/types";
 import { logger as log } from "./logger";
+import { hostEnv } from "./host";
 
 export interface RequestLoggerOptions {
     /** Paths to skip logging (e.g. "/health"). Supports exact match. */
     skip?: string[];
+    /**
+     * Outside production, a request answered below 400 is logged at debug
+     * unless it took at least this long, in milliseconds. Default 1000.
+     */
+    slowRequestMs?: number;
 }
+
+/** The latency from which a successful development request is worth a line. */
+const DEFAULT_SLOW_REQUEST_MS = 1000;
 
 export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler<HonoEnv> {
     const skipPaths = new Set(options?.skip ?? ["/health", "/favicon.ico"]);
+    const slowRequestMs = options?.slowRequestMs ?? DEFAULT_SLOW_REQUEST_MS;
 
     return async (c, next) => {
         const start = performance.now();
@@ -101,12 +112,20 @@ export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler
         // routine answer, such as NO_SESSION to a browser that holds no
         // session, and is logged like a success. Anything else at 4xx still
         // says something about the server and stays at warn.
+        //
+        // In development a page load is several requests, and an INFO line for
+        // each scrolled the ready box and every real warning out of the
+        // terminal. There a routine answer is logged at debug — `LOG_LEVEL=debug`
+        // brings every line back — unless it was slow. Production keeps its
+        // INFO line per request: that is its access log.
         if (status >= 500) {
             log.error("request", data);
         } else if (status >= 400 && !errorSummary?.expected) {
             log.warn("request", data);
-        } else {
+        } else if (hostEnv().NODE_ENV === "production" || latencyMs >= slowRequestMs) {
             log.info("request", data);
+        } else {
+            log.debug("request", data);
         }
     };
 }

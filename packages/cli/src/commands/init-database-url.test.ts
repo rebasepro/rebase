@@ -15,7 +15,7 @@ import os from "os";
 import path from "path";
 import inquirer from "inquirer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildInitQuestions, createRebaseApp, databaseUrlProblem } from "./init";
+import { buildInitQuestions, createRebaseApp, databaseUrlProblem, resolveInteractiveDatabase } from "./init";
 
 class Exit extends Error {
     constructor(readonly code: number | undefined) {
@@ -136,5 +136,55 @@ describe("rebase init", () => {
 
         expect(name.validate("taken")).toMatch(/already holds files.*notes\.txt/);
         expect(name.validate("fresh")).toBe(true);
+    });
+});
+
+/**
+ * On a terminal, `init app --database-url … --introspect` asked for the
+ * connection string anyway, and the blank default replaced the flag: the
+ * project got the Blog template on the managed database and nothing was
+ * introspected. The --yes path read the flags; the interactive one did not.
+ */
+describe("interactive init honours --database-url and --introspect", () => {
+    const url = "postgresql://postgres@127.0.0.1:55432/library";
+    const names = (params: Partial<Parameters<typeof buildInitQuestions>[0]>) =>
+        buildInitQuestions({ hasGitFlag: false, hasInstallFlag: false, pm: "pnpm", ...params }).map(q => q.name);
+
+    it("does not ask for a connection string that was passed", () => {
+        expect(names({ databaseUrlArg: url })).not.toContain("databaseUrl");
+    });
+
+    it("still offers to introspect the database that was passed", () => {
+        const introspect = buildInitQuestions({ hasGitFlag: false, hasInstallFlag: false, pm: "pnpm", databaseUrlArg: url })
+            .find(q => q.name === "introspect");
+        if (!introspect || !("when" in introspect) || typeof introspect.when !== "function") throw new Error("no conditional introspect question");
+        expect(introspect.when({})).toBe(true);
+    });
+
+    it("asks neither the introspect nor the template question under --introspect", () => {
+        const questions = buildInitQuestions({ hasGitFlag: false, hasInstallFlag: false, pm: "pnpm", databaseUrlArg: url, introspectArg: true });
+        expect(questions.map(q => q.name)).not.toContain("introspect");
+        const preset = questions.find(q => q.name === "preset");
+        if (!preset || !("when" in preset) || typeof preset.when !== "function") throw new Error("no conditional preset question");
+        expect(preset.when({ headless: false })).toBe(false);
+    });
+
+    it("lets the flags win over the answers", () => {
+        expect(resolveInteractiveDatabase({ databaseUrlArg: url, introspectArg: true, answers: {} }))
+            .toEqual({ databaseUrl: url, introspect: true });
+        expect(resolveInteractiveDatabase({ databaseUrlArg: url, answers: { introspect: false } }))
+            .toEqual({ databaseUrl: url, introspect: false });
+    });
+
+    it("keeps the prompted answers when no flag was passed", () => {
+        expect(resolveInteractiveDatabase({ answers: { databaseUrl: `  ${url}  `, introspect: true } }))
+            .toEqual({ databaseUrl: url, introspect: true });
+        expect(resolveInteractiveDatabase({ answers: { databaseUrl: "" } }))
+            .toEqual({ databaseUrl: undefined, introspect: false });
+    });
+
+    it("introspects nothing when --introspect meets a blank connection string", () => {
+        expect(resolveInteractiveDatabase({ introspectArg: true, answers: { databaseUrl: "" } }))
+            .toEqual({ databaseUrl: undefined, introspect: false });
     });
 });

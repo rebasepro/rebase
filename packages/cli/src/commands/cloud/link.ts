@@ -4,6 +4,7 @@
  * `link` associates the current directory with a cloud project by writing
  * `.rebase/cloud.json`; deploy/logs/status then operate on it with no flags.
  */
+import arg from "arg";
 import chalk from "chalk";
 import inquirer from "inquirer";
 import {
@@ -27,10 +28,15 @@ import {
     warn,
     requireInteractive,
     cloudRows,
-    grantForLink
+    grantForLink,
+    projectRefIfAny,
+    hasCredentials,
+    canPrompt,
+    type CloudClient
 } from "./context";
+import { createProject } from "./projects";
 
-interface ProjectRow {
+export interface ProjectRow {
     id: string | number;
     name?: string;
     subdomain?: string;
@@ -115,6 +121,156 @@ async function linkDirect(target: string, rawArgs: string[]): Promise<void> {
     void rawArgs;
 }
 
+/** The picker's value for "make a new project and link it", beside the project rows. */
+export const CREATE_NEW_PROJECT = "__create_new_project__";
+
+/**
+ * The choices `rebase cloud link` offers, with creating a project first and
+ * therefore the default. With only the existing projects listed, one Enter on
+ * a fresh scaffold linked it to whichever project came first (a live one), and
+ * the next `rebase cloud deploy` would have sent this app there.
+ */
+export function linkPickerChoices(projects: ProjectRow[]): Array<{ name: string; value: ProjectRow | typeof CREATE_NEW_PROJECT }> {
+    return [
+        { name: `${chalk.bold("Create a new project")}  ${chalk.gray("for this directory")}`, value: CREATE_NEW_PROJECT },
+        ...projects.map((p) => ({
+            name: `${p.name ?? "(unnamed)"}  ${chalk.gray(String(p.subdomain ?? ""))}`,
+            value: p
+        }))
+    ];
+}
+
+/**
+ * The line `projects create --link` is run with from the picker: the same
+ * process and the same control plane (`--url`, when it was named).
+ */
+export function createFromLinkArgs(launcher: readonly string[], url: string | undefined): string[] {
+    // Only the interpreter and script words are kept: the rest of the link line
+    // was already parsed by `linkCommand`.
+    return [launcher[0] ?? "node", launcher[1] ?? "rebase", "cloud", "projects", "create", "--link", ...(url ? ["--url", url] : [])];
+}
+
+/**
+ * The picker `rebase cloud link` opens, shared with a `rebase cloud deploy`
+ * run in a directory that is not linked yet: create a new project (first, and
+ * the default), or pick an existing one. Creating runs `projects create --link`
+ * with `createArgs`, which writes the link itself; `CREATE_NEW_PROJECT` is
+ * returned then, and the picked row otherwise, for the caller to link.
+ *
+ * Needs a terminal: callers check before calling.
+ */
+export async function pickProjectOrCreate(
+    client: CloudClient,
+    url: string,
+    createArgs: string[],
+    opts: { thenDeploying?: boolean } = {}
+): Promise<ProjectRow | typeof CREATE_NEW_PROJECT> {
+    const org = getContextOrg(url);
+    const projects = cloudRows<ProjectRow>((await client.data.table("projects").find({
+        where: org ? { organization: ["==", org] } : undefined,
+        limit: 100
+    })).data);
+
+    // No projects is not a dead end: there is one thing to do, so do it.
+    const { picked } = projects.length === 0
+        ? { picked: CREATE_NEW_PROJECT }
+        : await inquirer.prompt([
+            {
+                type: "select",
+                name: "picked",
+                message: "Link this directory to:",
+                choices: linkPickerChoices(projects),
+                default: CREATE_NEW_PROJECT
+            }
+        ] as Parameters<typeof inquirer.prompt>[0]);
+    if (picked === CREATE_NEW_PROJECT) {
+        if (projects.length === 0) note(chalk.gray("No projects in this organization yet: creating one."));
+        await createProject(createArgs, { thenDeploying: opts.thenDeploying });
+        return CREATE_NEW_PROJECT;
+    }
+    return picked as ProjectRow;
+}
+
+/**
+ * Link this directory to an existing project row: the link file, and the line
+ * that says so. Returns the id written.
+ */
+export function linkToProject(url: string, project: ProjectRow): string {
+    const orgId = project.organization !== undefined ? String(project.organization) : undefined;
+    writeLink({
+        url,
+        projectId: String(project.id),
+        slug: project.subdomain,
+        projectName: project.name,
+        orgId
+    });
+    return String(project.id);
+}
+
+/** The first remedy an unlinked, non-interactive `deploy` names. */
+export const CREATE_AND_LINK_COMMAND = "rebase cloud projects create --name <n> --subdomain <s> --link";
+
+/**
+ * The project `rebase cloud deploy` acts on: `--project`, else the linked one —
+ * and, in a directory linked to neither, the choice `rebase cloud link` offers
+ * (create a new project first, or pick one), after which the deploy goes on.
+ *
+ * A scaffold's last step is `pnpm run deploy`, and it used to end there:
+ * "No project specified and this directory is not linked", exit 1, on the
+ * very first deploy of every new app. Off a terminal (or with `--json`) it
+ * still refuses — nobody can answer a picker — and names the one command
+ * that creates and links the project. Signed out, it says so first: the
+ * picker and the create both need a session.
+ */
+export async function resolveDeployProjectRef(rawArgs: string[]): Promise<string> {
+    const ref = projectRefIfAny(rawArgs);
+    if (ref) return ref;
+
+    if (!hasCredentials(rawArgs)) {
+        fail(
+            `Not logged in to ${chalk.cyan(resolveCloudUrl(rawArgs))}, and this directory is not linked to a project.`,
+            `Run ${chalk.bold("rebase cloud login")} first, then deploy again`
+                + (canPrompt()
+                    ? ": it offers to create the project."
+                    : `, after ${chalk.bold(CREATE_AND_LINK_COMMAND)} or with ${chalk.bold("--project <slug>")}.`),
+            "not_logged_in"
+        );
+    }
+
+    if (!canPrompt()) {
+        fail(
+            "No project specified and this directory is not linked.",
+            `Create one for it with ${chalk.bold(CREATE_AND_LINK_COMMAND)}, `
+                + `or pass ${chalk.bold("--project <slug>")}, or run ${chalk.bold("rebase cloud link")}.`,
+            "no_project"
+        );
+    }
+
+    const { client, url } = await requireClient(rawArgs);
+    const urlFlag = arg({ "--url": String }, { argv: rawArgs.slice(2), permissive: true })["--url"];
+    note(chalk.gray("This directory is not linked to a Rebase Cloud project yet."));
+    try {
+        const picked = await pickProjectOrCreate(
+            client,
+            url,
+            createFromLinkArgs(rawArgs.slice(0, 2), urlFlag),
+            { thenDeploying: true }
+        );
+        if (picked !== CREATE_NEW_PROJECT) {
+            linkToProject(url, picked);
+            success(`Linked to ${chalk.bold(picked.name ?? picked.subdomain ?? String(picked.id))}`);
+        }
+    } catch (e) {
+        reportError(e, "Failed to link project");
+    }
+    const linked = readLink()?.projectId;
+    if (!linked) {
+        fail("No project was linked, so there is nothing to deploy to.", `Run ${chalk.bold("rebase cloud link")}.`, "no_project");
+    }
+    noteBlank();
+    return linked;
+}
+
 export async function linkCommand(rawArgs: string[]): Promise<void> {
     // `--project` is a global, so the spec is empty: declaring it here would
     // replace the global in the merge while the global's other readers went on
@@ -166,44 +322,16 @@ export async function linkCommand(rawArgs: string[]): Promise<void> {
             // The picker needs a terminal. Without this, `rebase cloud link`
             // run by an agent parked on a select prompt forever.
             requireInteractive("a project to link", "--project <slug>");
-            const org = getContextOrg(url);
-            const projects = cloudRows<ProjectRow>((await client.data.table("projects").find({
-                where: org ? { organization: ["==", org] } : undefined,
-                limit: 100
-            })).data);
-
-            if (projects.length === 0) {
-                fail(
-                    "No projects found for your account.",
-                    `Create one and link this directory to it: ${chalk.bold("rebase cloud projects create --link")}.`,
-                    "no_projects"
-                );
-            }
-
-            const { picked } = await inquirer.prompt([
-                {
-                    type: "select",
-                    name: "picked",
-                    message: "Select a project to link:",
-                    choices: projects.map((p) => ({
-                        name: `${p.name ?? "(unnamed)"}  ${chalk.gray(String(p.subdomain ?? ""))}`,
-                        value: p
-                    }))
-                }
-            ] as Parameters<typeof inquirer.prompt>[0]);
-            project = picked as ProjectRow;
+            const picked = await pickProjectOrCreate(client, url, createFromLinkArgs(rawArgs.slice(0, 2), args["--url"]));
+            // Created and linked by `projects create --link`, which said so.
+            if (picked === CREATE_NEW_PROJECT) return;
+            project = picked;
         }
 
         if (!project) fail("No project selected.", undefined, "no_project");
 
+        linkToProject(url, project);
         const orgId = project.organization !== undefined ? String(project.organization) : undefined;
-        writeLink({
-            url,
-            projectId: String(project.id),
-            slug: project.subdomain,
-            projectName: project.name,
-            orgId
-        });
 
         success(`Linked to ${chalk.bold(project.name ?? project.subdomain ?? "")}`);
         emit(

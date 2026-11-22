@@ -1879,7 +1879,18 @@ describe("the template's install-script allowlists", () => {
         // needed is a grant with no benefit, so this fails if one is added here
         // without a reason.
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-        expect(Object.keys(pkg.allowScripts ?? {})).toEqual(["@ariga/atlas"]);
+        const granted = Object.entries(pkg.allowScripts ?? {}).filter(([, allowed]) => allowed === true).map(([name]) => name);
+        expect(granted).toEqual(["@ariga/atlas"]);
+    });
+
+    it.each(templates)("%s names esbuild and fsevents as denied, so npm does not warn that their scripts are uncovered", (_name, pkgPath) => {
+        // npm 11 printed "install scripts not yet covered by allowScripts:
+        // esbuild", and npm 12 "blocked … fsevents", on every install of a fresh
+        // scaffold. Both ship prebuilt binaries and their scripts are only a
+        // fallback; `false` records that decision and silences the warning.
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+        expect(pkg.allowScripts?.esbuild).toBe(false);
+        expect(pkg.allowScripts?.fsevents).toBe(false);
     });
 });
 

@@ -78,30 +78,38 @@ async function run() {
     console.log("🚀 Starting script...");
 
     try {
-        // Example: Check backend health
         const res = await fetch(`${baseUrl}/health`);
         const health = res.headers.get("content-type")?.includes("application/json")
             ? await res.json()
             : { status: res.status, text: await res.text() };
         console.log("✅ Backend health:", health);
 
-        // The tables this backend serves to this key: every one exported from
-        // backend/schema, or the database's own in a headless project.
-        const tables = await rebase.schema.tables();
-        console.log(`✅ ${tables.length} table(s): ${tables.map(table => table.slug).join(", ") || "none yet"}`);
+        // The tables this key can reach, as the admin panel and the SDK see them.
+        const tablesRes = await fetch(`${baseUrl}/api/schema/tables`, {
+            headers: serviceKey ? { Authorization: `Bearer ${serviceKey}` } : {}
+        });
+        if (!tablesRes.ok) {
+            console.log(`ℹ️  Listing tables answered ${tablesRes.status}; set REBASE_SERVICE_KEY to read them.`);
+        } else {
+            const tables = (await tablesRes.json()) as Array<{ slug: string }>;
+            console.log("📚 Tables:", tables.map(t => t.slug).join(", ") || "(none yet: add one in backend/schema)");
 
-        // A few rows of the first one. `data.table("<slug>")` reaches any
-        // served table; with the types `rebase dev` generates (the import
-        // above) the same call is `rebase.data.<table>.find(...)`, typed.
-        const first = tables[0];
-        if (first) {
-            const { data, meta } = await rebase.data.table(first.slug).find({ limit: 3 });
-            console.log(`✅ ${first.slug}: ${meta.total} row(s); the first ${data.length}:`, data);
+            // Read a few rows from the first table that is not the users table.
+            const first = tables.find(t => t.slug !== "users");
+            if (first) {
+                const { data } = await rebase.data.table(first.slug).find({ limit: 5 });
+                console.log(`📄 First ${data.length} row(s) of ${first.slug}:`, data);
+            }
         }
+
+        // Typed access: `rebase dev` writes generated/sdk/database.types.ts. Pass
+        // its `tablesDictionary` and `Database` to createRebaseClient (see the
+        // import above) and `rebase.data.<table>.find()` is typed end to end.
 
         console.log("✨ Script finished successfully.");
     } catch (error) {
         console.error("❌ Script failed:", error);
+        process.exitCode = 1;
     }
 }
 

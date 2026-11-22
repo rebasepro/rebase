@@ -273,10 +273,16 @@ export const de: RebaseTranslations = {
     group_name_exists_error: "Dieser Gruppenname existiert bereits.",
 
     // ─── Search ───────────────────────────────────────────────────
-    search_collections: "Suchen",
+    search_collections: "Sammlungen durchsuchen",
+
+    // ─── Home page with no tables of its own ─────────────────────
+    home_no_tables_title: "Noch keine Tabellen",
+    home_no_tables_body: "Inhalte kommen aus den Tabellen, die dein Backend deklariert, und dieses Projekt deklariert nur die eingebaute Benutzertabelle. Lege eine Datei in backend/schema/ an, die defineTable aufruft, und exportiere sie aus backend/schema/index.ts:",
+    home_no_tables_dev: "Solange rebase dev läuft, übernimmt es die neue Tabelle, legt sie in der Datenbank an und zeigt sie hier.",
+    home_no_tables_docs: "So definierst du eine Tabelle",
 
     // ─── Navigation groups ────────────────────────────────────────
-    views_group: "Tabellen",
+    views_group: "Ansichten",
 
     // ─── Entity Edit View ─────────────────────────────────────────
     youd_need_to_save_before_additional_collections: "Speichere diesen Datensatz, bevor du verknüpfte Datensätze hinzufügst.",
@@ -1188,6 +1194,7 @@ export const de: RebaseTranslations = {
     // The admin's own three groups, read by `useNavigationGroupLabel` the same
     // way as the Studio ones below — the group *name* is an identifier the
     // ordering and the icons key off, and only the heading is translated.
+    // The default group (named "Views") holds the project's tables.
     studio_group_views: "Tabellen",
     studio_group_admin: "Verwaltung",
     studio_group_settings: "Einstellungen",
@@ -1972,4 +1979,7 @@ export const de: RebaseTranslations = {
     select_row: "{{id}} auswählen",
     relation_open_record: "{{label}} öffnen",
     select: "Auswählen",
+    studio_home_quick_start: "Schnellstart",
+    studio_home_quick_start_dev: "Das vollständig typisierte SDK für deine Tabellen in generated/sdk hält dieser Befehl aktuell:",
+    studio_home_quick_start_outside_dev: "Außerhalb von dev erzeugst du es neu mit",
 };

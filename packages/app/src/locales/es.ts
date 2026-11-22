@@ -281,10 +281,16 @@ export const es: RebaseTranslations = {
     group_name_exists_error: "Este nombre de grupo ya existe.",
 
     // ─── Search ───────────────────────────────────────────────────
-    search_collections: "Buscar",
+    search_collections: "Buscar colecciones",
+
+    // ─── Home page with no tables of its own ─────────────────────
+    home_no_tables_title: "Todavía no hay tablas",
+    home_no_tables_body: "El contenido sale de las tablas que declara tu backend, y este proyecto solo declara la tabla de usuarios integrada. Añade un archivo en backend/schema/ que llame a defineTable y expórtalo desde backend/schema/index.ts:",
+    home_no_tables_dev: "Mientras rebase dev está en marcha, detecta la nueva tabla, la crea en la base de datos y la muestra aquí.",
+    home_no_tables_docs: "Cómo definir una tabla",
 
     // ─── Navigation groups ────────────────────────────────────────
-    views_group: "Tablas",
+    views_group: "Vistas",
 
     // ─── Entity Edit View ─────────────────────────────────────────
     youd_need_to_save_before_additional_collections: "Guarda este registro antes de añadir registros relacionados.",
@@ -1196,6 +1202,7 @@ export const es: RebaseTranslations = {
     // The admin's own three groups, read by `useNavigationGroupLabel` the same
     // way as the Studio ones below — the group *name* is an identifier the
     // ordering and the icons key off, and only the heading is translated.
+    // The default group (named "Views") holds the project's tables.
     studio_group_views: "Tablas",
     studio_group_admin: "Administración",
     studio_group_settings: "Ajustes",
@@ -1980,4 +1987,7 @@ export const es: RebaseTranslations = {
     select_row: "Seleccionar {{id}}",
     relation_open_record: "Abrir {{label}}",
     select: "Seleccionar",
+    studio_home_quick_start: "Inicio rápido",
+    studio_home_quick_start_dev: "Un SDK con tipos completos para tus tablas se mantiene en generated/sdk gracias a",
+    studio_home_quick_start_outside_dev: "Fuera de dev, regenéralo con",
 };

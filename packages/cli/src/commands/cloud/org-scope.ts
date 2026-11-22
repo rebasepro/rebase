@@ -38,6 +38,23 @@ export async function projectOrganization(client: CloudClient, projectId: string
     }
 }
 
+/**
+ * How to name an organization to a person: its name, else its slug, else the
+ * id. A confirmation that said "in org c2926495-805c-…" asked the reader to
+ * recognise a UUID. Never throws: a failed read names the id.
+ */
+export async function organizationLabel(client: CloudClient, org: string): Promise<string> {
+    try {
+        const row = (await client.data.table("organizations").findById(org)) as Record<string, unknown> | undefined;
+        const name = typeof row?.name === "string" ? row.name.trim() : "";
+        if (name) return name;
+        const slug = typeof row?.slug === "string" ? row.slug.trim() : "";
+        return slug || org;
+    } catch {
+        return org;
+    }
+}
+
 /** Two control-plane addresses that name the same host, however they were spelled. */
 function sameControlPlane(a: string, b: string): boolean {
     const norm = (u: string) => u.trim().replace(/\/+$/, "").toLowerCase();

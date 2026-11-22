@@ -149,7 +149,7 @@ export type AdminCollectionOptions<
      * Navigation group for this collection.
      * Collections sharing the same group name will be visually grouped
      * together in the drawer and home page. If not set, the collection
-     * falls into the default "Views" group.
+     * falls into the default group (named `"Views"`, labelled "Tables").
      */
     group?: string;
 

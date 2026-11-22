@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openEmailForm } from "../auth";
 
 test("Full E2E: Sign in and view dashboard", async ({ page }) => {
   // Fail on any console error
@@ -40,8 +41,7 @@ test("Full E2E: Sign in and view dashboard", async ({ page }) => {
   // above the newsletter row, so it is the first one.
   await page.getByRole("checkbox").first().check();
 
-  // Click sign in button to enter login mode
-  await page.getByRole("button", { name: /Sign in with email/i }).click();
+  await openEmailForm(page);
 
   // The email and password inputs are pre-filled in DemoLoginView, so we can just click Sign in
   const signInButton = page.locator("button", { hasText: /^Sign in$/i }).first();

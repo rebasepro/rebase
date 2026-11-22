@@ -20,6 +20,7 @@
         "generate:sdk": "rebase generate-sdk",
         "skills:install": "rebase skills install",
         "example": "tsx scripts/example.ts",
+        "seed": "tsx scripts/seed.ts",
         "deploy": "rebase cloud deploy"
     },
     "devDependencies": {
@@ -45,6 +46,8 @@
         ]
     },
     "allowScripts": {
-        "@ariga/atlas": true
+        "@ariga/atlas": true,
+        "esbuild": false,
+        "fsevents": false
     }
 }

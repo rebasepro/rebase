@@ -768,6 +768,9 @@ export async function openPostgresDriver(
                 `🔒 [rls] Not serving ${unprotected.length} table(s) — row-level security is disabled, so they have no ` +
                 `authorization model: ${unprotected.join(", ")}\n` +
                 introspected.skipped.map((s) => s.remediationSql.split("\n").map((line) => `      ${line}`).join("\n")).join("\n") +
+                "\n      Once RLS is on, restart `rebase dev`, or reload without restarting: POST /api/admin/schema/reload " +
+                "(as an admin or with the service key), or `NOTIFY rebase_schema_changed;` on the database. Where this " +
+                "server's role could install its DDL event trigger, it reloads on its own." +
                 "\n      To serve them without RLS anyway, pass baas: { unprotectedTables: \"serve\" } to the server " +
                 "entry: an option `rebase eject` gives you, which the managed runtime does not read from backend/ or " +
                 "the environment."
@@ -2236,6 +2239,14 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
      */
     const withheldTables = new Map<string, { schema: string; table: string }>();
 
+    /**
+     * The tables `ensureTableSchema` created in this process, schema-qualified.
+     * Boot switches RLS on for them a moment later, as for any table; that is
+     * not news. RLS switched on for a table that was already there — a user's
+     * own, on an adopted database — is, and `ensureTablePolicies` names those.
+     */
+    const tablesCreatedHere = new Set<string>();
+
     const withholdAgain = async (runSql: RawSqlRunner): Promise<void> => {
         for (const [qualified, { schema, table }] of withheldTables) {
             try {
@@ -2533,6 +2544,9 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
             for (const failure of plan.failures) {
                 logger.warn(describeEnsureFailure(failure));
             }
+            for (const action of plan.actions) {
+                if (action.kind === "create-table") tablesCreatedHere.add(action.target);
+            }
             pendingIndexBuild?.cancel();
             pendingIndexBuild = undefined;
             if (!provisionOnly && plan.deferredIndexes.length > 0) {
@@ -2620,7 +2634,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
             driverResult?: InitializedDriver,
             log?: (message: string) => void
         ): Promise<{ applied: number }> {
-            const { ensureTablePolicies, describeRulesDropped } = await import("./schema/ensure-policies");
+            const { ensureTablePolicies, describeRulesDropped, describeRlsEnabled } = await import("./schema/ensure-policies");
             const queryable = provisioningQueryable(driverResult);
             // The order this depends on is set by the caller, and a caller that
             // gets it wrong fails silently-but-permanently: `CREATE POLICY`
@@ -2667,6 +2681,8 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
             // rather than open — but never in silence: it changes who reads
             // the table on every server sharing this database.
             for (const dropped of outcome.rulesDropped) logger.warn(describeRulesDropped(dropped));
+            const adoptedTablesSecured = outcome.rlsEnabled.filter(table => !tablesCreatedHere.has(table));
+            if (adoptedTablesSecured.length > 0) logger.warn(describeRlsEnabled(adoptedTablesSecured));
             // Not a failure: the table's transaction rolled back, so it is
             // exactly as it was — RLS on, its existing policies in force. Only
             // worth more than a warning when those are not the declared ones.

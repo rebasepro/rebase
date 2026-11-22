@@ -368,6 +368,43 @@ export function deploySummaryLines(input: DeploySummaryInput): string[] {
 }
 
 /**
+ * Where an owner signs in to the deployed admin: the project's page in the
+ * console, opened with `?open=admin`. That is the address a tenant's own
+ * "Continue with Rebase Cloud" button opens (`REBASE_PLATFORM_SIGNIN_URL`):
+ * the console looks the project up, and signs its owner into the admin with
+ * a one-minute token. The deployed login says owners sign in "from the
+ * project's page in the console", with no password to type, and a deploy that
+ * printed only the live URLs left that page for the reader to find.
+ */
+export function consoleSignInUrl(controlPlaneUrl: string, projectId: string): string {
+    return `${controlPlaneUrl.replace(/\/+$/, "")}/projects/${encodeURIComponent(projectId)}?open=admin`;
+}
+
+/** The summary's sign-in line, for a deploy that shipped a backend (the admin lives there). */
+export function signInLine(apps: readonly DeployedApp[], controlPlaneUrl: string, projectId: string): string | undefined {
+    if (!apps.some(app => app.type === "backend")) return undefined;
+    return chalk.gray("  Sign in to the admin from the console: ") + chalk.cyan(consoleSignInUrl(controlPlaneUrl, projectId));
+}
+
+/**
+ * The build log's "File storage is OFF" line, cut to its first sentence, or
+ * undefined when the build did not report storage off.
+ *
+ * The control plane writes it into the build log (`tenantStorageLogLine` in
+ * the saas backend), where it scrolls past above the summary. A project whose
+ * uploads all answer 501 is worth one line where the reader is looking.
+ */
+export function storageOffNotice(buildLog: string | undefined): string | undefined {
+    if (!buildLog) return undefined;
+    const match = /File storage(?: for "[^"]*")? is OFF:[^\n]*/.exec(buildLog);
+    if (!match) return undefined;
+    // The first sentence. Its own text has no ". " before the end, and the
+    // remedy that follows names variables, so it is the part that fits a line.
+    const sentence = match[0].split(/\.\s/)[0].replace(/\.$/, "");
+    return `${sentence}.`;
+}
+
+/**
  * Whether the new version is live, as one sentence and one boolean.
  *
  * `live: null` when nothing was checked — the check was skipped, or no app had

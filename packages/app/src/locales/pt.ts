@@ -278,10 +278,16 @@ export const pt: RebaseTranslations = {
     group_name_exists_error: "Este nome de grupo já existe.",
 
     // ─── Search ───────────────────────────────────────────────────
-    search_collections: "Pesquisar",
+    search_collections: "Pesquisar coleções",
+
+    // ─── Home page with no tables of its own ─────────────────────
+    home_no_tables_title: "Ainda não há tabelas",
+    home_no_tables_body: "O conteúdo vem das tabelas que o seu backend declara, e este projeto declara apenas a tabela de usuários integrada. Adicione um arquivo em backend/schema/ que chame defineTable e exporte-o em backend/schema/index.ts:",
+    home_no_tables_dev: "Enquanto o rebase dev está em execução, ele detecta a nova tabela, cria-a no banco de dados e mostra-a aqui.",
+    home_no_tables_docs: "Como definir uma tabela",
 
     // ─── Navigation groups ────────────────────────────────────────
-    views_group: "Tabelas",
+    views_group: "Visualizações",
 
     // ─── Entity Edit View ─────────────────────────────────────────
     youd_need_to_save_before_additional_collections: "Guarde este registo antes de adicionar registos relacionados.",
@@ -1193,6 +1199,7 @@ export const pt: RebaseTranslations = {
     // The admin's own three groups, read by `useNavigationGroupLabel` the same
     // way as the Studio ones below — the group *name* is an identifier the
     // ordering and the icons key off, and only the heading is translated.
+    // The default group (named "Views") holds the project's tables.
     studio_group_views: "Tabelas",
     studio_group_admin: "Administração",
     studio_group_settings: "Definições",
@@ -1977,4 +1984,7 @@ export const pt: RebaseTranslations = {
     select_row: "Selecionar {{id}}",
     relation_open_record: "Abrir {{label}}",
     select: "Selecionar",
+    studio_home_quick_start: "Início rápido",
+    studio_home_quick_start_dev: "Um SDK totalmente tipado para as suas tabelas é mantido em generated/sdk por",
+    studio_home_quick_start_outside_dev: "Fora do dev, gere-o novamente com",
 };

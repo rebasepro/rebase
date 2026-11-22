@@ -63,6 +63,33 @@ export class MemoryAuthStore {
         return [...this.users.values()].find(u => u.email === wanted);
     }
 
+    /**
+     * An account that is already there, written straight into the store.
+     *
+     * For a test about an ordinary registration: the first account a
+     * development server creates is its bootstrap admin, whose address is
+     * taken as proven, so a test of the address proofs needs someone to have
+     * registered first.
+     */
+    seedUser(email: string, roles: string[] = ["admin"]): UserData {
+        const now = new Date();
+        const user: UserData = {
+            id: randomUUID(),
+            email: email.trim().toLowerCase(),
+            passwordHash: null,
+            displayName: null,
+            photoUrl: null,
+            emailVerified: true,
+            isAnonymous: false,
+            metadata: {},
+            createdAt: now,
+            updatedAt: now
+        };
+        this.users.set(user.id, user);
+        this.roles.set(user.id, roles);
+        return this.snapshot(user);
+    }
+
     /** The providers linked to a user, sorted, for a one-line assertion. */
     providersOf(uid: string): string[] {
         return this.identities.filter(i => i.uid === uid).map(i => i.provider).sort();

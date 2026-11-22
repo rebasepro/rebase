@@ -4,6 +4,13 @@ import type { AppView, RebasePlugin, NavigationGroupMapping, AdminCollection } f
 import { getSubcollections } from "@rebasepro/cms-types";
 import { deepEqual as equal } from "fast-equals";
 
+/**
+ * The group a table or view lands in when it names none. The name is an
+ * identifier — `hiddenGroups`, navigation mappings saved by dragging cards on
+ * the home page and the drawer's group state all store it — so it stays
+ * `"Views"`; what the panel draws for it is the translated label
+ * `studio_group_views`, "Tables" in English.
+ */
 export const NAVIGATION_DEFAULT_GROUP_NAME = "Views";
 export const NAVIGATION_ADMIN_GROUP_NAME = "Admin";
 

@@ -11,5 +11,7 @@
   "rebase cloud": "The command family has shipped for many releases.",
   "rebase cloud domains add": "Shipped with custom domains; this release changes its answer for a host already registered.",
   "rebase cloud domains list": "Shipped with custom domains; this release adds the certificate state.",
-  "rebase schema introspect": "Shipped since 0.1x; this release changes what it does to ai-instructions.md."
+  "rebase schema introspect": "Shipped since 0.1x; this release changes what it does to ai-instructions.md.",
+  "rebase dev": "A command since the first release; this release changes only which requests it logs (a Changed entry), which no docs section describes.",
+  "rebase init": "A command since the first release; this release changes only the next steps it prints (a Changed entry), which no docs section describes."
 }

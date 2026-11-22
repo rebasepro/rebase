@@ -352,6 +352,10 @@ export interface RebaseTranslations {
 
     // ─── Search ───────────────────────────────────────────────────
     search_collections: string;
+    home_no_tables_title?: string;
+    home_no_tables_body?: string;
+    home_no_tables_dev?: string;
+    home_no_tables_docs?: string;
 
     // ─── Navigation groups ────────────────────────────────────────
     /** Default group name shown when collections/views have no explicit group */
@@ -2134,4 +2138,7 @@ export interface RebaseTranslations {
     select_row?: string;
     relation_open_record?: string;
     select?: string;
+    studio_home_quick_start?: string;
+    studio_home_quick_start_dev?: string;
+    studio_home_quick_start_outside_dev?: string;
 }

@@ -74,6 +74,13 @@ describe("a navigation group has one label", () => {
         expect(labels).toEqual(["Tablas", "Base de datos", "Ajustes"]);
     });
 
+    it("labels the default group, where tables land, \"Tables\" rather than \"Views\"", () => {
+        // "Views" collided with `defineView`, which is a SQL view; the group
+        // holds the project's tables. Its name stays "Views" (an identifier).
+        expect(homeLabel(NAVIGATION_DEFAULT_GROUP_NAME, "en")).toBe("Tables");
+        expect(drawerLabel(NAVIGATION_DEFAULT_GROUP_NAME, "en")).toBe("Tables");
+    });
+
     it("renders a group the app declared itself exactly as written", () => {
         // No key exists for one of these and none should: the name is the
         // app's, and inventing a translation for it would be worse than

@@ -1,5 +1,5 @@
 ---
-sourceHash: 19a897df04526a75
+sourceHash: 7c8d0492d7fcfa15
 title: "Recette : CMS de Blog"
 sidebar_label: CMS de Blog
 description: Créez un CMS de blog complet avec articles, auteurs, catégories, édition en texte enrichi et téléversement d'images — tables dans backend/schema, présentation dans frontend/src/cms.
@@ -149,7 +149,7 @@ import { customizeTable } from "@rebasepro/cms";
 import type { articles } from "../../../backend/schema/articles";
 
 export const articlesCms = customizeTable<typeof articles>("articles", {
-    icon: "Article",
+    icon: "Newspaper",
     defaultViewMode: "table",
     fields: {
         content: { markdown: true },
@@ -171,7 +171,7 @@ import { customizeTable } from "@rebasepro/cms";
 import type { authors } from "../../../backend/schema/authors";
 
 export const authorsCms = customizeTable<typeof authors>("authors", {
-    icon: "Person",
+    icon: "UserPen",
     fields: { bio: { multiline: true } },
 });
 ```

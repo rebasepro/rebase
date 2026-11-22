@@ -23,7 +23,7 @@
  * one-line tidy-up.
  */
 import { expect, test } from "@playwright/test";
-import { AUTH_STATE, freshSession } from "../auth";
+import { AUTH_STATE, freshSession, openEmailForm } from "../auth";
 import {
     describeNamelessControls,
     findNamelessControls,
@@ -58,10 +58,7 @@ for (const { name, viewport } of WIDTHS) {
                 // mode refuses. Privacy comes from the host's `topComponent`, which renders
                 // above the newsletter row, so it is the first one.
                 await page.getByRole("checkbox").first().check();
-                await page.getByRole("button", { name: /Sign in with email/i }).click();
-
-                // The form is up once the password field exists.
-                await expect(page.locator('input[type="password"]')).toBeVisible({ timeout: 15000 });
+                await openEmailForm(page);
 
                 const found = await findNamelessControls(page);
                 expect(found, describeNamelessControls(found, `the login screen at ${name}`)).toEqual([]);

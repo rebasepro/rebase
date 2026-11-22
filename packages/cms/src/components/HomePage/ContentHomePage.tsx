@@ -25,7 +25,9 @@ import { useRestoreScroll } from "@rebasepro/app";
 import { SchemaDriftBanner } from "@rebasepro/app";
 import { useBreadcrumbsController } from "../../hooks/useBreadcrumbsController";
 import { useAdminContext } from "../../hooks/useAdminContext";
+import { NAVIGATION_DEFAULT_GROUP_NAME } from "../../hooks/navigation/utils";
 import { NavigationLoadingErrorView } from "../NavigationLoadingErrorView";
+import { NoTablesEmptyState } from "./NoTablesEmptyState";
 
 /**
  * What the page reads while the navigation is not built yet. Constants: a
@@ -36,7 +38,7 @@ import { NavigationLoadingErrorView } from "../NavigationLoadingErrorView";
 const NO_ENTRIES: NavigationEntry[] = [];
 const NO_GROUPS: string[] = [];
 
-export const DEFAULT_GROUP_NAME = "Views";
+export const DEFAULT_GROUP_NAME = NAVIGATION_DEFAULT_GROUP_NAME;
 export const ADMIN_GROUP_NAME = "Admin";
 
 export function ContentHomePage({
@@ -96,6 +98,17 @@ export function ContentHomePage({
         const entryGroups = new Set(rawNavigationEntries.map(e => e.group).filter(Boolean));
         return unFilteredGroupOrder.filter(g => entryGroups.has(g));
     }, [unFilteredGroupOrder, rawNavigationEntries]);
+
+    /**
+     * The project declares no table of its own: every collection is the auth
+     * table, and no custom view was added. A blank scaffold looks like this
+     * until its first `defineTable`.
+     */
+    const hasNoOwnTables = useMemo(
+        () => adminModeController.mode !== "studio" && !rawNavigationEntries.some(e =>
+            e.type === "view" || (e.type === "collection" && !e.collection?.auth)),
+        [adminModeController.mode, rawNavigationEntries]
+    );
 
     const fuse = useRef<Fuse<NavigationEntry> | null>(null);
     const [filteredUrls, setFilteredUrls] = useState<string[] | null>(null);
@@ -241,7 +254,7 @@ export function ContentHomePage({
             isDndDirtyRef.current = false;
         }, 1000);
 
-        // Map ALL groups including "Views"
+        // Map ALL groups including the default one
         const draggable: NavigationGroupMapping[] = latest.map((g) => ({
             name: g.name,
             entries: g.entries.map((e) => e.slug)
@@ -368,6 +381,10 @@ export function ContentHomePage({
                 {/* The collections are still being built (the served tables are on their way). */}
                 {navigationStateController.loading && rawNavigationEntries.length === 0 &&
                     <CircularProgressCenter/>}
+
+                {hasNoOwnTables && !performingSearch && !navigationStateController.loading &&
+                    !navigationStateController.navigationLoadingError &&
+                    <NoTablesEmptyState/>}
 
                 <FavouritesView hidden={performingSearch}/>
 

@@ -64,6 +64,9 @@ import {
     failureHint,
     failureReason,
     DEFAULT_LIVE_TIMEOUT_MS,
+    consoleSignInUrl,
+    signInLine,
+    storageOffNotice,
     type DeployedApp,
     type LiveCheck
 } from "./deploy-summary";
@@ -790,7 +793,7 @@ following: false }
         console.log("");
     }
 
-    const { status } = await streamBuildLogs(client, deploymentId, {
+    const { status, logs: buildLog } = await streamBuildLogs(client, deploymentId, {
         quiet: isJsonMode(),
         timeoutMs: opts.timeoutMs,
         projectId,
@@ -804,6 +807,7 @@ following: false }
     const appKey = await mintMissingAppKey({ url, projectId, root: projectRoot });
     reportMintedAppKey(appKey);
     await reportDeployed({
+        buildLog,
         undo: manifest.kind === "static" ? STATIC_UNDO_HINT : ROLLBACK_HINT,
         client,
         url,
@@ -844,6 +848,8 @@ async function reportDeployed(o: {
     registeredHosts: DeployHost[] | undefined;
     /** How to undo this deploy, printed under the summary. */
     undo?: string;
+    /** The build log the follow read, for what it reported (storage off). */
+    buildLog?: string;
     json: Record<string, unknown>;
 }): Promise<void> {
     const host = await deployedUrl(o.client, { projectId: o.projectId, url: o.url });
@@ -864,6 +870,8 @@ async function reportDeployed(o: {
         ? resolveBlockedState({ database: {}, lastDeploy: { status: "success" }, authConfig: await readAuthConfig(host) })
         : undefined;
     const blockedOn = blocked?.blockedOn ? blocked : undefined;
+    const signIn = signInLine(apps, o.url, o.projectId);
+    const storageOff = storageOffNotice(o.buildLog);
 
     emit(
         () => {
@@ -882,6 +890,12 @@ async function reportDeployed(o: {
                     chalk.yellow(`  ⚠ Live, but nobody can sign in: magic-link sign-in is on and the app has no email service (${blockedOn.blockedOn}).`),
                     chalk.gray(`    ${blockedOn.nextAction}`));
             }
+            if (storageOff) {
+                lines.splice(lines.length - 1, 0,
+                    chalk.yellow(`  ⚠ ${storageOff}`),
+                    chalk.gray("    Turn it on with `rebase cloud storage create` (or `storage attach` for your own bucket), then deploy again."));
+            }
+            if (signIn) lines.splice(lines.length - 1, 0, signIn);
             for (const line of lines) console.log(line);
             printPendingHosts(hosts);
         },
@@ -893,7 +907,9 @@ durationMs: elapsedMs,
 live: verdict.live,
 liveChecks: live ?? [],
 blockedOn: blockedOn?.blockedOn ?? null,
-nextAction: blockedOn?.nextAction ?? null }
+nextAction: blockedOn?.nextAction ?? null,
+signInUrl: signIn ? consoleSignInUrl(o.url, o.projectId) : null,
+storageOff: storageOff ?? null }
     );
 }
 
@@ -1717,7 +1733,14 @@ async function recordDeploy(o: {
     }, { projectRoot: o.projectRoot ?? process.cwd() });
 }
 
-export async function deployCommand(rawArgs: string[], projectRef: string): Promise<void> {
+/**
+ * @param target the project to deploy to, or how to find it: the dispatcher
+ *   passes a resolver, run only once the line's own usage checks have passed,
+ *   because in an unlinked directory it can create a project — and a usage
+ *   error after that would leave one behind for nothing.
+ */
+export async function deployCommand(rawArgs: string[], target: string | (() => Promise<string>)): Promise<void> {
+    const resolveTarget = (): Promise<string> => typeof target === "string" ? Promise.resolve(target) : target();
     const startedAt = Date.now();
     const { flags: args, appName } = resolveDeployArgs(rawArgs);
 
@@ -1748,7 +1771,7 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     }
 
     if (args["--git"]) {
-        await deployFromGit(rawArgs, projectRef, startedAt);
+        await deployFromGit(rawArgs, await resolveTarget(), startedAt);
         return;
     }
 
@@ -1773,6 +1796,7 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
         );
     }
 
+    const projectRef = await resolveTarget();
     const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
 
@@ -1971,7 +1995,7 @@ following: false,
     // Recorded as the follow ends, whatever it ends in: a failed build exits
     // non-zero from inside the follow, and recording after it only ever
     // recorded successes.
-    const { status } = await streamBuildLogs(client, deploymentId, {
+    const { status, logs: buildLog } = await streamBuildLogs(client, deploymentId, {
         quiet: isJsonMode(),
         timeoutMs: resolveDeployTimeout(args["--timeout"]),
         projectId,
@@ -1983,6 +2007,7 @@ following: false,
     const appKey = await mintMissingAppKey({ url, projectId });
     reportMintedAppKey(appKey);
     await reportDeployed({
+        buildLog,
         undo: ROLLBACK_HINT,
         client,
         url,
@@ -2098,7 +2123,7 @@ async function deployFromGit(rawArgs: string[], projectRef: string, startedAt: n
         console.log(chalk.gray("  Streaming build logs (Ctrl-C to stop watching — the build keeps running):"));
         console.log("");
     }
-    const { status } = await streamBuildLogs(client, deploymentId, {
+    const { status, logs: buildLog } = await streamBuildLogs(client, deploymentId, {
         quiet: isJsonMode(),
         timeoutMs: resolveDeployTimeout(args["--timeout"]),
         projectId,
@@ -2108,6 +2133,7 @@ async function deployFromGit(rawArgs: string[], projectRef: string, startedAt: n
         onTerminal: (ended) => recordDeploy({ followed: true, status: ended, deduplicated, startedAt })
     });
     await reportDeployed({
+        buildLog,
         undo: ROLLBACK_HINT,
         client,
         url,

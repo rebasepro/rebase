@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planTablePolicies } from "../src/schema/generate-postgres-ddl-logic";
-import { ensureTablePolicies, lockTables } from "../src/schema/ensure-policies";
+import { describeRlsEnabled, ensureTablePolicies, lockTables } from "../src/schema/ensure-policies";
 import type { Queryable } from "../src/schema/ensure-tables";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 import { compileSet } from "./helpers/plan-tables";
@@ -275,6 +275,34 @@ describe("a table whose RLS is already on", () => {
         expect(ran.filter(t => /REVOKE ALL PRIVILEGES ON/.test(t))).toEqual([]);
         expect(result.tablesSecured).toBe(2);
         expect(result.unsecured).toEqual([]);
+    });
+
+    /**
+     * On a database adopted with `rebase init`, the first boot is what switches
+     * RLS on for the user's own tables. It names them, rather than a count of
+     * policy statements: who may read those tables just changed.
+     */
+    it("names only the tables it switched RLS on for", async () => {
+        const { queryable } = catalogueDb({ "public.tiers": true, "public.customers": false });
+        const result = await ensureTablePolicies(queryable, compileSet([tiers, customers]));
+
+        expect(result.rlsEnabled).toEqual(["public.customers"]);
+        expect(describeRlsEnabled(result.rlsEnabled)).toContain("public.customers");
+        expect(describeRlsEnabled(result.rlsEnabled)).toMatch(/row-level security ON for 1 existing table/);
+    });
+
+    it("names the table on the one-statement-at-a-time path too", async () => {
+        const { queryable } = catalogueDb({ "public.tiers": false });
+        const refusing: Queryable = {
+            async query<T>(text: string): Promise<{ rows: T[] }> {
+                if (text.includes(";\n") || /^\s*BEGIN|SET LOCAL/i.test(text)) {
+                    throw Object.assign(new Error("cannot insert multiple commands into a prepared statement"), { code: "42601" });
+                }
+                return queryable.query<T>(text);
+            }
+        };
+        const result = await ensureTablePolicies(refusing, compileSet([tiers]));
+        expect(result.rlsEnabled).toEqual(["public.tiers"]);
     });
 
     it("is not revoked when its ENABLE times out but the catalogue says RLS is on", async () => {

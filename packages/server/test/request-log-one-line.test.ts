@@ -81,7 +81,7 @@ describe("a failed request logs once", () => {
         expect(lines.map(line => line.message).join("\n")).toContain("[API]");
     });
 
-    it("writes an expected refusal at info, and an incident at warn", async () => {
+    it("writes an expected refusal below warn, and an incident at warn", async () => {
         // A browser that holds no session asks POST /auth/refresh on every
         // load and is told NO_SESSION: a routine answer, which the handler
         // already logs at debug when it writes its own line. The request line
@@ -98,8 +98,9 @@ describe("a failed request logs once", () => {
         await app.request("/orders/1");
 
         const requests = lines.filter(line => line.message === "request");
+        // Debug, because this is not production: see request-log-development.test.ts.
         expect(requests.map(line => [line.level, line.data?.errorCode])).toEqual([
-            ["info", "NO_SESSION"],
+            ["debug", "NO_SESSION"],
             ["warn", "WRITE_DENIED"]
         ]);
     });

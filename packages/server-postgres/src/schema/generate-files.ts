@@ -2,7 +2,7 @@ import { promises as fsPromises } from "fs";
 import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
-import { declaredDatabaseExtensions } from "@rebasepro/types";
+import { declaredDatabaseExtensions, parseEnvBoolean } from "@rebasepro/types";
 import { loadTables } from "./load-tables";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
@@ -74,7 +74,8 @@ export async function writeDrizzleSchema(options: GenerateFileOptions): Promise<
             out(String(schemaContent));
         }
 
-        if (options.nextStep !== false) out(nextStepAfterGenerate());
+        // Inside `rebase init`, which closes on its own next steps.
+        if (options.nextStep !== false && parseEnvBoolean(process.env.REBASE_INIT_SCAFFOLD) !== true) out(nextStepAfterGenerate());
     } catch (error) {
         outError(`Error generating schema: ${describeFailure(error)}`);
         // `rebase db push` runs this as step 1 and must stop on it: going on

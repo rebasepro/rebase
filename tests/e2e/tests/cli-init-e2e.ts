@@ -1053,7 +1053,7 @@ height: 800 }
             console.log("Filling admin account details...");
             await page.fill('input[placeholder="Jane Doe (optional)"]', "Francesco Admin");
             await page.fill('input[placeholder="you@example.com"]', "admin@rebase.pro");
-            await page.fill('input[placeholder="••••••••"]', "SecureAdmin123!");
+            await page.fill('input[type="password"]', "SecureAdmin123!");
             await page.screenshot({ path: path.join(screenshotDir, "2-bootstrap-details-filled.png") });
 
             console.log("Submitting the admin bootstrap form...");

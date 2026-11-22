@@ -99,6 +99,9 @@ const NOT_OURS = new Map([
     // reader who did would be telling the server a port was named when it was
     // derived, and turning a harmless walk into a boot failure.
     ["REBASE_DEV_PORT_EXPLICIT", "set by `rebase dev` for the backend it spawns"],
+    // `rebase init` closes on its own numbered next steps, so the introspect and
+    // generate children it runs leave out theirs. Nobody sets it by hand.
+    ["REBASE_INIT_SCAFFOLD", "set by `rebase init` for the introspect and generate children it runs"],
     // The port dev hands its backend, for the `generate-sdk` child it runs
     // before that backend has bound — the SDK README's example names it.
     // Nobody sets it; the README of a hand-run `generate-sdk` reads

@@ -330,14 +330,27 @@ describe("describeTables (runtime) — row-level security", () => {
         expect(result.skipped).toEqual([{
             table: "secrets",
             reason: expect.stringContaining("row-level security is disabled"),
-            remediationSql: rlsRemediationSql("public", "secrets")
+            remediationSql: rlsRemediationSql("public", "secrets", ["id"])
         }]);
-        expect(rlsRemediationSql("public", "secrets")).toBe(
+        // No owner-like column, so no owner policy: one naming `owner_id` on a
+        // table without it fails the moment it is run.
+        expect(rlsRemediationSql("public", "secrets", ["id"])).toBe(
             "ALTER TABLE \"public\".\"secrets\" ENABLE ROW LEVEL SECURITY;\n" +
-            "CREATE POLICY \"secrets_owner\" ON \"public\".\"secrets\" FOR ALL TO public USING (owner_id = rebase.uid());  -- an example: write the condition that fits"
+            "CREATE POLICY \"secrets_read\" ON \"public\".\"secrets\" FOR SELECT TO public USING (true);  " +
+            "-- read-only: every caller reads every row; inserts, updates and deletes need a policy of their own"
         );
         expect(result.junctions).toEqual([{ table: "posts_tags", rlsEnabled: false }]);
         expect(result.unprotected).toEqual([]);
+    });
+
+    it("suggests an owner policy on the owner-like column a table has, cast to text", () => {
+        expect(rlsRemediationSql("public", "books", ["id", "title", "created_by", "user_id"])).toBe(
+            "ALTER TABLE \"public\".\"books\" ENABLE ROW LEVEL SECURITY;\n" +
+            "CREATE POLICY \"books_owner\" ON \"public\".\"books\" FOR ALL TO public " +
+            "USING (user_id::text = rebase.uid()) WITH CHECK (user_id::text = rebase.uid());  " +
+            "-- each user reaches the rows whose user_id is theirs; adapt as needed"
+        );
+        expect(rlsRemediationSql("public", "notes", ["id", "author_id"])).toContain("USING (author_id::text = rebase.uid())");
     });
 
     it("states the catalogue's policies as the rules, and RLS on with no policy as closed", () => {

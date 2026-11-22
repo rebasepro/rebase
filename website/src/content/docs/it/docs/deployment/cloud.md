@@ -1,20 +1,16 @@
 ---
-sourceHash: 325c29335f5ae263
+sourceHash: daa75b0f6ab9dbdf
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
-description: Rebase Cloud è lo stesso Rebase, gestito per te. Cos'è, come si collega e si distribuisce un progetto, e cosa la beta privata non include ancora.
+description: Rebase Cloud è lo stesso Rebase, gestito per te. Di cosa si tratta, come collegare e distribuire un progetto e cosa la beta privata non include ancora.
 ---
 
-Rebase Cloud esegue lo stesso Rebase open source che ospiteresti in autonomia — la stessa
-immagine `rebasepro/server` pubblicata, lo stesso bundle, lo stesso Postgres. La
-differenza sta in chi lo gestisce.
+Rebase Cloud esegue lo stesso Rebase open source che ospiteresti in self-hosting: la stessa immagine `rebasepro/server` pubblicata, lo stesso bundle, lo stesso Postgres. La differenza sta in chi lo gestisce.
 
 :::note[Beta privata]
-Rebase Cloud è in **beta privata**. Esegue tenant reali già oggi e apre l'accesso
-a scaglioni. [Richiedi l'accesso](https://rebase.pro/pricing).
+Rebase Cloud è in **beta privata**. Attualmente ospita tenant reali e le aperture avvengono a scaglioni. [Richiedi l'accesso](https://rebase.pro/pricing).
 
-Non è self-service, quindi i comandi seguenti richiedono un account a cui è stato concesso l'accesso.
-Tutto il resto su questo sito funziona senza di esso.
+Non è self-service, quindi i comandi seguenti richiedono un account a cui è stato concesso l'accesso. Tutto il resto su questo sito funziona anche senza.
 :::
 
 ## Cos'è
@@ -23,16 +19,13 @@ Un **progetto** Cloud è composto da tre elementi che la piattaforma gestisce pe
 
 | | Cosa ottieni |
 |---|---|
-| **App** | Il tuo bundle, in esecuzione sull'immagine di runtime pubblicata. I deploy consistono nel caricamento di un bundle, non nella build di un container |
-| **Database** | Un PostgreSQL gestito, con backup automatici e point-in-time recovery |
-| **Storage** | Un bucket dedicato, se il tuo progetto utilizza l'archiviazione di file |
+| **App** | Il tuo bundle, in esecuzione sull'immagine di runtime pubblicata. I deploy consistono nel caricamento di un bundle, non nella compilazione di un container |
+| **Database** | Un PostgreSQL gestito, con backup automatizzati e point-in-time recovery |
+| **Storage** | Un bucket dedicato, se il tuo progetto utilizza lo storage di file |
 
-Ciascuno viene eseguito con provisioning al tuo primo deploy, e ciascuno viene fatturato in base a ciò che
-riserva piuttosto che per utente (per-seat).
+L'app e il database vengono sottoposti a provisioning al tuo primo deploy; un bucket solo quando lo richiedi ([Storage dei file](#storage-dei-file)). Ognuno è fatturato in base alle risorse riservate anziché per utente (per seat).
 
-**Non cambia nulla nel tuo progetto per essere eseguito lì.** Lo stesso repository
-può essere self-hosted con `docker compose`, e la via d'uscita è reale: `rebase build`
-produce un bundle che si avvia ovunque sia eseguibile l'immagine di runtime.
+**Nulla cambia nel tuo progetto per essere eseguito lì.** Lo stesso repository può essere ospitato in self-hosting con `docker compose`, e la via d'uscita è concreta: `rebase build` genera un bundle che si avvia ovunque sia eseguibile l'immagine di runtime.
 
 ## Collegare un progetto
 
@@ -44,107 +37,50 @@ rebase cloud billing setup
 rebase cloud projects create --name "My app" --subdomain my-app --link
 ```
 
-`login` apre la console nel tuo browser e stampa un codice breve. Verifica che
-la console mostri lo stesso codice e approva l'accesso da lì: il terminale
-acquisisce la sessione e la scrive in `~/.rebase/credentials.json`. Se non hai
-effettuato l'accesso alla console, accedi prima lì con il metodo che preferisci,
-inclusi Google e GitHub. Tramite SSH, `rebase cloud login --no-browser` stampa il link
-da aprire sulla tua macchina locale.
+`login` apre la console nel browser e stampa un codice breve. Verifica che la console mostri lo stesso codice e approva l'accesso da lì: il terminale acquisirà la sessione e la salverà in `~/.rebase/credentials.json`. Se non hai ancora effettuato l'accesso alla console, accedi prima lì con il metodo che preferisci, inclusi Google e GitHub. Tramite SSH, `rebase cloud login --no-browser` stampa il link da aprire sul proprio computer.
 
-`projects create` non accetta argomenti posizionali. Il nome e il sottodominio sono
-flag, ed entrambi sono obbligatori — su un terminale vengono richiesti in modo interattivo, e una
-sessione headless che ometta uno dei due termina con `input_required` anziché inventarne
-uno. **Il sottodominio non è modificabile in seguito:** è l'host
-`<slug>.rebase.website` su cui risponde il progetto, quindi sceglilo con attenzione.
+`projects create` non accetta argomenti posizionali. Il nome e il sottodominio sono flag ed entrambi sono obbligatori: su un terminale vengono richiesti in modo interattivo, mentre un'esecuzione non interattiva (headless) che ne omette uno termina con `input_required` anziché inventarne uno. **Il sottodominio non è modificabile in seguito:** è l'host `<slug>.rebase.website` su cui risponde il progetto, quindi sceglilo con attenzione.
 
-`--link` associa questa directory al progetto nella stessa chiamata, quindi non è
-necessario un passaggio `link` separato. Questo scrive `.rebase/cloud.json`, che memorizza l'ID
-e lo slug del progetto. Quel file non è un segreto e non rappresenta le tue credenziali — queste ultime risiedono
-in `~/.rebase/credentials.json`, scritto da `login`.
+`--link` collega questa directory al progetto nella stessa chiamata, eliminando la necessità di un passaggio `link` separato. Scrive `.rebase/cloud.json`, che registra l'ID del progetto e lo slug. Quel file non è un segreto e non contiene le tue credenziali: queste risiedono in `~/.rebase/credentials.json`, scritto da `login`.
 
-Viene tuttavia committato con il codice, quindi un repository clonato può specificare qualsiasi
-control plane. Quando l'host proviene solo da quel file e non è né quello
-proprietario della piattaforma né uno a cui hai già effettuato l'accesso in precedenza, `login` ne indica il nome e chiede
-conferma prima di inviare lì la tua email e la tua password. Senza un terminale, o con
-`--json`, rifiuta l'operazione con `unknown_control_plane`; passa `--url <host>` (o imposta
-`REBASE_CLOUD_URL`) per accedere intenzionalmente a quell'indirizzo.
+Viene tuttavia sottoposto a commit insieme al codice, quindi un repository clonato può indicare qualsiasi control plane. Quando l'host proviene solo da quel file e non è né quello ufficiale della piattaforma né uno su cui hai già effettuato l'accesso in precedenza, `login` ne mostra il nome e chiede conferma prima di inviarvi email e password. Senza un terminale, o con `--json`, rifiuta l'operazione con `unknown_control_plane`; passa `--url <host>` (o imposta `REBASE_CLOUD_URL`) per accedere intenzionalmente a quell'indirizzo.
 
-Per accedere senza browser, passa la tua email: `rebase cloud login --email
-me@example.com` richiede la password. **Ti sei registrato con Google, GitHub o
-LinkedIn?** Il tuo account non ha una password, quindi usa un codice:
+Per accedere senza il browser, specifica la tua email: `rebase cloud login --email me@example.com` ti chiederà la password. **Ti sei registrato con Google, GitHub o LinkedIn?** Il tuo account non ha una password, quindi usa invece un codice:
 
 ```bash
 rebase cloud login --code --email me@example.com
 ```
 
-Il control plane ti invierà via email un codice a 6 cifre, valido per dieci minuti, da digitare
-al prompt. Con `--email` e senza password, `rebase cloud login` chiede
-se utilizzare la password o un codice. I codici richiedono che il control plane sia in grado di inviare
-email; in caso contrario, `--code` lo segnala ed esce con `otp_unavailable`.
+Il control plane ti invierà un codice a 6 cifre via email, valido per dieci minuti, da digitare al prompt. Con `--email` e senza password, `rebase cloud login` ti chiederà se usare la password o un codice. L'uso dei codici richiede che il control plane sia in grado di inviare email; in caso contrario, `--code` lo segnala ed esce con `otp_unavailable`.
 
-Se hai abilitato l'autenticazione a due fattori, `login` richiede quindi il codice dalla
-tua app di autenticazione o uno dei tuoi codici di recupero, a seconda del metodo di accesso
-utilizzato. Tramite browser, la console lo richiede al momento del login. Né un codice di accesso né un secondo fattore possono essere digitati senza un terminale.
-Per uno script, crea un access token nella console (**Settings → Access
-tokens**) e imposta `REBASE_TOKEN`; consulta [CI e agenti](/docs/deployment/cloud-agents/#ci-and-agents).
+Se hai attivato l'autenticazione a due fattori, `login` chiederà quindi il codice dall'app di autenticazione o uno dei tuoi codici di recupero, indipendentemente dal metodo di accesso scelto. Tramite browser, la console lo richiede durante l'accesso. Né un codice di accesso né un secondo fattore possono essere digitati senza un terminale. Per gli script, crea un token di accesso nella console (**Settings → Access tokens**) e imposta `REBASE_TOKEN`; vedi [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
 
-Una password errata risponde con `invalid_credentials` offrendo gli stessi due metodi di accesso, poiché
-la causa più comune è un account che non ne ha mai avuta una.
+Una password errata restituisce `invalid_credentials` suggerendo le stesse due modalità di accesso, poiché la causa comune è un account a cui non è mai stata associata una password.
 
-`billing setup` associa una carta all'organizzazione, una sola volta. È posizionato per primo nella
-sequenza intenzionalmente: il primo deploy di un progetto viene rifiutato senza di essa, e
-scoprirlo dopo il completamento del caricamento del bundle sarebbe l'ordine peggiore.
+`billing setup` collega una carta all'organizzazione, una sola volta. È volutamente il primo passaggio della sequenza: il primo deploy di un progetto viene rifiutato senza una carta registrata, e scoprirlo dopo che il caricamento del bundle è terminato sarebbe l'ordine peggiore.
 
-Successivamente, la pagina **Billing** della console elenca le fatture dell'organizzazione,
-ciascuna con la pagina ospitata di Stripe e il relativo PDF, e mostra un'anteprima della fattura successiva per ciascun
-progetto. `rebase cloud billing invoices` e `rebase cloud billing upcoming`
-stampano le stesse informazioni. Entrambi sono riservati ai proprietari (owner) e agli amministratori (admin) dell'organizzazione. Laddove la
-piattaforma lo offra, **Manage billing** apre il portale clienti di Stripe per la
-carta, i dettagli di fatturazione e le fatture passate.
+Successivamente, la pagina **Billing** della console elenca le fatture dell'organizzazione, ciascuna con la pagina ospitata e il PDF di Stripe, e mostra l'anteprima della fattura successiva di ogni progetto. `rebase cloud billing invoices` e `rebase cloud billing upcoming` mostrano le stesse informazioni. Entrambi i comandi sono riservati a owner e admin dell'organizzazione. Dove previsto dalla piattaforma, **Manage billing** apre il portale clienti di Stripe per gestire la carta, i dati di fatturazione e le fatture precedenti.
 
-Con una carta già registrata, la creazione di un altro progetto nella console non richiede
-alcun secondo pagamento: il progetto viene fatturato su quella carta e distribuito. Se la carta
-viene rifiutata o la banca richiede la conferma del pagamento, la console ti reindirizza a
-**Billing**, dove **Fix your card** consente di salvare un'altra carta e **Complete the
-payment** apre la fattura di Stripe.
+Con una carta già memorizzata, la creazione di un altro progetto nella console non richiede un secondo pagamento: il progetto viene addebitato su quella carta e distribuito. Se la carta viene rifiutata o la banca richiede la conferma del pagamento, la console ti reindirizza a **Billing**, dove **Fix your card** consente di salvare un'altra carta e **Complete the payment** apre la fattura di Stripe.
 
-L'utilizzo di un progetto viene mostrato nella sua panoramica, sotto **Usage this month**, e
-contemporaneamente per tutti i progetti nella pagina **Billing**: richieste rispetto alla
-soglia inclusa (la barra diventa ambra all'80%), errori 5xx, l'overage finora accumulato
-e l'andamento del mese a questo ritmo. L'overage viene calcolato dallo
-stesso codice che lo trasmette a Stripe, pertanto corrisponde esattamente a ciò che sarà riportato in fattura;
-comparirà nella fattura del mese successivo. `rebase cloud usage` stampa
-gli stessi dati, e `rebase cloud usage org` quelli dell'intera organizzazione. Qualsiasi membro può visualizzarli.
-I dati segnalano ciò che non possono ancora monitorare: l'object storage non viene misurato,
-quindi non viene fatturato alcun overage di archiviazione; quando un progetto esegue due o più pod applicativi,
-le relative richieste non vengono conteggiate; e un giorno con campionamenti mancati genera un sottoconteggio. Un
-progetto con autoscaling mostra anche i pod eseguiti oltre `--replicas`, in ore-pod,
-il loro costo alle tariffe dedicate e se questa piattaforma li addebita già. Un
-progetto riscattato da un agente conteggia solo i giorni a partire dal riscatto: prima
-di esso, il progetto apparteneva alla piattaforma.
+Il consumo di un progetto è mostrato nella sua panoramica, sotto **Usage this month**, e per tutti i progetti contemporaneamente nella pagina **Billing**: richieste rispetto alla quota inclusa (la barra diventa arancione all'80%), errori 5xx, l'eccedenza maturata finora e la proiezione di fine mese a questo ritmo. L'eccedenza è calcolata dallo stesso codice che la trasmette a Stripe, quindi corrisponde a quanto sarà riportato in fattura; comparirà nella fattura del mese successivo. `rebase cloud usage` stampa le stesse metriche, mentre `rebase cloud usage org` mostra quelle dell'intera organizzazione. Qualsiasi membro può visualizzarle. I dati specificano ciò che non possono ancora rilevare: l'object storage non viene misurato, quindi non viene fatturata alcuna eccedenza di archiviazione; quando un progetto esegue due o più pod applicativi, le sue richieste non vengono conteggiate; e una giornata con campioni mancanti genera un sottoconteggio. Un progetto con scalabilità automatica mostra anche i pod eseguiti oltre `--replicas`, in ore-pod, il loro costo in base alle proprie tariffe e se questa piattaforma li fattura già. Un progetto riscattato (claimed) da un agente conteggia solo i giorni successivi al riscatto: prima di allora, il progetto apparteneva alla piattaforma.
 
-Un progetto esistente può essere collegato senza doverne creare uno nuovo:
+Un progetto esistente può essere collegato senza crearne uno nuovo:
 
 ```bash
 rebase cloud projects list
 rebase cloud link --project my-app
 ```
 
-## Eseguire il deploy
+## Deploy
 
 ```bash
 rebase cloud deploy
 ```
 
-Un solo comando, e nessun flag da ricordare. Il `rebase.json` di uno scaffold dichiara
-`runtime: "managed"` per il proprio backend, e `deploy` legge tale dichiarazione — lo
-segnala durante l'esecuzione (`rebase.json declares runtime: managed — deploying a
-bundle`), compila l'applicazione in `dist-bundle`, carica il bundle, lo esegue sull'immagine
-di runtime pubblicata e segue il deployment fino a uno stato terminale. Il codice di uscita
-costituisce il verdetto, quindi la stessa riga funziona in modo non presidiato nella CI.
+Un solo comando e nessun flag da ricordare. Il `rebase.json` dello scaffold dichiara `runtime: "managed"` per il proprio backend e `deploy` legge tale dichiarazione — notificandolo durante il processo (`rebase.json declares runtime: managed — deploying a bundle`), compila l'applicazione in `dist-bundle`, carica il bundle, lo esegue sull'immagine di runtime pubblicata e segue il deployment fino a uno stato terminale. Il codice di uscita rappresenta l'esito finale, quindi la stessa riga funziona in modo non presidiato nei flussi di CI.
 
-Al termine, indica dove risponde ciascuna app e se la nuova versione è
-attiva lì:
+Termina indicando dove risponde ora ciascuna app e se la nuova versione è attiva (live) su di esse:
 
 ```text
   ✓ Deployed songbuzz in 1m 12s  (deployment fb3c7442-9937-4179-8d3c-88a106da149d)
@@ -156,47 +92,24 @@ attiva lì:
   Something wrong? `rebase cloud rollback` puts the previous deployment back.
 ```
 
-"Live" significa che l'indirizzo ha risposto dopo la build: il percorso `/health` del backend
-ha restituito `ok`, e la pagina di un'app statica si è caricata (da questo deployment, quando servita dalla
-piattaforma). La verifica attende fino a `--live-timeout` secondi, 60 per
-impostazione predefinita; `0` la salta. Se un'app non risponde in tempo, il deploy termina comunque con codice
-zero, poiché il deployment ha avuto successo, e l'ultima riga specifica quale app non ha
-risposto e il motivo. Un deploy fallito termina invece su una singola riga, indicando l'app e il
-motivo, rimandando a `rebase cloud logs` per il log completo di build.
+"Live" significa che l'indirizzo ha risposto dopo la compilazione: l'endpoint `/health` di un backend ha restituito `ok` e la pagina di un'app statica è stata caricata (da questo deployment, quando viene servita dalla piattaforma). Il controllo attende fino a `--live-timeout` secondi, 60 per impostazione predefinita; `0` lo disabilita. Se un'app non risponde in tempo, il deploy termina comunque con codice zero poiché il deployment è andato a buon fine, e l'ultima riga specifica quale app non ha risposto e il motivo. Al contrario, un deploy fallito termina con una singola riga che indica l'app e il motivo, rimandando a `rebase cloud logs` per il log di compilazione completo.
 
-Gli script possono passare `--json` per ricevere un unico oggetto contenente i medesimi dettagli — `apps`, `hosts`,
-`live`, `liveChecks`, `durationMs` e l'ID del deployment. A differenza del resto dei comandi di
-`rebase cloud`, `deploy` non passa automaticamente a JSON quando usato in una pipe.
+Gli script possono passare `--json` per ricevere un singolo oggetto contenente le medesime informazioni: `apps`, `hosts`, `live`, `liveChecks`, `durationMs` e l'ID del deployment. A differenza del resto di `rebase cloud`, `deploy` non passa automaticamente al formato JSON quando reindirizzato via pipe.
 
-Ciò che questo runtime consente — pacchetti e moduli nativi, memoria e istanze,
-timeout e dimensioni del body, filesystem, secret, storage e traffico di rete
-in uscita — è illustrato nella pagina dedicata:
-[Runtime backend gestito](/docs/deployment/managed-runtime/).
+Cosa consente tale runtime — pacchetti e moduli nativi, memoria e istanze, timeout e dimensioni del body, filesystem, secret, storage e rete in uscita — è descritto nella pagina dedicata: [Managed backend runtime](/docs/deployment/managed-runtime/).
 
-Per distribuire un artefatto compilato in precedenza — ad esempio in un job di CI che compila una volta e
-distribuisce due volte — punta direttamente alla directory anziché ricompilare:
+Per distribuire un artefatto compilato in precedenza — ad esempio in un job di CI che compila una volta e distribuisce due volte — punta alla directory invece di ricompilare:
 
 ```bash
 rebase build
 rebase cloud deploy --bundle-dir dist-bundle
 ```
 
-L'uscita dal runtime gestito richiede un flag dedicato, `--eject`, e nient'altro lo
-richiede: una build che trasferirebbe un progetto gestito su un'immagine container di cui assume
-la titolarità viene rifiutata finché non lo specifichi esplicitamente. In passato si usava `--force` per questo, il che metteva
-l'azione meno reversibile della CLI sotto la stessa parola usata per "sovrascrivi questo
-file"; ora è un'opzione non riconosciuta anziché un alias, quindi uno script che la contiene
-si arresta.
+L'uscita dal runtime gestito richiede un flag dedicato, `--eject`, e nessun altro comando la richiede: una compilazione che sposterebbe un progetto gestito su un'immagine container proprietaria viene rifiutata finché non lo specifichi espressamente. In passato si usava `--force`, che associava l'azione meno reversibile della CLI allo stesso termine di "sovrascrivi questo file"; ora è un'opzione non riconosciuta anziché un alias, quindi uno script che la contiene si interromperà.
 
-### Il controllo sintattico prima dell'upload
+### La verifica sintattica prima del caricamento
 
-I file di un'app statica vengono serviti esattamente come sono. Quando il relativo comando `build` si limita a
-copiare script scritti a mano in `output`, nessun parser li ha controllati, e un file
-contenente un errore di battitura finirebbe in produzione impedendo il caricamento della pagina. Pertanto, prima che qualsiasi
-cosa venga caricata, `deploy` analizza ogni file `.js`, `.mjs` e `.cjs` nell'`output` di ciascuna app
-statica, insieme a ogni tag `<script>` inline presente nei file `.html`. Questo
-copre sia un'app statica distribuita singolarmente, sia le app statiche incorporate nel
-bundle del backend. Un errore di sintassi arresta il deploy indicando file, riga e colonna:
+I file di un'app statica vengono serviti esattamente come sono. Quando la fase di `build` si limita a copiare script scritti a mano in `output`, nessun parser li ha controllati, rischiando che un file contenente un errore di battitura finisca in produzione impedendo il caricamento della pagina. Pertanto, prima di caricare qualsiasi elemento, `deploy` analizza ogni file `.js`, `.mjs` e `.cjs` nell'`output` di ciascuna app statica, insieme a ogni `<script>` inline nei suoi file `.html`. Questo include sia le app statiche distribuite singolarmente, sia quelle incorporate nel bundle del backend. Un errore di sintassi interrompe il deploy indicando file, riga e colonna:
 
 ```
 ✗ A syntax error in the static output, so nothing was deployed:
@@ -205,115 +118,85 @@ bundle del backend. Un errore di sintassi arresta il deploy indicando file, riga
 Fix it and deploy again, or pass --no-verify to deploy anyway.
 ```
 
-Con `--json` il campo `code` dell'errore è `syntax_error`. Gli script inline che un browser
-non esegue come JavaScript vengono ignorati: JSON, import map, template e qualsiasi
-altro `type` non JavaScript, i tag `<script src>` e gli script che contengono ancora
-markup di template non renderizzato come `{{ }}`. Un file `.js` è valido se viene interpretato correttamente
-come script classico o come modulo, poiché spetta alla pagina stabilirlo. Nessun elemento
-all'interno di `node_modules` viene letto, e lo stesso vale per una directory precompilata `--bundle-dir`.
-`--no-verify` ignora il controllo per un singolo deploy.
+Con `--json`, il `code` dell'errore è `syntax_error`. Gli script inline che un browser non esegue come JavaScript vengono ignorati: JSON, import map, template e qualsiasi altro `type` non JavaScript, i tag `<script src>` e gli script che contengono ancora markup di template non renderizzato come `{{ }}`. Un file `.js` supera il controllo se viene analizzato correttamente sia come script classico che come modulo, poiché è la pagina a determinarlo. Non viene letto nulla all'interno di `node_modules`, né all'interno di una cartella precompilata con `--bundle-dir`. `--no-verify` ignora la verifica per un singolo deploy.
 
-Monitoraggio:
+Monitora l'avanzamento:
 
 ```bash
-rebase cloud logs               # il log di build
-rebase cloud logs --runtime -f  # ciò che l'app in esecuzione stampa, in tempo reale, fino a Ctrl-C
-rebase cloud status             # lo stato del progetto secondo la piattaforma
+rebase cloud logs               # the build log
+rebase cloud logs --runtime -f  # what the running app prints, live, until Ctrl-C
+rebase cloud status             # what the platform thinks the project is doing
 ```
 
-`status` riporta i campi `blockedOn` e `nextAction`. Quando `blockedOn` è `null`, la
-piattaforma sta effettivamente lavorando e fare polling è l'operazione corretta; quando indica
-un valore, quell'elemento è in attesa di un tuo intervento.
+`status` riporta `blockedOn` e `nextAction`. Quando `blockedOn` è `null`, la piattaforma sta lavorando regolarmente ed eseguire il polling è la procedura corretta; quando indica un valore, significa che quel componente è in attesa di una tua azione.
 
-Uno di questi è `email_not_configured`: l'app ha attivato l'accesso tramite magic-link o codice
-email (`AUTH_MAGIC_LINK`, `AUTH_EMAIL_OTP`) ma non dispone di un servizio email configurato, quindi
-il deployment è attivo ma nessuno può effettuare l'accesso. Rebase Cloud non invia
-email per conto della tua app: imposta `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` e
-`SMTP_FROM` con `rebase cloud env set`, quindi esegui il deploy. `status` rileva questa condizione dal
-percorso `GET /api/auth/config` dell'app stessa (nel campo `unavailable`), e `deploy` segnala la
-stessa cosa durante il controllo live.
+Uno di questi è `email_not_configured`: l'app ha attivato l'accesso tramite magic link o codice email (`AUTH_MAGIC_LINK`, `AUTH_EMAIL_OTP`) ma non dispone di un servizio email configurato, quindi il deployment è live ma nessuno può accedere. Rebase Cloud non invia email per conto della tua applicazione: imposta `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` e `SMTP_FROM` con `rebase cloud env set`, quindi esegui il deploy. `status` rileva questa condizione dal `GET /api/auth/config` dell'app stessa (nel campo `unavailable`) e `deploy` segnala lo stesso messaggio durante il controllo di disponibilità.
 
-## Visualizzare l'anteprima di una modifica
+## Storage dei file
+
+Un nuovo progetto non ha un bucket: i caricamenti vengono rifiutati con `501 STORAGE_NOT_CONFIGURED`,
+e il riepilogo del deploy lo dice, invece di essere scritti su un disco che ogni deploy sostituisce.
+
+Dagliene uno dei due tipi, poi esegui di nuovo il deploy perché l'app lo usi:
+
+```bash
+# Un bucket gestito da Rebase per te. La pagina Storage della console fa lo stesso.
+rebase cloud storage create
+
+# Oppure il tuo bucket compatibile con S3: AWS S3, Cloudflare R2, Backblaze B2, MinIO…
+rebase cloud storage attach --bucket <name> \
+  --access-key-id <id> --secret-access-key <secret> \
+  --endpoint <url>        # omettilo per AWS; aggiungi --force-path-style per MinIO
+
+rebase cloud deploy
+```
+
+`rebase cloud storage` elenca i bucket del progetto. Un progetto con più bucket
+li collega ciascuno con `--source <key>`; uno che configura lo storage nel codice non ha bisogno di nessuno dei due.
+
+## Anteprima di una modifica
 
 ```bash
 rebase cloud deploy --preview
 ```
 
-Questo comando compila e carica esattamente ciò che farebbe `deploy`, ma rende disponibile l'anteprima a un indirizzo
-dedicato, come `https://shop--k3x9ab.rebase.website`. L'ambiente di produzione continua
-a servire quanto serviva in precedenza. Al termine della build, il deploy stampa l'indirizzo dell'anteprima.
+Questo compila e carica esattamente ciò che farebbe `deploy`, ma lo serve a un indirizzo dedicato, come `https://shop--k3x9ab.rebase.website`. L'ambiente di produzione continua a servire la versione precedente. Al termine della compilazione, il deploy stampa l'indirizzo dell'anteprima.
 
-Per mantenere lo stesso indirizzo attraverso più deploy, assegna un nome all'anteprima. Eseguire nuovamente il deploy
-con lo stesso nome la aggiornerà:
+Per mantenere lo stesso indirizzo tra più deploy, assegna un nome all'anteprima. Eseguendo nuovamente il deploy con lo stesso nome, l'anteprima verrà aggiornata:
 
 ```bash
 rebase cloud deploy --preview-name new-checkout
 ```
 
-I componenti con cui un'anteprima comunica dipendono da ciò che hai distribuito:
+Le risorse con cui un'anteprima comunica dipendono da ciò che è stato distribuito:
 
-- **`rebase cloud deploy --preview`** genera un'anteprima del backend, con le sue app statiche
-  incorporate, nello stesso modo in cui le esegue la produzione. Riceve un backend dedicato su
-  un **database vuoto dedicato**, mai quello di produzione. L'avvio contro
-  il database di produzione applicherebbe ad esso lo schema e le regole di accesso dell'anteprima.
-- **`rebase cloud deploy web --preview`** genererebbe l'anteprima di una singola app statica
-  a sé stante, con le relative pagine che richiamano il backend di **produzione**. Questo richiede un control plane
-  in grado di servire siti statici autonomamente, cosa che Rebase Cloud non supporta ancora:
-  l'operazione viene rifiutata con `PREVIEW_STATIC_UNSERVED` e non viene pubblicato nulla. Esegui invece l'anteprima del
-  backend, che include le app statiche incorporate in esso; un progetto privo di
-  un backend gestito non può ancora essere visualizzato in anteprima.
+- **`rebase cloud deploy --preview`** genera l'anteprima del backend con le relative app statiche incorporate, esattamente come vengono eseguite in produzione. Riceve un proprio backend su un **database dedicato vuoto**, mai su quello di produzione. L'avvio sul database di produzione applicherebbe infatti lo schema e le regole di accesso dell'anteprima a quest'ultimo.
+- **`rebase cloud deploy web --preview`** visualizzerebbe in anteprima una singola app statica autonoma, con le sue pagine che richiamano il backend di **produzione**. Questa funzionalità richiede un control plane in grado di servire siti statici in modo indipendente, cosa che Rebase Cloud non supporta ancora: l'operazione viene rifiutata con `PREVIEW_STATIC_UNSERVED` e non viene pubblicato nulla. Esegui invece l'anteprima del backend, che include e serve le app statiche incorporate; un progetto privo di backend gestito non può ancora essere visualizzato in anteprima.
 
-Un'anteprima non carica codice sorgente e non registra app o nomi host, poiché ciascuna
-di queste operazioni modificherebbe il progetto di produzione. `--source` ed `--eject` non possono essere
-combinati con `--preview`. Entrambi creano un'immagine container per la produzione.
+Un'anteprima non carica codice sorgente e non registra app o hostname, poiché ognuna di queste azioni modificherebbe il progetto di produzione. `--source` ed `--eject` non possono essere combinati con `--preview`. Entrambi creano un'immagine container per la produzione.
 
 ```bash
-rebase cloud previews                      # nome, indirizzo, app, backend, scadenza
-rebase cloud logs --preview new-checkout   # il relativo log di build; -f segue una build ancora in corso
-rebase cloud logs --runtime --preview new-checkout -f  # l'output del backend dell'anteprima
-rebase cloud previews delete new-checkout  # interrompe l'erogazione ed elimina il relativo database
+rebase cloud previews                      # name, address, app, backend, expiry
+rebase cloud logs --preview new-checkout   # its build log; -f follows a build still running
+rebase cloud logs --runtime --preview new-checkout -f  # what its backend prints
+rebase cloud previews delete new-checkout  # stops serving it and drops its database
 ```
 
-`rebase cloud logs` senza `--preview` fa sempre riferimento alla produzione.
+`rebase cloud logs` senza `--preview` si riferisce sempre alla produzione.
 
-La pagina **Deployments** della console elenca le stesse anteprime, consentendo di aprirne una, visualizzarne
-il log di build o eliminarla. La creazione rimane un passaggio da CLI.
+La pagina **Deployments** della console elenca le medesime anteprime e consente di aprire, visualizzare il log di compilazione o eliminare ciascuna di esse. La creazione rimane un passaggio da riga di comando (CLI).
 
-Un'anteprima scade una settimana dopo l'ultimo deploy effettuato su di essa.
+Un'anteprima scade una settimana dopo l'ultimo deploy effettuato.
 
-Al termine, il deploy verifica che l'indirizzo dell'anteprima risponda, esattamente come fa
-un deploy di produzione (`--live-timeout <seconds>`, `0` per saltare). Il rilascio del certificato per una nuova
-anteprima può richiedere uno o due minuti, pertanto un deploy riuscito può
-segnalare che l'indirizzo non risponde ancora.
+Al termine, il deploy verifica che l'indirizzo dell'anteprima risponda, esattamente come avviene per un deploy in produzione (`--live-timeout <seconds>`, `0` per saltare). Il rilascio del certificato per una nuova anteprima può richiedere un minuto o due, quindi un deploy completato con successo potrebbe indicare che l'indirizzo non risponde ancora.
 
-Un'anteprima del backend viene fatturata come un'unità applicativa di dimensione predefinita (100m di CPU
-e 384 MiB di memoria, alla tariffa della tua app per la relativa regione e capacità),
-ripartita pro rata per l'intera durata della sua esistenza, e compare nella stima
-mensile del progetto nella console. `rebase cloud deploy --preview` stampa la medesima stima
-per essa, su base mensile (`cost` sotto `--json`). L'avvio di un'anteprima richiede una carta registrata, come
-un deploy di produzione. Un primo deploy che
-fallisce prima che qualsiasi processo venga eseguito viene rimosso anziché fatturato. Un progetto può eseguire fino a
-tre anteprime di backend contemporaneamente.
+Un'anteprima del backend viene fatturata come un'unità applicativa di dimensioni standard (100m di CPU e 384 MiB di memoria, alla tariffa della tua app per regione e capacità), ripartita in base alla sua durata effettiva, e compare nel preventivo mensile del progetto nella console. `rebase cloud deploy --preview` stampa lo stesso preventivo mensile (`cost` sotto `--json`). L'avvio di un'anteprima richiede una carta registrata, proprio come un deploy in produzione. Un primo deploy che fallisce prima che qualsiasi elemento venga eseguito viene rimosso anziché fatturato. Un progetto può eseguire fino a tre anteprime di backend contemporaneamente.
 
-Ogni nuovo indirizzo di anteprima riceve un certificato TLS dedicato da Let's Encrypt,
-il quale concede a un dominio 50 nuovi certificati a settimana, condivisi con tutti i siti di produzione
-su di esso. Le anteprime possono utilizzarne fino a 20 in qualsiasi finestra di 7 giorni, su tutta la piattaforma. Oltre
-questa soglia, una nuova anteprima viene rifiutata (`429`, `preview_cert_budget`) indicando quando potrà
-essere distribuita; il ridispiegamento di un'anteprima già esistente non viene mai conteggiato nel limite.
+Ogni nuovo indirizzo di anteprima riceve un certificato TLS dedicato da Let's Encrypt, che concede a un dominio 50 nuovi certificati alla settimana, condivisi con tutti i siti di produzione su di esso. Le anteprime possono utilizzarne fino a 20 nell'arco di 7 giorni, sull'intera piattaforma. Oltre questa soglia, una nuova anteprima viene rifiutata (`429`, `preview_cert_budget`) indicando il momento in cui potrà essere distribuita; la ridistribuzione di un'anteprima già esistente non viene mai conteggiata.
 
-Il database di un'anteprima del backend è un secondo database sull'istanza Postgres di **produzione**:
-dati separati, ma sulla stessa istanza e sullo stesso disco. È limitato a 10
-connessioni, affinché le anteprime non saturino quelle di produzione, e a 2 GB: un'anteprima
-il cui database superi tale limite viene sospesa. Il suo backend si arresta, il suo indirizzo smette di
-rispondere, `rebase cloud previews` e la console la mostrano come `paused` con il
-relativo motivo, e i proprietari e gli amministratori del progetto ricevono una notifica (`preview.paused`). I suoi
-dati vengono conservati fino alla scadenza. Esegui nuovamente il deploy per avviarla (verrà sospesa nuovamente
-se il database è ancora troppo grande), oppure eliminala. Un'anteprima in pausa continua a essere
-fatturata finché non viene eliminata o scade. Elimina le anteprime che non ti servono più. Le estensioni installate in produzione non vengono
-installate nel database di un'anteprima.
+Il database di un'anteprima di backend è un secondo database sull'istanza Postgres di **produzione**: dati isolati, ma stessa istanza e stesso disco. È limitato a 10 connessioni, per evitare che le anteprime esauriscano quelle di produzione, e a 2 GB: un'anteprima il cui database supera tale dimensione viene messa in pausa. Il relativo backend si arresta, il suo indirizzo smette di rispondere, `rebase cloud previews` e la console la mostrano come `paused` indicandone il motivo, e i proprietari e gli amministratori del progetto ricevono una notifica (`preview.paused`). I suoi dati vengono conservati fino alla scadenza. Esegui nuovamente il deploy per avviarla (verrà nuovamente messa in pausa se il database è ancora troppo grande) oppure eliminala. Un'anteprima in pausa continua a essere fatturata finché non viene eliminata o scade. Elimina le anteprime che non ti servono più. Le estensioni installate in produzione non vengono installate nel database di un'anteprima.
 
-Le anteprime sono in fase di rollout graduale. Un control plane che non le supporta ancora rifiuterà
-`--preview` con `previews_unavailable` senza distribuire alcunché.
+La funzionalità delle anteprime è in fase di implementazione progressiva. Un control plane che non le supporta ancora rifiuterà `--preview` con `previews_unavailable` senza distribuire nulla.
 
 ## Rollback
 
@@ -322,134 +205,70 @@ rebase cloud deployments
 rebase cloud rollback
 ```
 
-Un rollback reimposta il progetto sulla versione distribuita da un precedente deployment riuscito,
-senza mai ricompilare — l'utilità di un rollback risiede proprio nel ripristinare un
-artefatto già precedentemente eseguito.
+Un rollback reindirizza il progetto a quanto rilasciato da un precedente deployment riuscito, senza mai ricompilare: il valore di un rollback risiede nel distribuire un artefatto già testato ed eseguito.
 
-I criteri di idoneità dei deployment dipendono dalla modalità di deploy del progetto, ed entrambe
-le modalità sono supportate:
+Quali deployment siano idonei dipende da come viene distribuito il progetto, ed entrambe le modalità sono supportate:
 
-| Come è stato distribuito | Cosa viene ripristinato |
+| Modalità di deploy | Cosa viene ripristinato |
 |---|---|
-| `rebase cloud deploy` (build da sorgente) | L'immagine pubblicata da quella build |
-| `rebase cloud deploy --bundle` (runtime della piattaforma) | Il bundle distribuito da quel deploy, sulla versione del runtime attualmente in esecuzione per il progetto |
+| `rebase cloud deploy` (compilazione dai sorgenti) | L'immagine pubblicata da quella compilazione |
+| `rebase cloud deploy --bundle` (runtime della piattaforma) | Il bundle distribuito da quel deploy, sulla versione del runtime attualmente in uso dal progetto |
 
-Le app statiche incorporate nel bundle del backend (un normale `rebase cloud deploy` su un
-progetto con backend) fanno parte di quel bundle, quindi vengono ripristinate insieme ad esso.
+Le app statiche incorporate nel bundle del backend (un normale `rebase cloud deploy` su un progetto con un backend) fanno parte di quel bundle, quindi vengono ripristinate insieme ad esso.
 
-Un'app statica distribuita singolarmente (`rebase cloud deploy <app>`) non può ancora essere
-ripristinata tramite rollback. Il suo deployment registra l'app pubblicata ma nessun bundle, quindi il
-control plane non ha elementi da cui ripristinarla. La soluzione consiste nel ridistribuire l'ultima versione
-corretta, ad esempio dal commit precedente a quello problematico. Dopo un tale
-deploy, `deploy` indicherà questo approccio anziché suggerire `rollback`, e un `rollback`
-senza un ID rifiuterà l'operazione anziché ridistribuire il backend in esecuzione.
+Un'app statica distribuita singolarmente (`rebase cloud deploy <app>`) non può ancora essere ripristinata con un rollback. Il suo deployment registra quale app è stata pubblicata, ma nessun bundle, quindi il control plane non dispone di elementi da cui ripristinarla. La soluzione consiste nel ridistribuire l'ultima versione funzionante, ad esempio dal commit precedente a quello problematico. Dopo un tale deploy, `deploy` segnala questa circostanza anziché suggerire `rollback`, e `rollback` senza un ID rifiuta l'operazione anziché ridistribuire il backend attualmente attivo.
 
-Pertanto, un rollback richiede un deployment che abbia registrato uno dei due elementi, il che implica un
-progetto distribuito con successo almeno due volte. `rebase cloud deployments`
-contrassegna quelli idonei, e `--json` riporta `rollbackable` per ciascuna riga insieme
-all'`image` o al `bundle` che verrebbe ripristinato.
+Pertanto, un rollback richiede un deployment che abbia registrato uno dei due elementi, il che implica un progetto distribuito con successo almeno due volte. `rebase cloud deployments` contrassegna quelli idonei e `--json` riporta `rollbackable` per ogni riga insieme all'`image` o al `bundle` che verrebbe ripristinato.
 
-Due tipologie di deployment vengono rifiutate, e la CLI specifica quali: uno che non ha avuto successo,
-e uno risalente a prima che la piattaforma registrasse il relativo artefatto. Non vi è nulla da presupporre
-in nessuno dei due casi — avanzare ipotesi significherebbe distribuire ciò che è stato compilato o caricato più
-di recente fingendo di ripristinare questo — pertanto distribuisci direttamente la versione desiderata.
+Due tipi di deployment vengono rifiutati, e la CLI ne specifica il motivo: uno che non è andato a buon fine e uno risalente a prima che la piattaforma iniziasse a registrare gli artefatti. In entrambi i casi non c'è spazio per supposizioni — tirare a indovinare porterebbe a distribuire qualsiasi elemento sia stato compilato o caricato più di recente pretendendo di ripristinare questo — quindi distribuisci direttamente la versione desiderata.
 
-Ogni deploy riuscito termina indicando la procedura di ripristino (`rebase cloud rollback`),
-in modo da averla subito visibile nel momento in cui viene rilevato un rilascio errato.
+Ogni deploy riuscito termina indicando il comando di ripristino (`rebase cloud rollback`), rendendolo immediatamente visibile nel momento in cui ci si accorge di un rilascio errato.
 
-Un rollback aggiunge un nuovo deployment anziché riavvolgere la cronologia, e attende che
-la versione ripristinata sia operativa prima di segnalare il successo. Seguilo con
-`rebase cloud logs -f`.
+Un rollback aggiunge un nuovo deployment anziché riavvolgere la cronologia, e attende che la versione ripristinata sia attiva prima di segnalare il successo. Puoi seguirne l'avanzamento con `rebase cloud logs -f`.
 
-## Ripristinare il database a un momento specifico (PITR)
+## Ripristinare il database a un momento specifico (Point-in-Time Recovery)
 
-Un database gestito può essere ripristinato a qualsiasi minuto all'interno della sua finestra di conservazione,
-dalla sezione **Database → Backups** nella console o tramite CLI:
+Un database gestito può essere ripristinato a qualsiasi minuto all'interno della relativa finestra di ripristino, dalla sezione **Database → Backups** della console o tramite CLI:
 `rebase cloud db pitr status | restore --target <ISO> | cutover | discard`.
-L'operazione richiede due passaggi. Innanzitutto, una copia ripristinata viene allestita a fianco del database attivo;
-la tua app continua a funzionare su quello attivo, e lo storage della copia viene fatturato fino
-al cutover o alla cancellazione.
-Successivamente, una volta pronta la copia, l'operazione di cutover ripunta l'app su di essa e la
-riavvia. Qualsiasi dato scritto dopo l'orario di destinazione non sarà presente nella copia. Il database originale
-viene mantenuto come procedura di riserva e continua a fatturare lo storage; per ripristinarlo,
-rimuoverlo o eseguire un secondo ripristino è necessario contattare il supporto. Solo un owner o admin
-può allestire la copia, eseguire il cutover o cancellarla, e la console richiede la conferma del nome del progetto
-prima di effettuare il cutover.
+La procedura prevede due passaggi. Innanzitutto, viene predisposta (staged) una copia ripristinata accanto al database attivo; la tua app continua a funzionare su quello attivo e lo storage della copia viene fatturato finché non esegui il cutover o lo scarti.
+Successivamente, una volta pronta la copia, il cutover reindirizza l'applicazione verso di essa e la riavvia. Tutto ciò che è stato scritto dopo l'orario di destinazione non sarà presente nella copia. Il database originale viene conservato come punto di ripristino e continua a fatturare lo storage; per ripristinarlo, rimuoverlo o eseguire un secondo restore è necessario contattare il supporto. Solo un owner o un admin può predisporre, eseguire il cutover o scartare la copia, e la console richiederà il nome del progetto prima di procedere al cutover.
 
-## Proteggere il proprio account
+## Proteggere il tuo account
 
-Il tuo account sulla console può accedere ai database di produzione, ai secret e alla fatturazione,
-quindi proteggilo adeguatamente. Apri **Account security** dal menu sotto il tuo avatar
-nella console (oppure vai su `/account`). La pagina è personale, non
-dell'organizzazione: le impostazioni configurate lì si applicano a tutte le organizzazioni a cui appartieni.
+Il tuo account della console può accedere ai database di produzione, ai secret e alla fatturazione, quindi proteggilo adeguatamente. Apri **Account security** dal menu sotto il tuo avatar nella console (oppure vai su `/account`). Questa pagina appartiene a te, non a un'organizzazione: le impostazioni configurate qui si applicano a tutte le organizzazioni a cui appartieni.
 
-- **Verifica in due passaggi.** Attivala con qualsiasi app di autenticazione (1Password,
-  Google Authenticator, Authy). La pagina mostra una chiave di configurazione da aggiungere all'app, oppure un
-  link che apre l'app con la chiave precompilata su uno smartphone, quindi richiede il
-  codice a 6 cifre mostrato dall'app. Da quel momento, ogni accesso richiederà un codice,
-  indipendentemente dal fatto che tu acceda con password, Google o GitHub.
-- **Codici di recupero.** L'attivazione fornisce dieci codici monouso, mostrati una sola volta.
-  Ciascuno consente di accedere al posto del codice dell'authenticator in caso di smarrimento del
-  telefono, quindi salvali prima di chiudere la finestra di dialogo. **New recovery codes**
-  li sostituisce, rendendo non validi i precedenti. Sia la disattivazione della verifica in due passaggi
-  sia la generazione di nuovi codici richiedono prima l'inserimento di un codice valido.
-- **Password.** La sua modifica comporta la disconnessione da ogni altro dispositivo. Un account
-  creato con Google, GitHub o LinkedIn non possiede una password; la pagina consente di
-  ricevere via email un link per impostarne una.
-- **Dispositivi connessi.** Mostra ogni browser e terminale connesso al tuo account,
-  con il rispettivo indirizzo e l'orario di accesso. Puoi disconnettere qualsiasi dispositivo che non
-  riconosci, o tutti contemporaneamente.
+- **Verifica in due passaggi.** Attivala con qualsiasi app di autenticazione (1Password, Google Authenticator, Authy). La pagina mostra una chiave di configurazione da aggiungere all'app, oppure un link che apre l'app su smartphone con la chiave già inserita, richiedendo poi il codice a 6 cifre mostrato dall'app. Da quel momento in poi, ogni accesso richiederà un codice, sia che tu acceda tramite password, Google o GitHub.
+- **Codici di recupero.** L'attivazione genera dieci codici monouso, mostrati una sola volta. Ciascuno di essi consente di accedere al posto del codice dell'autenticatore in caso di smarrimento dello smartphone; salvali quindi prima di chiudere la finestra di dialogo. **New recovery codes** li sostituisce invalidando i precedenti. Sia la disattivazione della verifica in due passaggi che la generazione di nuovi codici richiedono prima l'inserimento di un codice.
+- **Password.** La sua modifica comporterà la disconnessione su tutti gli altri dispositivi. Un account creato tramite Google, GitHub o LinkedIn non possiede una password; la pagina consente di ricevere via email un link per impostarne una.
+- **Dispositivi connessi.** Ogni browser e terminale connesso al tuo account, con il relativo indirizzo e data/ora di accesso. Puoi disconnettere qualsiasi dispositivo non riconosciuto o tutti contemporaneamente.
 
-Gli [access token](/docs/deployment/cloud-agents/#ci-and-agents) non sono sessioni e non richiedono un secondo
-fattore, quindi la CI continuerà a distribuire dopo l'attivazione. Revoca un token di cui non ti
-fidi più in **Settings → Access tokens**.
+I [token di accesso](/docs/deployment/cloud-agents/#ci-and-agents) non sono sessioni e non richiedono un secondo fattore, quindi la CI continuerà a eseguire i deploy anche dopo l'attivazione. Puoi revocare un token non più ritenuto sicuro in **Settings → Access tokens**.
 
-## Invitare il proprio team
+## Invitare il tuo team
 
-**Members → Add member** consente di aggiungere qualcuno che possiede già un account Rebase con un
-indirizzo email verificato, in qualità di admin o member; un owner può promuoverlo a owner
-successivamente. L'accesso è immediato e non viene inviata alcuna email. Rebase Cloud non
-invia ancora inviti via email, pertanto chiedi a un collega privo di account di registrarsi e
-verificare prima il proprio indirizzo. Da terminale:
-[`rebase cloud orgs members invite <email>`](/docs/cli/cloud/#organizations), che
-segnalerà se all'indirizzo specificato non corrisponde alcun account.
+**Members → Add member** aggiunge un utente che possiede già un account Rebase con indirizzo email verificato, con ruolo di admin o member; un owner potrà successivamente promuoverlo a owner. L'accesso è immediato e non viene inviata alcuna email. Rebase Cloud non invia ancora inviti via email, quindi chiedi ai colleghi sprovvisti di account di registrarsi e verificare il proprio indirizzo prima di procedere. Da terminale:
+[`rebase cloud orgs members invite <email>`](/docs/cli/cloud/#organizations), che segnalerà se l'indirizzo specificato non è associato ad alcun account.
 
-## Consultare il registro delle attività
+## Verificare chi ha fatto cosa
 
-La pagina **Activity** della console e il comando `rebase cloud activity` mostrano ai
-proprietari e agli amministratori dell'organizzazione chi ha effettuato un deploy, impostato o visualizzato una variabile
-d'ambiente (per nome, mai per valore), modificato un dominio, ripristinato un backup,
-ridimensionato, arrestato o eliminato un progetto, modificato il ruolo di un membro o creato un
-token, e quando ciò è avvenuto. La sezione **Settings** di un progetto rimanda alle proprie voci; le voci
-relative a un progetto eliminato restano archiviate. Uno script può leggerle tramite un token creato con
-`--can audit` sull'organizzazione. Le voci vengono conservate per un anno. I filtri sono descritti in
+La pagina **Activity** della console e il comando `rebase cloud activity` mostrano a owner e admin dell'organizzazione chi ha effettuato un deploy, impostato o visualizzato una variabile d'ambiente (per nome, mai per valore), modificato un dominio, ripristinato un backup, ridimensionato, arrestato o eliminato un progetto, modificato il ruolo di un membro o creato un token, e quando ciò è avvenuto. La sezione **Settings** di un progetto rimanda alle proprie voci; le voci relative a un progetto eliminato vengono conservate. Uno script può leggerle tramite un token creato con permessi `--can audit` sull'organizzazione. Le registrazioni vengono conservate per un anno. I filtri disponibili sono descritti in
 [`rebase cloud`](/docs/cli/cloud/#organizations).
 
 ## CI e agenti
 
-Un job di CI o un agente non dovrebbe mai contenere la tua password personale. Assegna piuttosto un token limitato a
-poche azioni su un singolo progetto, creato da un terminale autenticato con
+Un job di CI o un agente non dovrebbero mai contenere la tua password. Assegna loro un token limitato a poche azioni su un singolo progetto, creato da un terminale autenticato con
 `rebase cloud tokens create --project shop --can deploy,logs`, e impostalo come
-`REBASE_TOKEN`. La fatturazione di un'organizzazione, il registro delle attività e le impostazioni di
-notifica sono permessi specifici (`--can billing`, `audit`,
-`notifications`) che un token detiene solo se esplicitamente richiesti. I permessi, un flusso di lavoro
-di GitHub Actions e le prerogative che rimangono riservate a un utente autenticato sono trattati in
-[CI e agenti](/docs/deployment/cloud-agents/#ci-and-agents).
+`REBASE_TOKEN`. La fatturazione dell'organizzazione, il log delle attività e le impostazioni di notifica sono permessi specifici (`--can billing`, `audit`, `notifications`) che il token acquisisce solo se esplicitamente richiesto. L'elenco dei permessi, un flusso di lavoro di GitHub Actions e le prerogative esclusive di un utente autenticato sono trattati in
+[CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ## Un backend senza account
 
-`rebase cloud init --claim` assegna a un'applicazione un backend attivo prima ancora che qualcuno si sia
-registrato, stampando un URL di riscatto (claim) per consentire all'utente di mantenerne il possesso; un progetto non riscattato
-entro 72 ore viene eliminato. Le azioni consentite al token di un progetto non riscattato, il valore
-`REBASE_API_TOKEN` generato e ciò che il riscatto comporta sono illustrati in
-[Un backend senza account](/docs/deployment/cloud-agents/#a-backend-with-no-account).
+`rebase cloud init --claim` assegna a un'applicazione un backend attivo prima ancora che qualcuno si sia registrato e stampa un URL di riscatto (claim) per consentire all'utente di mantenerlo; un progetto che non viene riscattato entro 72 ore viene eliminato. Le operazioni consentite al token del progetto non riscattato, il `REBASE_API_TOKEN` generato e ciò che comporta il riscatto sono descritti in
+[A backend with no account](/docs/deployment/cloud-agents/#a-backend-with-no-account).
 
 ## Risorse di calcolo e relativi costi
 
-Il prezzo di un progetto si basa sulle risorse riservate, non su un piano fisso. `compute` stampa
-ogni parametro di configurazione e la stima dettagliata fornita dal control plane. (`rebase cloud
-resources` è un comando differente: elenca i database e i bucket dichiarati dal codice,
-e se per ciascuno è stato eseguito il provisioning — consulta la [Guida di riferimento CLI](/docs/cli/cloud/).)
+Il prezzo di un progetto dipende da ciò che riserva, non da un piano a scaglioni fisso. `compute` mostra ogni parametro di configurazione e il relativo preventivo dettagliato calcolato dal control plane. (`rebase cloud resources` è diverso: indica i database e i bucket dichiarati dal codice e se per ciascuno è stato effettuato il provisioning — vedi il [riferimento CLI](/docs/cli/cloud/).)
 
 ```bash
 rebase cloud compute
@@ -458,127 +277,81 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 
 | Parametro | Unità e significato |
 |---|---|
-| `--cpu`, `--memory` | Risorse richieste dall'app per istanza, es. `500m` e `2Gi`. Se vuoto, si applica il valore predefinito della piattaforma, che dipende dalla regione (vedi sotto) |
-| `--replicas` | Istanze sempre attive: il valore minimo dell'autoscaler e ciò che l'abbonamento del progetto fattura mensilmente |
-| `--autoscale-max` | 1–16. Il tetto massimo raggiungibile. Le istanze aggiunte dall'autoscaler oltre `--replicas` sono tariffate al secondo-pod alle medesime tariffe, e addebitate solo dove la piattaforma ha abilitato tale funzione; **Usage this month** specifica dove è attiva. `--no-autoscale` la disattiva |
-| `--autoscale-cpu-target` | 10–95. L'utilizzo di CPU che l'autoscaler mantiene, calcolato sulla richiesta anziché sul limite. Se vuoto, il valore predefinito è 70 |
-| `--spot` | `true` o `false`. Capacità preemptible: più economica, ma soggetta a riavvio senza preavviso |
+| `--cpu`, `--memory` | Risorse richieste dall'app per istanza, es. `500m` e `2Gi`. Vuoto indica il valore predefinito della piattaforma — `100m` e `384Mi`, con burst fino a 2 CPU e `2Gi` |
+| `--replicas` | Istanze sempre attive: il limite minimo dell'autoscaler e la quota fissa addebitata mensilmente dall'abbonamento del progetto |
+| `--autoscale-max` | 1–16. Il tetto massimo raggiungibile. Le istanze aggiunte dall'autoscaler oltre `--replicas` sono misurate al secondo-pod alle stesse tariffe e addebitate solo dove la piattaforma ha abilitato tale opzione; **Usage this month** ne specifica lo stato. `--no-autoscale` lo disattiva |
+| `--autoscale-cpu-target` | 10–95. L'utilizzo della CPU che l'autoscaler mira a mantenere, calcolato rispetto alla richiesta (request) anziché al limite (limit). Vuoto indica 70 |
+| `--spot` | `true` o `false`. Capacità preemptible: più economica, ma soggetta a riavvii senza preavviso |
 | `--db-instances` | 1–3. `1` indica un'istanza singola senza failover; `2` aggiunge uno standby automatico |
-| `--db-cpu`, `--db-memory` | Per istanza di database. Se vuoto, i valori predefiniti sono `160m` e `1Gi` |
+| `--db-cpu`, `--db-memory` | Per istanza di database. Vuoto indica `160m` e `1Gi` |
 
-Un parametro lasciato vuoto non equivale a uno impostato sullo stesso valore numerico: un parametro non valorizzato
-segue le impostazioni predefinite della piattaforma e varia al variare di queste ultime.
+Un parametro vuoto non equivale a uno impostato sullo stesso valore: un parametro vuoto segue i valori predefiniti della piattaforma e si adegua automaticamente quando questi cambiano.
 
-In Belgio (europe-west1) l'impostazione predefinita riserva 100m di CPU e 384Mi con possibilità di picco (burst)
-fino a 2 CPU e 2 GiB; a Falkenstein e Helsinki la memoria può estendersi fino a 1,4× rispetto alla
-richiesta e la CPU fino a 10× (al massimo 1,7 vCPU). `rebase cloud compute` mostra i parametri specifici del tuo
-progetto.
+Nulla viene convalidato intenzionalmente dalla CLI — i limiti dipendono dal cluster su cui gira il progetto e variano a seconda del provider. Il control plane rifiuterà i valori non supportati indicando il campo interessato. Esegui `rebase cloud compute` per visualizzare il costo in €/mese prima e dopo; le modifiche hanno effetto immediato, ripartite proporzionalmente da oggi, tranne quelle che richiedono il riavvio del database, che attendono una finestra di manutenzione.
 
-La CLI non esegue alcuna convalida preventiva, intenzionalmente — i limiti dipendono dal cluster su cui
-è in esecuzione il progetto e variano a seconda dei provider. Il control plane rifiuterà qualunque
-valore non supportato indicando il campo relativo. Esegui `rebase cloud compute` per visualizzare
-il costo in €/mese prima e dopo la modifica; le variazioni si applicano immediatamente, con calcolo pro rata a partire da oggi.
-Una modifica al database si applica subito; viene fatturata alle dimensioni correnti fino al completamento dell'attivazione.
-Un cambio di CPU o memoria del database, o una riduzione delle istanze, riavvia il database (da circa
-30 secondi a 3 minuti; le connessioni vengono interrotte e ristabilite): `compute set`
-lo segnala richiedendo conferma; al di fuori di un terminale, il flag `--yes` funge da consenso. Se tale riavvio
-fallisce, `rebase cloud compute apply` tenterà nuovamente l'operazione.
+## Il resto delle funzionalità
 
-## Gli altri comandi disponibili
-
-| Gruppo di comandi | Ambito di applicazione |
+| Gruppo di comandi | Cosa include |
 |---|---|
-| `login`, `logout`, `whoami`, `access-token` | Gestione della sessione; `access-token` stampa il token bearer che la CLI invierebbe adesso, per script e per il server MCP |
-| `tokens` | Token per CI e agenti, ciascuno limitato a un singolo progetto. Consulta [CI e agenti](/docs/deployment/cloud-agents/#ci-and-agents) |
-| `link`, `unlink`, `use`, `open` | Associazione della directory a un progetto, selezione dell'organizzazione, apertura della console |
-| `connect` | Aggiunta di un server Rebase self-hosted al tuo account, affinché il [connettore Rebase](/docs/ai/rebase-connector/#add-your-self-hosted-instances) in Claude possa raggiungerlo accanto ai tuoi progetti Cloud. `--list` li mostra, `--remove` ne rimuove uno. Riservato a owner e admin |
-| `init`, `claim` | Con `--claim`: un backend live senza account e un link per riscattarlo; `claim` stampa nuovamente tale link. Consulta [Un backend senza account](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
+| `login`, `logout`, `whoami`, `access-token` | La tua sessione; `access-token` stampa il token bearer che la CLI invierebbe ora, utile per script e server MCP |
+| `tokens` | Token per CI e agenti, ciascuno limitato a un singolo progetto. Vedi [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents) |
+| `link`, `unlink`, `use`, `open` | Collegamento di questa directory a un progetto, selezione di un'organizzazione, apertura della console |
+| `connect` | Aggiunta di un server Rebase in self-hosting al tuo account, in modo che il [Rebase connector](/docs/ai/rebase-connector/#add-your-self-hosted-instances) in Claude possa raggiungerlo accanto ai tuoi progetti Cloud. `--list` li mostra, `--remove` ne rimuove uno. Riservato a owner e admin |
+| `init`, `claim` | Con `--claim`: un backend attivo senza account e un link per riscattarlo; `claim` stampa nuovamente tale link. Vedi [A backend with no account](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
 | `projects` | Creazione, visualizzazione, ispezione ed eliminazione |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Distribuzione e monitoraggio |
-| `deploy-hooks` | URL segreti richiamati da un host git o dalla CI per distribuire il progetto: elenco, creazione (l'URL viene mostrato una sola volta), revoca. |
-| `previews` | Build rese disponibili su un proprio indirizzo tramite `deploy --preview` e la loro eliminazione. Consulta [Visualizzare l'anteprima di una modifica](#visualizzare-lanteprima-di-una-modifica) |
-| `sleep` | Sospensione durante l'inattività: `on [--after 15m\|30m\|1h\|4h]`, `off`, `wake`, e `status` (predefinito). In stato di sospensione, un progetto non consuma CPU o memoria e la prima richiesta in arrivo lo riattiva; i job pianificati e le attività in background rimangono in pausa. Laddove un progetto non possa essere sospeso, il control plane rifiuterà l'operazione indicandone il motivo |
-| `start`, `stop`, `restart` | Sospensione temporanea di un progetto e suo ripristino. Un progetto arrestato mantiene la propria sottoscrizione attiva, a meno che la piattaforma non addebiti per i progetti arrestati unicamente lo storage e la quota fissa della piattaforma; la riga **Billing** della console lo specifica se applicabile |
-| `status`, `metrics`, `debug` | Monitoraggio delle attività in corso e diagnosi di eventuali problemi |
-| `alerts` | Incidenti aperti relativi al progetto, con possibilità di presa in carico (acknowledge) o posticipazione (snooze). |
-| `cron` | Cron job dell'applicazione distribuita e storico delle loro esecuzioni, consultabili con il login `rebase cloud`. Sola lettura |
+| `deploy-hooks` | URL segreti richiamati da un host git o da una CI per distribuire il progetto: elenco, creazione (l'URL viene mostrato una sola volta), revoca. |
+| `previews` | Build servite su un proprio indirizzo tramite `deploy --preview` e loro eliminazione. Vedi [Anteprima di una modifica](#anteprima-di-una-modifica) |
+| `start`, `stop`, `restart` | Messa in pausa di un progetto e suo ripristino. Un progetto arrestato mantiene il proprio abbonamento, a meno che la piattaforma non fatturi per i progetti fermati solo lo storage e la quota di piattaforma; la riga **Billing** della console lo specifica quando applicabile |
+| `status`, `metrics`, `debug` | Cosa sta facendo il sistema e perché eventualmente è bloccato |
+| `alerts` | Incidenti aperti del progetto, con possibilità di prenderli in carico (acknowledge) o posticiparli (snooze). |
+| `cron` | Cron job dell'app distribuita e relative esecuzioni registrate, consultabili tramite le credenziali di accesso a `rebase cloud`. In sola lettura |
 | `env` | Variabili d'ambiente. `list` non stampa mai i valori; `--secret` è in sola scrittura |
 | `app-key` | La chiave scritta da `init --claim` in `.env` come `REBASE_API_TOKEN`, trasferita al momento del riscatto; `rotate` la sostituisce revocando la precedente. Riservato a owner e admin |
-| `service-key` | `REBASE_SERVICE_KEY`, con privilegi di amministrazione sull'API dell'app stessa: data dell'ultima rotazione; `rotate` ne genera una nuova per l'app. Riservato a owner e admin |
-| `domains` | Domini personalizzati, record DNS da configurare e verifica. Un progetto può rispondere su più domini, ciascuno verificato singolarmente; `verify` e `remove` accettano il dominio di destinazione, che può essere omesso solo quando ne è presente uno solo (per `verify`, uno ancora in sospeso). Ciascun dominio verificato serve il progetto direttamente; `primary <domain>` imposta il dominio canonico e `redirect <domain>` risponde su un altro dominio con un reindirizzamento 308 verso di esso, preservando path e query (`--off` ripristina la normale erogazione) — procedura consigliata per `www.` rispetto al dominio apex, poiché l'accesso con Google, i cookie e le passkey sono isolati per origine. Un dominio su cui è servita una specifica app (un `path` con hostname) non viene mai reindirizzato. Un dominio apex (`example.com`, senza sottodominio) richiede un record **A**, poiché il DNS non vi consente record CNAME. Tale indirizzo corrisponde all'ingress della piattaforma e la sua immutabilità non è garantita: in caso di migrazione della piattaforma, un record A continuerà a puntare al vecchio indirizzo. Se il tuo gestore DNS supporta ALIAS, ANAME o CNAME flattening sull'apex, punta l'apex al `tenantHost` del progetto, che segue automaticamente gli aggiornamenti della piattaforma. I CNAME dei sottodomini li seguono già in modo predefinito. `list` indica `verified, certificate pending` finché HTTPS non risponde con un certificato reale. `list --json` restituisce `{ projectId, tenantHost, domains: [...] }` |
-| `db` | Collegamento o creazione di un database, connessione locale dalla propria macchina, backup, ripristino e point-in-time recovery |
-| `guests` | Utenti guest generati dagli accessi anonimi: conteggio, eliminazione mirata, rimozione di quelli inattivi da lungo tempo. Consulta [Ospiti](/docs/cli/cloud/#guests). Riservato a owner e admin |
+| `service-key` | `REBASE_SERVICE_KEY`, con privilegi di admin sull'API dell'app: data dell'ultima rotazione; `rotate` assegna una nuova chiave all'app. Riservato a owner e admin |
+| `domains` | Domini personalizzati, record DNS da configurare e verifica. Un progetto può rispondere su più domini, ciascuno verificato singolarmente; `verify` e `remove` richiedono il dominio su cui operare, che può essere omesso solo quando ce n'è uno solo (per `verify`, uno ancora in sospeso). Ciascun dominio verificato serve il progetto come host autonomo; `primary <domain>` sceglie quello canonico e `redirect <domain>` risponde su un altro con un reindirizzamento 308 verso di esso, mantenendo percorso e parametri di query (`--off` torna a servirlo direttamente) — operazione consigliata per `www.` accanto al dominio principale (apex), poiché l'accesso Google, i cookie e le passkey sono limitati all'origine (origin). Un dominio su cui viene servita un'app (un `path` di un'app con un hostname) non esegue mai reindirizzamenti. Un dominio apex (`example.com`, senza sottodominio) richiede un record **A**, poiché il DNS non ammette record CNAME alla radice. Tale indirizzo rappresenta l'ingress della piattaforma e non è garantito che rimanga invariato: in caso di migrazione della piattaforma, un record A continuerà a puntare al vecchio indirizzo. Se il tuo provider DNS supporta ALIAS, ANAME o CNAME flattening sull'apex, punta l'apex al `tenantHost` del progetto, che segue automaticamente la piattaforma. Il CNAME di un sottodominio la segue già normalmente. `list` mostra `verified, certificate pending` finché HTTPS non risponde con un certificato valido. `list --json` restituisce `{ projectId, tenantHost, domains: [...] }` |
+| `db` | Connessione o creazione di un database, connessione ad esso dal proprio computer, backup, ripristino e point-in-time recovery |
+| `guests` | Utenti guest generati dagli accessi anonimi: conteggio, eliminazione di singoli utenti, eliminazione massiva (prune) di quelli inattivi da tempo. Vedi [Guests](/docs/cli/cloud/#guests). Riservato a owner e admin |
 | `extensions` | Allowlist delle estensioni Postgres |
-| `storage` | Il bucket dedicato del progetto |
-| `resources` | Database e bucket gestiti dalla piattaforma a fronte di quanto dichiarato nel codice |
+| `storage` | Il bucket del progetto |
+| `resources` | Quali database e bucket sono gestiti dalla piattaforma rispetto a quanto dichiarato dal codice |
 | `compute` | Risorse riservate dal progetto, relativi costi e modalità di modifica |
-| `events` | Cronologia degli eventi del backend, dal più recente: scalabilità dell'app, modifiche pianificate e applicate al database, subentro di un'istanza di standby, espansione del disco |
-| `usage` | Richieste utilizzate nel mese rispetto alla soglia inclusa e overage finora accumulato, secondo il calcolo di fatturazione. `usage org` elenca tutti i progetti dell'organizzazione |
+| `events` | Eventi che hanno interessato il backend, dal più recente: scalabilità dell'app, modifiche pianificate e applicate al database, subentro di uno standby, espansione del disco |
+| `usage` | Richieste utilizzate questo mese rispetto alla quota inclusa ed eccedenza maturata finora, come conteggiato in fattura. `usage org` elenca tutti i progetti dell'organizzazione |
 | `clusters` | I cluster su cui vengono eseguiti i tenant. Riservato agli amministratori della piattaforma |
-| `settings`, `orgs`, `billing` | Impostazioni di progetto, organizzazioni, membri, inviti e pagamenti |
-| `activity` | Audit log dell'organizzazione: tracciamento di chi ha eseguito un deploy, modificato una variabile d'ambiente (per nome), un dominio, un backup, un membro o un token. Riservato a owner e admin. Consulta [Consultare il registro delle attività](#consultare-il-registro-delle-attività) |
-| `notifications` | Destinazioni a cui inviare via POST gli eventi del progetto: Slack, Discord o qualsiasi URL HTTPS ([Notifiche Cloud](/docs/deployment/cloud-notifications/)) |
+| `settings`, `orgs`, `billing` | Impostazioni del progetto, organizzazioni con relativi membri e inviti, pagamenti |
+| `activity` | Audit log dell'organizzazione: chi ha eseguito un deploy, modificato una variabile d'ambiente (per nome), un dominio, un backup, un membro o un token. Riservato a owner e admin. Vedi [Verificare chi ha fatto cosa](#verificare-chi-ha-fatto-cosa) |
+| `notifications` | Destinazioni a cui vengono inviati gli eventi del progetto tramite POST: Slack, Discord o qualsiasi URL HTTPS ([Cloud notifications](/docs/deployment/cloud-notifications/)) |
 
-Ogni gruppo della tabella risponde a `--help` con una documentazione dedicata — sintassi di utilizzo,
-flag ed esempi — e `--help` non esegue mai il comando. Un test automatico verifica
-l'indice delle pagine: un gruppo aggiunto senza documentazione provocherà il fallimento della build anziché
-mostrare l'indice generale. `verify:docs` allinea la tabella stessa a tale
-indice: ogni comando gestito dalla CLI figura qui esattamente una volta; un gruppo
-aggiunto senza la rispettiva riga farà fallire a sua volta la build.
+Ogni gruppo in quella tabella risponde a `--help` con una pagina dedicata — una riga di utilizzo (usage), i relativi flag ed esempi — e `--help` non esegue mai il comando. Un test tiene traccia dell'indice delle pagine, quindi un gruppo aggiunto senza di essa fa fallire la build anziché rispondere con il sommario. `verify:docs` vincola la tabella stessa a tale indice: ogni gruppo gestito dalla CLI compare qui esattamente una volta, quindi anche un gruppo aggiunto senza una corrispondente riga farebbe fallire la build.
 
-Se eseguito in pipe, `--help` restituisce invece l'output in formato JSON: la medesima sintassi di utilizzo,
-i flag e gli esempi strutturati per l'elaborazione programmatica anziché sessanta righe di sequenze di escape da terminale.
+Se reindirizzato tramite pipe, `--help` risponde invece in formato JSON: la stessa riga di utilizzo, flag ed esempi strutturati per la lettura anziché sessanta righe di sequenze di escape del terminale.
 
 ## Cosa non include la versione beta
 
-Esposto chiaramente, poiché scoprirlo in un secondo momento sarebbe peggio:
+Detto chiaramente, perché scoprirlo in seguito sarebbe peggio:
 
-- **Nessuna selezione della regione.** Attualmente tutto viene eseguito in un'unica regione. Il modello
-  di posizionamento è previsto nell'architettura della piattaforma, ma un progetto non può selezionare una regione autonoma.
-  I comandi `projects create --provider` e `--region` non costituiscono l'eccezione che sembrano:
-  registrano a quale dei target di deploy del control plane appartiene un
-  progetto, ed essendocene uno solo, entrambi assumono quello predefinito senza spostare il
-  progetto altrove. `rebase cloud projects create --help` riporta la medesima precisazione.
-- **Nessun modello self-service.** L'accesso viene accordato a lotti; non è presente una procedura di registrazione e pagamento immediata.
-- **Nessun SLA pubblico**, né conformità SOC 2. Se necessiti di uno dei due, segnalalo
-  al momento della richiesta di accesso anziché darlo per scontato.
-- **Nessun branch deploy**, né integrazione nativa tramite GitHub App. I deploy hook — URL segreti
-  a cui associare i webhook del repository — rappresentano il meccanismo di automazione supportato. I [deploy
-  di anteprima](#visualizzare-lanteprima-di-una-modifica) sono in fase di rollout graduale e vengono avviati da CLI.
-- **I token agiscono per conto di una persona fisica.** Un [token](/docs/deployment/cloud-agents/#ci-and-agents) viene generato da un account
-  e opera con i privilegi di quest'ultimo; non esistono ancora identità macchina gestite a livello di organizzazione. Se
-  effettui l'accesso da CI, trasmetti `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD`
-  tramite un secret manager — l'uso di `--password` espone la password nella cronologia della shell
-  e nella tabella dei processi, e il comando lo segnala prima di autenticarti. Se il file
-  `.rebase/cloud.json` del repository fa riferimento a un control plane diverso da quello della piattaforma,
-  passalo anche tramite `--url`: in assenza di un terminale interattivo, `login` rifiuterà di inviare la password
-  a un host indicato esclusivamente dal file clonato.
-- **Nessun endpoint pubblico per il database.** Un database gestito non viene esposto su
-  Internet, quindi l'host visualizzato nella console rappresenta l'indirizzo interno raggiungibile dal tuo backend e
-  non sarà risolvibile dalla tua macchina locale. `rebase cloud db connect` apre una porta
-  locale verso quel database, mediante un tunnel instradato dal control plane, per tutto il tempo
-  in cui il comando viene mantenuto attivo — tuttavia non esiste un hostname pubblico permanente a cui
-  un servizio di terze parti possa connettersi direttamente. Per eseguire query SQL senza un client Postgres locale,
-  `rebase cloud db query "<sql>"` o `rebase cloud db query --file file.sql` apre il
-  medesimo tunnel per una singola interrogazione, esegue il testo come script unico (arrestandosi al primo
-  errore) e stampa l'esito restituito da ciascuna istruzione (`--json` per l'uso in script). Sia l'apertura del tunnel, sia la password accessibile tramite
-  `rebase cloud db info --reveal`, richiedono il ruolo di owner o admin
-  nell'organizzazione: gli stessi privilegi richiesti dall'editor SQL di Studio, poiché tutte e tre le modalità consentono
-  l'accesso diretto a una sessione sui dati di produzione.
-- **Eseguire il deploy equivale a eseguire codice con i secret di produzione.** L'ambiente dell'applicazione
-  custodisce `REBASE_SERVICE_KEY` (privilegi di amministrazione sulla propria API),
-  `DATABASE_URL` e `JWT_SECRET`; pertanto, il codice distribuito da un membro del team può accedervi,
-  sebbene solo i proprietari e gli amministratori possano visualizzarli in chiaro nella console. Invita
-  come membro unicamente persone a cui affideresti direttamente tali credenziali.
-- **La service key può essere rigenerata.** Nella sezione **Settings** del progetto
-  (o tramite `rebase cloud service-key rotate`) è possibile emettere una nuova `REBASE_SERVICE_KEY`
-  e riavviare l'app con essa. La chiave precedente rimane valida fino al completamento
-  del riavvio e cessa di funzionare subito dopo, invalidando qualunque componente che ne conservi
-  una copia. Il riscatto (claim) di un progetto esegue la medesima procedura.
+- **Nessuna scelta della regione.** Attualmente tutto viene eseguito in un'unica regione. Il modello di allocazione esiste nella piattaforma, ma un progetto non può selezionare una regione.
+  `projects create --provider` e `--region` non costituiscono l'eccezione che potrebbero sembrare: registrano a quale dei target di deploy registrati del control plane appartiene un progetto, e poiché ce n'è solo uno, entrambi assumono quel valore predefinito e nessuno dei due sposta il progetto altrove. `rebase cloud projects create --help` riporta la stessa indicazione.
+- **Non è self-service.** L'accesso viene concesso a scaglioni; non esiste una procedura immediata di registrazione e pagamento.
+- **Nessun SLA pubblicato** e nessuna certificazione SOC 2. Se hai bisogno dell'uno o dell'altra, segnalalo al momento della richiesta di accesso anziché darlo per scontato.
+- **Nessun branch deploy** e nessuna GitHub App proprietaria. I deploy hook — URL segreti a cui puntare un webhook del repository — rappresentano l'automazione supportata. I [deploy di anteprima](#anteprima-di-una-modifica) sono in fase di rilascio progressivo e vengono avviati dalla CLI.
+- **I token agiscono per conto di una persona.** Un [token](/docs/deployment/cloud-agents/#ci-and-agents) viene generato da un account e agisce a suo nome; non esiste ancora un'identità macchina di proprietà dell'organizzazione. Se invece effettui l'accesso da CI, passa `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD` da un gestore di segreti — `--password` inserisce la password nella cronologia della shell e nella tabella dei processi, segnalandolo prima di effettuare l'accesso. Se il file `.rebase/cloud.json` del repository specifica un control plane diverso da quello ufficiale della piattaforma, passalo anche tramite `--url`: in assenza di un terminale, `login` rifiuta di inviare una password a un host indicato unicamente dal file scaricato dal repository.
+- **Nessun endpoint di database pubblico.** Un database gestito non è esposto a Internet, quindi l'host mostrato dalla console rappresenta il relativo indirizzo interno per il tuo backend e non è risolvibile sul tuo computer locale. `rebase cloud db connect` apre una porta locale collegata a quel database, tramite tunnel attraverso il control plane, per tutto il tempo in cui viene lasciato in esecuzione — ma non esiste un hostname permanente a cui un servizio di terze parti possa connettersi. Per eseguire istruzioni SQL senza un client Postgres locale,
+  `rebase cloud db query "<sql>"` o `rebase cloud db query --file file.sql` apre lo stesso tunnel per una singola query, esegue il testo come un unico script (interrompendosi al primo errore) e stampa la risposta di ciascuna istruzione (`--json` per l'uso con script). Sia quel tunnel che la password mostrata da
+  `rebase cloud db info --reveal` richiedono il ruolo di owner o admin dell'organizzazione: lo stesso richiesto dall'editor SQL di Studio, poiché in tutti e tre i casi si accede a una sessione sui dati di produzione.
+- **Eseguire un deploy equivale a eseguire codice con i secret di produzione.** L'ambiente dell'applicazione contiene `REBASE_SERVICE_KEY` (admin sulla propria API),
+  `DATABASE_URL` e `JWT_SECRET`, quindi il codice distribuito da un membro può leggerli,
+  anche se solo owner e admin possono visualizzarli nella console. Invita
+  con il ruolo di membro solo persone a cui affideresti tali valori.
+- **La service key può essere sostituita.** Dalla sezione **Settings** del progetto
+  (o con `rebase cloud service-key rotate`) è possibile generare una nuova `REBASE_SERVICE_KEY`
+  e riavviare l'applicazione associandola ad essa. La vecchia chiave rimane valida fino al completamento del riavvio
+  e non oltre, quindi qualsiasi client che l'abbia memorizzata verrà rifiutato da
+  quel momento in poi. Il riscatto (claim) di un progetto esegue la stessa operazione.
 
 ## Self-hosting alternativo
 
-Nessuna delle configurazioni descritte costituisce un vincolo di dipendenza (vendor lock-in). La [guida al self-hosting](/docs/deployment/self-hosting/)
-consente di eseguire esattamente la stessa immagine e lo stesso bundle tramite `docker compose`, e la
-[guida a Kubernetes](/docs/deployment/kubernetes/) riproduce la medesima topologia partendo
-dal relativo Helm chart.
+Nulla di tutto questo comporta un lock-in. La [guida al self-hosting](/docs/deployment/self-hosting/)
+consente di eseguire la medesima immagine e lo stesso bundle con `docker compose`, mentre la
+[guida a Kubernetes](/docs/deployment/kubernetes/) riproduce la stessa topologia a partire dall'Helm chart.

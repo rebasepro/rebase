@@ -12,7 +12,7 @@
  * `test/e2e/introspect-policies-e2e.test.ts`.
  */
 import { classifyTables } from "../src/schema/introspect-db-structure";
-import { describeRlsOffTables, generateSchemaModules } from "../src/schema/introspect-db-logic";
+import { describeRlsOffTables, generateSchemaModules, wireCustomizationsIntoApp } from "../src/schema/introspect-db-logic";
 import { formatPolicyDrift, type PolicyDrift, type PolicyRef } from "../src/security/policy-drift";
 import { autoStamp, buildSchema, column, foreignKey, rlsPolicy, serialPk } from "./helpers/schema-metadata";
 
@@ -156,10 +156,10 @@ describe("writing a table's policies into its `rls`", () => {
         const source = generated([rlsPolicy("customers", "customers_owner", { qual: OWNER })], false);
         expect(source).toContain(`name: "customers_owner"`);
         expect(source).not.toContain("defaultPolicies");
-        expect(source).toMatch(/\/\/ ⚠ Row-level security is off on this table, so every request reaches every row\. `rebase db push`\n\/\/ switches it on/);
+        expect(source).toMatch(/\/\/ ⚠ Row-level security is off on this table, so every request reaches every row\. The first `rebase dev`\n\/\/ \(or `rebase db push`\) switches it on/);
         expect(generated([], false)).toContain("rls: \"admin-only\"");
         expect(describeRlsOffTables(["orders", "customers"])).toMatch(
-            /^2 table\(s\) have row-level security off, so every request reaches every row: customers, orders\.\n`rebase db push` switches it on/);
+            /^2 table\(s\) have row-level security off, so every request reaches every row: customers, orders\.\nThe first `rebase dev` switches it on \(so does `rebase db push`\)/);
         expect(describeRlsOffTables([])).toBeUndefined();
     });
 
@@ -190,5 +190,35 @@ describe("the doctor's word for a policy no table describes", () => {
         const report = formatPolicyDrift(drift([ref("orders_select_1a2b3c4")]));
         expect(report).toMatch(/left behind by an earlier push/);
         expect(report).toMatch(/next `rebase db push` drops it/);
+    });
+});
+
+describe("wireCustomizationsIntoApp", () => {
+    const app = [
+        "import { RebaseCMS } from \"@rebasepro/cms\";",
+        "import { usersCms } from \"./cms/users\";",
+        "import uiConfig from \"./cms/ui-config.json\";",
+        "",
+        "export function App() {",
+        "    return <RebaseCMS tableCustomizations={[usersCms]} uiConfig={uiConfig} />;",
+        "}",
+        ""
+    ].join("\n");
+
+    it("passes the generated customizations to <RebaseCMS> and imports them", () => {
+        const wired = wireCustomizationsIntoApp(app, [
+            { identifier: "booksCms", importPath: "./cms/books" },
+            { identifier: "loansCms", importPath: "./cms/loans" }
+        ]);
+        expect(wired).toContain("tableCustomizations={[usersCms, booksCms, loansCms]}");
+        expect(wired).toContain("import uiConfig from \"./cms/ui-config.json\";\nimport { booksCms } from \"./cms/books\";\nimport { loansCms } from \"./cms/loans\";");
+    });
+
+    it("leaves an App that already passes them alone", () => {
+        expect(wireCustomizationsIntoApp(app, [{ identifier: "usersCms", importPath: "./cms/users" }])).toBeUndefined();
+    });
+
+    it("leaves an App with no tableCustomizations list for the reader", () => {
+        expect(wireCustomizationsIntoApp("export const App = () => null;\n", [{ identifier: "booksCms", importPath: "./cms/books" }])).toBeUndefined();
     });
 });

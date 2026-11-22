@@ -119,8 +119,24 @@ describe("StudioHomePage Component", () => {
         // and the copied client 404s on that collection at runtime.
         const { container } = render(<StudioHomePage />);
 
-        expect(container.textContent).toContain("import { tablesDictionary, type Database } from './database.types';");
+        expect(container.textContent).toContain("import { tablesDictionary, type Database } from './generated/sdk/database.types';");
         expect(container.textContent).toContain("tables: tablesDictionary,");
+    });
+
+    it("says the SDK comes from `rebase dev`, without npx, and queries through typed accessors", () => {
+        // It told a scaffold to run `npx rebase generate-sdk` (scaffolds are
+        // pnpm, and `rebase dev` already writes the SDK), imported a path no
+        // scaffold has, and queried `rebase.data.collection('posts')`, which
+        // the client no longer has and a blank project has no table for.
+        const { container } = render(<StudioHomePage />);
+        const text = container.textContent ?? "";
+
+        expect(text).toContain("rebase dev");
+        expect(text).toContain("generated/sdk");
+        expect(text).toContain("rebase generate-sdk");
+        expect(text).not.toContain("npx");
+        expect(text).not.toContain(".collection(");
+        expect(text).toContain("rebase.data.users.find();");
     });
 
     it("renders additional children when provided", () => {

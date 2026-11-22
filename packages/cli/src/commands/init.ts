@@ -184,6 +184,10 @@ export interface BuildQuestionsParams {
     hasGitFlag: boolean;
     hasInstallFlag: boolean;
     pm: PackageManager;
+    /** `--database-url`, already checked: its question is not asked. */
+    databaseUrlArg?: string;
+    /** `--introspect`: its question is not asked, and neither is the template's. */
+    introspectArg?: boolean;
 }
 
 /**
@@ -236,8 +240,24 @@ function scaffoldConflictLine(dir: string): string | null {
     return `"${path.basename(dir)}" already holds files a new project would overwrite or mix with (${shown}). Choose another name.`;
 }
 
+/**
+ * The database an interactive `init` scaffolds against: a flag wins over the
+ * prompt, which is not asked when the flag was passed. Introspection needs a
+ * database to read, so `--introspect` with a blank answer introspects nothing.
+ */
+export function resolveInteractiveDatabase(params: {
+    databaseUrlArg?: string;
+    introspectArg?: boolean;
+    answers: { databaseUrl?: unknown; introspect?: unknown };
+}): { databaseUrl?: string; introspect: boolean } {
+    const { databaseUrlArg, introspectArg, answers } = params;
+    const answered = typeof answers.databaseUrl === "string" ? answers.databaseUrl.trim() : "";
+    const databaseUrl = databaseUrlArg || answered || undefined;
+    return { databaseUrl, introspect: !!databaseUrl && (introspectArg === true || answers.introspect === true) };
+}
+
 export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[] {
-    const { nameArg, templateArg, headlessArg, hasGitFlag, hasInstallFlag, pm } = params;
+    const { nameArg, templateArg, headlessArg, hasGitFlag, hasInstallFlag, pm, databaseUrlArg, introspectArg } = params;
     const questions: InitQuestion[] = [];
 
     if (!nameArg) {
@@ -271,8 +291,9 @@ export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[]
             message: "Choose a starter template:",
             choices: PRESET_CHOICES,
             default: "blog",
-            // A headless project has no schema files, so a preset is moot.
-            when: (answers: Record<string, unknown>) => !(headlessArg ?? answers.headless)
+            // A headless project has no schema files, so a preset is moot; and
+            // `--introspect` takes its tables from the database (it implies blank).
+            when: (answers: Record<string, unknown>) => !(headlessArg ?? answers.headless) && !introspectArg
         });
     }
 
@@ -294,7 +315,10 @@ export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[]
         });
     }
 
-    questions.push({
+    // A flag that was passed is never asked again: `init --database-url … --introspect`
+    // on a terminal used to ask for the connection string anyway, and the blank
+    // default replaced the flag with the managed database.
+    if (!databaseUrlArg) questions.push({
         type: "input",
         name: "databaseUrl",
         message: "PostgreSQL connection string (blank = a managed database for this project, no setup):",
@@ -311,12 +335,12 @@ export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[]
         }
     });
 
-    questions.push({
+    if (!introspectArg) questions.push({
         type: "confirm",
         name: "introspect",
         message: "Would you like to introspect this database to generate backend/schema from its tables?",
         default: true,
-        when: (answers: Record<string, unknown>) => !!(answers.databaseUrl as string)?.trim()
+        when: (answers: Record<string, unknown>) => !!(databaseUrlArg || (answers.databaseUrl as string)?.trim())
     });
 
     return questions;
@@ -549,11 +573,14 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         headlessArg,
         hasGitFlag: !!args["--git"],
         hasInstallFlag,
-        pm
+        pm,
+        databaseUrlArg,
+        introspectArg: args["--introspect"] === true
     });
 
 
     const answers = await inquirer.prompt(questions);
+    const database = resolveInteractiveDatabase({ databaseUrlArg, introspectArg: args["--introspect"] === true, answers });
     const agents = namedAgents ?? await promptForAgents();
 
     const targetDirectory = path.resolve(process.cwd(), nameArg || answers.projectName);
@@ -567,8 +594,8 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         installDeps: noInstall ? false : (args["--install"] || answers.installDeps || false),
         targetDirectory,
         templateDirectory,
-        databaseUrl: (answers.databaseUrl as string)?.trim() || undefined,
-        introspect: answers.introspect || false,
+        databaseUrl: database.databaseUrl,
+        introspect: database.introspect,
         preset: templateArg || (answers.preset as TemplatePreset) || "blog",
         // Only a flag is "explicit" here: the interactive path never asks for a
         // preset once baas is chosen, so it can't produce a conflicting answer.
@@ -768,6 +795,8 @@ export interface InitNextStepsInput {
     /** What the reader types to enter the project; "" when they are in it. */
     cdTarget: string;
     pm: PMCommands;
+    /** `scripts/seed.ts` has example rows for this project's tables (the blog and e-commerce templates). */
+    seed?: boolean;
 }
 
 /**
@@ -782,7 +811,7 @@ export interface InitNextStepsInput {
  * named here to the scaffold it is printed for.
  */
 export function initNextSteps(input: InitNextStepsInput): string[] {
-    const { headless, ownDatabase, introspect, introspected, installed, cdTarget, pm } = input;
+    const { headless, ownDatabase, introspect, introspected, installed, cdTarget, pm, seed } = input;
     const cmd = (parts: string[]): string => `  ${chalk.cyan(parts.join(" "))}`;
     const note = (text: string): string => chalk.gray(`  # ${text}`);
     const runDev = cmd(pm.run("dev"));
@@ -861,12 +890,9 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
         // Drizzle schema from backend/schema, and applying the tables to the
         // database. The push-and-Docker steps are documented under
         // `rebase dev --help`.
-        lines.push(note("A local database configuration has been generated in .env."));
-        lines.push(note("Start everything — the database and schema are set up for you,"));
-        lines.push(note("with no Docker and nothing else to install:"));
         lines.push(runDev);
-        lines.push("");
-        lines.push(note("To use a Postgres of your own instead, uncomment DATABASE_URL in .env."));
+        lines.push(note("Starts the database (no Docker), the API and the admin panel, and prints their URLs."));
+        lines.push(note("To use a Postgres of your own, uncomment DATABASE_URL in .env first."));
     }
 
     lines.push("");
@@ -886,25 +912,22 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
         // opens the admin's reset page, which a headless project does not serve.
         lines.push(note("There is no sign-in screen here: with dev running, create the first admin:"));
         lines.push(cmd(pm.exec("rebase", ["users", "create", "you@example.com", "--role", "admin", "--password", "<a password>"])));
+        lines.push(note("(under docker compose, the REBASE_ADMIN_EMAIL account in .env is created instead)."));
     } else {
-        lines.push(note("Sign in: the first account you register becomes the admin."));
+        lines.push(note("Sign in: the first account you register becomes the admin"));
+        lines.push(note("(under docker compose, the REBASE_ADMIN_EMAIL account in .env is created instead)."));
     }
-    lines.push(note("In production (docker compose) that window is shut and the account named by"));
-    lines.push(note("REBASE_ADMIN_EMAIL in .env is created at boot instead."));
 
-    lines.push("");
     // `--headless --introspect` had these two claims fighting: the step above
     // announced the generated schema and this line then said there is none.
     // Both were reachable at once, and the reader has to believe one of them.
-    lines.push(headless
-        ? introspected
+    if (headless) lines.push("");
+    if (headless) lines.push(introspected
             ? chalk.gray("This starts a headless API (Hono + PostgreSQL) over the tables just ")
                 + chalk.gray("generated from your database in backend/schema. Edit them to change what the ")
                 + chalk.gray("API exposes; its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true).")
             : chalk.gray("This starts a headless API (Hono + PostgreSQL). There is no backend/schema: ")
-                + chalk.gray("the API is derived from your database schema. Once it serves a table, its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true).")
-        : chalk.gray("This starts both the backend (Hono + PostgreSQL)")
-            + chalk.gray(" and the frontend (Vite + React) concurrently."));
+                + chalk.gray("the API is derived from your database schema. Once it serves a table, its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true)."));
 
     // What to do once it runs: the first run is one command, and the reader's
     // next question is where their own code goes.
@@ -918,15 +941,16 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
         lines.push(cmd(pm.run("deploy")));
         lines.push(note("   or self-host it with Docker. README.md has both."));
     } else {
-        lines.push(note("1. Open the admin panel at the URL dev prints."));
-        lines.push(note("   Ports come from the project's path, so trust the terminal over 3001/5173."));
-        lines.push(note("2. Add a table: a file in backend/schema/ with defineTable(...), exported from"));
-        lines.push(note("   backend/schema/index.ts. dev regenerates the schema and SDK and creates it."));
-        lines.push(note("3. Choose how it looks in the admin in frontend/src/cms/<table>.tsx."));
-        lines.push(note("4. Call the API from your own code: scripts/example.ts uses the typed client."));
-        lines.push(note("5. Ship it to Rebase Cloud:"));
+        const steps: string[] = [];
+        if (seed) steps.push(`Load example rows: ${pm.run("seed").join(" ")} (scripts/seed.ts).`);
+        steps.push("Add a table: a file in backend/schema/ with defineTable(...), exported from\n   backend/schema/index.ts. dev creates it and regenerates the typed SDK.");
+        steps.push("Choose how it looks in the admin in frontend/src/cms/<table>.tsx.");
+        steps.push(`Call the API from a script: ${pm.run("example").join(" ")} (scripts/example.ts).`);
+        steps.push("Ship it to Rebase Cloud, or self-host it with docker compose (README.md):");
+        steps.forEach((step, i) => {
+            for (const [j, line] of step.split("\n").entries()) lines.push(note(j === 0 ? `${i + 1}. ${line}` : line));
+        });
         lines.push(cmd(pm.run("deploy")));
-        lines.push(note("   or self-host it with docker compose. README.md has both."));
     }
     return lines;
 }
@@ -1179,14 +1203,18 @@ async function createProject(options: InitOptions) {
                 // --force replaces the blank preset's schema with the database's tables
                 await execa(execCmd[0], execCmd.slice(1), {
                     cwd: options.targetDirectory,
-                    stdio: "inherit"
+                    stdio: "inherit",
+                    // Tells the driver it runs inside init, which closes on its
+                    // own next steps: no migration-oriented advice in between.
+                    env: { REBASE_INIT_SCAFFOLD: "1" }
                 });
                 // The scaffold holds the blank preset's schema.generated.ts;
                 // regenerate it from the introspected tables or the
                 // backend serves a schema that doesn't match the database.
                 await execa(generateCmd[0], generateCmd.slice(1), {
                     cwd: options.targetDirectory,
-                    stdio: "inherit"
+                    stdio: "inherit",
+                    env: { REBASE_INIT_SCAFFOLD: "1" }
                 });
                 console.log(chalk.green("  Database successfully introspected!"));
                 introspected = true;
@@ -1256,7 +1284,9 @@ async function createProject(options: InitOptions) {
         // apps/my-app` must say `cd apps/my-app`, and `init .` needs no cd at all
         // because they are already standing in the project.
         cdTarget: formatCdTarget(process.cwd(), options.targetDirectory),
-        pm: pmCommands
+        pm: pmCommands,
+        // The blog and e-commerce templates ship example rows; blank has no tables.
+        seed: !options.headless && !options.introspect && (applied ?? options.preset) !== "blank"
     });
     for (const line of nextSteps) console.log(line);
     console.log("");
@@ -1291,6 +1321,8 @@ force: true });
 force: true });
     // Generated from backend/schema; a headless project reads the live schema.
     fs.rmSync(path.join(targetDirectory, "backend", "src", "schema.generated.ts"), { force: true });
+    // Rows for the blog's tables, which a headless project does not declare.
+    fs.rmSync(path.join(targetDirectory, "scripts", "seed.ts"), { force: true });
 
     const overlayDir = path.resolve(cliRoot!, "templates", "overlays", "baas");
     if (!fs.existsSync(overlayDir)) {
@@ -1361,7 +1393,8 @@ export const BLOG_PRESET_FILES: readonly string[] = [
     "backend/schema/tags.ts",
     "frontend/src/cms/posts.tsx",
     "frontend/src/cms/authors.tsx",
-    "frontend/src/cms/tags.tsx"
+    "frontend/src/cms/tags.tsx",
+    "scripts/seed.ts"
 ];
 
 /** Where a non-blog preset's files ship: `templates/presets/<preset>/`, laid out as in a project. */

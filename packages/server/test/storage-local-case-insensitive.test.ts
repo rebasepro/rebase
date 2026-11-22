@@ -6,6 +6,7 @@ import * as path from "path";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { initializeStorage } from "../src/init/storage";
 import { logger } from "../src/utils/logger";
+import { _resetDevNoticesForTests } from "../src/utils/dev-notices";
 
 /**
  * On macOS (APFS, HFS+) and Windows the default file system folds case, so
@@ -47,6 +48,48 @@ describe("local storage on a case-insensitive file system", () => {
 
         const messages = warn.mock.calls.map(call => String(call[0]));
         expect(messages.some(m => m.includes("case-insensitive") && m.includes(basePath))).toBe(true);
+    });
+
+    /**
+     * The file system does not change between boots, and `rebase dev` boots
+     * again at every hot restart: the warning at each one buried the warnings
+     * that do change. It is said once per project, remembered in `.rebase/`.
+     */
+    it("warns once per project, across restarts of rebase dev", async () => {
+        jest.spyOn(LocalStorageController.prototype, "isCaseInsensitive").mockResolvedValue(true);
+        const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+        const basePath = path.join(dir, "uploads");
+        const previous = process.env.REBASE_DEV_PROJECT_ROOT;
+        process.env.REBASE_DEV_PROJECT_ROOT = dir;
+        const caseWarnings = () => warn.mock.calls.map(call => String(call[0])).filter(m => m.includes("case-insensitive")).length;
+        try {
+            await initializeStorage({ type: "local", basePath }, false);
+            expect(caseWarnings()).toBe(1);
+
+            // A tsx restart: a new process, the same project.
+            _resetDevNoticesForTests();
+            await initializeStorage({ type: "local", basePath }, false);
+            expect(caseWarnings()).toBe(1);
+            expect(fs.existsSync(path.join(dir, ".rebase", "notices.json"))).toBe(true);
+        } finally {
+            if (previous === undefined) delete process.env.REBASE_DEV_PROJECT_ROOT;
+            else process.env.REBASE_DEV_PROJECT_ROOT = previous;
+        }
+    });
+
+    it("warns once per process when no project is named", async () => {
+        jest.spyOn(LocalStorageController.prototype, "isCaseInsensitive").mockResolvedValue(true);
+        const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+        const basePath = path.join(dir, "uploads");
+        const previous = process.env.REBASE_DEV_PROJECT_ROOT;
+        delete process.env.REBASE_DEV_PROJECT_ROOT;
+        try {
+            await initializeStorage({ type: "local", basePath }, false);
+            await initializeStorage({ type: "local", basePath }, false);
+            expect(warn.mock.calls.map(call => String(call[0])).filter(m => m.includes("case-insensitive"))).toHaveLength(1);
+        } finally {
+            if (previous !== undefined) process.env.REBASE_DEV_PROJECT_ROOT = previous;
+        }
     });
 
     it("says nothing on a case-sensitive one", async () => {

@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { BrowserContext } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 import { API_PORT } from "./playwright.config";
 
 /**
@@ -17,6 +17,22 @@ import { API_PORT } from "./playwright.config";
  * tests that exercise the login view itself, and must start signed out.
  */
 export const AUTH_STATE = path.join(__dirname, ".auth", "user.json");
+
+/**
+ * Bring up the login view's email and password form.
+ *
+ * When email is the backend's only sign-in method the view shows the form
+ * directly; with another way in (Google, Rebase Cloud) it sits behind "Sign in
+ * with email". The view decides once `/auth/config` lands, so this waits for
+ * whichever of the two is on screen rather than assuming one.
+ */
+export async function openEmailForm(page: Page): Promise<void> {
+    const password = page.locator('input[type="password"]');
+    const withEmail = page.getByRole("button", { name: /Sign in with email/i });
+    await password.or(withEmail).first().waitFor({ state: "visible", timeout: 30_000 });
+    if (!(await password.isVisible()) && await withEmail.isVisible()) await withEmail.click();
+    await password.waitFor({ state: "visible", timeout: 15_000 });
+}
 
 /**
  * A sign-in of this test's own, for a test that replays `AUTH_STATE`.

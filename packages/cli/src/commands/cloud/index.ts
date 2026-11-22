@@ -11,7 +11,7 @@ import arg from "arg";
 import chalk from "chalk";
 import { accessTokenCommand, loginCommand, logoutCommand, whoamiCommand } from "./auth";
 import { tokensCommand } from "./tokens";
-import { linkCommand, unlinkCommand, selectOrgCommand, openCommand } from "./link";
+import { linkCommand, unlinkCommand, selectOrgCommand, openCommand, resolveDeployProjectRef } from "./link";
 import { listProjects, createProject, projectInfo, deleteProject, transferProject, resolveProjectArg } from "./projects";
 import { cloudInitCommand } from "./init";
 import { claimCommand } from "./claim";
@@ -376,7 +376,7 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
 
         /* deploy + logs (operate on linked/--project) */
         case "deploy":
-            await deployCommand(rawArgs, requireProjectRef(rawArgs));
+            await deployCommand(rawArgs, () => resolveDeployProjectRef(rawArgs));
             break;
         case "logs":
             await logsCommand(rawArgs, requireProjectRef(rawArgs));
