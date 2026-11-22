@@ -141,11 +141,11 @@ export function UsersAndRolesView() {
                 : (Array.isArray(raw) ? raw : []);
             setUsers(arr.map(parseUser).filter((u): u is AdminUserRow => u !== null));
         } catch (err: unknown) {
-            setUsersError(err instanceof Error ? err.message : "Failed to load users.");
+            setUsersError(err instanceof Error ? err.message : t("studio_users_load_failed"));
         } finally {
             setUsersLoading(false);
         }
-    }, [requestJson]);
+    }, [requestJson, t]);
 
     const loadRoles = useCallback(async () => {
         setRolesLoading(true);
@@ -155,11 +155,11 @@ export function UsersAndRolesView() {
             const arr = isRecord(raw) && Array.isArray(raw.roles) ? raw.roles : [];
             setRoles(arr.map(parseRole).filter((r): r is StoredRoleRow => r !== null));
         } catch (err: unknown) {
-            setRolesError(err instanceof Error ? err.message : "Failed to load roles.");
+            setRolesError(err instanceof Error ? err.message : t("studio_users_roles_load_failed"));
         } finally {
             setRolesLoading(false);
         }
-    }, [requestJson]);
+    }, [requestJson, t]);
 
     useEffect(() => {
         void loadUsers();
@@ -210,7 +210,7 @@ export function UsersAndRolesView() {
                         ...(userPassword.trim() ? { password: userPassword } : {})
                     }
                 });
-                snackbar.open({ type: "success", message: `Updated user ${editingUser.email}.` });
+                snackbar.open({ type: "success", message: t("studio_users_user_updated", { email: editingUser.email }) });
             } else {
                 await requestJson("/admin/users", {
                     method: "POST",
@@ -221,12 +221,12 @@ export function UsersAndRolesView() {
                         roles: parsedRoles
                     }
                 });
-                snackbar.open({ type: "success", message: `Created user ${userEmail.trim()}.` });
+                snackbar.open({ type: "success", message: t("studio_users_user_created", { email: userEmail.trim() }) });
             }
             setUserDialogOpen(false);
             await loadUsers();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to save user." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_users_user_save_failed") });
         } finally {
             setSavingUser(false);
         }
@@ -235,10 +235,10 @@ export function UsersAndRolesView() {
     const handleDeleteUser = async (u: AdminUserRow) => {
         try {
             await requestJson(`/admin/users/${encodeURIComponent(u.uid)}`, { method: "DELETE" });
-            snackbar.open({ type: "success", message: `Deleted user ${u.email}.` });
+            snackbar.open({ type: "success", message: t("studio_users_user_deleted", { email: u.email }) });
             await loadUsers();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to delete user." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_users_user_delete_failed") });
         }
     };
 
@@ -292,7 +292,7 @@ export function UsersAndRolesView() {
                         assignable: roleAssignable
                     }
                 });
-                snackbar.open({ type: "success", message: `Role "${editingRoleName}" updated.` });
+                snackbar.open({ type: "success", message: t("studio_users_role_updated", { name: editingRoleName }) });
             } else {
                 await requestJson("/admin/roles", {
                     method: "POST",
@@ -304,12 +304,12 @@ export function UsersAndRolesView() {
                         assignable: roleAssignable
                     }
                 });
-                snackbar.open({ type: "success", message: `Role "${targetName}" created.` });
+                snackbar.open({ type: "success", message: t("studio_users_role_created", { name: targetName }) });
             }
             setRoleDialogOpen(false);
             await loadRoles();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to save role." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_users_role_save_failed") });
         } finally {
             setSavingRole(false);
         }
@@ -318,10 +318,10 @@ export function UsersAndRolesView() {
     const handleDeleteRole = async (name: string) => {
         try {
             await requestJson(`/admin/roles/${encodeURIComponent(name)}`, { method: "DELETE" });
-            snackbar.open({ type: "success", message: `Role "${name}" deleted.` });
+            snackbar.open({ type: "success", message: t("studio_users_role_deleted", { name }) });
             await loadRoles();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to delete role." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_users_role_delete_failed") });
         }
     };
 
@@ -331,27 +331,27 @@ export function UsersAndRolesView() {
                 <div className="flex items-center gap-2.5">
                     <UsersIcon size={iconSize.medium} className={"text-text-secondary"} />
                     <div>
-                        <Typography variant="h6">Users &amp; Roles</Typography>
+                        <Typography variant="h6">{t("studio_tool_users")}</Typography>
                         <Typography variant="caption" color="secondary">
-                            Manage accounts, role assignments, and zero-code RBAC scopes
+                            {t("studio_users_subtitle")}
                         </Typography>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Tooltip title="Refresh">
-                        <IconButton size="small" aria-label="Refresh" onClick={() => { void loadUsers(); void loadRoles(); }}>
+                    <Tooltip title={t("refresh")}>
+                        <IconButton size="small" aria-label={t("refresh")} onClick={() => { void loadUsers(); void loadRoles(); }}>
                             <RefreshCwIcon size={iconSize.small} />
                         </IconButton>
                     </Tooltip>
                     {tab === "users" ? (
                         <Button size="small" variant="filled" onClick={openCreateUser}>
                             <PlusIcon size={iconSize.small} />
-                            Create User
+                            {t("create_user")}
                         </Button>
                     ) : (
                         <Button size="small" variant="filled" onClick={openCreateRole}>
                             <PlusIcon size={iconSize.small} />
-                            New Role
+                            {t("studio_users_new_role")}
                         </Button>
                     )}
                 </div>
@@ -363,8 +363,8 @@ export function UsersAndRolesView() {
                 variant="boxy"
                 className="border-b border-hairline px-4"
             >
-                <Tab value="users">Users ({users.length})</Tab>
-                <Tab value="roles">Roles &amp; Scopes ({roles.length})</Tab>
+                <Tab value="users">{t("studio_users_tab_users", { count: users.length })}</Tab>
+                <Tab value="roles">{t("studio_users_tab_roles", { count: roles.length })}</Tab>
             </Tabs>
 
             <div className="flex-1 overflow-auto p-5">
@@ -373,7 +373,7 @@ export function UsersAndRolesView() {
                         <div className="max-w-sm">
                             <SearchBar
                                 onTextSearch={(v) => setSearch(v ?? "")}
-                                placeholder="Search by email, name, or role..."
+                                placeholder={t("studio_users_search_placeholder")}
                                 innerClassName="w-full"
                             />
                         </div>
@@ -385,22 +385,22 @@ export function UsersAndRolesView() {
                         ) : filteredUsers.length === 0 ? (
                             <Card className="p-8 text-center flex flex-col items-center gap-3">
                                 <Typography variant="body2" color="secondary">
-                                    No user accounts found.
+                                    {t("studio_users_empty")}
                                 </Typography>
                                 <Button size="small" variant="filled" onClick={openCreateUser}>
                                     <PlusIcon size={iconSize.small} />
-                                    Create User
+                                    {t("create_user")}
                                 </Button>
                             </Card>
                         ) : (
                             <div className={cls("overflow-x-auto rounded-lg border", defaultBorderMixin)}>
                                 <Table className="w-full">
                                     <TableHeader>
-                                            <TableCell header>Email</TableCell>
+                                            <TableCell header>{t("email")}</TableCell>
                                             <TableCell header>{t("display_name")}</TableCell>
-                                            <TableCell header>Roles</TableCell>
-                                            <TableCell header>Status</TableCell>
-                                            <TableCell header className="text-right">Actions</TableCell>
+                                            <TableCell header>{t("roles")}</TableCell>
+                                            <TableCell header>{t("studio_cron_status")}</TableCell>
+                                            <TableCell header className="text-right">{t("actions")}</TableCell>
                                         </TableHeader>
                                     <TableBody>
                                         {filteredUsers.map((u) => (
@@ -410,7 +410,7 @@ export function UsersAndRolesView() {
                                                 <TableCell>
                                                     <div className="flex items-center gap-1 flex-wrap">
                                                         {u.roles.length === 0 ? (
-                                                            <Typography variant="caption" color="secondary">none</Typography>
+                                                            <Typography variant="caption" color="secondary">{t("studio_users_no_roles")}</Typography>
                                                         ) : u.roles.map((r) => (
                                                             <Chip key={r} size="small" colorScheme={r === "admin" ? "purpleLight" : "blueLight"}>
                                                                 {r}
@@ -420,14 +420,14 @@ export function UsersAndRolesView() {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Chip size="small" colorScheme={u.disabled ? "redLight" : "greenLight"}>
-                                                        {u.disabled ? "Disabled" : "Active"}
+                                                        {u.disabled ? t("disabled") : t("studio_users_status_active")}
                                                     </Chip>
                                                 </TableCell>
                                                 <TableCell className="text-right whitespace-nowrap">
-                                                    <IconButton size="small" aria-label={`Edit ${u.email}`} onClick={() => openEditUser(u)}>
+                                                    <IconButton size="small" aria-label={t("studio_users_edit_user_aria", { email: u.email })} onClick={() => openEditUser(u)}>
                                                         <PencilIcon size={iconSize.small} />
                                                     </IconButton>
-                                                    <IconButton size="small" aria-label={`Delete ${u.email}`} onClick={() => void handleDeleteUser(u)}>
+                                                    <IconButton size="small" aria-label={t("studio_users_delete_user_aria", { email: u.email })} onClick={() => void handleDeleteUser(u)}>
                                                         <Trash2Icon size={iconSize.small} className={"text-red-500"} />
                                                     </IconButton>
                                                 </TableCell>
@@ -450,21 +450,21 @@ export function UsersAndRolesView() {
                             <Card className="p-8 text-center flex flex-col items-center gap-3">
                                 <ShieldIcon className="w-8 h-8 text-text-disabled" />
                                 <Typography variant="body2" color="secondary">
-                                    No custom roles configured yet. Create roles here to assign admin or application scopes without editing code.
+                                    {t("studio_users_roles_empty")}
                                 </Typography>
                                 <Button size="small" variant="filled" onClick={openCreateRole}>
                                     <PlusIcon size={iconSize.small} />
-                                    New Role
+                                    {t("studio_users_new_role")}
                                 </Button>
                             </Card>
                         ) : (
                             <div className={cls("overflow-x-auto rounded-lg border", defaultBorderMixin)}>
                                 <Table className="w-full">
                                     <TableHeader>
-                                            <TableCell header>Role</TableCell>
+                                            <TableCell header>{t("role")}</TableCell>
                                             <TableCell header>{t("description")}</TableCell>
-                                            <TableCell header>Scopes</TableCell>
-                                            <TableCell header className="text-right">Actions</TableCell>
+                                            <TableCell header>{t("studio_api_keys_scopes")}</TableCell>
+                                            <TableCell header className="text-right">{t("actions")}</TableCell>
                                         </TableHeader>
                                     <TableBody>
                                         {roles.map((r) => (
@@ -472,14 +472,14 @@ export function UsersAndRolesView() {
                                                 <TableCell className="font-mono text-sm font-medium whitespace-nowrap">
                                                     <div className="flex items-center gap-1.5">
                                                         <span>{r.name}</span>
-                                                        {r.isDefault && <Chip size="small" colorScheme="greenLight">Default</Chip>}
+                                                        {r.isDefault && <Chip size="small" colorScheme="greenLight">{t("studio_users_default_role_chip")}</Chip>}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-sm text-text-secondary">{r.description ?? "—"}</TableCell>
                                                 <TableCell>
                                                     <div className="flex items-center gap-1 flex-wrap">
                                                         {r.scopes.length === 0 ? (
-                                                            <Typography variant="caption" color="secondary">no scopes</Typography>
+                                                            <Typography variant="caption" color="secondary">{t("studio_users_no_scopes")}</Typography>
                                                         ) : r.scopes.map((s) => (
                                                             <Chip key={s} size="small" colorScheme="grayLight">{s}</Chip>
                                                         ))}
@@ -487,12 +487,12 @@ export function UsersAndRolesView() {
                                                 </TableCell>
                                                 <TableCell className="text-right whitespace-nowrap">
                                                     {r.source !== "built-in" && (
-                                                        <IconButton size="small" aria-label={`Edit role ${r.name}`} onClick={() => openEditRole(r)}>
+                                                        <IconButton size="small" aria-label={t("studio_users_edit_role_aria", { name: r.name })} onClick={() => openEditRole(r)}>
                                                             <PencilIcon size={iconSize.small} />
                                                         </IconButton>
                                                     )}
                                                     {r.source === "database" && r.name !== "admin" && (
-                                                        <IconButton size="small" aria-label={`Delete role ${r.name}`} onClick={() => void handleDeleteRole(r.name)}>
+                                                        <IconButton size="small" aria-label={t("studio_users_delete_role_aria", { name: r.name })} onClick={() => void handleDeleteRole(r.name)}>
                                                             <Trash2Icon size={iconSize.small} className={"text-red-500"} />
                                                         </IconButton>
                                                     )}
@@ -509,17 +509,17 @@ export function UsersAndRolesView() {
 
             {/* User Dialog */}
             <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen} maxWidth="md" fullWidth>
-                <DialogTitle>{editingUser ? `Edit User (${editingUser.email})` : "Create User"}</DialogTitle>
+                <DialogTitle>{editingUser ? t("studio_users_edit_user_title", { email: editingUser.email }) : t("create_user")}</DialogTitle>
                 <DialogContent className="flex flex-col gap-3">
                     <TextField
-                        label="Email"
+                        label={t("email")}
                         value={userEmail}
                         disabled={Boolean(editingUser)}
                         onChange={(e) => setUserEmail(e.target.value)}
                         placeholder="user@example.com"
                     />
                     <TextField
-                        label={editingUser ? "New Password (leave blank to keep current)" : t("auth_password")}
+                        label={editingUser ? t("studio_users_new_password_label") : t("auth_password")}
                         type="password"
                         value={userPassword}
                         onChange={(e) => setUserPassword(e.target.value)}
@@ -530,34 +530,34 @@ export function UsersAndRolesView() {
                         onChange={(e) => setUserDisplayName(e.target.value)}
                     />
                     <TextField
-                        label="Roles (comma-separated)"
+                        label={t("studio_roles_comma_separated")}
                         value={userRolesInput}
                         onChange={(e) => setUserRolesInput(e.target.value)}
                         placeholder="admin, support"
                     />
                     {editingUser && (
                         <BooleanSwitchWithLabel
-                            label="Disable account"
+                            label={t("studio_users_disable_account")}
                             value={userDisabled}
                             onValueChange={setUserDisabled}
                         />
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="text" onClick={() => setUserDialogOpen(false)}>Cancel</Button>
+                    <Button variant="text" onClick={() => setUserDialogOpen(false)}>{t("cancel")}</Button>
                     <Button
                         variant="filled"
                         disabled={savingUser || (!editingUser && (!userEmail.trim() || !userPassword))}
                         onClick={() => void handleSaveUser()}
                     >
-                        {savingUser ? t("saving") : (editingUser ? "Save Changes" : "Create User")}
+                        {savingUser ? t("saving") : (editingUser ? t("studio_save_changes") : t("create_user"))}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             {/* Role Dialog */}
             <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen} maxWidth="lg" fullWidth>
-                <DialogTitle>{editingRoleName ? `Edit Role "${editingRoleName}"` : "New Role"}</DialogTitle>
+                <DialogTitle>{editingRoleName ? t("studio_users_edit_role_title", { name: editingRoleName }) : t("studio_users_new_role")}</DialogTitle>
                 <DialogContent className="flex flex-col gap-4">
                     <TextField
                         label={t("role_name")}
@@ -570,10 +570,10 @@ export function UsersAndRolesView() {
                         label={t("description")}
                         value={roleDescription}
                         onChange={(e) => setRoleDescription(e.target.value)}
-                        placeholder="Support operators who can manage accounts and inspect logs"
+                        placeholder={t("studio_users_role_description_placeholder")}
                     />
                     <div className="flex flex-col gap-2">
-                        <Typography variant="subtitle2">Built-in Scopes</Typography>
+                        <Typography variant="subtitle2">{t("studio_users_builtin_scopes")}</Typography>
                         <div className="flex flex-wrap gap-1.5">
                             {BUILT_IN_SCOPES.map((scope) => {
                                 const selected = roleScopes.includes(scope);
@@ -593,13 +593,13 @@ export function UsersAndRolesView() {
                     <div className="flex items-end gap-2">
                         <div className="flex-1">
                             <TextField
-                                label="Add custom scope (resource:action)"
+                                label={t("studio_users_custom_scope_label")}
                                 value={customScopeInput}
                                 onChange={(e) => setCustomScopeInput(e.target.value)}
                                 placeholder="billing:refund"
                             />
                         </div>
-                        <Button variant="outlined" onClick={addCustomScope}>Add</Button>
+                        <Button variant="outlined" onClick={addCustomScope}>{t("add")}</Button>
                     </div>
                     {roleScopes.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
@@ -611,24 +611,24 @@ export function UsersAndRolesView() {
                         </div>
                     )}
                     <BooleanSwitchWithLabel
-                        label="Default role for new sign-ups"
+                        label={t("studio_users_default_role_label")}
                         value={roleIsDefault}
                         onValueChange={setRoleIsDefault}
                     />
                     <BooleanSwitchWithLabel
-                        label="Assignable to users"
+                        label={t("studio_users_assignable_label")}
                         value={roleAssignable}
                         onValueChange={setRoleAssignable}
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="text" onClick={() => setRoleDialogOpen(false)}>Cancel</Button>
+                    <Button variant="text" onClick={() => setRoleDialogOpen(false)}>{t("cancel")}</Button>
                     <Button
                         variant="filled"
                         disabled={savingRole || !(editingRoleName ?? roleName).trim()}
                         onClick={() => void handleSaveRole()}
                     >
-                        {savingRole ? t("saving") : "Save Role"}
+                        {savingRole ? t("saving") : t("studio_users_save_role")}
                     </Button>
                 </DialogActions>
             </Dialog>

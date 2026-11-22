@@ -111,11 +111,11 @@ export function WebhooksView() {
             const arr = isRecord(raw) && Array.isArray(raw.webhooks) ? raw.webhooks : [];
             setWebhooks(arr.map(parseWebhook).filter((w): w is WebhookRow => w !== null));
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Failed to load webhooks.");
+            setError(err instanceof Error ? err.message : t("studio_webhooks_load_failed"));
         } finally {
             setLoading(false);
         }
-    }, [requestJson]);
+    }, [requestJson, t]);
 
     useEffect(() => {
         void loadWebhooks();
@@ -155,12 +155,12 @@ export function WebhooksView() {
             try {
                 const json: unknown = JSON.parse(headersText);
                 if (!isRecord(json)) {
-                    snackbar.open({ type: "error", message: "Custom headers must be a JSON object." });
+                    snackbar.open({ type: "error", message: t("studio_webhooks_headers_not_object") });
                     return;
                 }
                 parsedHeaders = parseHeaders(json);
             } catch {
-                snackbar.open({ type: "error", message: "Custom headers must be valid JSON." });
+                snackbar.open({ type: "error", message: t("studio_webhooks_headers_invalid_json") });
                 return;
             }
         }
@@ -183,18 +183,18 @@ export function WebhooksView() {
                     method: "PATCH",
                     body: payload
                 });
-                snackbar.open({ type: "success", message: `Webhook "${name.trim()}" updated.` });
+                snackbar.open({ type: "success", message: t("studio_webhooks_updated", { name: name.trim() }) });
             } else {
                 await requestJson("/admin/webhooks", {
                     method: "POST",
                     body: payload
                 });
-                snackbar.open({ type: "success", message: `Webhook "${name.trim()}" created.` });
+                snackbar.open({ type: "success", message: t("studio_webhooks_created", { name: name.trim() }) });
             }
             setDialogOpen(false);
             await loadWebhooks();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to save webhook." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_webhooks_save_failed") });
         } finally {
             setSaving(false);
         }
@@ -208,7 +208,7 @@ export function WebhooksView() {
             });
             await loadWebhooks();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to toggle webhook." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_webhooks_toggle_failed") });
         }
     };
 
@@ -223,11 +223,11 @@ export function WebhooksView() {
             snackbar.open({
                 type: ok ? "success" : "error",
                 message: ok
-                    ? `Test delivery succeeded (HTTP ${status}).`
-                    : `Test delivery failed (${status ? `HTTP ${status}` : (errText || "network error")}).`
+                    ? t("studio_webhooks_test_succeeded", { status })
+                    : t("studio_webhooks_test_failed_detail", { detail: status ? `HTTP ${status}` : (errText || t("studio_webhooks_network_error")) })
             });
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Test delivery failed." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_webhooks_test_failed") });
         } finally {
             setTestingId(null);
         }
@@ -236,10 +236,10 @@ export function WebhooksView() {
     const handleDelete = async (w: WebhookRow) => {
         try {
             await requestJson(`/admin/webhooks/${encodeURIComponent(w.id)}`, { method: "DELETE" });
-            snackbar.open({ type: "success", message: `Webhook "${w.name}" deleted.` });
+            snackbar.open({ type: "success", message: t("studio_webhooks_deleted", { name: w.name }) });
             await loadWebhooks();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to delete webhook." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_webhooks_delete_failed") });
         }
     };
 
@@ -249,21 +249,21 @@ export function WebhooksView() {
                 <div className="flex items-center gap-2.5">
                     <SendIcon size={iconSize.medium} className={"text-text-secondary"} />
                     <div>
-                        <Typography variant="h6">Database Webhooks</Typography>
+                        <Typography variant="h6">{t("studio_webhooks_title")}</Typography>
                         <Typography variant="caption" color="secondary">
-                            Trigger signed HTTP callbacks automatically on row inserts, updates, and deletes
+                            {t("studio_webhooks_subtitle")}
                         </Typography>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Tooltip title="Refresh">
-                        <IconButton size="small" aria-label="Refresh webhooks" onClick={() => void loadWebhooks()}>
+                    <Tooltip title={t("refresh")}>
+                        <IconButton size="small" aria-label={t("studio_webhooks_refresh_aria")} onClick={() => void loadWebhooks()}>
                             <RefreshCwIcon size={iconSize.small} />
                         </IconButton>
                     </Tooltip>
                     <Button size="small" variant="filled" onClick={openCreate}>
                         <PlusIcon size={iconSize.small} />
-                        New Webhook
+                        {t("studio_webhooks_new")}
                     </Button>
                 </div>
             </div>
@@ -277,23 +277,23 @@ export function WebhooksView() {
                     <Card className="p-8 text-center flex flex-col items-center gap-3">
                         <SendIcon className="w-8 h-8 text-text-disabled" />
                         <Typography variant="body2" color="secondary">
-                            No webhooks configured yet. Create a webhook to send real-time HTTP events whenever rows change.
+                            {t("studio_webhooks_empty")}
                         </Typography>
                         <Button size="small" variant="filled" onClick={openCreate}>
                             <PlusIcon size={iconSize.small} />
-                            Create Webhook
+                            {t("studio_webhooks_create")}
                         </Button>
                     </Card>
                 ) : (
                     <div className={cls("overflow-x-auto rounded-lg border", defaultBorderMixin)}>
                         <Table className="w-full">
                             <TableHeader>
-                                    <TableCell header>Name</TableCell>
-                                    <TableCell header>Endpoint URL</TableCell>
-                                    <TableCell header>Tables</TableCell>
-                                    <TableCell header>Events</TableCell>
-                                    <TableCell header>Enabled</TableCell>
-                                    <TableCell header className="text-right">Actions</TableCell>
+                                    <TableCell header>{t("name")}</TableCell>
+                                    <TableCell header>{t("studio_webhooks_endpoint_url")}</TableCell>
+                                    <TableCell header>{t("studio_tool_tables")}</TableCell>
+                                    <TableCell header>{t("studio_events")}</TableCell>
+                                    <TableCell header>{t("studio_enabled")}</TableCell>
+                                    <TableCell header className="text-right">{t("actions")}</TableCell>
                                 </TableHeader>
                             <TableBody>
                                 {webhooks.map((w) => (
@@ -303,7 +303,7 @@ export function WebhooksView() {
                                         <TableCell>
                                             <div className="flex items-center gap-1 flex-wrap">
                                                 {w.table === "*" ? (
-                                                    <Chip size="small" colorScheme="grayLight">All tables (*)</Chip>
+                                                    <Chip size="small" colorScheme="grayLight">{t("studio_webhooks_all_tables")}</Chip>
                                                 ) : (
                                                     <Chip size="small" colorScheme="blueLight">{w.table}</Chip>
                                                 )}
@@ -324,20 +324,20 @@ export function WebhooksView() {
                                             />
                                         </TableCell>
                                         <TableCell className="text-right whitespace-nowrap">
-                                            <Tooltip title="Send test event">
+                                            <Tooltip title={t("studio_webhooks_send_test")}>
                                                 <IconButton
                                                     size="small"
-                                                    aria-label={`Test webhook ${w.name}`}
+                                                    aria-label={t("studio_webhooks_test_aria", { name: w.name })}
                                                     disabled={testingId === w.id}
                                                     onClick={() => void handleTest(w)}
                                                 >
                                                     <PlayIcon size={iconSize.small} />
                                                 </IconButton>
                                             </Tooltip>
-                                            <IconButton size="small" aria-label={`Edit webhook ${w.name}`} onClick={() => openEdit(w)}>
+                                            <IconButton size="small" aria-label={t("studio_webhooks_edit_aria", { name: w.name })} onClick={() => openEdit(w)}>
                                                 <PencilIcon size={iconSize.small} />
                                             </IconButton>
-                                            <IconButton size="small" aria-label={`Delete webhook ${w.name}`} onClick={() => void handleDelete(w)}>
+                                            <IconButton size="small" aria-label={t("studio_webhooks_delete_aria", { name: w.name })} onClick={() => void handleDelete(w)}>
                                                 <Trash2Icon size={iconSize.small} className={"text-red-500"} />
                                             </IconButton>
                                         </TableCell>
@@ -350,22 +350,22 @@ export function WebhooksView() {
             </div>
 
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen} maxWidth="lg" fullWidth>
-                <DialogTitle>{editing ? `Edit Webhook "${editing.name}"` : "New Database Webhook"}</DialogTitle>
+                <DialogTitle>{editing ? t("studio_webhooks_edit_title", { name: editing.name }) : t("studio_webhooks_new_title")}</DialogTitle>
                 <DialogContent className="flex flex-col gap-4">
                     <TextField
-                        label="Name"
+                        label={t("name")}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Notify Slack on new orders"
+                        placeholder={t("studio_webhooks_name_placeholder")}
                     />
                     <TextField
-                        label="Destination URL"
+                        label={t("studio_webhooks_destination_url")}
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         placeholder="https://example.com/webhooks/rebase"
                     />
                     <div className="flex flex-col gap-1.5">
-                        <Typography variant="subtitle2">Events</Typography>
+                        <Typography variant="subtitle2">{t("studio_events")}</Typography>
                         <div className="flex items-center gap-2">
                             {WEBHOOK_EVENTS.map((ev) => (
                                 <Chip
@@ -380,14 +380,14 @@ export function WebhooksView() {
                         </div>
                     </div>
                     <div className="flex flex-col gap-1.5">
-                        <Typography variant="subtitle2">Target Table</Typography>
+                        <Typography variant="subtitle2">{t("studio_webhooks_target_table")}</Typography>
                         <div className="flex items-center gap-1.5 flex-wrap">
                             <Chip
                                 size="small"
                                 colorScheme={selectedTable === "*" ? "blueLight" : "grayLight"}
                                 onClick={() => setSelectedTable("*")}
                             >
-                                All tables (*)
+                                {t("studio_webhooks_all_tables")}
                             </Chip>
                             {descriptors.map((d) => (
                                 <Chip
@@ -402,32 +402,32 @@ export function WebhooksView() {
                         </div>
                     </div>
                     <TextField
-                        label={editing?.hasSecret ? "HMAC Signing Secret (leave blank to keep existing)" : "HMAC Signing Secret (optional)"}
+                        label={editing?.hasSecret ? t("studio_webhooks_secret_keep") : t("studio_webhooks_secret_optional")}
                         value={secret}
                         onChange={(e) => setSecret(e.target.value)}
                         placeholder="whsec_..."
                     />
                     <TextField
-                        label="Custom Headers (JSON)"
+                        label={t("studio_webhooks_headers_label")}
                         value={headersText}
                         onChange={(e) => setHeadersText(e.target.value)}
                         multiline
                         minRows={3}
                     />
                     <BooleanSwitchWithLabel
-                        label="Enabled"
+                        label={t("studio_enabled")}
                         value={enabled}
                         onValueChange={setEnabled}
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="text" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                    <Button variant="text" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>
                     <Button
                         variant="filled"
                         disabled={saving || !name.trim() || !url.trim() || events.length === 0}
                         onClick={() => void handleSave()}
                     >
-                        {saving ? t("saving") : (editing ? "Save Changes" : "Create Webhook")}
+                        {saving ? t("saving") : (editing ? t("studio_save_changes") : t("studio_webhooks_create"))}
                     </Button>
                 </DialogActions>
             </Dialog>

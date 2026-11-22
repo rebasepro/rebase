@@ -141,10 +141,10 @@ const SQL_TYPES = [
 ] as const;
 
 const RLS_PRESETS = [
-    { value: "authenticated", label: "Authenticated users (full CRUD)" },
-    { value: "public-read", label: "Public read, authenticated write" },
-    { value: "owner", label: "Owner only (matches user_id = rebase.uid())" },
-    { value: "admin-only", label: "Admin only (RLS enabled, no public policy)" }
+    { value: "authenticated", labelKey: "studio_tables_preset_authenticated" },
+    { value: "public-read", labelKey: "studio_tables_preset_public_read" },
+    { value: "owner", labelKey: "studio_tables_preset_owner" },
+    { value: "admin-only", labelKey: "studio_tables_preset_admin_only" }
 ] as const;
 
 function parseColumn(raw: unknown): DbColumnInfo | null {
@@ -244,12 +244,13 @@ function rowColumnWidth(col: DbColumnInfo): number {
 
 /**
  * Why a table is not on `/api/data`, from what the server reported about it —
- * the one reason that holds, not a list of possible ones.
+ * the one reason that holds, not a list of possible ones. The translation key
+ * of the sentence, for the caller to hand to `t()`.
  */
-function notServedReason(table: DbTableInfo): string {
-    if (!table.rlsEnabled) return "Row Level Security is off, and a table without it is never served.";
-    if (!(table.meta?.exposed ?? table.exposed)) return "exposure is turned off in its settings.";
-    return "the running server did not pick it up when it reloaded its schema. An app that declares its tables in code (backend/schema) serves only those tables.";
+function notServedReasonKey(table: DbTableInfo): string {
+    if (!table.rlsEnabled) return "studio_tables_not_served_rls_off";
+    if (!(table.meta?.exposed ?? table.exposed)) return "studio_tables_not_served_not_exposed";
+    return "studio_tables_not_served_not_picked_up";
 }
 
 /** The text a cell's edit box opens with: empty for NULL, JSON for an object or array. */
@@ -372,12 +373,12 @@ export function TableEditorView() {
             });
             return list;
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Failed to load database tables.");
+            setError(err instanceof Error ? err.message : t("studio_tables_load_failed"));
             return null;
         } finally {
             setLoading(false);
         }
-    }, [requestJson]);
+    }, [requestJson, t]);
 
     /**
      * What a change that should leave `name` served actually left: served, or
@@ -385,15 +386,15 @@ export function TableEditorView() {
      * succeeded.
      */
     const reportServed = useCallback((list: DbTableInfo[] | null, name: string, done: string) => {
-        const table = list?.find((t) => t.name === name);
+        const table = list?.find((candidate) => candidate.name === name);
         if (!table) {
             snackbar.open({ type: "success", message: `${done}.` });
         } else if (table.served) {
-            snackbar.open({ type: "success", message: `${done}, served on /api/data/${table.slug}.` });
+            snackbar.open({ type: "success", message: t("studio_tables_done_served", { done, path: `/api/data/${table.slug}` }) });
         } else {
-            snackbar.open({ type: "warning", message: `${done}, but it is not served on /api/data: ${notServedReason(table)}` });
+            snackbar.open({ type: "warning", message: t("studio_tables_done_not_served", { done, reason: t(notServedReasonKey(table)) }) });
         }
-    }, [snackbar]);
+    }, [snackbar, t]);
 
     useEffect(() => {
         void loadTables();
@@ -437,11 +438,11 @@ export function TableEditorView() {
             });
         } catch (err: unknown) {
             setLoadedRows({ table: table.name, rows: [] });
-            setRowsError(err instanceof Error ? err : new Error("Failed to load rows."));
+            setRowsError(err instanceof Error ? err : new Error(t("studio_tables_rows_load_failed")));
         } finally {
             setRowsLoading(false);
         }
-    }, [requestJson]);
+    }, [requestJson, t]);
 
     const rows = loadedRows !== null && loadedRows.table === selectedName ? loadedRows.rows : NO_ROWS;
 
@@ -460,10 +461,10 @@ export function TableEditorView() {
         try {
             const res = await requestJson("/admin/schema/reload", { method: "POST" });
             const count = isRecord(res) ? asNumber(res.tables, 0) : 0;
-            snackbar.open({ type: "success", message: `Schema reloaded (${count} table${count === 1 ? "" : "s"} active)` });
+            snackbar.open({ type: "success", message: t("studio_tables_schema_reloaded", { count }) });
             await loadTables();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Schema reload failed" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_schema_reload_failed") });
         }
     };
 
@@ -505,7 +506,7 @@ export function TableEditorView() {
             const sql = isRecord(raw) ? asStringArray(raw.statements ?? raw.sql) : [];
             setPreviewSql(sql);
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "SQL preview failed" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_sql_preview_failed") });
         }
     };
 
@@ -520,10 +521,10 @@ export function TableEditorView() {
             setCreateOpen(false);
             setNewTableName("");
             setPreviewSql(null);
-            reportServed(await loadTables(), createdName, `Table "${createdName}" created`);
+            reportServed(await loadTables(), createdName, t("studio_tables_table_created", { name: createdName }));
             setSelectedName(createdName);
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to create table" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_create_failed") });
         } finally {
             setCreating(false);
         }
@@ -543,12 +544,12 @@ export function TableEditorView() {
                     ...(newCol.defaultExpr.trim() ? { default: newCol.defaultExpr.trim() } : {})
                 }
             });
-            snackbar.open({ type: "success", message: `Column "${newCol.name.trim()}" added.` });
+            snackbar.open({ type: "success", message: t("studio_tables_column_added", { name: newCol.name.trim() }) });
             setAddColOpen(false);
             setNewCol({ name: "", type: "text", primaryKey: false, nullable: true, unique: false, defaultExpr: "" });
             await loadTables();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to add column" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_column_add_failed") });
         } finally {
             setAddingCol(false);
         }
@@ -561,10 +562,10 @@ export function TableEditorView() {
                 method: "DELETE",
                 body: { confirm: colName }
             });
-            snackbar.open({ type: "success", message: `Column "${colName}" dropped.` });
+            snackbar.open({ type: "success", message: t("studio_tables_column_dropped", { name: colName }) });
             await loadTables();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to drop column" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_column_drop_failed") });
         }
     };
 
@@ -578,13 +579,13 @@ export function TableEditorView() {
                 method: "POST",
                 body: { columns: cols, unique: newIdxUnique }
             });
-            snackbar.open({ type: "success", message: "Index created." });
+            snackbar.open({ type: "success", message: t("studio_tables_index_created") });
             setAddIdxOpen(false);
             setNewIdxColumns("");
             setNewIdxUnique(false);
             await loadTables();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to create index" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_index_create_failed") });
         } finally {
             setAddingIdx(false);
         }
@@ -596,10 +597,10 @@ export function TableEditorView() {
             await requestJson(`/admin/db/tables/${encodeURIComponent(selectedTable.name)}/indexes/${encodeURIComponent(indexName)}`, {
                 method: "DELETE"
             });
-            snackbar.open({ type: "success", message: `Index "${indexName}" dropped.` });
+            snackbar.open({ type: "success", message: t("studio_tables_index_dropped", { name: indexName }) });
             await loadTables();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to drop index" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_index_drop_failed") });
         }
     };
 
@@ -610,10 +611,10 @@ export function TableEditorView() {
                 method: "PATCH",
                 body: { rlsEnabled: enabled }
             });
-            snackbar.open({ type: "success", message: `RLS ${enabled ? "enabled" : "disabled"} on "${selectedTable.name}".` });
+            snackbar.open({ type: "success", message: t(enabled ? "studio_tables_rls_enabled_on" : "studio_tables_rls_disabled_on", { name: selectedTable.name }) });
             await loadTables();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to update RLS" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_rls_update_failed") });
         }
     };
 
@@ -635,9 +636,9 @@ export function TableEditorView() {
                     }
                 });
             }
-            reportServed(await loadTables(), selectedTable.name, `"${selectedTable.name}" is RLS-protected and exposed`);
+            reportServed(await loadTables(), selectedTable.name, t("studio_tables_protected_and_exposed", { name: selectedTable.name }));
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to expose table" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_expose_failed") });
         }
     };
 
@@ -659,10 +660,10 @@ export function TableEditorView() {
                     }
                 }
             });
-            snackbar.open({ type: "success", message: "Table metadata saved and reloaded." });
+            snackbar.open({ type: "success", message: t("studio_tables_meta_saved") });
             await loadTables();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to save table metadata" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_meta_save_failed") });
         } finally {
             setSavingMeta(false);
         }
@@ -676,12 +677,12 @@ export function TableEditorView() {
                 method: "DELETE",
                 body: { confirm: dropConfirm }
             });
-            snackbar.open({ type: "success", message: `Table "${selectedTable.name}" dropped.` });
+            snackbar.open({ type: "success", message: t("studio_tables_table_dropped", { name: selectedTable.name }) });
             setDropOpen(false);
             setDropConfirm("");
             await loadTables();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to drop table" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_drop_failed") });
         } finally {
             setDropping(false);
         }
@@ -730,18 +731,18 @@ export function TableEditorView() {
                     method: "PATCH",
                     body: payload
                 });
-                snackbar.open({ type: "success", message: "Row updated." });
+                snackbar.open({ type: "success", message: t("studio_tables_row_updated") });
             } else {
                 await requestJson(`/data/${encodeURIComponent(selectedTable.slug)}`, {
                     method: "POST",
                     body: payload
                 });
-                snackbar.open({ type: "success", message: "Row inserted." });
+                snackbar.open({ type: "success", message: t("studio_tables_row_inserted") });
             }
             setRowDialogOpen(false);
             await loadRows(selectedTable);
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to save row" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_row_save_failed") });
         } finally {
             setRowSaving(false);
         }
@@ -755,12 +756,12 @@ export function TableEditorView() {
             await requestJson(`/data/${encodeURIComponent(selectedTable.slug)}/${encodeURIComponent(String(idVal))}`, {
                 method: "DELETE"
             });
-            snackbar.open({ type: "success", message: "Row deleted." });
+            snackbar.open({ type: "success", message: t("studio_tables_row_deleted") });
             await loadRows(selectedTable);
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to delete row" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_row_delete_failed") });
         }
-    }, [selectedTable, pkColumn, requestJson, snackbar, loadRows]);
+    }, [selectedTable, pkColumn, requestJson, snackbar, loadRows, t]);
 
     /**
      * The cell being edited in place, as in the SQL editor's result grid: the
@@ -774,16 +775,16 @@ export function TableEditorView() {
         const col = selectedTable.columns.find((c) => c.key === columnKey);
         if (!col) return;
         if (col.primaryKey) {
-            snackbar.open({ type: "error", message: `"${col.name}" is the primary key, which is not edited in place.` });
+            snackbar.open({ type: "error", message: t("studio_tables_pk_not_editable", { name: col.name }) });
             return;
         }
         const idVal = rowData[pkColumn];
         if (idVal === undefined || idVal === null) {
-            snackbar.open({ type: "error", message: `This row has no "${pkColumn}" to save it by.` });
+            snackbar.open({ type: "error", message: t("studio_tables_row_no_pk", { name: pkColumn }) });
             return;
         }
         setEditingCell({ table: selectedTable.name, rowIndex, columnKey, initialValue: cellEditText(rowData[columnKey]) });
-    }, [selectedTable, pkColumn, snackbar]);
+    }, [selectedTable, pkColumn, snackbar, t]);
 
     const handleCellSave = useCallback(async (text: string, rowData: Record<string, unknown>, columnKey: string, rowIndex: number) => {
         const editing = editingCell;
@@ -814,11 +815,11 @@ export function TableEditorView() {
                 next[rowIndex] = row;
                 return { ...prev, rows: next };
             });
-            snackbar.open({ type: "success", message: "Row updated." });
+            snackbar.open({ type: "success", message: t("studio_tables_row_updated") });
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to save row" });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_tables_row_save_failed") });
         }
-    }, [editingCell, selectedTable, pkColumn, requestJson, snackbar]);
+    }, [editingCell, selectedTable, pkColumn, requestJson, snackbar, t]);
 
     // What the rows grid is handed. `VirtualTable` holds its columns by value,
     // so a width the user dragged survives a reload of the same table.
@@ -867,9 +868,9 @@ export function TableEditorView() {
         if (column.key === ROW_ACTIONS_COLUMN) {
             return (
                 <div className="h-full flex items-center justify-center gap-0.5">
-                    <Tooltip title="Edit row">
+                    <Tooltip title={t("studio_tables_edit_row")}>
                         <IconButton size="small"
-                            aria-label="Edit row"
+                            aria-label={t("studio_tables_edit_row")}
                             className={ROW_ACTION_ICON}
                             onClick={() => openEditRow(rowData)}>
                             <PencilIcon size={iconSize.smallest}/>
@@ -919,18 +920,18 @@ export function TableEditorView() {
                     <div className="flex items-center gap-2 min-w-0">
                         <DatabaseIcon size={iconSize.smallest} className={"text-text-secondary dark:text-text-secondary-dark shrink-0"} />
                         <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark truncate">
-                            Tables
+                            {t("studio_tool_tables")}
                         </Typography>
                     </div>
                     <div className="flex items-center gap-1">
-                        <Tooltip title="Reload live schema">
-                            <IconButton size="small" aria-label="Reload live schema" onClick={handleReloadSchema}>
+                        <Tooltip title={t("studio_tables_reload_schema")}>
+                            <IconButton size="small" aria-label={t("studio_tables_reload_schema")} onClick={handleReloadSchema}>
                                 <RefreshCwIcon size={iconSize.smallest} />
                             </IconButton>
                         </Tooltip>
                         <Button size="small" color="primary" variant="filled" onClick={() => setCreateOpen(true)}>
                             <PlusIcon size={iconSize.smallest} />
-                            New
+                            {t("studio_api_keys_new")}
                         </Button>
                     </div>
                 </div>
@@ -939,7 +940,7 @@ export function TableEditorView() {
                     <SearchBar
                         size="small"
                         onTextSearch={(v) => setSearch(v ?? "")}
-                        placeholder="Filter tables..."
+                        placeholder={t("studio_tables_filter_placeholder")}
                         innerClassName="w-full"
                     />
                 </div>
@@ -952,23 +953,23 @@ export function TableEditorView() {
                     ) : filteredTables.length === 0 ? (
                         <div className="px-3 py-6 text-center flex flex-col items-center gap-2">
                             <Typography variant="body2" color="secondary">
-                                {tables.length === 0 ? "No user tables yet." : "No matching tables."}
+                                {tables.length === 0 ? t("studio_tables_empty") : t("studio_tables_no_match")}
                             </Typography>
                             {tables.length === 0 && (
                                 <Button size="small" variant="outlined" onClick={() => setCreateOpen(true)}>
                                     <PlusIcon size={iconSize.small} />
-                                    Create your first table
+                                    {t("studio_tables_create_first")}
                                 </Button>
                             )}
                         </div>
                     ) : (
-                        filteredTables.map((t) => {
-                            const active = t.name === selectedName;
+                        filteredTables.map((table) => {
+                            const active = table.name === selectedName;
                             return (
                                 <button
-                                    key={`${t.schema}.${t.name}`}
+                                    key={`${table.schema}.${table.name}`}
                                     type="button"
-                                    onClick={() => setSelectedName(t.name)}
+                                    onClick={() => setSelectedName(table.name)}
                                     className={cls(
                                         "w-full text-left px-2.5 h-8 rounded-lg flex items-center justify-between gap-2 transition-colors cursor-pointer",
                                         active
@@ -976,14 +977,14 @@ export function TableEditorView() {
                                             : "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-hover hover:text-text-primary dark:hover:text-text-primary-dark"
                                     )}
                                 >
-                                    <span className="truncate text-[13px]">{t.name}</span>
+                                    <span className="truncate text-[13px]">{table.name}</span>
                                     <div className="flex items-center gap-1 shrink-0">
-                                        {t.served ? (
-                                            <Tooltip title="Served on /api/data">
+                                        {table.served ? (
+                                            <Tooltip title={t("studio_tables_served_tooltip")}>
                                                 <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500/80" />
                                             </Tooltip>
                                         ) : (
-                                            <Tooltip title="Not exposed (RLS required)">
+                                            <Tooltip title={t("studio_tables_not_exposed_tooltip")}>
                                                 <AlertCircleIcon className="w-3.5 h-3.5 text-amber-500/80" />
                                             </Tooltip>
                                         )}
@@ -1007,14 +1008,14 @@ export function TableEditorView() {
                     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-4">
                         <DatabaseIcon className="w-10 h-10 text-text-disabled" />
                         <div className="max-w-md flex flex-col gap-1">
-                            <Typography variant="h6">Zero-Code Table Editor</Typography>
+                            <Typography variant="h6">{t("studio_tables_intro_title")}</Typography>
                             <Typography variant="body2" color="secondary">
-                                Create PostgreSQL tables, manage columns and indexes, edit rows, and expose REST, Realtime, OpenAPI, and MCP endpoints automatically without writing backend code.
+                                {t("studio_tables_intro_body")}
                             </Typography>
                         </div>
                         <Button variant="filled" onClick={() => setCreateOpen(true)}>
                             <PlusIcon size={iconSize.small} />
-                            New Table
+                            {t("studio_tables_new_table")}
                         </Button>
                     </div>
                 ) : (
@@ -1026,27 +1027,27 @@ export function TableEditorView() {
                                     {selectedTable.schema}.{selectedTable.name}
                                 </Typography>
                                 <Chip size="smallest" colorScheme={selectedTable.served ? "greenLight" : "orangeLight"}>
-                                    {selectedTable.served ? `/api/data/${selectedTable.slug}` : "Not exposed"}
+                                    {selectedTable.served ? `/api/data/${selectedTable.slug}` : t("studio_tables_not_exposed")}
                                 </Chip>
                                 <Chip size="smallest" colorScheme={selectedTable.rlsEnabled ? "blueLight" : "grayLight"}>
-                                    {selectedTable.rlsEnabled ? `RLS (${selectedTable.policies.length})` : "RLS Off"}
+                                    {selectedTable.rlsEnabled ? `RLS (${selectedTable.policies.length})` : t("studio_tables_rls_off")}
                                 </Chip>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                                 {!selectedTable.served && (
                                     <Button size="small" color="primary" variant="filled" onClick={handleEnableAndExpose}>
                                         <ShieldIcon size={iconSize.smallest} />
-                                        Enable RLS &amp; Expose
+                                        {t("studio_tables_enable_and_expose")}
                                     </Button>
                                 )}
                                 {activeTab === "data" && selectedTable.served && (
                                     <>
-                                        <IconButton size="small" aria-label="Refresh rows" onClick={() => void loadRows(selectedTable)}>
+                                        <IconButton size="small" aria-label={t("studio_tables_refresh_rows")} onClick={() => void loadRows(selectedTable)}>
                                             <RefreshCwIcon size={iconSize.smallest} />
                                         </IconButton>
                                         <Button size="small" color="primary" variant="filled" onClick={openAddRow}>
                                             <PlusIcon size={iconSize.smallest} />
-                                            Add Row
+                                            {t("studio_tables_add_row")}
                                         </Button>
                                     </>
                                 )}
@@ -1054,11 +1055,11 @@ export function TableEditorView() {
                                     <>
                                         <Button size="small" variant="outlined" onClick={() => setAddIdxOpen(true)}>
                                             <PlusIcon size={iconSize.smallest} />
-                                            Add Index
+                                            {t("studio_tables_add_index")}
                                         </Button>
                                         <Button size="small" color="primary" variant="filled" onClick={() => setAddColOpen(true)}>
                                             <PlusIcon size={iconSize.smallest} />
-                                            Add Column
+                                            {t("studio_tables_add_column")}
                                         </Button>
                                     </>
                                 )}
@@ -1073,8 +1074,8 @@ export function TableEditorView() {
                             variant="boxy"
                             className="border-b border-hairline px-4 bg-surface-sheet shrink-0"
                         >
-                            <Tab value="data">Data ({rows.length})</Tab>
-                            <Tab value="columns">Columns &amp; Indexes ({selectedTable.columns.length})</Tab>
+                            <Tab value="data">{t("studio_tables_tab_data", { count: rows.length })}</Tab>
+                            <Tab value="columns">{t("studio_tables_tab_columns", { count: selectedTable.columns.length })}</Tab>
                             <Tab value="settings">{t("settings_heading")}</Tab>
                         </Tabs>
 
@@ -1092,11 +1093,11 @@ export function TableEditorView() {
                                     emptyComponent={
                                         <div className="flex flex-col items-center gap-3 text-center">
                                             <Typography variant="body2" color="secondary">
-                                                No rows in <span className="font-mono">{selectedTable.name}</span> yet.
+                                                {t("studio_tables_no_rows", { name: selectedTable.name })}
                                             </Typography>
                                             <Button size="small" variant="filled" onClick={openAddRow}>
                                                 <PlusIcon size={iconSize.small} />
-                                                Insert First Row
+                                                {t("studio_tables_insert_first_row")}
                                             </Button>
                                         </div>
                                     }
@@ -1107,10 +1108,10 @@ export function TableEditorView() {
                                 <Alert color="warning">
                                     <div className="flex items-center justify-between gap-4">
                                         <span>
-                                            This table is not served over <code className="font-mono">/api/data</code>: {notServedReason(selectedTable)}
+                                            {t("studio_tables_not_served", { reason: t(notServedReasonKey(selectedTable)) })}
                                         </span>
                                         <Button size="small" variant="filled" onClick={handleEnableAndExpose}>
-                                            Enable RLS &amp; Expose
+                                            {t("studio_tables_enable_and_expose")}
                                         </Button>
                                     </div>
                                 </Alert>
@@ -1122,15 +1123,15 @@ export function TableEditorView() {
                             {activeTab === "columns" && (
                                 <div className="flex flex-col gap-6">
                                     <div className="flex flex-col gap-2">
-                                        <Typography variant="subtitle2">Columns</Typography>
+                                        <Typography variant="subtitle2">{t("studio_columns")}</Typography>
                                         <div className={cls("overflow-x-auto rounded-lg border", defaultBorderMixin)}>
                                             <Table className="w-full">
                                                 <TableHeader>
-                                                        <TableCell header>Column</TableCell>
-                                                        <TableCell header>Type</TableCell>
-                                                        <TableCell header>Constraints</TableCell>
-                                                        <TableCell header>Default</TableCell>
-                                                        <TableCell header className="text-right">Actions</TableCell>
+                                                        <TableCell header>{t("studio_branch_diff_object_column")}</TableCell>
+                                                        <TableCell header>{t("type")}</TableCell>
+                                                        <TableCell header>{t("studio_tables_constraints")}</TableCell>
+                                                        <TableCell header>{t("studio_tables_default")}</TableCell>
+                                                        <TableCell header className="text-right">{t("actions")}</TableCell>
                                                     </TableHeader>
                                                 <TableBody>
                                                     {selectedTable.columns.map((col) => (
@@ -1149,10 +1150,10 @@ export function TableEditorView() {
                                                             </TableCell>
                                                             <TableCell className="text-right">
                                                                 {!col.primaryKey && (
-                                                                    <Tooltip title={`Drop column ${col.name}`}>
+                                                                    <Tooltip title={t("studio_tables_drop_column", { name: col.name })}>
                                                                         <IconButton
                                                                             size="small"
-                                                                            aria-label={`Drop column ${col.name}`}
+                                                                            aria-label={t("studio_tables_drop_column", { name: col.name })}
                                                                             onClick={() => void handleDropColumn(col.name)}
                                                                         >
                                                                             <Trash2Icon size={iconSize.small} className={"text-red-500"} />
@@ -1168,13 +1169,13 @@ export function TableEditorView() {
                                     </div>
 
                                     <div className="flex flex-col gap-2">
-                                        <Typography variant="subtitle2">Indexes ({selectedTable.indexes.length})</Typography>
+                                        <Typography variant="subtitle2">{t("studio_tables_indexes_heading", { count: selectedTable.indexes.length })}</Typography>
                                         <div className={cls("overflow-x-auto rounded-lg border", defaultBorderMixin)}>
                                             <Table className="w-full">
                                                 <TableHeader>
-                                                        <TableCell header>Name</TableCell>
-                                                        <TableCell header>Definition</TableCell>
-                                                        <TableCell header className="text-right">Actions</TableCell>
+                                                        <TableCell header>{t("name")}</TableCell>
+                                                        <TableCell header>{t("studio_tables_definition")}</TableCell>
+                                                        <TableCell header className="text-right">{t("actions")}</TableCell>
                                                     </TableHeader>
                                                 <TableBody>
                                                     {selectedTable.indexes.map((idx) => (
@@ -1193,7 +1194,7 @@ export function TableEditorView() {
                                                                 {!idx.primary && (
                                                                     <IconButton
                                                                         size="small"
-                                                                        aria-label={`Drop index ${idx.name}`}
+                                                                        aria-label={t("studio_tables_drop_index", { name: idx.name })}
                                                                         onClick={() => void handleDropIndex(idx.name)}
                                                                     >
                                                                         <Trash2Icon size={iconSize.small} className={"text-red-500"} />
@@ -1212,9 +1213,9 @@ export function TableEditorView() {
                             {activeTab === "settings" && (
                                 <div className="max-w-2xl flex flex-col gap-5">
                                     <Card className="p-4 flex flex-col gap-4">
-                                        <Typography variant="subtitle1">API &amp; Catalog Metadata</Typography>
+                                        <Typography variant="subtitle1">{t("studio_tables_meta_heading")}</Typography>
                                         <TextField
-                                            label="REST API Slug"
+                                            label={t("studio_tables_slug_label")}
                                             value={metaSlug}
                                             onChange={(e) => setMetaSlug(e.target.value)}
                                             placeholder={selectedTable.name}
@@ -1223,49 +1224,49 @@ export function TableEditorView() {
                                             label={t("description")}
                                             value={metaDescription}
                                             onChange={(e) => setMetaDescription(e.target.value)}
-                                            placeholder="Shown in OpenAPI docs and MCP tools"
+                                            placeholder={t("studio_tables_description_placeholder")}
                                         />
                                         <BooleanSwitchWithLabel
-                                            label="Expose on REST / Realtime / OpenAPI"
+                                            label={t("studio_tables_expose_label")}
                                             value={metaExposed}
                                             onValueChange={setMetaExposed}
                                         />
                                         <BooleanSwitchWithLabel
-                                            label="Enable Row Level Security (PostgreSQL RLS)"
+                                            label={t("studio_tables_enable_rls_label")}
                                             value={selectedTable.rlsEnabled}
                                             onValueChange={(v) => void handleToggleRls(v)}
                                         />
                                         <BooleanSwitchWithLabel
-                                            label="Read-only API"
+                                            label={t("studio_tables_read_only_label")}
                                             value={metaReadOnly}
                                             onValueChange={setMetaReadOnly}
                                         />
                                         <BooleanSwitchWithLabel
-                                            label="Soft delete (deleted_at)"
+                                            label={t("studio_tables_soft_delete_label")}
                                             value={metaSoftDelete}
                                             onValueChange={setMetaSoftDelete}
                                         />
                                         <BooleanSwitchWithLabel
-                                            label="Track row history"
+                                            label={t("studio_tables_history_label")}
                                             value={metaHistory}
                                             onValueChange={setMetaHistory}
                                         />
                                         <div className="flex justify-end">
                                             <Button variant="filled" disabled={savingMeta} onClick={() => void handleSaveMeta()}>
-                                                {savingMeta ? t("saving") : "Save Settings"}
+                                                {savingMeta ? t("saving") : t("studio_tables_save_settings")}
                                             </Button>
                                         </div>
                                     </Card>
 
                                     <Card className="p-4 border border-red-500/30 flex items-center justify-between gap-4">
                                         <div>
-                                            <Typography variant="subtitle2" className="text-red-500">Danger Zone</Typography>
+                                            <Typography variant="subtitle2" className="text-red-500">{t("studio_tables_danger_zone")}</Typography>
                                             <Typography variant="body2" color="secondary">
-                                                Permanently drop table <span className="font-mono">{selectedTable.name}</span> and all of its rows.
+                                                {t("studio_tables_drop_description", { name: selectedTable.name })}
                                             </Typography>
                                         </div>
                                         <Button variant="outlined" color="error" onClick={() => setDropOpen(true)}>
-                                            Drop Table
+                                            {t("studio_tables_drop_table")}
                                         </Button>
                                     </Card>
                                 </div>
@@ -1278,29 +1279,29 @@ export function TableEditorView() {
 
             {/* Create Table Dialog */}
             <Dialog open={createOpen} onOpenChange={setCreateOpen} maxWidth="2xl" fullWidth>
-                <DialogTitle>Create Table</DialogTitle>
+                <DialogTitle>{t("studio_tables_create_table")}</DialogTitle>
                 <DialogContent className="flex flex-col gap-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <TextField
-                            label="Table name (snake_case)"
+                            label={t("studio_tables_name_label")}
                             value={newTableName}
                             onChange={(e) => setNewTableName(e.target.value)}
                             placeholder="projects"
                         />
                         <Select
-                            label="Initial Row Level Security"
+                            label={t("studio_tables_initial_rls")}
                             value={newTableRls}
                             onValueChange={(v) => setNewTableRls(String(v))}
                         >
                             {RLS_PRESETS.map((p) => (
-                                <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                <SelectItem key={p.value} value={p.value}>{t(p.labelKey)}</SelectItem>
                             ))}
                         </Select>
                     </div>
 
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                            <Typography variant="subtitle2">Columns</Typography>
+                            <Typography variant="subtitle2">{t("studio_columns")}</Typography>
                             <Button
                                 size="small"
                                 variant="outlined"
@@ -1310,7 +1311,7 @@ export function TableEditorView() {
                                 ])}
                             >
                                 <PlusIcon size={iconSize.small} />
-                                Add Column
+                                {t("studio_tables_add_column")}
                             </Button>
                         </div>
 
@@ -1339,7 +1340,7 @@ export function TableEditorView() {
                                     <div className="col-span-3">
                                         <TextField
                                             size="small"
-                                            placeholder="default (optional)"
+                                            placeholder={t("studio_tables_default_optional_placeholder")}
                                             value={col.defaultExpr}
                                             onChange={(e) => setDraftColumns((prev) => prev.map((c, i) => i === idx ? { ...c, defaultExpr: e.target.value } : c))}
                                         />
@@ -1363,7 +1364,7 @@ export function TableEditorView() {
                                     <div className="col-span-1 flex justify-end">
                                         <IconButton
                                             size="small"
-                                            aria-label="Remove draft column"
+                                            aria-label={t("studio_tables_remove_draft_column")}
                                             onClick={() => setDraftColumns((prev) => prev.filter((_, i) => i !== idx))}
                                         >
                                             <Trash2Icon size={iconSize.small} />
@@ -1381,28 +1382,28 @@ export function TableEditorView() {
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="text" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                    <Button variant="text" onClick={() => setCreateOpen(false)}>{t("cancel")}</Button>
                     <Button variant="outlined" disabled={!newTableName.trim()} onClick={() => void handlePreviewCreate()}>
-                        Preview SQL
+                        {t("studio_tables_preview_sql")}
                     </Button>
                     <Button variant="filled" disabled={creating || !newTableName.trim()} onClick={() => void handleCreateTable()}>
-                        {creating ? "Creating..." : "Create Table"}
+                        {creating ? t("studio_tables_creating") : t("studio_tables_create_table")}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             {/* Add Column Dialog */}
             <Dialog open={addColOpen} onOpenChange={setAddColOpen} maxWidth="md" fullWidth>
-                <DialogTitle>Add Column to {selectedTable?.name}</DialogTitle>
+                <DialogTitle>{t("studio_tables_add_column_to", { name: selectedTable?.name ?? "" })}</DialogTitle>
                 <DialogContent className="flex flex-col gap-3">
                     <TextField
-                        label="Column name"
+                        label={t("studio_tables_column_name")}
                         value={newCol.name}
                         onChange={(e) => setNewCol((c) => ({ ...c, name: e.target.value }))}
                         placeholder="status"
                     />
                     <Select
-                        label="SQL Type"
+                        label={t("studio_tables_sql_type")}
                         value={newCol.type}
                         onValueChange={(v) => setNewCol((c) => ({ ...c, type: String(v) }))}
                     >
@@ -1411,99 +1412,99 @@ export function TableEditorView() {
                         ))}
                     </Select>
                     <TextField
-                        label="Default expression (optional)"
+                        label={t("studio_tables_default_expr")}
                         value={newCol.defaultExpr}
                         onChange={(e) => setNewCol((c) => ({ ...c, defaultExpr: e.target.value }))}
                         placeholder="'draft'"
                     />
                     <BooleanSwitchWithLabel
-                        label="Nullable"
+                        label={t("studio_tables_nullable")}
                         value={newCol.nullable}
                         onValueChange={(v) => setNewCol((c) => ({ ...c, nullable: v }))}
                     />
                     <BooleanSwitchWithLabel
-                        label="Unique"
+                        label={t("unique")}
                         value={newCol.unique}
                         onValueChange={(v) => setNewCol((c) => ({ ...c, unique: v }))}
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="text" onClick={() => setAddColOpen(false)}>Cancel</Button>
+                    <Button variant="text" onClick={() => setAddColOpen(false)}>{t("cancel")}</Button>
                     <Button variant="filled" disabled={addingCol || !newCol.name.trim()} onClick={() => void handleAddColumn()}>
-                        {addingCol ? "Adding..." : "Add Column"}
+                        {addingCol ? t("studio_tables_adding") : t("studio_tables_add_column")}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             {/* Add Index Dialog */}
             <Dialog open={addIdxOpen} onOpenChange={setAddIdxOpen} maxWidth="md" fullWidth>
-                <DialogTitle>Create Index on {selectedTable?.name}</DialogTitle>
+                <DialogTitle>{t("studio_tables_create_index_on", { name: selectedTable?.name ?? "" })}</DialogTitle>
                 <DialogContent className="flex flex-col gap-3">
                     <TextField
-                        label="Columns (comma-separated)"
+                        label={t("studio_tables_index_columns")}
                         value={newIdxColumns}
                         onChange={(e) => setNewIdxColumns(e.target.value)}
                         placeholder="user_id, created_at"
                     />
                     <BooleanSwitchWithLabel
-                        label="Unique index"
+                        label={t("studio_tables_unique_index")}
                         value={newIdxUnique}
                         onValueChange={setNewIdxUnique}
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="text" onClick={() => setAddIdxOpen(false)}>Cancel</Button>
+                    <Button variant="text" onClick={() => setAddIdxOpen(false)}>{t("cancel")}</Button>
                     <Button variant="filled" disabled={addingIdx || !newIdxColumns.trim()} onClick={() => void handleAddIndex()}>
-                        {addingIdx ? "Creating..." : t("create_index")}
+                        {addingIdx ? t("studio_tables_creating") : t("create_index")}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             {/* Add / Edit Row Dialog */}
             <Dialog open={rowDialogOpen} onOpenChange={setRowDialogOpen} maxWidth="lg" fullWidth>
-                <DialogTitle>{editingRowId ? `Edit Row (${editingRowId})` : `Insert Row into ${selectedTable?.name}`}</DialogTitle>
+                <DialogTitle>{editingRowId ? t("studio_tables_edit_row_title", { id: editingRowId }) : t("studio_tables_insert_row_into", { name: selectedTable?.name ?? "" })}</DialogTitle>
                 <DialogContent className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto">
                     {selectedTable?.columns.map((col) => (
                         <TextField
                             key={col.name}
-                            label={`${col.name} (${col.dataType}${col.nullable ? "" : ", required"})`}
+                            label={col.nullable ? `${col.name} (${col.dataType})` : t("studio_tables_field_required", { name: col.name, type: col.dataType })}
                             value={rowForm[col.name] ?? ""}
                             disabled={Boolean(editingRowId && col.primaryKey)}
-                            placeholder={col.defaultExpr ? `Default: ${col.defaultExpr}` : ""}
+                            placeholder={col.defaultExpr ? t("studio_tables_default_placeholder", { value: col.defaultExpr }) : ""}
                             onChange={(e) => setRowForm((prev) => ({ ...prev, [col.name]: e.target.value }))}
                         />
                     ))}
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="text" onClick={() => setRowDialogOpen(false)}>Cancel</Button>
+                    <Button variant="text" onClick={() => setRowDialogOpen(false)}>{t("cancel")}</Button>
                     <Button variant="filled" disabled={rowSaving} onClick={() => void handleSaveRow()}>
-                        {rowSaving ? t("saving") : (editingRowId ? "Save Changes" : "Insert Row")}
+                        {rowSaving ? t("saving") : (editingRowId ? t("studio_save_changes") : t("studio_tables_insert_row"))}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             {/* Drop Table Confirmation Dialog */}
             <Dialog open={dropOpen} onOpenChange={setDropOpen} maxWidth="sm" fullWidth>
-                <DialogTitle>Drop Table</DialogTitle>
+                <DialogTitle>{t("studio_tables_drop_table")}</DialogTitle>
                 <DialogContent className="flex flex-col gap-3">
                     <Alert color="error">
-                        This permanently drops <code className="font-mono">{selectedTable?.name}</code> and all data inside it.
+                        {t("studio_tables_drop_warning", { name: selectedTable?.name ?? "" })}
                     </Alert>
                     <TextField
-                        label={`Type "${selectedTable?.name ?? ""}" to confirm`}
+                        label={t("studio_tables_drop_confirm_label", { name: selectedTable?.name ?? "" })}
                         value={dropConfirm}
                         onChange={(e) => setDropConfirm(e.target.value)}
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="text" onClick={() => setDropOpen(false)}>Cancel</Button>
+                    <Button variant="text" onClick={() => setDropOpen(false)}>{t("cancel")}</Button>
                     <Button
                         variant="filled"
                         color="error"
                         disabled={dropping || dropConfirm !== selectedTable?.name}
                         onClick={() => void handleDropTable()}
                     >
-                        {dropping ? "Dropping..." : "Drop Table"}
+                        {dropping ? t("studio_tables_dropping") : t("studio_tables_drop_table")}
                     </Button>
                 </DialogActions>
             </Dialog>
