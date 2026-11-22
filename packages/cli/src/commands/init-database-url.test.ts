@@ -157,7 +157,7 @@ describe("interactive init honours --database-url and --introspect", () => {
     it("still offers to introspect the database that was passed", () => {
         const introspect = buildInitQuestions({ hasGitFlag: false, hasInstallFlag: false, pm: "pnpm", databaseUrlArg: url })
             .find(q => q.name === "introspect");
-        if (!introspect || typeof introspect.when !== "function") throw new Error("no conditional introspect question");
+        if (!introspect || !("when" in introspect) || typeof introspect.when !== "function") throw new Error("no conditional introspect question");
         expect(introspect.when({})).toBe(true);
     });
 
@@ -165,7 +165,7 @@ describe("interactive init honours --database-url and --introspect", () => {
         const questions = buildInitQuestions({ hasGitFlag: false, hasInstallFlag: false, pm: "pnpm", databaseUrlArg: url, introspectArg: true });
         expect(questions.map(q => q.name)).not.toContain("introspect");
         const preset = questions.find(q => q.name === "preset");
-        if (!preset || typeof preset.when !== "function") throw new Error("no conditional preset question");
+        if (!preset || !("when" in preset) || typeof preset.when !== "function") throw new Error("no conditional preset question");
         expect(preset.when({ headless: false })).toBe(false);
     });
 

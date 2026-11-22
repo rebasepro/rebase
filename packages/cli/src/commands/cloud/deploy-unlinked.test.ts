@@ -105,9 +105,12 @@ describe("rebase cloud deploy in an unlinked directory", () => {
 
         await expect(resolveDeployProjectRef(argv())).resolves.toBe("new_1");
 
-        const question = vi.mocked(inquirer.prompt).mock.calls[0][0] as unknown as Array<{ default: unknown; choices: Array<{ value: unknown }> }>;
-        expect(question[0].default).toBe(CREATE_NEW_PROJECT);
-        expect(question[0].choices[0].value).toBe(CREATE_NEW_PROJECT);
+        const asked: unknown = vi.mocked(inquirer.prompt).mock.calls[0][0];
+        const first: unknown = Array.isArray(asked) ? asked[0] : undefined;
+        expect(first).toMatchObject({ default: CREATE_NEW_PROJECT });
+        expect(first).toMatchObject({ choices: expect.arrayContaining([expect.objectContaining({ value: CREATE_NEW_PROJECT })]) });
+        const choices: unknown = typeof first === "object" && first !== null && "choices" in first ? first.choices : undefined;
+        expect(Array.isArray(choices) ? choices[0] : undefined).toMatchObject({ value: CREATE_NEW_PROJECT });
         const [createArgs, opts] = vi.mocked(projects.createProject).mock.calls[0];
         expect(createArgs).toContain("--link");
         expect(createArgs.slice(2, 5)).toEqual(["cloud", "projects", "create"]);
