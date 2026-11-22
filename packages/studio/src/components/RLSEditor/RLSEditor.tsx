@@ -180,6 +180,7 @@ function SidebarTableRow({ table, isSelected, onSelect, badge, dimmed, t }: {
 
 export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
     const [mode, setMode] = useState<"inspector" | "direct">("inspector");
+    const { t } = useTranslation();
 
     return (
         <div className="flex flex-col h-full w-full overflow-hidden">
@@ -189,8 +190,8 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                 variant="boxy"
                 className="border-b border-hairline px-4 bg-surface-sheet shrink-0"
             >
-                <Tab value="inspector">Schema Inspector</Tab>
-                <Tab value="direct">Direct Policies (DB)</Tab>
+                <Tab value="inspector">{t("studio_rls_tab_inspector")}</Tab>
+                <Tab value="direct">{t("studio_rls_tab_direct")}</Tab>
             </Tabs>
             <div className="flex-1 min-h-0 overflow-hidden">
                 {mode === "direct" ? <DirectRlsPoliciesPanel /> : <RLSEditorInspector apiUrl={apiUrl} />}

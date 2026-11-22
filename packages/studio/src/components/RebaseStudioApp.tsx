@@ -79,7 +79,7 @@ function StudioSignInScreen({
                 await auth.emailPasswordLogin(email.trim(), password);
             }
         } catch (err: unknown) {
-            setLocalError(err instanceof Error ? err.message : "Authentication failed.");
+            setLocalError(err instanceof Error ? err.message : t("studio_app_auth_failed"));
         } finally {
             setSubmitting(false);
         }
@@ -96,8 +96,8 @@ function StudioSignInScreen({
                     </Typography>
                     <Typography variant="body2" color="secondary">
                         {auth.needsSetup
-                            ? "Create the first administrator account to unlock your Rebase Studio console."
-                            : (isRegister ? "Create an account" : "Sign in with your administrator account")}
+                            ? t("studio_app_setup_subtitle")
+                            : (isRegister ? t("studio_app_register_subtitle") : t("studio_app_signin_subtitle"))}
                     </Typography>
                 </div>
 
@@ -106,14 +106,14 @@ function StudioSignInScreen({
                 <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-3">
                     {isRegister && (
                         <TextField
-                            label="Display name (optional)"
+                            label={t("studio_app_display_name_optional")}
                             value={displayName}
                             onChange={(e) => setDisplayName(e.target.value)}
                             placeholder="Admin"
                         />
                     )}
                     <TextField
-                        label="Email"
+                        label={t("email")}
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -134,8 +134,8 @@ function StudioSignInScreen({
                         className="mt-1"
                     >
                         {submitting
-                            ? "Please wait..."
-                            : (auth.needsSetup ? "Create Admin Account" : (isRegister ? "Create Account" : "Sign In"))}
+                            ? t("studio_app_please_wait")
+                            : (auth.needsSetup ? t("studio_app_create_admin") : (isRegister ? t("studio_app_create_account") : t("auth_sign_in")))}
                     </Button>
                 </form>
 
@@ -146,7 +146,7 @@ function StudioSignInScreen({
                             variant="text"
                             onClick={() => setMode((m) => m === "signin" ? "register" : "signin")}
                         >
-                            {isRegister ? "Already have an account? Sign in" : "Need an account? Register"}
+                            {isRegister ? t("studio_app_have_account") : t("studio_app_need_account")}
                         </Button>
                     </div>
                 )}
@@ -167,6 +167,7 @@ function StudioStandaloneShell({
     const location = useLocation();
     const modeController = useModeController();
     const labelGroup = useNavigationGroupLabel();
+    const { t } = useTranslation();
 
     const views = useMemo(
         () => (registry.studioConfig?.devViews ?? []).filter((v) => !v.hideFromNavigation),
@@ -220,10 +221,10 @@ function StudioStandaloneShell({
                             {name}
                         </Typography>
                     </button>
-                    <Tooltip title={isDark ? "Switch to light mode" : "Switch to dark mode"}>
+                    <Tooltip title={isDark ? t("studio_app_light_mode") : t("studio_app_dark_mode")}>
                         <IconButton
                             size="small"
-                            aria-label="Toggle color theme"
+                            aria-label={t("toggle_theme")}
                             onClick={() => modeController.setMode(isDark ? "light" : "dark")}
                         >
                             {isDark ? <SunIcon size={iconSize.small} /> : <MoonIcon size={iconSize.small} />}
@@ -243,7 +244,7 @@ function StudioStandaloneShell({
                         )}
                     >
                         <HomeIcon size={iconSize.small} />
-                        <span>Home</span>
+                        <span>{t("home")}</span>
                     </button>
 
                     {groupedViews.map(({ group, items }) => (
@@ -290,8 +291,8 @@ function StudioStandaloneShell({
                                 </Typography>
                             )}
                         </div>
-                        <Tooltip title="Sign out">
-                            <IconButton size="small" aria-label="Sign out" onClick={() => void auth.signOut()}>
+                        <Tooltip title={t("studio_app_sign_out")}>
+                            <IconButton size="small" aria-label={t("studio_app_sign_out")} onClick={() => void auth.signOut()}>
                                 <LogOutIcon size={iconSize.small} />
                             </IconButton>
                         </Tooltip>

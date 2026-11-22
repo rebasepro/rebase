@@ -48,10 +48,10 @@ interface StoredCronJobRow {
 }
 
 const SCHEDULE_PRESETS = [
-    { label: "Every minute", value: "* * * * *" },
-    { label: "Every 5 minutes", value: "*/5 * * * *" },
-    { label: "Every hour", value: "0 * * * *" },
-    { label: "Daily at midnight", value: "0 0 * * *" }
+    { labelKey: "studio_cron_db_preset_minute", value: "* * * * *" },
+    { labelKey: "studio_cron_db_preset_5_minutes", value: "*/5 * * * *" },
+    { labelKey: "studio_cron_db_preset_hour", value: "0 * * * *" },
+    { labelKey: "studio_cron_db_preset_midnight", value: "0 0 * * *" }
 ] as const;
 
 function parseJob(raw: unknown): StoredCronJobRow | null {
@@ -94,11 +94,11 @@ export function DbCronJobsPanel() {
             const arr = isRecord(raw) && Array.isArray(raw.jobs) ? raw.jobs : [];
             setJobs(arr.map(parseJob).filter((j): j is StoredCronJobRow => j !== null));
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Failed to load scheduled jobs.");
+            setError(err instanceof Error ? err.message : t("studio_cron_db_load_failed"));
         } finally {
             setLoading(false);
         }
-    }, [requestJson]);
+    }, [requestJson, t]);
 
     useEffect(() => {
         void load();
@@ -138,18 +138,18 @@ export function DbCronJobsPanel() {
                     method: "PATCH",
                     body: payload
                 });
-                snackbar.open({ type: "success", message: `Scheduled job "${payload.name}" updated.` });
+                snackbar.open({ type: "success", message: t("studio_cron_db_updated", { name: payload.name }) });
             } else {
                 await requestJson("/admin/cron/jobs", {
                     method: "POST",
                     body: payload
                 });
-                snackbar.open({ type: "success", message: `Scheduled job "${payload.name}" created.` });
+                snackbar.open({ type: "success", message: t("studio_cron_db_created", { name: payload.name }) });
             }
             setDialogOpen(false);
             await load();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to save scheduled job." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_cron_db_save_failed") });
         } finally {
             setSaving(false);
         }
@@ -163,17 +163,17 @@ export function DbCronJobsPanel() {
             });
             await load();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to toggle job." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_cron_db_toggle_failed") });
         }
     };
 
     const handleDelete = async (j: StoredCronJobRow) => {
         try {
             await requestJson(`/admin/cron/jobs/${encodeURIComponent(j.id)}`, { method: "DELETE" });
-            snackbar.open({ type: "success", message: `Deleted scheduled job "${j.name}".` });
+            snackbar.open({ type: "success", message: t("studio_cron_db_deleted", { name: j.name }) });
             await load();
         } catch (err: unknown) {
-            snackbar.open({ type: "error", message: err instanceof Error ? err.message : "Failed to delete job." });
+            snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_cron_db_delete_failed") });
         }
     };
 
@@ -182,21 +182,21 @@ export function DbCronJobsPanel() {
             <div className="flex items-center justify-between gap-4">
                 <div>
                     <Typography variant="subtitle1" className="font-semibold">
-                        Zero-Code Scheduled Jobs
+                        {t("studio_cron_db_title")}
                     </Typography>
                     <Typography variant="caption" color="secondary">
-                        Run recurring SQL statements or HTTP webhooks on a cron schedule without deploying custom code
+                        {t("studio_cron_db_subtitle")}
                     </Typography>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Tooltip title="Refresh">
-                        <IconButton size="small" aria-label="Refresh scheduled jobs" onClick={() => void load()}>
+                    <Tooltip title={t("refresh")}>
+                        <IconButton size="small" aria-label={t("studio_cron_db_refresh_aria")} onClick={() => void load()}>
                             <RefreshCwIcon size={iconSize.small} />
                         </IconButton>
                     </Tooltip>
                     <Button size="small" variant="filled" onClick={openCreate}>
                         <PlusIcon size={iconSize.small} />
-                        New Scheduled Job
+                        {t("studio_cron_db_new")}
                     </Button>
                 </div>
             </div>
@@ -208,23 +208,23 @@ export function DbCronJobsPanel() {
             ) : jobs.length === 0 ? (
                 <Card className="p-8 text-center flex flex-col items-center gap-3">
                     <Typography variant="body2" color="secondary">
-                        No database-managed cron jobs yet.
+                        {t("studio_cron_db_empty")}
                     </Typography>
                     <Button size="small" variant="filled" onClick={openCreate}>
                         <PlusIcon size={iconSize.small} />
-                        Create Scheduled Job
+                        {t("studio_cron_db_create")}
                     </Button>
                 </Card>
             ) : (
                 <div className={cls("overflow-x-auto rounded-lg border", defaultBorderMixin)}>
                     <Table className="w-full">
                         <TableHeader>
-                                <TableCell header>Name</TableCell>
+                                <TableCell header>{t("name")}</TableCell>
                                 <TableCell header>{t("studio_cron_schedule")}</TableCell>
-                                <TableCell header>Kind</TableCell>
-                                <TableCell header>Target</TableCell>
-                                <TableCell header>Enabled</TableCell>
-                                <TableCell header className="text-right">Actions</TableCell>
+                                <TableCell header>{t("studio_api_keys_stat_kind")}</TableCell>
+                                <TableCell header>{t("studio_cron_db_target")}</TableCell>
+                                <TableCell header>{t("studio_enabled")}</TableCell>
+                                <TableCell header className="text-right">{t("actions")}</TableCell>
                             </TableHeader>
                         <TableBody>
                             {jobs.map((j) => (
@@ -243,10 +243,10 @@ export function DbCronJobsPanel() {
                                         <BooleanSwitch size="small" value={j.enabled} onValueChange={(v) => void handleToggle(j, v)} />
                                     </TableCell>
                                     <TableCell className="text-right whitespace-nowrap">
-                                        <IconButton size="small" aria-label={`Edit job ${j.name}`} onClick={() => openEdit(j)}>
+                                        <IconButton size="small" aria-label={t("studio_cron_db_edit_aria", { name: j.name })} onClick={() => openEdit(j)}>
                                             <PencilIcon size={iconSize.small} />
                                         </IconButton>
-                                        <IconButton size="small" aria-label={`Delete job ${j.name}`} onClick={() => void handleDelete(j)}>
+                                        <IconButton size="small" aria-label={t("studio_cron_db_delete_aria", { name: j.name })} onClick={() => void handleDelete(j)}>
                                             <Trash2Icon size={iconSize.small} className={"text-red-500"} />
                                         </IconButton>
                                     </TableCell>
@@ -258,28 +258,28 @@ export function DbCronJobsPanel() {
             )}
 
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen} maxWidth="md" fullWidth>
-                <DialogTitle>{editing ? `Edit Job "${editing.name}"` : "New Scheduled Job"}</DialogTitle>
+                <DialogTitle>{editing ? t("studio_cron_db_edit_title", { name: editing.name }) : t("studio_cron_db_new")}</DialogTitle>
                 <DialogContent className="flex flex-col gap-3">
-                    <TextField label="Job Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="cleanup_expired_tokens" />
-                    <TextField label="Cron Schedule (5-field)" value={schedule} onChange={(e) => setSchedule(e.target.value)} placeholder="*/5 * * * *" />
+                    <TextField label={t("studio_cron_db_job_name")} value={name} onChange={(e) => setName(e.target.value)} placeholder="cleanup_expired_tokens" />
+                    <TextField label={t("studio_cron_db_schedule_label")} value={schedule} onChange={(e) => setSchedule(e.target.value)} placeholder="*/5 * * * *" />
                     <div className="flex items-center gap-1.5 flex-wrap">
                         {SCHEDULE_PRESETS.map((p) => (
                             <Chip key={p.value} size="small" colorScheme={schedule === p.value ? "blueLight" : "grayLight"} onClick={() => setSchedule(p.value)}>
-                                {p.label}
+                                {t(p.labelKey)}
                             </Chip>
                         ))}
                     </div>
                     <Select
-                        label="Job Type"
+                        label={t("studio_cron_db_job_type")}
                         value={kind}
                         onValueChange={(v) => { if (v === "sql" || v === "http") setKind(v); }}
                     >
-                        <SelectItem value="sql">SQL Statement</SelectItem>
-                        <SelectItem value="http">HTTP Request</SelectItem>
+                        <SelectItem value="sql">{t("studio_cron_db_kind_sql")}</SelectItem>
+                        <SelectItem value="http">{t("studio_cron_db_kind_http")}</SelectItem>
                     </Select>
                     {kind === "sql" ? (
                         <TextField
-                            label="SQL Statement"
+                            label={t("studio_cron_db_kind_sql")}
                             value={sqlText}
                             onChange={(e) => setSqlText(e.target.value)}
                             multiline
@@ -287,18 +287,18 @@ export function DbCronJobsPanel() {
                             placeholder="DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '30 days';"
                         />
                     ) : (
-                        <TextField label="HTTP POST Webhook URL" value={httpUrl} onChange={(e) => setHttpUrl(e.target.value)} placeholder="https://example.com/cron/sync" />
+                        <TextField label={t("studio_cron_db_http_url")} value={httpUrl} onChange={(e) => setHttpUrl(e.target.value)} placeholder="https://example.com/cron/sync" />
                     )}
-                    <BooleanSwitchWithLabel label="Enabled" value={enabled} onValueChange={setEnabled} />
+                    <BooleanSwitchWithLabel label={t("studio_enabled")} value={enabled} onValueChange={setEnabled} />
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="text" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                    <Button variant="text" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>
                     <Button
                         variant="filled"
                         disabled={saving || !name.trim() || !schedule.trim() || (kind === "sql" ? !sqlText.trim() : !httpUrl.trim())}
                         onClick={() => void handleSave()}
                     >
-                        {saving ? t("saving") : "Save Job"}
+                        {saving ? t("saving") : t("studio_cron_db_save")}
                     </Button>
                 </DialogActions>
             </Dialog>
