@@ -191,24 +191,12 @@ All configuration is managed through a single `.env` file in the project root. B
 Two containers: PostgreSQL, and the Rebase runtime with your built project
 mounted into it. There is no application image to build.
 
-This is the [variant above](#variant-your-own-postgresql), packaged: the
-compose database is a database of your own, so step 0 is the same one line.
-
 ```bash
-# 0. Point the project at the compose database: uncomment DATABASE_URL in .env
-#    (the line whose host is 127.0.0.1 and whose password matches
-#    DATABASE_PASSWORD — `rebase init` wrote it there, commented out)
-
 # 1. Build your project into ./dist-bundle
 pnpm run build          # or: npm run build
 
-# 2. Start the database. Boot creates the tables from backend/schema;
-#    `db:push` is for what it leaves alone — any change that is not purely
-#    additive.
-docker compose up -d db
-pnpm run db:push        # or: npm run db:push
-
-# 3. Start the runtime
+# 2. Start PostgreSQL and the runtime. Boot creates the tables from
+#    backend/schema, so a first deploy needs nothing else.
 docker compose up -d
 
 # View logs
@@ -220,6 +208,11 @@ docker compose down
 # Stop and remove data
 docker compose down -v
 ```
+
+For a later change that boot leaves alone (a renamed column, a narrowed
+type, a removed field), push it to the compose database with
+`pnpm rebase db push --docker` (or `npx rebase db push --docker`): `--docker`
+points the command at that database, so `.env` needs no edit.
 
 One container now serves the API at `/api` and the admin at `/` — same origin,
 so there is no CORS between them and no second web server to run.

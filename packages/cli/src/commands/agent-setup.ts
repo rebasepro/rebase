@@ -335,10 +335,10 @@ export function printAgentSetup(
             parts.push(`${result.skills} skills in ${chalk.gray(agent.targetDir)}`);
         }
 
-        if (result.mcp?.status === "added") {
+        // "present" on a new scaffold is the template's own .mcp.json, so
+        // "already in" read as though something had been there before init.
+        if (result.mcp?.status === "added" || result.mcp?.status === "present") {
             parts.push(`MCP server in ${chalk.gray(result.mcp.file)}`);
-        } else if (result.mcp?.status === "present") {
-            parts.push(`MCP server already in ${chalk.gray(result.mcp.file)}`);
         }
 
         // A tick is a claim that something was written; with nothing, it isn't.

@@ -74,7 +74,8 @@ export async function writeDrizzleSchema(options: GenerateFileOptions): Promise<
             out(String(schemaContent));
         }
 
-        if (options.nextStep !== false) out(nextStepAfterGenerate());
+        // Inside `rebase init`, which closes on its own next steps.
+        if (options.nextStep !== false && process.env.REBASE_INIT_SCAFFOLD !== "1") out(nextStepAfterGenerate());
     } catch (error) {
         outError(`Error generating schema: ${describeFailure(error)}`);
         // `rebase db push` runs this as step 1 and must stop on it: going on

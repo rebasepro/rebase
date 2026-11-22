@@ -35,6 +35,7 @@ type Flavour = Omit<InitNextStepsInput, "pm" | "cdTarget">;
 const FLAVOURS: Record<string, Flavour> = {
     "default": { headless: false, ownDatabase: false, introspect: false, introspected: false, installed: false },
     "default, installed": { headless: false, ownDatabase: false, introspect: false, introspected: false, installed: true },
+    "blog, installed": { headless: false, ownDatabase: false, introspect: false, introspected: false, installed: true, seed: true },
     "--database-url": { headless: false, ownDatabase: true, introspect: false, introspected: false, installed: true },
     "--database-url --introspect": { headless: false, ownDatabase: true, introspect: true, introspected: true, installed: true },
     "--database-url --introspect, not run": { headless: false, ownDatabase: true, introspect: true, introspected: false, installed: false },
@@ -99,6 +100,14 @@ describe("every command init prints works in the scaffold it is printed for", ()
     });
 });
 
+describe("the seed step", () => {
+    it("names `run seed` only for a template that ships example rows", () => {
+        expect(steps(FLAVOURS["blog, installed"]).join("\n")).toContain("pnpm run seed");
+        expect(steps(FLAVOURS["default, installed"]).join("\n")).not.toContain("run seed");
+        expect(steps(FLAVOURS["--headless"]).join("\n")).not.toContain("run seed");
+    });
+});
+
 describe("the steps, per flavour", () => {
     it("default", () => {
         expect(steps(FLAVOURS["default"])).toMatchInlineSnapshot(`
@@ -106,30 +115,21 @@ describe("the steps, per flavour", () => {
             "  cd my-app",
             "  pnpm install",
             "",
-            "  # A local database configuration has been generated in .env.",
-            "  # Start everything — the database and schema are set up for you,",
-            "  # with no Docker and nothing else to install:",
             "  pnpm run dev",
+            "  # Starts the database (no Docker), the API and the admin panel, and prints their URLs.",
+            "  # To use a Postgres of your own, uncomment DATABASE_URL in .env first.",
             "",
-            "  # To use a Postgres of your own instead, uncomment DATABASE_URL in .env.",
-            "",
-            "  # Sign in: the first account you register becomes the admin.",
-            "  # In production (docker compose) that window is shut and the account named by",
-            "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
-            "",
-            "This starts both the backend (Hono + PostgreSQL) and the frontend (Vite + React) concurrently.",
+            "  # Sign in: the first account you register becomes the admin",
+            "  # (under docker compose, the REBASE_ADMIN_EMAIL account in .env is created instead).",
             "",
             "Once it is running:",
             "",
-            "  # 1. Open the admin panel at the URL dev prints.",
-            "  #    Ports come from the project's path, so trust the terminal over 3001/5173.",
-            "  # 2. Add a table: a file in backend/schema/ with defineTable(...), exported from",
-            "  #    backend/schema/index.ts. dev regenerates the schema and SDK and creates it.",
-            "  # 3. Choose how it looks in the admin in frontend/src/cms/<table>.tsx.",
-            "  # 4. Call the API from your own code: scripts/example.ts uses the typed client.",
-            "  # 5. Ship it to Rebase Cloud:",
+            "  # 1. Add a table: a file in backend/schema/ with defineTable(...), exported from",
+            "  #    backend/schema/index.ts. dev creates it and regenerates the typed SDK.",
+            "  # 2. Choose how it looks in the admin in frontend/src/cms/<table>.tsx.",
+            "  # 3. Call the API from a script: pnpm run example (scripts/example.ts).",
+            "  # 4. Ship it to Rebase Cloud, or self-host it with docker compose (README.md):",
             "  pnpm run deploy",
-            "  #    or self-host it with docker compose. README.md has both.",
           ]
         `);
     });
@@ -146,23 +146,17 @@ describe("the steps, per flavour", () => {
             "  # Then start the development server:",
             "  pnpm run dev",
             "",
-            "  # Sign in: the first account you register becomes the admin.",
-            "  # In production (docker compose) that window is shut and the account named by",
-            "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
-            "",
-            "This starts both the backend (Hono + PostgreSQL) and the frontend (Vite + React) concurrently.",
+            "  # Sign in: the first account you register becomes the admin",
+            "  # (under docker compose, the REBASE_ADMIN_EMAIL account in .env is created instead).",
             "",
             "Once it is running:",
             "",
-            "  # 1. Open the admin panel at the URL dev prints.",
-            "  #    Ports come from the project's path, so trust the terminal over 3001/5173.",
-            "  # 2. Add a table: a file in backend/schema/ with defineTable(...), exported from",
-            "  #    backend/schema/index.ts. dev regenerates the schema and SDK and creates it.",
-            "  # 3. Choose how it looks in the admin in frontend/src/cms/<table>.tsx.",
-            "  # 4. Call the API from your own code: scripts/example.ts uses the typed client.",
-            "  # 5. Ship it to Rebase Cloud:",
+            "  # 1. Add a table: a file in backend/schema/ with defineTable(...), exported from",
+            "  #    backend/schema/index.ts. dev creates it and regenerates the typed SDK.",
+            "  # 2. Choose how it looks in the admin in frontend/src/cms/<table>.tsx.",
+            "  # 3. Call the API from a script: pnpm run example (scripts/example.ts).",
+            "  # 4. Ship it to Rebase Cloud, or self-host it with docker compose (README.md):",
             "  pnpm run deploy",
-            "  #    or self-host it with docker compose. README.md has both.",
           ]
         `);
     });
@@ -180,23 +174,17 @@ describe("the steps, per flavour", () => {
             "  # Then start the development server:",
             "  pnpm run dev",
             "",
-            "  # Sign in: the first account you register becomes the admin.",
-            "  # In production (docker compose) that window is shut and the account named by",
-            "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
-            "",
-            "This starts both the backend (Hono + PostgreSQL) and the frontend (Vite + React) concurrently.",
+            "  # Sign in: the first account you register becomes the admin",
+            "  # (under docker compose, the REBASE_ADMIN_EMAIL account in .env is created instead).",
             "",
             "Once it is running:",
             "",
-            "  # 1. Open the admin panel at the URL dev prints.",
-            "  #    Ports come from the project's path, so trust the terminal over 3001/5173.",
-            "  # 2. Add a table: a file in backend/schema/ with defineTable(...), exported from",
-            "  #    backend/schema/index.ts. dev regenerates the schema and SDK and creates it.",
-            "  # 3. Choose how it looks in the admin in frontend/src/cms/<table>.tsx.",
-            "  # 4. Call the API from your own code: scripts/example.ts uses the typed client.",
-            "  # 5. Ship it to Rebase Cloud:",
+            "  # 1. Add a table: a file in backend/schema/ with defineTable(...), exported from",
+            "  #    backend/schema/index.ts. dev creates it and regenerates the typed SDK.",
+            "  # 2. Choose how it looks in the admin in frontend/src/cms/<table>.tsx.",
+            "  # 3. Call the API from a script: pnpm run example (scripts/example.ts).",
+            "  # 4. Ship it to Rebase Cloud, or self-host it with docker compose (README.md):",
             "  pnpm run deploy",
-            "  #    or self-host it with docker compose. README.md has both.",
           ]
         `);
     });
@@ -219,9 +207,8 @@ describe("the steps, per flavour", () => {
             "  CREATE POLICY your_table_owner ON your_table FOR ALL USING (user_id::text = rebase.uid());",
             "  #    The API logs any table it skips, and why.",
             "",
-            "  # Sign in: the first account you register becomes the admin.",
-            "  # In production (docker compose) that window is shut and the account named by",
-            "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
+            "  # Sign in: the first account you register becomes the admin",
+            "  # (under docker compose, the REBASE_ADMIN_EMAIL account in .env is created instead).",
             "",
             "This starts a headless API (Hono + PostgreSQL). There is no backend/schema: the API is derived from your database schema. Once it serves a table, its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true).",
             "",
@@ -254,9 +241,8 @@ describe("the steps, per flavour", () => {
             "  CREATE POLICY your_table_owner ON your_table FOR ALL USING (user_id::text = rebase.uid());",
             "  #    The API logs any table it skips, and why.",
             "",
-            "  # Sign in: the first account you register becomes the admin.",
-            "  # In production (docker compose) that window is shut and the account named by",
-            "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
+            "  # Sign in: the first account you register becomes the admin",
+            "  # (under docker compose, the REBASE_ADMIN_EMAIL account in .env is created instead).",
             "",
             "This starts a headless API (Hono + PostgreSQL). There is no backend/schema: the API is derived from your database schema. Once it serves a table, its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true).",
             "",
@@ -280,9 +266,8 @@ describe("the steps, per flavour", () => {
             "  # Start the API over it:",
             "  pnpm run dev",
             "",
-            "  # Sign in: the first account you register becomes the admin.",
-            "  # In production (docker compose) that window is shut and the account named by",
-            "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
+            "  # Sign in: the first account you register becomes the admin",
+            "  # (under docker compose, the REBASE_ADMIN_EMAIL account in .env is created instead).",
             "",
             "This starts a headless API (Hono + PostgreSQL) over the tables just generated from your database in backend/schema. Edit them to change what the API exposes; its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true).",
             "",

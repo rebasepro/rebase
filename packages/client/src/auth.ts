@@ -117,7 +117,10 @@ export function createMemoryStorage(): AuthStorage {
 
 function detectStorage(): AuthStorage {
     try {
-        if (typeof localStorage !== "undefined") {
+        // Only a browser's: Node 22.23+ has a `localStorage` of its own, which
+        // warns ("`--localstorage-file` was provided without a valid path") the
+        // moment it is touched, so every script using the SDK printed it.
+        if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
             localStorage.setItem("__rebase_test__", "1");
             localStorage.removeItem("__rebase_test__");
             return localStorage;

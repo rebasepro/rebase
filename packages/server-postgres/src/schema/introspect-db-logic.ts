@@ -750,8 +750,8 @@ function customizationOf(
 function rlsOffComment(table: TableRow | undefined): string[] {
     if (table?.rls_enabled !== false) return [];
     return [
-        "⚠ Row-level security is off on this table, so every request reaches every row. `rebase db push`",
-        "switches it on: from then on the server and admins reach its rows, and anyone else what `rls` grants."
+        "⚠ Row-level security is off on this table, so every request reaches every row. The first `rebase dev`",
+        "(or `rebase db push`) switches it on: then the server and admins reach its rows, and anyone else what `rls` grants."
     ];
 }
 
@@ -902,8 +902,43 @@ export function describeRlsOffTables(tableNames: readonly string[]): string | un
     if (tableNames.length === 0) return undefined;
     return `${tableNames.length} table(s) have row-level security off, so every request reaches every row: ` +
         `${[...tableNames].sort().join(", ")}.\n` +
-        "`rebase db push` switches it on: from then on the server and admins reach their rows, and anyone else " +
-        "what each table's `rls` grants.";
+        "The first `rebase dev` switches it on (so does `rebase db push`): from then on the server and admins reach " +
+        "their rows, and anyone else what each table's `rls` grants.";
+}
+
+/**
+ * The admin's `App.tsx` with these customizations passed to `<RebaseCMS>`, or
+ * `undefined` when it already passes them all or has no
+ * `tableCustomizations={[…]}` literal to add them to (then the caller says what
+ * to add by hand).
+ *
+ * Introspection wrote `frontend/src/cms/<table>.tsx` and told the reader to pass
+ * them to `<RebaseCMS tableCustomizations={[…]} />` themselves, so a project
+ * scaffolded with `init --introspect` showed every table uncustomized.
+ */
+export function wireCustomizationsIntoApp(
+    appSource: string,
+    customizations: readonly { identifier: string; importPath: string }[]
+): string | undefined {
+    const listMatch = /tableCustomizations=\{\[([^\]]*)\]\}/.exec(appSource);
+    if (!listMatch) return undefined;
+    const listed = listMatch[1].split(",").map((entry) => entry.trim()).filter(Boolean);
+    const missing = customizations.filter((c) => !listed.includes(c.identifier));
+    if (missing.length === 0) return undefined;
+
+    const list = `tableCustomizations={[${[...listed, ...missing.map((c) => c.identifier)].join(", ")}]}`;
+    let source = appSource.slice(0, listMatch.index) + list + appSource.slice(listMatch.index + listMatch[0].length);
+
+    const imports = missing
+        .filter((c) => !new RegExp(`\\bimport\\s*\\{[^}]*\\b${c.identifier}\\b[^}]*\\}`).test(source))
+        .map((c) => `import { ${c.identifier} } from "${c.importPath}";`);
+    if (imports.length > 0) {
+        const importLines = [...source.matchAll(/^import[^\n]*;$/gm)];
+        const last = importLines[importLines.length - 1];
+        const at = last && last.index !== undefined ? last.index + last[0].length : 0;
+        source = source.slice(0, at) + (at > 0 ? "\n" : "") + imports.join("\n") + (at > 0 ? "" : "\n") + source.slice(at);
+    }
+    return source;
 }
 
 /**

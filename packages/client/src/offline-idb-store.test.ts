@@ -296,7 +296,14 @@ describe("two tabs over one database", () => {
             removeItem: (key: string) => { map.delete(key); }
         };
         Object.defineProperty(globalThis, "localStorage", { value: storage, configurable: true });
-        return () => { Reflect.deleteProperty(globalThis, "localStorage"); };
+        // The lease reads a browser's storage only (Node has a `localStorage`
+        // of its own that warns when touched), so the page needs a `window` too.
+        const hadWindow = "window" in globalThis;
+        if (!hadWindow) Object.defineProperty(globalThis, "window", { value: globalThis, configurable: true });
+        return () => {
+            Reflect.deleteProperty(globalThis, "localStorage");
+            if (!hadWindow) Reflect.deleteProperty(globalThis, "window");
+        };
     }
 
     it("replays a shared write once without Web Locks", async () => {

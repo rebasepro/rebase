@@ -45,15 +45,7 @@ export const usersCms = customizeTable<typeof users>("users", {
                 name: "Role"
             }
         },
-        passwordHash: {
-            hidden: true,
-            hiddenInForm: true
-        },
         emailVerified: {
-            hidden: true,
-            hiddenInForm: true
-        },
-        emailVerificationToken: {
             hidden: true,
             hiddenInForm: true
         },

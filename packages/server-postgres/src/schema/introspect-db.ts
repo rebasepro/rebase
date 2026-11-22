@@ -10,6 +10,7 @@ import { printIndexModule, tableIdentifier } from "@rebasepro/common";
 import {
     buildTablesMap,
     describeRlsOffTables,
+    wireCustomizationsIntoApp,
     generateSchemaModules,
     mergeIndexModule,
     safeHostFromUrl
@@ -329,12 +330,25 @@ async function main() {
             out(chalk.gray(`  Review the generated files in ${outDir}.`));
         }
         if (customizations.length > 0 && cmsDir) {
-            out(chalk.gray(`  ${customizations.length} panel customization(s) in ${cmsDir}: pass them to <RebaseCMS tableCustomizations={[…]} />.`));
+            const appPath = path.join(path.dirname(cmsDir), "App.tsx");
+            const wired = fs.existsSync(appPath)
+                ? wireCustomizationsIntoApp(fs.readFileSync(appPath, "utf-8"), customizations.map((table) => ({
+                    identifier: `${tableIdentifier(table)}Cms`,
+                    importPath: `./${path.basename(cmsDir)}/${table}`
+                })))
+                : undefined;
+            if (wired !== undefined) {
+                fs.writeFileSync(appPath, wired, "utf-8");
+                out(chalk.gray(`  ${customizations.length} panel customization(s) in ${cmsDir}, passed to <RebaseCMS> in ${appPath}.`));
+            } else if (!fs.existsSync(appPath) || !/tableCustomizations=\{\[/.test(fs.readFileSync(appPath, "utf-8"))) {
+                out(chalk.gray(`  ${customizations.length} panel customization(s) in ${cmsDir}: pass them to <RebaseCMS tableCustomizations={[…]} />.`));
+            }
         }
         // The database just read is usually the one being left: a migration's
         // source. DATABASE_URL still names it, so the next `db push` would
-        // write the generated tables back into it.
-        if (generatedFiles.length > 0 && projectEnvNames(envFileUsed, databaseUrl)) {
+        // write the generated tables back into it. Not inside `rebase init
+        // --introspect`, where the database is the one the new project runs on.
+        if (generatedFiles.length > 0 && process.env.REBASE_INIT_SCAFFOLD !== "1" && projectEnvNames(envFileUsed, databaseUrl)) {
             out(chalk.yellow(`⚠ DATABASE_URL still points at the database this read (${hostPart}).`));
             out(chalk.gray("  If it is the source of a migration, point DATABASE_URL at the new database before `rebase db push`;"));
             out(chalk.gray("  pushing now writes the generated tables back into the one just introspected."));

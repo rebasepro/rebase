@@ -78,20 +78,38 @@ async function run() {
     console.log("🚀 Starting script...");
 
     try {
-        // Example: Check backend health
         const res = await fetch(`${baseUrl}/health`);
         const health = res.headers.get("content-type")?.includes("application/json")
             ? await res.json()
             : { status: res.status, text: await res.text() };
         console.log("✅ Backend health:", health);
 
-        // Example: Fetch some data (requires auth if backend is secure-by-default)
-        // const items = await rebase.data.table("users").find({ limit: 5 });
-        // console.log("Items:", items);
+        // The tables this key can reach, as the admin panel and the SDK see them.
+        const tablesRes = await fetch(`${baseUrl}/api/schema/tables`, {
+            headers: serviceKey ? { Authorization: `Bearer ${serviceKey}` } : {}
+        });
+        if (!tablesRes.ok) {
+            console.log(`ℹ️  Listing tables answered ${tablesRes.status}; set REBASE_SERVICE_KEY to read them.`);
+        } else {
+            const tables = (await tablesRes.json()) as Array<{ slug: string }>;
+            console.log("📚 Tables:", tables.map(t => t.slug).join(", ") || "(none yet: add one in backend/schema)");
+
+            // Read a few rows from the first table that is not the users table.
+            const first = tables.find(t => t.slug !== "users");
+            if (first) {
+                const { data } = await rebase.data.table(first.slug).find({ limit: 5 });
+                console.log(`📄 First ${data.length} row(s) of ${first.slug}:`, data);
+            }
+        }
+
+        // Typed access: `rebase dev` writes generated/sdk/database.types.ts. Pass
+        // its `tablesDictionary` and `Database` to createRebaseClient (see the
+        // import above) and `rebase.data.<table>.find()` is typed end to end.
 
         console.log("✨ Script finished successfully.");
     } catch (error) {
         console.error("❌ Script failed:", error);
+        process.exitCode = 1;
     }
 }
 

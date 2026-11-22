@@ -84,7 +84,8 @@ function readRecord(storage: LeaseStorage, key: string): LeaseRecord | null {
  */
 export function browserLeaseStorage(): LeaseStorage | undefined {
     try {
-        if (typeof localStorage === "undefined") return undefined;
+        // A browser's only: touching Node's own `localStorage` prints a warning.
+        if (typeof window === "undefined" || typeof localStorage === "undefined") return undefined;
         const storage: LeaseStorage = localStorage;
         // Safari in some private modes exposes the object and throws on write.
         const probe = "rebase-lease-probe";

@@ -2,7 +2,7 @@ import { customizeTable } from "@rebasepro/cms";
 import type { posts } from "../../../backend/schema/posts";
 
 export const postsCms = customizeTable<typeof posts>("posts", {
-    icon: "Article",
+    icon: "Newspaper",
     fields: {
         content: {
             markdown: true
