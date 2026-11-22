@@ -58,7 +58,12 @@ const TEMPLATE = path.join(__dirname, "../../cli/templates/template/backend/sche
 // `scaffold.sql` was dumped again from a boot of these tables on PostgreSQL
 // 18.6 and is byte-identical to the 11-12 recording below its header (every
 // table, policy, function, grant and role), so EXPECTED_BASELINE is unchanged.
-const RECORDED = "2b2d4868898533f4";
+// Moved 2026-11-22, re-recorded: users.ts matches `rebase.users` as auth
+// creates it (a `text` key, 610bdcfb07), so the uid columns and the self-read
+// policy follow; boot also provisions the zero-code catalog and the DDL event
+// trigger. rls-check on the new recording reports EXPECTED_BASELINE exactly;
+// the table count went from 20 to 25.
+const RECORDED = "81616c0c72367c01";
 
 describe("the recorded scaffold fixture", () => {
     it("was recorded from the template the CLI still ships", () => {

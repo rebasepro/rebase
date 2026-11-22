@@ -40,6 +40,13 @@
 -- PostgreSQL 18.6, after the template's columns were re-spelled the Drizzle
 -- way (45323f117c): the dump is byte-identical to the 2026-11-12 recording —
 -- the same 20 tables, policies, functions, grants and roles.
+-- Re-recorded 2026-11-22 against main@226bd6a14f, PostgreSQL 18.4, after the
+-- template's users table was made to match `rebase.users` as auth creates it
+-- (610bdcfb07): its key is `text`, so the `uid` columns that reference it and
+-- `users_default_self_read` follow. Boot also provisions the zero-code catalog
+-- now (`rebase.cron_jobs`, `roles`, `storage_policies`, `table_meta`,
+-- `webhooks`) and, as a role that may, the DDL event trigger that reloads the
+-- schema (`rebase_schema_change_ddl`). Roles unchanged.
 
 -- Boot creates these; they are cluster objects, so `pg_dump` of one database
 -- does not carry them.
@@ -70,6 +77,16 @@ CREATE FUNCTION rebase.jwt() RETURNS jsonb
         '{}'
     )::jsonb;
 $$;
+CREATE FUNCTION rebase.notify_schema_change() RETURNS event_trigger
+    LANGUAGE plpgsql
+    AS $$
+            BEGIN
+                PERFORM pg_notify(
+                    'rebase_schema_changed',
+                    json_build_object('tag', tg_tag, 'ts', extract(epoch from now()))::text
+                );
+            END;
+            $$;
 CREATE FUNCTION rebase.rebase_cdc_notify() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
@@ -384,6 +401,18 @@ CREATE TABLE rebase.cron_job_state (
     last_success boolean,
     last_error text
 );
+CREATE TABLE rebase.cron_jobs (
+    id text NOT NULL,
+    name text NOT NULL,
+    schedule text NOT NULL,
+    timezone text DEFAULT 'UTC'::text NOT NULL,
+    kind text NOT NULL,
+    config jsonb NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cron_jobs_kind_check CHECK ((kind = ANY (ARRAY['http'::text, 'sql'::text])))
+);
 CREATE TABLE rebase.cron_logs (
     id text DEFAULT (gen_random_uuid())::text NOT NULL,
     job_id text NOT NULL,
@@ -399,7 +428,7 @@ CREATE TABLE rebase.cron_logs (
 );
 CREATE TABLE rebase.magic_link_tokens (
     id text DEFAULT (gen_random_uuid())::text NOT NULL,
-    uid uuid NOT NULL,
+    uid text NOT NULL,
     token_hash text NOT NULL,
     expires_at timestamp with time zone NOT NULL,
     used_at timestamp with time zone,
@@ -422,7 +451,7 @@ CREATE TABLE rebase.mfa_challenges (
 );
 CREATE TABLE rebase.mfa_factors (
     id text DEFAULT (gen_random_uuid())::text NOT NULL,
-    uid uuid NOT NULL,
+    uid text NOT NULL,
     factor_type text DEFAULT 'totp'::text NOT NULL,
     secret_encrypted text NOT NULL,
     friendly_name text,
@@ -433,7 +462,7 @@ CREATE TABLE rebase.mfa_factors (
 );
 CREATE TABLE rebase.password_reset_tokens (
     id text DEFAULT (gen_random_uuid())::text NOT NULL,
-    uid uuid NOT NULL,
+    uid text NOT NULL,
     token_hash text NOT NULL,
     expires_at timestamp with time zone NOT NULL,
     used_at timestamp with time zone,
@@ -441,14 +470,14 @@ CREATE TABLE rebase.password_reset_tokens (
 );
 CREATE TABLE rebase.recovery_codes (
     id text DEFAULT (gen_random_uuid())::text NOT NULL,
-    uid uuid NOT NULL,
+    uid text NOT NULL,
     code_hash text NOT NULL,
     used_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now()
 );
 CREATE TABLE rebase.refresh_tokens (
     id text DEFAULT (gen_random_uuid())::text NOT NULL,
-    uid uuid NOT NULL,
+    uid text NOT NULL,
     session_id text DEFAULT (gen_random_uuid())::text NOT NULL,
     token_hash text NOT NULL,
     expires_at timestamp with time zone NOT NULL,
@@ -461,9 +490,48 @@ CREATE TABLE rebase.refresh_tokens (
     aal text,
     method text
 );
+CREATE TABLE rebase.roles (
+    name text NOT NULL,
+    description text,
+    scopes text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    is_default boolean DEFAULT false NOT NULL,
+    assignable boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
 CREATE TABLE rebase.schema_meta (
     key text NOT NULL,
     value text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE rebase.storage_policies (
+    id text NOT NULL,
+    bucket text DEFAULT 'default'::text NOT NULL,
+    name text NOT NULL,
+    path_pattern text NOT NULL,
+    operations text[] DEFAULT ARRAY['read'::text, 'write'::text, 'delete'::text, 'list'::text] NOT NULL,
+    rule jsonb NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    priority integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE rebase.table_meta (
+    schema_name text DEFAULT 'public'::text NOT NULL,
+    table_name text NOT NULL,
+    slug text,
+    exposed boolean DEFAULT true NOT NULL,
+    description text,
+    soft_delete_column text,
+    history_enabled boolean DEFAULT false NOT NULL,
+    tenant_column text,
+    tenant_source jsonb,
+    tenant_bypass_roles text[] DEFAULT ARRAY['admin'::text] NOT NULL,
+    search_config jsonb,
+    column_access jsonb DEFAULT '{}'::jsonb NOT NULL,
+    column_storage jsonb DEFAULT '{}'::jsonb NOT NULL,
+    private_columns text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    readonly_columns text[] DEFAULT ARRAY[]::text[] NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 CREATE TABLE rebase.ui_preferences (
@@ -477,7 +545,7 @@ CREATE TABLE rebase.ui_preferences (
 );
 CREATE TABLE rebase.user_identities (
     id text DEFAULT (gen_random_uuid())::text NOT NULL,
-    uid uuid NOT NULL,
+    uid text NOT NULL,
     provider text NOT NULL,
     provider_id text NOT NULL,
     profile_data jsonb,
@@ -485,7 +553,7 @@ CREATE TABLE rebase.user_identities (
     updated_at timestamp with time zone DEFAULT now()
 );
 CREATE TABLE rebase.users (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    id text DEFAULT (gen_random_uuid())::text NOT NULL,
     email text NOT NULL,
     display_name text,
     photo_url text,
@@ -494,15 +562,27 @@ CREATE TABLE rebase.users (
     email_verified boolean DEFAULT false NOT NULL,
     email_verification_token text,
     email_verification_sent_at timestamp with time zone,
-    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
     is_anonymous boolean DEFAULT false NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     tokens_valid_after timestamp with time zone,
     disabled_at timestamp with time zone,
     pending_email text,
     email_change_token text,
-    email_change_sent_at timestamp with time zone
+    email_change_sent_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE rebase.webhooks (
+    id text NOT NULL,
+    name text NOT NULL,
+    table_slug text NOT NULL,
+    events text[] NOT NULL,
+    url text NOT NULL,
+    secret text,
+    headers jsonb DEFAULT '{}'::jsonb NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 ALTER TABLE ONLY public.authors
     ADD CONSTRAINT authors_pkey PRIMARY KEY (id);
@@ -522,6 +602,10 @@ ALTER TABLE ONLY rebase.cron_claims
     ADD CONSTRAINT cron_claims_pkey PRIMARY KEY (job_id, slot);
 ALTER TABLE ONLY rebase.cron_job_state
     ADD CONSTRAINT cron_job_state_pkey PRIMARY KEY (job_id);
+ALTER TABLE ONLY rebase.cron_jobs
+    ADD CONSTRAINT cron_jobs_name_key UNIQUE (name);
+ALTER TABLE ONLY rebase.cron_jobs
+    ADD CONSTRAINT cron_jobs_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY rebase.cron_logs
     ADD CONSTRAINT cron_logs_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY rebase.magic_link_tokens
@@ -544,8 +628,14 @@ ALTER TABLE ONLY rebase.refresh_tokens
     ADD CONSTRAINT refresh_tokens_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY rebase.refresh_tokens
     ADD CONSTRAINT refresh_tokens_token_hash_key UNIQUE (token_hash);
+ALTER TABLE ONLY rebase.roles
+    ADD CONSTRAINT roles_pkey PRIMARY KEY (name);
 ALTER TABLE ONLY rebase.schema_meta
     ADD CONSTRAINT schema_meta_pkey PRIMARY KEY (key);
+ALTER TABLE ONLY rebase.storage_policies
+    ADD CONSTRAINT storage_policies_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY rebase.table_meta
+    ADD CONSTRAINT table_meta_pkey PRIMARY KEY (schema_name, table_name);
 ALTER TABLE ONLY rebase.ui_preferences
     ADD CONSTRAINT ui_preferences_pkey PRIMARY KEY (scope, owner, table_slug);
 ALTER TABLE ONLY rebase.user_identities
@@ -556,6 +646,8 @@ ALTER TABLE rebase.users
     ADD CONSTRAINT users_email_length_check CHECK ((length(email) <= 320)) NOT VALID;
 ALTER TABLE ONLY rebase.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY rebase.webhooks
+    ADD CONSTRAINT webhooks_pkey PRIMARY KEY (id);
 CREATE INDEX posts_author_id_ix_00ad191 ON public.posts USING btree (author_id);
 CREATE INDEX posts_tags_tag_id_ix_d4456f1 ON public.posts_tags USING btree (tag_id);
 CREATE INDEX idx_api_keys_owner ON rebase.api_keys USING btree (owner_uid) WHERE (owner_uid IS NOT NULL);
@@ -765,8 +857,8 @@ CREATE POLICY users_default_admin_write_update ON rebase.users FOR UPDATE TO reb
 COMMENT ON POLICY users_default_admin_write_update ON rebase.users IS 'rebase:0c198fe78e4b663ef56e7698c52cc53bf75a74c8ebc08b0bfdce8ccc4fababd2';
 CREATE POLICY users_default_admin_write_update_ar_687e5ca3 ON rebase.users FOR UPDATE TO rebase_admin_request USING (true) WITH CHECK (true);
 COMMENT ON POLICY users_default_admin_write_update_ar_687e5ca3 ON rebase.users IS 'rebase:0d5532de1931beca11f2ae5ddb8a9627460d04e0800af1012f1c3f2789462a4f';
-CREATE POLICY users_default_self_read ON rebase.users FOR SELECT USING (((id)::text = ( SELECT rebase.uid() AS uid)));
-COMMENT ON POLICY users_default_self_read ON rebase.users IS 'rebase:30de33dd00153a8d146b8cdd80af27a203e84d7f10934bd5f81777e7d35d8c75';
+CREATE POLICY users_default_self_read ON rebase.users FOR SELECT USING ((id = ( SELECT rebase.uid() AS uid)));
+COMMENT ON POLICY users_default_self_read ON rebase.users IS 'rebase:2135ca4c19b1891442097a9fd222f0a5710d4edd7f7dd47156ccef430f38e3c0';
 CREATE POLICY users_delete_3561e70_2 ON rebase.users FOR DELETE TO rebase_admin USING (( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])));
 COMMENT ON POLICY users_delete_3561e70_2 ON rebase.users IS 'rebase:d97d18944f79442d8a3fef6c40cf5093a99c0ad11b666fb0597bcb4361334f45';
 CREATE POLICY users_delete_3561e70_2_ar_40c56324 ON rebase.users FOR DELETE TO rebase_admin_request USING (true);
@@ -803,3 +895,6 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT,USAGE ON SEQUENCES TO reb
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT,INSERT,DELETE,UPDATE ON TABLES TO rebase_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA rebase GRANT SELECT,USAGE ON SEQUENCES TO rebase_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA rebase GRANT SELECT,INSERT,DELETE,UPDATE ON TABLES TO rebase_user;
+CREATE EVENT TRIGGER rebase_schema_change_ddl ON ddl_command_end
+         WHEN TAG IN ('CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW', 'DROP VIEW', 'CREATE POLICY', 'ALTER POLICY', 'DROP POLICY', 'CREATE INDEX', 'DROP INDEX', 'CREATE TYPE', 'ALTER TYPE', 'DROP TYPE')
+   EXECUTE FUNCTION rebase.notify_schema_change();

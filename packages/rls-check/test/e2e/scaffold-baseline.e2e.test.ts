@@ -94,7 +94,10 @@ describe.skipIf(!dockerAvailable)("rls-check against a freshly provisioned scaff
         expect(result.stats.schemas).toBe(2);
         // 20 since the 2026-11-12 recording: boot also provisions the cron
         // and UI-preference tables in `rebase`, which grant rebase_user nothing.
-        expect(result.stats.tables).toBe(20);
+        // 25 since the 2026-11-22 recording: the zero-code catalog
+        // (`rebase.cron_jobs`, `roles`, `storage_policies`, `table_meta`,
+        // `webhooks`), which grants rebase_user nothing either.
+        expect(result.stats.tables).toBe(25);
         expect(result.stats.policies).toBe(78);
     });
 
