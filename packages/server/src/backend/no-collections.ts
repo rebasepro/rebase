@@ -7,7 +7,24 @@
  * tables were found and deliberately not served, because without RLS a table
  * has no authorization model. Saying "the database has no tables" to the
  * second sent its developer looking for tables that were right there.
+ *
+ * Either way the answer describes the database as it was read at startup, or
+ * at the last schema reload, and says so: a developer who has just enabled RLS
+ * and still reads "row-level security is disabled" otherwise has no way to
+ * tell a stale answer from a wrong fix.
  */
+
+/**
+ * How the answer is brought up to date: restart, or reload the schema in
+ * place. The reload is the route every introspected backend mounts; on
+ * Postgres the server also reloads on its own after DDL, when its role could
+ * install the event trigger, and on `NOTIFY rebase_schema_changed`.
+ */
+export const SCHEMA_RELOAD_HINT =
+    "This reflects the database as it was read at startup (or at the last schema reload). " +
+    "After changing it, restart `rebase dev`, or reload without restarting: " +
+    "`POST /api/admin/schema/reload` as an admin or with the service key, " +
+    "or run `NOTIFY rebase_schema_changed;` on the database (Postgres, not the embedded dev database).";
 
 /** How many skipped tables the message names before it counts the rest. */
 const NAMED_TABLES = 10;
@@ -20,7 +37,8 @@ const NAMED_TABLES = 10;
 export function noCollectionsCause(unprotected: readonly { schema: string; table: string }[]): string {
     if (unprotected.length === 0) {
         return "It declares none in code, and the database has no tables to derive them from. " +
-            "Create tables — a migration, SQL, or a table in backend/schema plus `rebase db push` — and restart.";
+            "Create tables — a migration, SQL, or a table in backend/schema plus `rebase db push`. " +
+            SCHEMA_RELOAD_HINT;
     }
     const names = unprotected.slice(0, NAMED_TABLES).map(({ schema, table }) => `${schema}.${table}`);
     const rest = unprotected.length - names.length;
@@ -30,7 +48,8 @@ export function noCollectionsCause(unprotected: readonly { schema: string; table
         `(${listed}) ${unprotected.length === 1 ? "was" : "were"} not served: row-level security is disabled, ` +
         "so nothing decides who may read which rows. Enable it on each — " +
         `\`ALTER TABLE "${first.schema}"."${first.table}" ENABLE ROW LEVEL SECURITY;\` — add a policy that opens ` +
-        "the rows each user may see, and restart. A table with RLS and no policy is served and returns no rows. " +
+        "the rows each user may see. A table with RLS and no policy is served and returns no rows. " +
         "To serve them without RLS anyway, pass `baas: { unprotectedTables: \"serve\" }` to the server entry, " +
-        "which takes `rebase eject`: the managed runtime does not read it from config/ or the environment.";
+        "which takes `rebase eject`: the managed runtime does not read it from config/ or the environment. " +
+        SCHEMA_RELOAD_HINT;
 }

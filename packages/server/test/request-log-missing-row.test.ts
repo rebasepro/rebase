@@ -80,7 +80,7 @@ const requestLines = (lines: ReturnType<typeof capture>) => lines.filter(line =>
 describe("the request log of a missing row", () => {
     afterEach(() => { jest.restoreAllMocks(); });
 
-    it("writes a read by id that finds nothing at info", async () => {
+    it("writes a read by id that finds nothing below warn", async () => {
         const lines = capture();
 
         const res = await mount().request("/api/data/rooms/SMZJ");
@@ -88,20 +88,21 @@ describe("the request log of a missing row", () => {
         expect(res.status).toBe(404);
         const [only, ...rest] = requestLines(lines);
         expect(rest).toHaveLength(0);
-        expect(only.level).toBe("info");
+        // Debug, because this is not production: see request-log-development.test.ts.
+        expect(only.level).toBe("debug");
         expect(only.data).toMatchObject({ status: 404, errorCode: "NOT_FOUND", collection: "rooms" });
         expect(String(only.data?.errorMessage)).toContain("No row with id 'SMZJ' in 'rooms'");
         // Nothing else spoke up about it at warn either.
         expect(lines.filter(line => line.level === "warn" || line.level === "error")).toHaveLength(0);
     });
 
-    it("writes a nested read by id that finds nothing at info", async () => {
+    it("writes a nested read by id that finds nothing below warn", async () => {
         const lines = capture();
 
         const res = await mount().request("/api/data/rooms/SMZJ/players/p1");
 
         expect(res.status).toBe(404);
-        expect(requestLines(lines).map(line => [line.level, line.data?.errorCode])).toEqual([["info", "NOT_FOUND"]]);
+        expect(requestLines(lines).map(line => [line.level, line.data?.errorCode])).toEqual([["debug", "NOT_FOUND"]]);
     });
 
     it("keeps a delete of a missing row at warn", async () => {

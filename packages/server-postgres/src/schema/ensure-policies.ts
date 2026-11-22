@@ -146,6 +146,12 @@ export interface PolicyEnsureResult {
      * on every server sharing the database, so it is not done in silence.
      */
     rulesDropped: { table: string; policies: string[] }[];
+    /**
+     * Tables that had row-level security OFF and this run switched on —
+     * schema-qualified. On an adopted database these are the user's own tables,
+     * whose every row was reachable until now, so the boot names them.
+     */
+    rlsEnabled: string[];
 }
 
 const isCreatePolicy = (statement: string): boolean => /^\s*CREATE POLICY/i.test(statement);
@@ -674,7 +680,7 @@ export async function ensureTablePolicies(
 ): Promise<PolicyEnsureResult> {
     const result: PolicyEnsureResult = {
         policiesApplied: 0, tablesSecured: 0, unchanged: 0, skipped: [], failures: [], unsecured: [],
-        orphansDropped: 0, deferred: [], rulesDropped: []
+        orphansDropped: 0, deferred: [], rulesDropped: [], rlsEnabled: []
     };
 
     let plans = planTablePolicies(compiledTables, { adminRequestRoleAvailable: options.adminRequestRoleAvailable });
@@ -830,6 +836,22 @@ export function describeRulesDropped(dropped: { table: string; policies: string[
         "If the rules were removed on purpose, this is that change.";
 }
 
+/**
+ * The warning a boot gives for {@link PolicyEnsureResult.rlsEnabled}: the
+ * tables it switched row-level security on for, by name.
+ *
+ * On a project adopted from an existing database (`rebase init` over it), the
+ * first `rebase dev` is what does what `rebase db push` was said to do, and a
+ * count of policy statements did not tell the developer that their own tables
+ * had just changed who may read them.
+ */
+export function describeRlsEnabled(tables: readonly string[]): string {
+    return `🔐 [rls] Switched row-level security ON for ${tables.length} existing table(s) that had it off, and ` +
+        `created their declared policies: ${tables.join(", ")}. From now on a request reaches only the rows those ` +
+        "policies allow, on every server sharing this database; the server and admins still reach every row. " +
+        "The policies are the `rls` of each table in backend/schema. This happens once: RLS stays on.";
+}
+
 /** The orphans just dropped, when they were every rule the table had. See {@link PolicyEnsureResult.rulesDropped}. */
 function recordRulesDropped(result: PolicyEnsureResult, table: TableWork): void {
     if (table.declaresNoRule && table.orphans.length > 0) {
@@ -840,6 +862,7 @@ function recordRulesDropped(result: PolicyEnsureResult, table: TableWork): void 
 function record(result: PolicyEnsureResult, table: TableWork, log?: (message: string) => void): void {
     const created = table.plan.policyStatements.filter(isCreatePolicy).length;
     result.tablesSecured++;
+    if (!table.rlsOn) result.rlsEnabled.push(table.plan.qualified);
     result.policiesApplied += created;
     result.orphansDropped += table.orphans.length;
     recordRulesDropped(result, table);
@@ -875,6 +898,7 @@ async function applyEachStatement(
         return;
     }
     result.tablesSecured++;
+    if (!table.rlsOn) result.rlsEnabled.push(plan.qualified);
 
     // The restrictive gates go in before any grant, and a gate that cannot be
     // created is replaced by one that passes nothing. A restrictive policy is

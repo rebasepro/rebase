@@ -71,6 +71,8 @@ interface Session {
 
 function world(options: MemoryAuthStoreOptions = {}) {
     const store = new MemoryAuthStore(options);
+    // The bootstrap admin, so the accounts below are ordinary registrations.
+    store.seedUser("admin@app.test");
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.route("/auth", createAuthRoutes({

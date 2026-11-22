@@ -10,6 +10,7 @@ import {
 } from "../storage";
 import { parseEnvBoolean, resourceEnvSuffix } from "@rebasepro/types";
 import { logger } from "../utils/logger";
+import { firstTimeForProject } from "../utils/dev-notices";
 
 /**
  * Whether `FORCE_LOCAL_STORAGE` says a durable volume is mounted, so a `local`
@@ -110,9 +111,17 @@ export async function initializeStorage(
             );
         }
         const controller = await createStorageController(conf);
-        if (conf.type === "local" && controller instanceof LocalStorageController && await controller.isCaseInsensitive()) {
+        if (
+            conf.type === "local" &&
+            controller instanceof LocalStorageController &&
+            await controller.isCaseInsensitive() &&
+            firstTimeForProject(`storage-case-insensitive:${path.resolve(conf.basePath)}`)
+        ) {
             // Development, almost always: a Mac. Nothing is refused — the keys
             // are what they are — but the difference only shows on deploy.
+            // Said once per project and directory: the file system does not
+            // change between boots, and a warning at every hot restart buried
+            // the ones that do.
             logger.warn(
                 `Storage source "${label}" stores files in ${path.resolve(conf.basePath)}, ` +
                 "on a case-insensitive file system: keys that differ only in case (`Avatar.png`, " +

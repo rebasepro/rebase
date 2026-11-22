@@ -288,15 +288,37 @@ export async function describeUnmappedTables(
 }
 
 /**
+ * The column names read as "the user this row belongs to", in order of
+ * preference — the list `rls-check` suggests owner policies from.
+ */
+const OWNER_COLUMNS: readonly string[] = ["user_id", "owner_id", "created_by", "author_id", "account_id"];
+
+/**
  * The SQL that protects a table introspection skipped: row-level security on,
- * and an example policy to adapt — what boot prints for it.
+ * and a starting policy that fits the table — what boot prints for it.
  *
+ * A table with an owner-like column (`user_id`, `owner_id`, `created_by`, …)
+ * gets an owner policy on it, cast to text as `rebase.uid()` is. One without
+ * gets a read-only policy, and the comment says writes need their own: an
+ * owner policy naming a column the table does not have fails when it is run.
+ *
+ * @param columns The table's column names; without them the policy is the
+ *        read-only one.
  * @group Schema
  */
-export function rlsRemediationSql(schema: string, table: string): string {
+export function rlsRemediationSql(schema: string, table: string, columns: readonly string[] = []): string {
     const relation = `${quoteIdent(schema)}.${quoteIdent(table)}`;
-    return `ALTER TABLE ${relation} ENABLE ROW LEVEL SECURITY;\n` +
-        `CREATE POLICY ${quoteIdent(`${table}_owner`)} ON ${relation} FOR ALL TO public USING (owner_id = rebase.uid());  -- an example: write the condition that fits`;
+    const enable = `ALTER TABLE ${relation} ENABLE ROW LEVEL SECURITY;\n`;
+    const owner = OWNER_COLUMNS.find(name => columns.includes(name));
+    if (owner) {
+        const condition = `${owner}::text = rebase.uid()`;
+        return enable +
+            `CREATE POLICY ${quoteIdent(`${table}_owner`)} ON ${relation} FOR ALL TO public ` +
+            `USING (${condition}) WITH CHECK (${condition});  -- each user reaches the rows whose ${owner} is theirs; adapt as needed`;
+    }
+    return enable +
+        `CREATE POLICY ${quoteIdent(`${table}_read`)} ON ${relation} FOR SELECT TO public USING (true);  ` +
+        "-- read-only: every caller reads every row; inserts, updates and deletes need a policy of their own";
 }
 
 /**
@@ -334,7 +356,11 @@ export function describeTables(metadata: SchemaMetadata, options: DescribeTables
             skipped.push({
                 table: name,
                 reason: "row-level security is disabled, so the table has no authorization model: every request would reach every row",
-                remediationSql: rlsRemediationSql(schema, name)
+                remediationSql: rlsRemediationSql(
+                    schema,
+                    name,
+                    metadata.columns.filter(column => column.table_name === name).map(column => column.column_name)
+                )
             });
             continue;
         }

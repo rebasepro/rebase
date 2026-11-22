@@ -15,12 +15,12 @@ import { logger } from "../src/utils/logger";
  */
 function requestLines() {
     const lines: Array<Record<string, unknown> | undefined> = [];
-    for (const level of ["info", "warn", "error"] as const) {
+    // Debug included: outside production a routine request is logged there.
+    for (const level of ["debug", "info", "warn", "error"] as const) {
         jest.spyOn(logger, level).mockImplementation(((message: string, data?: Record<string, unknown>) => {
             if (message === "request") lines.push(data);
         }));
     }
-    jest.spyOn(logger, "debug").mockImplementation(() => undefined);
     return lines;
 }
 

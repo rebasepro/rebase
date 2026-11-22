@@ -706,8 +706,19 @@ refreshToken };
             throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
         }
 
-        if (isFirstUser && isBootstrapWindowOpen()) {
+        // The bootstrap admin is the person at the keyboard of a development
+        // server, signing up to its own admin panel: their address needs no
+        // proof, and a "verify your address" mail for it is only noise in the
+        // dev console. Every other account proves its address as below.
+        const bootstrapAdmin = isFirstUser && isBootstrapWindowOpen();
+        if (bootstrapAdmin) {
             await authRepo.setUserRoles(user.id, ["admin"]);
+            if (!user.emailVerified) {
+                // Everything on the account was put there by this request a
+                // moment ago — the password included — so nothing is removed.
+                await confirmAddressOwnership(authRepo, user, user.passwordHash ?? null, { everythingProven: true });
+                user.emailVerified = true;
+            }
         } else {
             if (isFirstUser) {
                 // Registration was open, so the first account was created as an
@@ -727,7 +738,7 @@ refreshToken };
         // password they just chose. Left for later, the first proof was a
         // magic link or an email code, which has to remove a password nobody
         // proved — the owner's own included.
-        if (config.requireEmailVerification) {
+        if (config.requireEmailVerification && !bootstrapAdmin) {
             // Confirm-first: no session until the address is proven.
             sendVerificationMailInBackground(user);
             if (ops.afterUserCreate) {
@@ -750,7 +761,7 @@ refreshToken };
         // Send welcome email (fire-and-forget, don't block registration)
         sendWelcomeEmail({ email: user.email,
 displayName: user.displayName });
-        sendVerificationMailInBackground(user);
+        if (!bootstrapAdmin) sendVerificationMailInBackground(user);
 
         // Fire afterUserCreate hook
         if (ops.afterUserCreate) {

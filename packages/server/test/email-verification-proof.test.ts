@@ -45,8 +45,10 @@ beforeAll(() => configureJwt({ secret: "email-verification-proof-secret-at-least
 /** A message as the auth routes hand it to the email service. */
 type Mail = EmailSendOptions;
 
-function world(overrides: Partial<AuthModuleConfig> = {}) {
+function world(overrides: Partial<AuthModuleConfig> = {}, options: { empty?: boolean } = {}) {
     const store = new MemoryAuthStore();
+    // The bootstrap admin, so the accounts below are ordinary registrations.
+    if (!options.empty) store.seedUser("admin@app.test");
     const mails: Mail[] = [];
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
@@ -151,7 +153,7 @@ describe("the owner's own verification (IDENTITY-6)", () => {
         expect(followed.json).toMatchObject({ success: true, passwordRemoved: false });
         expect((await w.login(OWNER_PASSWORD)).status).toBe(200);
         // And a later magic link or code has nothing left to remove.
-        expect([...w.store.users.values()][0].emailVerified).toBe(true);
+        expect([...w.store.users.values()].find(u => u.email === VICTIM)!.emailVerified).toBe(true);
     });
 
     it("asks for the password instead of removing it when followed signed out", async () => {
@@ -187,7 +189,7 @@ describe("the owner's own verification (IDENTITY-6)", () => {
         const w = world();
         const owner = await w.register(OWNER_PASSWORD);
         const link = await w.mailedVerificationToken();
-        [...w.store.users.values()][0].emailVerificationSentAt = new Date(Date.now() - 25 * 60 * 60 * 1000);
+        [...w.store.users.values()].find(u => u.email === VICTIM)!.emailVerificationSentAt = new Date(Date.now() - 25 * 60 * 60 * 1000);
 
         const followed = await w.call("GET", `/auth/verify-email?token=${link}`, undefined, owner.json.tokens.accessToken);
 
@@ -210,7 +212,7 @@ describe("requireEmailVerification (confirm-first)", () => {
         // The existing, unconfirmed account is mailed its link again; the
         // password the first registrant chose is untouched.
         expect(w.mails.filter(m => m.to === VICTIM)).toHaveLength(2);
-        expect([...w.store.users.values()][0].passwordHash).toBe(`hashed:${OWNER_PASSWORD}`);
+        expect([...w.store.users.values()].find(u => u.email === VICTIM)!.passwordHash).toBe(`hashed:${OWNER_PASSWORD}`);
     });
 
     it("refuses password sign-in until the address is verified — and only says so to the password's holder", async () => {
@@ -232,6 +234,37 @@ describe("requireEmailVerification (confirm-first)", () => {
         const w = world();
         await w.register(OWNER_PASSWORD);
         expect((await w.register(OWNER_PASSWORD)).json.error.code).toBe("EMAIL_EXISTS");
+    });
+});
+
+/**
+ * The first account on a development server is its bootstrap admin: the
+ * person at the keyboard signing up to their own admin panel. Their address
+ * needs no proof, and a "verify your address" mail is noise in the dev console.
+ */
+describe("the bootstrap admin", () => {
+    it("is verified at registration and is mailed no verification link", async () => {
+        const w = world({}, { empty: true });
+        const admin = await w.register(OWNER_PASSWORD);
+        expect(admin.status).toBe(201);
+        await new Promise(resolve => setImmediate(resolve));
+
+        const stored = [...w.store.users.values()].find(u => u.email === VICTIM)!;
+        expect(stored.emailVerified).toBe(true);
+        expect(stored.passwordHash).toBe(`hashed:${OWNER_PASSWORD}`);
+        expect(w.store.roles.get(stored.id)).toEqual(["admin"]);
+        expect(w.mails.some(m => /verify-email\?token=/.test(m.text ?? ""))).toBe(false);
+    });
+
+    it("is signed in even under confirm-first, while the next account still confirms", async () => {
+        const w = world({ requireEmailVerification: true }, { empty: true });
+        const admin = await w.register(OWNER_PASSWORD);
+        expect(admin.status).toBe(201);
+        expect(admin.json.tokens?.accessToken).toBeTruthy();
+
+        const next = await w.call("POST", "/auth/register", { email: "second@corp.com", password: OWNER_PASSWORD });
+        expect(next.json.confirmationRequired).toBe(true);
+        await w.mailedVerificationToken("second@corp.com");
     });
 });
 
