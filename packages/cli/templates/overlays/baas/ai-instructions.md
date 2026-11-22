@@ -15,7 +15,7 @@ This is a **headless** Rebase project: a REST API, auth, storage and realtime ov
 | `pnpm generate:sdk` | Regenerate the typed client from `backend/schema/` — so in a headless project it has nothing to read until you introspect. Once there are tables there, `pnpm dev` does this on start and on every save; the script is for CI and for when `pnpm dev` is not running |
 | `pnpm build` then `pnpm start` | Build the deployable bundle, then run it |
 | `pnpm skills:install` | Install the Rebase skills for your assistant |
-| `pnpm example` | Run `scripts/example.ts` against the running backend: a health check, and an SDK call to uncomment |
+| `pnpm example` | Run `scripts/example.ts` against the running backend: lists the tables and reads a few rows through the SDK |
 | `rebase doctor` | Checks the environment and the database connection — run this before guessing |
 | `rebase resources --write` | After declaring a database, bucket or topic in `backend/resources.ts`: regenerate `rebase.resources.json` and commit it (`pnpm build` does this too) |
 | `pnpm deploy` | Deploys this project. Never run it; see below |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 19a897df04526a75
+sourceHash: 7c8d0492d7fcfa15
 title: "Rezept: Blog-CMS"
 sidebar_label: Blog-CMS
 description: Erstellen Sie ein vollständiges Blog-CMS mit Artikeln, Autoren, Kategorien, Rich-Text-Bearbeitung und Bild-Uploads – Tabellen in backend/schema, Darstellung in frontend/src/cms.

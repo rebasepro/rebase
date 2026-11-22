@@ -1,5 +1,5 @@
 ---
-sourceHash: 19a897df04526a75
+sourceHash: 7c8d0492d7fcfa15
 title: "Ricetta: Blog CMS"
 sidebar_label: Blog CMS
 description: Crea un CMS completo per blog con articoli, autori, categorie, rich text editing e caricamento immagini — tabelle in backend/schema, presentazione in frontend/src/cms.

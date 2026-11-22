@@ -17,7 +17,7 @@ This is a backend-only Rebase project: a REST API, auth, storage and realtime ov
 | `pnpm generate:sdk` | Regenerate the typed client in `generated/sdk/` from `backend/schema/`. `pnpm dev` already does this on start and on every save; the script is for CI and for when `pnpm dev` is not running |
 | `pnpm build` then `pnpm start` | Build the deployable bundle, then run it |
 | `pnpm skills:install` | Install the Rebase skills for your assistant |
-| `pnpm example` | Run `scripts/example.ts` against the running backend: a health check, and an SDK call to uncomment |
+| `pnpm example` | Run `scripts/example.ts` against the running backend: lists the tables and reads a few rows through the SDK |
 | `rebase doctor` | What disagrees between `backend/schema/`, the generated schema and the live database — run this before guessing |
 | `rebase verify` | After every schema edit, and in CI: a table the server would refuse, a `rls` that does not compile, migrations behind the tables. `--json` names each file, path and fix |
 | `rebase resources --write` | After declaring a database, bucket or topic in `backend/resources.ts`: regenerate `rebase.resources.json` and commit it (`pnpm build` does this too) |

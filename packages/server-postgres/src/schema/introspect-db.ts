@@ -6,6 +6,7 @@ import arg from "arg";
 import * as dotenv from "dotenv";
 
 import { printIndexModule, tableIdentifier } from "@rebasepro/common";
+import { parseEnvBoolean } from "@rebasepro/types";
 
 import {
     buildTablesMap,
@@ -348,7 +349,7 @@ async function main() {
         // source. DATABASE_URL still names it, so the next `db push` would
         // write the generated tables back into it. Not inside `rebase init
         // --introspect`, where the database is the one the new project runs on.
-        if (generatedFiles.length > 0 && process.env.REBASE_INIT_SCAFFOLD !== "1" && projectEnvNames(envFileUsed, databaseUrl)) {
+        if (generatedFiles.length > 0 && parseEnvBoolean(process.env.REBASE_INIT_SCAFFOLD) !== true && projectEnvNames(envFileUsed, databaseUrl)) {
             out(chalk.yellow(`⚠ DATABASE_URL still points at the database this read (${hostPart}).`));
             out(chalk.gray("  If it is the source of a migration, point DATABASE_URL at the new database before `rebase db push`;"));
             out(chalk.gray("  pushing now writes the generated tables back into the one just introspected."));

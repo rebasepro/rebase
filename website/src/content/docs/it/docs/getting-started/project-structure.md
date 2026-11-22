@@ -1,5 +1,5 @@
 ---
-sourceHash: 10e6c0404ca260a3
+sourceHash: 47693473154fa052
 title: Struttura del progetto
 sidebar_label: Struttura del progetto
 description: "La struttura di un progetto Rebase: le tabelle in backend/schema, i moduli backend letti dal runtime e le personalizzazioni del pannello di amministrazione in frontend/src/cms, con e senza pannello."
@@ -40,7 +40,7 @@ my-app/
 ├── tsconfig.json           # Typechecks scripts/; each workspace typechecks on its own
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
 ├── scripts/
-│   └── example.ts          # A health check and an SDK call to uncomment: `pnpm example`
+│   └── example.ts          # Lists the tables and reads a few rows: `pnpm example`
 │
 ├── backend/
 │   ├── schema/             # Your tables

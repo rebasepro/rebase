@@ -14,7 +14,8 @@
 | `pnpm generate:sdk` | Regenerate the typed client in `generated/sdk/` from `backend/schema/`. `pnpm dev` already does this on start and on every save; the script is for CI and for when `pnpm dev` is not running |
 | `pnpm build` then `pnpm start` | Build the deployable bundle, then run it |
 | `pnpm skills:install` | Install the Rebase skills for your assistant |
-| `pnpm example` | Run `scripts/example.ts` against the running backend: a health check, and an SDK call to uncomment |
+| `pnpm example` | Run `scripts/example.ts` against the running backend: lists the tables and reads a few rows through the SDK |
+| `pnpm seed` | Run `scripts/seed.ts` against the running backend: inserts the template's example rows, once (a second run changes nothing) |
 | `rebase doctor` | What disagrees between `backend/schema/`, the generated schema and the live database — run this before guessing |
 | `rebase verify` | After every schema edit, and in CI: a table the server would refuse, a `rls` that does not compile, migrations behind the tables. `--json` names each file, path and fix. Claude Code runs it for you after each edit under `backend/schema/` or `frontend/src/cms/`, through `.claude/hooks/post-edit-collection.sh` |
 | `rebase resources --write` | After declaring a database, bucket or topic in `backend/resources.ts`: regenerate `rebase.resources.json` and commit it (`pnpm build` does this too) |
