@@ -72,7 +72,8 @@ const CONTROL_PLANE_FUNCTIONS: Record<string, Status> = {
     notifications: { pending: "sweep/2026-10-24" },
     usage: { pending: "sweep/2026-10-24" },
     "db-access": { pending: "feat/db-external-access" },
-    maintenance: { pending: "feat/db-scaling" }
+    maintenance: { pending: "feat/db-scaling" },
+    "project-transfer": { pending: "claude/project-transfer-between-orgs-6f3564" }
 };
 
 /**

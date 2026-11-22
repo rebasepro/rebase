@@ -91,14 +91,15 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     projects: {
         command: "cloud projects",
-        usage: "cloud projects <list|create|info|delete> [options]",
-        summary: "List, create, inspect and delete projects in the selected organization.",
+        usage: "cloud projects <list|create|info|transfer|delete> [options]",
+        summary: "List, create, inspect, transfer and delete projects in the selected organization.",
         flags: [["--all-orgs", "list: every organization you belong to, not only the selected one"]],
         examples: [
             "rebase cloud projects list",
             "rebase cloud projects list --all-orgs --json",
             "rebase cloud projects create --help",
             "rebase cloud projects info shop",
+            "rebase cloud projects transfer shop --to-org acme",
             "rebase cloud projects delete shop --yes"
         ]
     },
@@ -539,6 +540,21 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "`--yes` is the global flag, listed below. Off a terminal this command refuses rather than assuming it.",
             "Refused while the code still declares the database, and for one the platform never made.",
             "Its connection string leaves the running backend at the next deploy."
+        ]
+    },
+
+    "projects transfer": {
+        command: "cloud projects transfer",
+        usage: "cloud projects transfer <slug|id> --to-org <id|slug> [--yes]",
+        summary:
+            "Move a project into another organization, unchanged: same id, address, custom domains, database, "
+            + "storage, variables and deployments. Only who owns it, who can see it and who pays for it change.",
+        flags: [["--to-org <id|slug>", "the organization to move it to; you must be its owner or admin"]],
+        examples: ["rebase cloud projects transfer shop --to-org acme", "rebase cloud projects transfer shop --to-org 2f1c…  --yes"],
+        notes: [
+            "You must be owner or admin of both organizations, and signed in with `rebase cloud login`: an access token cannot move a project.",
+            "The destination is billed from now on. One with no card on file (and not billed internally) refuses the move, and nothing changes.",
+            "Without --yes it prompts, and off a terminal it refuses rather than assuming."
         ]
     },
 

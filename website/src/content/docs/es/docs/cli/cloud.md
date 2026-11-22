@@ -102,6 +102,7 @@ rebase cloud projects list
 rebase cloud projects list --all-orgs   # every organization you belong to
 rebase cloud projects create [--link]
 rebase cloud projects info [id]
+rebase cloud projects transfer [id] --to-org <id|slug>
 rebase cloud projects delete [id]
 ```
 

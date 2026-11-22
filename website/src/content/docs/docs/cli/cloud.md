@@ -97,6 +97,7 @@ rebase cloud projects list
 rebase cloud projects list --all-orgs   # every organization you belong to
 rebase cloud projects create [--link]
 rebase cloud projects info [id]
+rebase cloud projects transfer [id] --to-org <id|slug>
 rebase cloud projects delete [id]
 ```
 
@@ -111,6 +112,16 @@ with `already_claimed` instead of printing a dead link. It also refuses once the
 window has ended (`claim_expired`), and in a directory with no claim link
 (`no_claim_link`). `rebase cloud status` and `rebase cloud whoami` show the same
 link while the project is unclaimed.
+
+`projects transfer` moves a project into another organization, unchanged: the
+same id, address, custom domains, database, storage, environment variables and
+deployments. Only who owns it, who can see it and who pays for it change. You
+must be owner or admin of both organizations and signed in with `rebase cloud login`;
+an access token cannot move a project. The destination is billed from then on,
+so one with no card on file (and not billed internally) refuses the move and
+nothing changes. A project still waiting to be claimed moves by its claim link
+instead. The console has the same action under the project's Settings, in the
+danger zone.
 
 ## Deploy and observe
 
