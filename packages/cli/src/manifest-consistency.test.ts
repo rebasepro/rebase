@@ -710,4 +710,9 @@ describe("rebase.json — the redirect rules agree", () => {
         expect({ value, schema: new RegExp(redirectProps().host.pattern).test(value) })
             .toEqual({ value, schema: cliAccepts({ from: "/old", to: "/new", host: value }, "host") });
     });
+
+    it.each(HOSTS)("judges the redirect notHost %j the same way on both sides", (value) => {
+        expect({ value, schema: new RegExp(redirectProps().notHost.pattern).test(value) })
+            .toEqual({ value, schema: cliAccepts({ from: "/old", to: "/new", notHost: value }, "notHost") });
+    });
 });

@@ -1,8 +1,8 @@
 ---
-sourceHash: 51ad2b8ffc5dc3c7
+sourceHash: 8250c897b7861c24
 title: Weiterleitungen und Clean URLs
 sidebar_label: Weiterleitungen & Clean URLs
-description: "Eine statische App in rebase.json kann Anfragen mit Weiterleitungen beantworten (Vercel-ähnliches :param-Matching, Host- und Query-Bedingungen) und mit cleanUrls x.html unter /x bereitstellen."
+description: "Eine statische App in rebase.json kann Anfragen mit Weiterleitungen beantworten (Vercel-ähnliches :param-Matching, Host-, negierte Host- und Query-Bedingungen) und mit cleanUrls x.html unter /x bereitstellen."
 ---
 
 <span class="since-badge" data-since="0.35">Seit 0.35</span>
@@ -41,6 +41,9 @@ Eine statische App kann bestimmte Anfragen mit einer Weiterleitung statt einer D
   und die Methode wird beibehalten.
 - **`host`** beschränkt eine Weiterleitung auf Anfragen für einen bestimmten Hostnamen. Bei einer App, deren
   `path` einen Hostnamen angibt, kann dies nur dieser sein.
+- **`notHost`** beschränkt sie auf Anfragen für jeden Hostnamen außer einem. Es kann nicht zusammen mit `host`
+  gesetzt werden, und bei einer App, deren `path` einen Hostnamen angibt, kann es nicht dieser sein, da die
+  Weiterleitung nie zutreffen würde.
 - **`query`** beschränkt sie auf Anfragen, deren Query-String jeden Parameter
   mit genau diesem Wert enthält, verglichen nach der Dekodierung. `""` entspricht einem Parameter,
   der ohne Wert vorhanden ist (`?preview` oder `?preview=`); es gibt keine Wildcards.
@@ -54,6 +57,21 @@ weitergeleitet. `rebase.json` wird abgelehnt, wenn eine Weiterleitung niemals zu
 `from` außerhalb der App oder unter dem Pfad einer anderen App), wenn zwei Weiterleitungen auf
 dieselben Anfragen zutreffen, und wenn eine Weiterleitung eine Anfrage an einen Pfad sendet, auf den ihr eigenes
 `from` erneut zutrifft, was zu einer Endlosschleife führen würde.
+
+## Ein Pfad, auf jedem Hostnamen eine andere Seite
+
+<span class="since-badge" data-since="0.35">Seit 0.35</span>
+
+Eine App, die unter mehreren Hostnamen bereitgestellt wird, kann denselben Pfad auf jedem zu einer anderen Seite weiterleiten. Hier öffnet `/` auf `app.example.com` die App und auf jedem anderen Hostnamen die Demo:
+
+```json
+"redirects": [
+  { "from": "/", "host": "app.example.com", "to": "/app.html", "status": 307 },
+  { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
+]
+```
+
+Ohne `notHost` kann die zweite Weiterleitung ganz ohne Bedingung auskommen: Die erste Übereinstimmung antwortet, daher sieht sie nur, was die erste durchgelassen hat. Mit `notHost` legt jede Weiterleitung für sich fest, wo sie gilt, so wie es eine `missing`-Bedingung in `vercel.json` tut, sodass die Reihenfolge keine Rolle mehr spielt.
 
 ## Eine Domain an eine andere weiterleiten
 
@@ -103,7 +121,8 @@ ein Verzeichnis mit dem exakten Namen der Anfrage wird zuerst ausgeliefert, soda
   "redirects": [
     { "source": "/blog/:slug", "destination": "/posts/:slug", "permanent": true },
     { "source": "/:path*", "has": [{ "type": "host", "value": "example.com" }], "destination": "https://www.example.com/:path*" },
-    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false }
+    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false },
+    { "source": "/", "missing": [{ "type": "host", "value": "app.example.com" }], "destination": "/demo.html", "permanent": false }
   ]
 }
 ```
@@ -116,7 +135,8 @@ wird in der statischen App in `rebase.json` zu:
   "redirects": [
     { "from": "/blog/:slug", "to": "/posts/:slug" },
     { "from": "/:path*", "host": "example.com", "to": "https://www.example.com/:path*" },
-    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 }
+    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 },
+    { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
   ]
 }
 ```
@@ -130,11 +150,12 @@ wird in der statischen App in `rebase.json` zu:
 | `statusCode` | `status` |
 | `has` vom Typ `"type": "host"` | `host` |
 | `has` vom Typ `"type": "query"` mit einem `value` | `query` |
+| `missing` vom Typ `"type": "host"` | `notHost` |
 | `cleanUrls` | `cleanUrls` |
 
 Ein Vercel-Projekt pro Domain wird zu einer statischen App pro Hostname, wie unter
 [Eine Domain an eine andere weiterleiten](#eine-domain-an-eine-andere-weiterleiten) beschrieben. Bedingungen an einen
-Header oder ein Cookie sowie reguläre Ausdrücke in `source` sind Logik: Eine
+Header oder ein Cookie, einen `missing`-Query-Parameter sowie reguläre Ausdrücke in `source` sind Logik: Eine
 [Route](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) übergibt einen solchen Pfad an eine
 Funktion, die mit einer beliebigen Weiterleitung antworten kann.
 

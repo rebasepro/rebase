@@ -1,8 +1,8 @@
 ---
-sourceHash: 51ad2b8ffc5dc3c7
+sourceHash: 8250c897b7861c24
 title: Redirect e clean URL
 sidebar_label: Redirect & Clean URL
-description: "Un'app statica in rebase.json può rispondere alle richieste con dei redirect (matching dei :param in stile Vercel, condizioni su host e query) e servire x.html su /x con cleanUrls."
+description: "Un'app statica in rebase.json può rispondere alle richieste con dei redirect (matching dei :param in stile Vercel, condizioni su host, host negato e query) e servire x.html su /x con cleanUrls."
 ---
 
 <span class="since-badge" data-since="0.35">Da 0.35</span>
@@ -42,6 +42,9 @@ servire le sue pagine HTML senza `.html`:
   e il metodo viene mantenuto.
 - **`host`** limita il redirect alle richieste per un singolo hostname. Su un'app il cui
   `path` specifica un hostname, può essere solo quello.
+- **`notHost`** lo limita alle richieste per qualsiasi hostname tranne uno. Non può essere impostato
+  insieme a `host`, e su un'app il cui `path` specifica un hostname non può essere quello, perché il
+  redirect non corrisponderebbe mai.
 - **`query`** lo limita alle richieste la cui query string contiene ciascun parametro
   esattamente con quel valore, confrontato dopo la decodifica. `""` corrisponde a un parametro
   presente senza valore (`?preview` o `?preview=`); non sono supportati caratteri jolly.
@@ -55,6 +58,21 @@ reindirizzati. `rebase.json` viene rifiutato quando un redirect non potrebbe mai
 `from` all'esterno dell'app o sotto il percorso di un'altra app), quando due redirect corrispondono
 alle stesse richieste, o quando un redirect invia una richiesta a un percorso a cui il suo stesso
 `from` corrisponde di nuovo, generando un loop infinito.
+
+## Un percorso, una pagina diversa per hostname
+
+<span class="since-badge" data-since="0.35">Da 0.35</span>
+
+Un'app servita su più hostname può inviare lo stesso percorso a una pagina diversa su ciascuno. Qui `/` apre l'app su `app.example.com` e la demo su tutti gli altri hostname:
+
+```json
+"redirects": [
+  { "from": "/", "host": "app.example.com", "to": "/app.html", "status": 307 },
+  { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
+]
+```
+
+Senza `notHost`, il secondo redirect può non avere alcuna condizione: risponde la prima corrispondenza, quindi vede solo ciò che il primo ha lasciato passare. `notHost` fa sì che ogni redirect dica da sé dove si applica, come fa una condizione `missing` di `vercel.json`, così l'ordine non conta più.
 
 ## Reindirizzare un dominio verso un altro
 
@@ -104,7 +122,8 @@ sito con `spa: false` risponde con un 404.
   "redirects": [
     { "source": "/blog/:slug", "destination": "/posts/:slug", "permanent": true },
     { "source": "/:path*", "has": [{ "type": "host", "value": "example.com" }], "destination": "https://www.example.com/:path*" },
-    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false }
+    { "source": "/", "has": [{ "type": "query", "key": "lang", "value": "es" }], "destination": "/es", "permanent": false },
+    { "source": "/", "missing": [{ "type": "host", "value": "app.example.com" }], "destination": "/demo.html", "permanent": false }
   ]
 }
 ```
@@ -117,7 +136,8 @@ diventa, sull'app statica in `rebase.json`:
   "redirects": [
     { "from": "/blog/:slug", "to": "/posts/:slug" },
     { "from": "/:path*", "host": "example.com", "to": "https://www.example.com/:path*" },
-    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 }
+    { "from": "/", "query": { "lang": "es" }, "to": "/es", "status": 307 },
+    { "from": "/", "notHost": "app.example.com", "to": "/demo.html", "status": 307 }
   ]
 }
 ```
@@ -131,11 +151,12 @@ diventa, sull'app statica in `rebase.json`:
 | `statusCode` | `status` |
 | `has` di `"type": "host"` | `host` |
 | `has` di `"type": "query"` con un `value` | `query` |
+| `missing` di `"type": "host"` | `notHost` |
 | `cleanUrls` | `cleanUrls` |
 
 Un progetto Vercel per dominio diventa un'app statica per hostname, come in
 [Reindirizzare un dominio verso un altro](#reindirizzare-un-dominio-verso-un-altro). Le condizioni su un
-header o un cookie, e le espressioni regolari in `source`, sono logica: una
+header o un cookie, un parametro di query `missing` e le espressioni regolari in `source`, sono logica: una
 [route](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) affida tale percorso a una
 funzione, che può rispondere con qualsiasi redirect decida.
 

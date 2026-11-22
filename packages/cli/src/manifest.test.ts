@@ -897,6 +897,24 @@ describe("static.redirects and static.cleanUrls", () => {
         }]);
     });
 
+    it("carries a host and a notHost redirect on the same path, which match different requests", () => {
+        const redirects = [
+            { from: "/", to: "/app.html", host: "app.example.com", status: 307 },
+            { from: "/", to: "/demo.html", notHost: "app.example.com", status: 307 }
+        ];
+        const { issues, manifest } = validate({ site: site({ redirects }) });
+        expect(issues).toEqual([]);
+        const app = manifest?.apps.site;
+        expect(app?.type === "static" ? app.redirects : undefined).toEqual(redirects);
+    });
+
+    it("refuses a notHost beside a host", () => {
+        const { issues } = validate({
+            site: site({ redirects: [{ from: "/a", to: "/b", host: "example.com", notHost: "www.example.com" }] })
+        });
+        expect(issues.map(i => i.path)).toEqual(["apps.site.redirects[0].notHost"]);
+    });
+
     it("refuses a redirect another app answers, and names it", () => {
         const { issues } = validate({
             site: site({ redirects: [{ from: "/docs/old", to: "/new" }] }),
@@ -920,6 +938,14 @@ describe("static.redirects and static.cleanUrls", () => {
         }
         expect(warnings.join("\n")).toMatch(/redirects\[0\]\.destination is not a field of a redirect — it is ignored — write "to"/);
         expect(warnings.join("\n")).toMatch(/redirects\[0\]\.permanent .* "status": 308/);
+        warnings.length = 0;
+        console.warn = (message: string) => { warnings.push(message); };
+        try {
+            validate({ site: site({ redirects: [{ from: "/a", to: "/b", missing: [{ type: "host", value: "x.example.com" }] }] }) });
+        } finally {
+            console.warn = original;
+        }
+        expect(warnings.join("\n")).toMatch(/redirects\[0\]\.missing .* "notHost"/);
     });
 });
 

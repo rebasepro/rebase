@@ -71,12 +71,18 @@ describe("loading a bundle's redirects and cleanUrls", () => {
                 redirects: [{ from: "/old", to: "/new", status: 301 }],
                 files: { "index.html": "SITE" }
             },
-            { name: "admin", path: "/admin", spa: true, files: { "index.html": "ADMIN" } }
+            { name: "admin", path: "/admin", spa: true, files: { "index.html": "ADMIN" } },
+            {
+                name: "apex", path: "/", host: APEX, spa: true,
+                redirects: [{ from: "/", to: "/demo.html", notHost: WWW }],
+                files: { "index.html": "APEX" }
+            }
         ]);
         const bundle = loadBundle(scratch);
         const site = bundle.staticApps.find(app => app.host === WWW);
         const admin = bundle.staticApps.find(app => app.path === "/admin");
         expect(site?.redirects).toEqual([{ from: "/old", to: "/new", status: 301 }]);
+        expect(bundle.staticApps.find(app => app.host === APEX)?.redirects).toEqual([{ from: "/", to: "/demo.html", notHost: WWW }]);
         expect(site?.cleanUrls).toBe(true);
         expect(admin).not.toHaveProperty("redirects");
         expect(admin).not.toHaveProperty("cleanUrls");
@@ -94,6 +100,7 @@ describe("loading a bundle's redirects and cleanUrls", () => {
         ["a redirect loop", { redirects: [{ from: "/:path*", to: "/new/:path*" }] }, /forever/],
         ["a status that is not a redirect", { redirects: [{ from: "/a", to: "/b", status: 200 }] }, /its status/],
         ["a host the app never answers on", { host: WWW, redirects: [{ from: "/a", to: "/b", host: APEX }] }, /its host/],
+        ["a notHost that is the app's own hostname", { host: WWW, redirects: [{ from: "/a", to: "/b", notHost: WWW }] }, /its notHost/],
         ["cleanUrls that is not a boolean", { cleanUrls: "yes" }, /cleanUrls/]
     ])("refuses %s, by name, at load", (_label, over, message) => {
         writeBundle(scratch, [
@@ -154,6 +161,19 @@ describe("serveSPA redirects", () => {
         expect(await request(app, "/pricing", { headers: { host: "Example.com:443" } }))
             .toMatchObject({ status: 308, location: `https://${WWW}/pricing` });
         expect(await request(app, "/pricing", { headers: { host: WWW } })).toMatchObject({ status: 200, body: "INDEX" });
+    });
+
+    it("answers a negated host condition on every hostname but that one", async () => {
+        const app = mount({
+            redirects: [
+                { from: "/", to: "/app.html", host: "app.example.com", status: 307 },
+                { from: "/", to: "/demo.html", notHost: "app.example.com", status: 307 }
+            ]
+        });
+        expect(await request(app, "/", { headers: { host: "App.Example.com" } })).toMatchObject({ status: 307, location: "/app.html" });
+        expect(await request(app, "/?ref=ad", { headers: { host: WWW } })).toMatchObject({ status: 307, location: "/demo.html?ref=ad" });
+        expect(await request(app, "/", { headers: { host: APEX } })).toMatchObject({ status: 307, location: "/demo.html" });
+        expect(await request(app, "/pricing", { headers: { host: APEX } })).toMatchObject({ status: 200, body: "INDEX" });
     });
 
     it("never redirects the API or a path another handler owns", async () => {

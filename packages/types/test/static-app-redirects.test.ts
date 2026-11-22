@@ -29,6 +29,7 @@ describe("validateStaticRedirect", () => {
             { from: "/blog/:slug", to: "/posts/:slug", status: 301 },
             { from: "/docs/:path*", to: "/guide/:path*" },
             { from: "/:path*", to: "https://www.example.com/:path*", host: "example.com" },
+            { from: "/", to: "/demo.html", notHost: "app.example.com" },
             { from: "/", to: "/es", query: { lang: "es" }, status: 302 },
             { from: "/privacy", to: "https://legal.example.com/privacy?from=site" },
             { from: "/café", to: "/cafe" },
@@ -75,6 +76,9 @@ describe("validateStaticRedirect", () => {
         ["a status as a string", { from: "/a", to: "/b", status: "301" }, "status"],
         ["a host with a scheme", { from: "/a", to: "/b", host: "https://example.com" }, "host"],
         ["a host with a capital", { from: "/a", to: "/b", host: "Example.com" }, "host"],
+        ["a notHost with a port", { from: "/a", to: "/b", notHost: "example.com:443" }, "notHost"],
+        ["a notHost that is not a string", { from: "/a", to: "/b", notHost: ["example.com"] }, "notHost"],
+        ["a notHost beside a host", { from: "/a", to: "/b", host: "example.com", notHost: "www.example.com" }, "notHost"],
         ["a query that is a string", { from: "/a", to: "/b", query: "lang=es" }, "query"],
         ["a query value that is not a string", { from: "/a", to: "/b", query: { lang: true } }, "query"]
     ])("refuses %s", (_label, value, field) => {
@@ -109,6 +113,21 @@ describe("validateStaticRedirect", () => {
         expect(validateStaticRedirect({ from: "/a", to: "/b", host: "example.com" }, app))
             .toMatchObject({ ok: false, field: "host" });
         expect(validateStaticRedirect({ from: "/a", to: "/b", host: "www.example.com" }, app).ok).toBe(true);
+    });
+
+    it("refuses a notHost that is the app's only hostname, and keeps one that is not", () => {
+        const app = { host: "www.example.com", path: "/" };
+        expect(validateStaticRedirect({ from: "/a", to: "/b", notHost: "www.example.com" }, app))
+            .toMatchObject({ ok: false, field: "notHost" });
+        expect(validateStaticRedirect({ from: "/a", to: "/b", notHost: "example.com" }, app))
+            .toEqual({ ok: true, redirect: { from: "/a", to: "/b", notHost: "example.com" } });
+    });
+
+    it("still finds a loop on a notHost redirect, whichever hostname it excludes", () => {
+        for (const notHost of ["example.com", "app.example.com"]) {
+            expect(validateStaticRedirect({ from: "/:path*", to: "/new/:path*", notHost }, ROOT))
+                .toMatchObject({ ok: false, field: "to" });
+        }
     });
 
     it.each([
@@ -210,6 +229,24 @@ describe("compileStaticRedirects", () => {
         const redirects = [{ from: "/a", to: "/b", host: "old.example.com" }];
         expect(answer(redirects, { host: "old.example.com", path: "/a" })).toBeDefined();
         expect(answer(redirects, { host: "example.com", path: "/a" })).toBeUndefined();
+    });
+
+    it("answers a negated host condition on every hostname but that one", () => {
+        const redirects = [{ from: "/", to: "/demo.html", notHost: "app.example.com", status: 307 as const }];
+        expect(answer(redirects, { host: "example.com", path: "/" })).toEqual({ status: 307, location: "/demo.html" });
+        expect(answer(redirects, { host: "www.example.com", path: "/" })?.location).toBe("/demo.html");
+        expect(answer(redirects, { host: "app.example.com", path: "/" })).toBeUndefined();
+    });
+
+    it("ports a vercel.json pair of has and missing host conditions one to one", () => {
+        // "/" is the app on app.example.com, and the demo everywhere else.
+        const redirects: RebaseStaticRedirect[] = [
+            { from: "/", to: "/app.html", host: "app.example.com", status: 307 },
+            { from: "/", to: "/demo.html", notHost: "app.example.com", status: 307 }
+        ];
+        expect(answer(redirects, { host: "app.example.com", path: "/" })?.location).toBe("/app.html");
+        expect(answer(redirects, { host: "example.com", path: "/", search: "?ref=x" })?.location).toBe("/demo.html?ref=x");
+        expect(answer(redirects, { host: "app.example.com", path: "/other" })).toBeUndefined();
     });
 
     it("answers with the first redirect that matches, in declaration order", () => {
