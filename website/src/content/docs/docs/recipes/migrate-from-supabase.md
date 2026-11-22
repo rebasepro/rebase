@@ -73,7 +73,8 @@ rebase db push
 
 `rebase db push` applies every `.sql` file in `backend/sql` in name order, after
 the tables and before the policies, and records each by hash in
-`rebase.sql_files`, so a file runs again only when it changes.
+`rebase.sql_files`, so a file runs again only when it changes. A deploy applies
+them the same way (step 8).
 
 A function the browser called with `supabase.rpc('fn')` is reached through a
 custom function that validates its input and calls it, as the caller under
@@ -148,8 +149,9 @@ reports `blockedOn: email_not_configured`.
 ```bash
 rebase cloud projects create --name Triptelier --link
 rebase cloud deploy
-rebase cloud db query --file backend/sql/introspected.sql
 ```
 
-A deploy does not apply `backend/sql` yet; run the file once on the Cloud
-database as above, and again after you change it.
+The deploy applies `backend/sql` as `rebase db push` does: the bundle carries
+the files, and the new revision's boot runs each new or changed one once, after
+the tables and before the policies. A file that fails stops the boot and names
+the file, so a mistake in one shows up in the deploy, not in a running app.

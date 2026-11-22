@@ -522,6 +522,17 @@ export interface RebaseBackendOptions {
     schemaEditor?: boolean;
 
     /**
+     * The project's own SQL — `backend/sql`, the functions, triggers and
+     * CHECKs a table declaration cannot say — applied by a provisioning boot
+     * after auth and before the policies, as `rebase db push` applies it: each
+     * new or changed file once, in name order, recorded by hash. A bundle boot
+     * passes the directory the bundle carries; an application may pass its
+     * own, or name it on the adapter (`createPostgresAdapter({ sqlDir })`).
+     * A file that fails fails the boot.
+     */
+    sqlDir?: string;
+
+    /**
      * The presentation the project's frontend ships — a copy of
      * `frontend/src/cms/ui-config.json` — for a server that cannot read the
      * project's tree: a built bundle carries it (`entry.uiConfig`). Read as

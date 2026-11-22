@@ -24,7 +24,8 @@ import {
     type RealtimeSocketOptions,
     type CompiledTable,
     type TableDescriptor,
-    type TableRefreshOutcome
+    type TableRefreshOutcome,
+    type SqlFilesOutcome
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import { RealtimeService, parseMaxSocketsPerUser, parseMaxSubscriptionsPerSocket, parseRealtimeTuning } from "./services/realtimeService";
@@ -65,6 +66,15 @@ import { ensurePooledRoleDefaults } from "./pooled-database";
 
 export interface PostgresDriverConfig {
     connectionString?: string;
+    /**
+     * The project's own SQL — `backend/sql`, the functions, triggers and
+     * CHECKs a table declaration cannot say — for a provisioning boot to apply
+     * as `rebase db push` does (each new or changed file once, in name order,
+     * recorded in `rebase.sql_files`). For an application that builds this
+     * adapter itself; a bundle boot hands the directory the bundle carries,
+     * which wins. Unset, and with no bundle, no files are applied.
+     */
+    sqlDir?: string;
     adminConnectionString?: string;
     /**
      * This database's read replica: reads are routed there, writes stay on
@@ -2474,6 +2484,40 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
          */
         async ensureRlsRuntime(driverResult?: InitializedDriver): Promise<void> {
             await provisionRlsRuntime(driverResult);
+        },
+
+        /**
+         * Apply `backend/sql/*.sql` — see `schema/sql-files-apply` for how
+         * several instances booting at once apply each file once. On a
+         * connection of its own (one file is many statements, which drizzle's
+         * extended protocol refuses), checked out of the driver's pool.
+         */
+        async ensureSqlFiles(
+            dir: string | undefined,
+            driverResult?: InitializedDriver,
+            log?: (message: string) => void
+        ): Promise<SqlFilesOutcome> {
+            const source = dir ?? pgConfig.sqlDir;
+            if (!source) return { applied: [], unchanged: [], removed: [] };
+            const { readSqlFiles } = await import("./schema/sql-files");
+            const files = readSqlFiles(source);
+            const { applySqlFilesOn, openSqlFilesSession } = await import("./schema/sql-files-apply");
+            const db = requireProvisioningDb(driverResult);
+            const session = await openSqlFilesSession("$client" in db ? db.$client : undefined);
+            if (!session) {
+                if (files.length === 0) return { dir: source, applied: [], unchanged: [], removed: [] };
+                throw new Error(
+                    `Cannot apply ${source}: this adapter's connection is neither a pg Pool, a pg Client nor PGlite, ` +
+                    "so there is no connection to run a multi-statement file on."
+                );
+            }
+            try {
+                const plan = await applySqlFilesOn(session, files);
+                for (const file of plan.apply) log?.(`applied ${file.name}${file.changed ? " (changed)" : ""}`);
+                return { dir: source, applied: plan.apply.map(file => file.name), unchanged: plan.unchanged, removed: plan.removed };
+            } finally {
+                await session.release();
+            }
         },
 
         async ensureTablePolicies(

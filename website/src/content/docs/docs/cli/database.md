@@ -50,6 +50,16 @@ to run again (`CREATE OR REPLACE FUNCTION`, `DROP TRIGGER IF EXISTS` before
 applied. Removing a file undoes nothing it did. `--dry-run` lists the files it
 would apply.
 
+A deploy applies the same files: `rebase build` carries them in the bundle, and
+the server's boot runs each new or changed one after the tables and auth and
+before the policies, recorded in the same `rebase.sql_files`. Each file's
+transaction takes one advisory lock first, so several instances starting
+together, or a push during a deploy, run each file once. A file may run for
+15 minutes. A file that fails stops the boot and names the file. `rebase dev` applies them at boot too. An
+application that builds its own backend names the directory with
+`createPostgresAdapter({ sqlDir: "backend/sql" })`. Nothing is applied with
+`REBASE_PROVISION=false` or `REBASE_MIGRATE_ON_BOOT=none`.
+
 :::caution
 `db push` modifies the database directly without migration files. Use `db generate` + `db migrate` for production.
 :::

@@ -189,6 +189,7 @@ function hasFieldOps
 function hasRole
 function hasScope
 function hashPassword
+function honoHttpExceptionStatus
 function html
 function httpMethodToOperation
 function identityResolved
@@ -388,7 +389,7 @@ interface ListUsersOptions { limit, offset, orderBy, orderDir, roleId, search }
 interface LiveSchemaConfig { allowMachineApply, repository }
 interface LoadBackendSchemaOptions { importModule, projectRoot }
 interface LoadDirectoryOptions { importModule, onSkip }
-interface LoadedBundle { cronsDir, dir, functionsDir, hooksModule, isSource, manifest, resourcesModule, staticApps, storageModule, tablesDir, uiConfigFile }
+interface LoadedBundle { cronsDir, dir, functionsDir, hooksModule, isSource, manifest, resourcesModule, sqlDir, staticApps, storageModule, tablesDir, uiConfigFile }
 interface LoadedCronJob { definition, id }
 interface LoadedFunction { app, name }
 interface LoadedFunctions { functions, problems }
@@ -435,8 +436,8 @@ interface RealtimeProvider { counts, destroy, health, notifyUpdate, onServerRead
 interface RebaseApiError { code, details, statusCode }
 interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, captcha, cookieAuth, defaultRole, deviceLogin, disableSelfRegistration, discord, email, emailOtp, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, magicLinkCreatesUsers, microsoft, providers, refreshExpiresIn, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireAuth, requireEmailVerification, serviceKey, signingKeys, slack, spotify, twitter }
 interface RebaseBackend { attachRealtime, auth, cronScheduler, driver, driverRegistry, fetch, getTableDescriptor, getTableDescriptors, healthCheck, history, jobQueue, metricsHistory, mount, realtimeService, realtimeServices, rebase, routes, services, setTableHooks, shutdown, start, storageController, storageRegistry, verifyCredential }
-interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, defaultRls, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, hooks, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provisionSchema, provisioningDriverResult, push, rateLimit, requireFilesLoaded, rlsAudit, runtimeVersion, schemaDir, schemaEditor, schemaTables, schemaVersion, server, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces, tables, uiConfigFile }
-interface RebaseBackendOptions { auth, baas, bootstrappers, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, defaultRls, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, hooks, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provision, provisioningDriverResult, push, rateLimit, requireFilesLoaded, rlsAudit, runtimeVersion, schemaDir, schemaEditor, schemaTables, schemaVersion, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces, tables, uiConfigFile }
+interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, defaultRls, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, hooks, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provisionSchema, provisioningDriverResult, push, rateLimit, requireFilesLoaded, rlsAudit, runtimeVersion, schemaDir, schemaEditor, schemaTables, schemaVersion, server, sqlDir, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces, tables, uiConfigFile }
+interface RebaseBackendOptions { auth, baas, bootstrappers, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, defaultRls, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, hooks, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provision, provisioningDriverResult, push, rateLimit, requireFilesLoaded, rlsAudit, runtimeVersion, schemaDir, schemaEditor, schemaTables, schemaVersion, sqlDir, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces, tables, uiConfigFile }
 interface RebaseFunctionContext { rebase }
 interface RebaseRoutes { admin, auth, cron, data, functions, meta, push, schema, storage }
 interface RecoveryCode { id, uid, usedAt }
@@ -851,7 +852,7 @@ interface AuthUserListResult { limit, offset, total, users }
 interface AuthenticatedPolicyExpression { kind }
 interface AuthenticatedSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface AuthenticatedUser { claims, displayName, email, isAdmin, isAnonymous, photoUrl, rawToken, roles, scopes, uid }
-interface BackendBootstrapper { ensureRlsRuntime, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readTablesSchemaVersion, runMigrations, stampTablesSchemaVersion, type, verifyConnection }
+interface BackendBootstrapper { ensureRlsRuntime, ensureSqlFiles, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readTablesSchemaVersion, runMigrations, stampTablesSchemaVersion, type, verifyConnection }
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider, tableRegistry }
 interface BackendLifecycle { destroy, healthCheck, initialize }
@@ -939,7 +940,7 @@ interface DataRateLimitCaller { apiKey, header, socketAddress, uid }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 interface DataSourceDefinition { databaseId, engine, key, label, transport }
-interface DatabaseAdapter { destroy, ensureRlsRuntime, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readTablesSchemaVersion, stampTablesSchemaVersion, type, verifyConnection }
+interface DatabaseAdapter { destroy, ensureRlsRuntime, ensureSqlFiles, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readTablesSchemaVersion, stampTablesSchemaVersion, type, verifyConnection }
 interface DatabaseAdapterInitConfig { baas, dataSourceKey, introspectCollections, provision, realtime, schemaProvisioning, tables }
 interface DatabaseConnection { close, isConnected, type }
 interface DatabaseHealthSample { connections, maxConnections, replicaLagSeconds, sizeBytes }
@@ -1047,9 +1048,9 @@ interface RealtimeProvider { counts, destroy, health, notifyUpdate, onServerRead
 interface RealtimeSocketOptions { accessModel, dataRateLimit, heartbeatIntervalMs, identityRecheckIntervalMs, maxPayload, maxSocketsPerUser, path, resolveApiKey, runInScope, verifyAccessToken }
 interface RealtimeSocketTotals { bytesIn, bytesOut, closeCodes, closedBy, framesIn, framesOut, opened, refused }
 interface RebaseBackendAppConfig { context, crons, dockerfile, functions, port, registerDatabase, runtime, schema, tables, type }
-interface RebaseBundleEntrypoints { crons, functions, hooks, resources, schema, static, storage, tables, uiConfig }
+interface RebaseBundleEntrypoints { crons, functions, hooks, resources, schema, sql, static, storage, tables, uiConfig }
 interface RebaseBundleFunction { file, name, portable, requires }
-interface RebaseBundleManifest { app, build, bundleFormat, deps, entry, functions, hooks, kind, resources, runtime, schemaVersion, storage, tables }
+interface RebaseBundleManifest { app, build, bundleFormat, deps, entry, functions, hooks, kind, resources, runtime, schemaVersion, sqlFiles, storage, tables }
 interface RebaseBundleStatic { cms, dir, frameAncestors, host, name, path, routes, spa }
 interface RebaseClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, data, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, storage, storageRegistry, ws }
 interface RebaseErrorInit { cause, code, details, requestId, retryAfterSeconds, status }
@@ -1122,6 +1123,7 @@ interface SimulatedContext { apiKeyId, collection, maskedColumns, role, sub }
 interface SingleSubscriptionConfig { clientId, id, path }
 interface SingleUpdateMessage { channel, error, etag, payload, requestId, row, rows, subscriptionId, type }
 interface SqlCursor { close, columns, read }
+interface SqlFilesOutcome { applied, dir, removed, unchanged }
 interface SqlScriptColumn { name, source, type }
 interface SqlScriptColumnSource { column, schema, table }
 interface SqlScriptNotice { message, severity }

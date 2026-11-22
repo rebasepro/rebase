@@ -9,7 +9,10 @@
  *
  * `rebase db push` now applies every file in this directory, in file-name
  * order, after the tables and views and before the policies (so a policy may
- * call a function a file defines). Each file is recorded by name and SHA-256
+ * call a function a file defines). So does a provisioning boot — how a deploy
+ * applies them: `rebase build` carries the files in the bundle (`entry.sql`),
+ * and the bootstrapper's `ensureSqlFiles` runs them after auth and before the
+ * policies. Each file is recorded by name and SHA-256
  * in `rebase.sql_files` and runs again only when its content changes, each in
  * its own transaction: a file that fails rolls back alone and stops the push,
  * naming it. Files must therefore be safe to run again (`CREATE OR REPLACE
@@ -24,7 +27,8 @@
  * and applied. The name it used before this, `introspected-left-behind.sql`,
  * is treated as a draft too, so a project that has one is not broken by it.
  *
- * Side-effect free; the database half is `applySqlFiles` in `cli-helpers.ts`.
+ * Side-effect free; the database half is `applySqlFilesOn` in
+ * `sql-files-apply.ts`, which `rebase db push` and a provisioning boot share.
  */
 import { createHash } from "crypto";
 import fs from "fs";
@@ -98,7 +102,3 @@ export const SQL_FILES_LEDGER_SQL = [
         applied_at timestamptz NOT NULL DEFAULT now()
     )`
 ];
-
-export const RECORD_SQL_FILE_SQL =
-    "INSERT INTO rebase.sql_files (name, hash, applied_at) VALUES ($1, $2, now()) " +
-    "ON CONFLICT (name) DO UPDATE SET hash = EXCLUDED.hash, applied_at = EXCLUDED.applied_at";

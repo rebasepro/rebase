@@ -117,6 +117,21 @@ describe("a format-3 bundle", () => {
         expect(() => loadBundle(escaping)).toThrow(/points outside the bundle/);
     });
 
+    it("resolves entry.sql, the project's backend/sql it carries, and boots one built before it without", () => {
+        const base = {
+            bundleFormat: BUNDLE_FORMAT_VERSION, runtime, schemaVersion: "abc", app: "backend", kind: "backend",
+            hooks: { native: false }, deps: { declared: {} }
+        };
+        const carrying = writeBundle({ ...base, entry: { sql: "backend/sql" } }, ["backend/sql/010_fn.sql"]);
+        expect(loadBundle(carrying).sqlDir).toBe(path.join(carrying, "backend/sql"));
+
+        const older = writeBundle({ ...base, entry: {} });
+        expect(loadBundle(older).sqlDir).toBeUndefined();
+
+        const escaping = writeBundle({ ...base, entry: { sql: "../sql" } });
+        expect(() => loadBundle(escaping)).toThrow(/points outside the bundle/);
+    });
+
     it("drops a declared static app whose directory is missing, and keeps the rest", () => {
         const dir = writeBundle({
             bundleFormat: BUNDLE_FORMAT_VERSION,
