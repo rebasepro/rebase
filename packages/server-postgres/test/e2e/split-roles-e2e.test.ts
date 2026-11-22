@@ -171,11 +171,16 @@ async function query<T = Record<string, unknown>>(sql: string, params: unknown[]
  * for the life of the process, which is what makes it visible here at all.
  */
 async function cdcListenerCount(): Promise<number> {
+    // The realtime channels only: change capture, entity changes and the
+    // channel bus, which exist to deliver to websocket clients. Every role
+    // also holds `rebase_schema_changed` (zero-code catalog reload), and rightly:
+    // a role edited in the admin has to reach the access model a function runs
+    // under, and a webhook added has to fire on a function's write.
     const rows = await query<{ n: string }>(
         `SELECT count(*)::text AS n FROM pg_stat_activity
           WHERE datname = current_database()
             AND pid <> pg_backend_pid()
-            AND query ILIKE 'LISTEN%'`
+            AND query ~* '^\\s*LISTEN\\s+"?(rebase_cdc|rebase_entity_changes|rebase_channel_bus)\\y'`
     );
     return Number(rows[0]?.n ?? 0);
 }
@@ -362,6 +367,12 @@ describe("the api process", () => {
         // made by the functions process is still heard — the trigger fires for
         // the writer, whoever it is.
         expect(await cdcTriggers()).toContain("split_notes");
+    });
+
+    it("holds the realtime LISTEN the functions process does not", async () => {
+        // The other side of "opens no dedicated LISTEN connection", and what
+        // keeps that assertion from passing on a pattern that matches nothing.
+        expect(await cdcListenerCount()).toBeGreaterThan(0);
     });
 
     it("serves the data surface", async () => {
