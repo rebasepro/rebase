@@ -718,7 +718,7 @@ const READ_CONFIG_EXPORTS = new Set([
  */
 const NO_MANAGED_ROUTE: Record<string, string> = {
     jobs: "no managed route — enqueue from a custom function, or eject and pass `jobs` to initializeRebaseBackend",
-    storagePolicies: "no managed route — express the rule in `storageAuthorize`, which IS read from backend/storage",
+    storagePolicies: "no managed route for code — set the rules as data in `STORAGE_POLICIES` (\"owner\" and { roles } cover the usual predicates), or express the rule in `storageAuthorize`, which IS read from backend/storage",
     storageTriggers: "no managed route — react to the upload in a custom function, or eject",
     rateLimit: "no managed route — put the limit in front of the deployment, or eject",
     webhooks: "no managed route — send from a job or a custom function, or eject",

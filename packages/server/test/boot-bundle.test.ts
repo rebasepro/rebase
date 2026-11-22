@@ -275,6 +275,8 @@ describe("project module exports", () => {
         const { messages } = await storageExporting(["storagePolicies"]);
         expect(messages).toContain("storagePolicies");
         expect(messages).toContain("storageAuthorize");
+        // Rules as data are the route that does exist.
+        expect(messages).toContain("STORAGE_POLICIES");
     });
 
     it("lists every unread option in one message", async () => {

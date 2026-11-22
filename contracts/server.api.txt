@@ -289,6 +289,9 @@ function setLogOutput
 function showAppArtifactGuide
 function splitFieldOps { fieldOps, values }
 function sql
+function storagePoliciesFromEnv
+function storagePoliciesFromRules
+function storageRuleProblems
 function subscriptionIdOf
 function summarizeRlsScan { level, message }
 function transformImage
@@ -636,6 +639,7 @@ const PUBLIC_STORAGE_PREFIX
 const REBASE_ADMIN_REQUEST_ROLE
 const REBASE_ADMIN_ROLE
 const REBASE_SCHEMA
+const RECOMMENDED_STORAGE_RULES
 const RELATION_BRAND
 const RELEVANCE_SORT_FIELD
 const RESERVED_BACKEND_PREFIXES
@@ -1136,6 +1140,7 @@ interface StorageListResult { items, nextPageToken, prefixes }
 interface StorageOptions { accept, fileName, imageResize, includeBucketUrl, maxBytes, metadata, path, public, source, storeUrl }
 interface StorageReference { bucket, contentType, fullPath, name, parent, root, size, toString, updated }
 interface StorageReferenceTarget { key, storageId }
+interface StorageRule { allow, operations, path }
 interface StorageSource { deleteObject, getObject, getObjectStream, getSignedUrl, listObjects, putObject, putObjectStream, statObject }
 interface StorageSourceDefinition { account, default, engine, key, label, orphanSweep, transport }
 interface StorageSourceRegistry { get, getDefault, getOrDefault, has, list }
@@ -1349,6 +1354,7 @@ type StaticRouteResult
 type StorageAuthorize
 type StorageOperation
 type StorageReferenceResolver
+type StorageRuleAllow
 type StorageSourceTransport
 type TableAccessorOf
 type TableIndexPredicate

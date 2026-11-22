@@ -70,6 +70,7 @@ import { fetchBundle, shouldFetchBundle, usableBundleFallback, dedupeRuntimePack
 import { describeDriverSkew, readRuntimeVersion, schemaRecoveryGuidance } from "./version-skew";
 import { describeDatabase, recordSchemaChanges, renderSchemaChangeScript, type SchemaChangeRecorder } from "./schema-change-recorder";
 import { provisionFirstUseTables } from "./provision";
+import { storagePoliciesFromEnv } from "../storage/policy-rules";
 
 /** A running runtime, and the handle to stop it. */
 export interface BootedRuntime {
@@ -468,8 +469,10 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         functionsUpstream: runtimeRole.functionsUpstream,
         bootstrappers: dataSources.map(s => s.bootstrapper),
         storage,
-        // Per-object access control comes from the project's own code — no
-        // environment variable can express "this user may read this key".
+        // Per-object access control: rules from the environment (the form a
+        // console edits), then the project's own `storageAuthorize`, consulted
+        // for a key no rule covers.
+        storagePolicies: storagePoliciesFromEnv(env.STORAGE_POLICIES),
         storageAuthorize: projectExports.storageAuthorize,
         storagePublicRead: env.STORAGE_PUBLIC_READ,
         storageRenditionCache: { enabled: env.STORAGE_RENDITION_CACHE },

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Storage access rules as data: `STORAGE_POLICIES`.** `storagePolicies` could only be written in code, and the managed runtime has no route for a predicate, so a project that runs no code of its own could choose only between every file public and every signed-in user touching every file. `STORAGE_POLICIES` takes the same deny-by-default rules as JSON — `[{ "path": "users/:uid/**", "allow": "owner" }]` — where `allow` is `"public"`, `"authenticated"`, `"owner"` (the signed-in caller whose uid is the key's `:uid` segment) or `{ "roles": [...] }`. They compile to `storagePolicies`, so matching, order and the fallback to `storageAuthorize` are unchanged, and they satisfy the production boot guard. An invalid list refuses the boot, naming each problem. `@rebasepro/server` exports `storageRuleProblems`, `storagePoliciesFromRules` and `storagePoliciesFromEnv`; `@rebasepro/types` exports `StorageRule`, `StorageRuleAllow` and `RECOMMENDED_STORAGE_RULES` (a public folder, a folder per user, admins everywhere).
+
 ### Changed
 
 - **A select draws its label inside the box, as a text field does.** It drew the label above the box, so a form that put a select beside text fields showed two kinds of label on one row. The label now rests in the middle of an empty select and moves into the top edge once there is a value or the select has focus, and the box is a labelled `TextField`'s height at the same size, so the two line up. At `smallest` the label stays above, since a 28px box has no room for it. Pass `labelPlacement="above"` to keep it above at any size. The record form's single selects already looked like this; their binding now uses the kit's label instead of drawing its own over the box. `MultiSelect` is unchanged.
