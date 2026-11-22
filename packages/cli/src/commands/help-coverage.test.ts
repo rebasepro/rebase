@@ -539,7 +539,12 @@ describe("every command the dispatch answers parses its flags strictly", () => {
             "orgs.ts:listMembers": "an action of `orgs members`, whose `membersCommand` parses the line before dispatching",
             "orgs.ts:inviteMember": "an action of `orgs members`, whose `membersCommand` parses the line before dispatching",
             "orgs.ts:removeMember": "an action of `orgs members`, whose `membersCommand` parses the line before dispatching",
-            "orgs.ts:changeRole": "an action of `orgs members`, whose `membersCommand` parses the line before dispatching"
+            "orgs.ts:changeRole": "an action of `orgs members`, whose `membersCommand` parses the line before dispatching",
+            "access.ts:listAccess": "an action of `access`, whose `accessCommand` parses the line before dispatching",
+            "access.ts:invite": "an action of `access`, whose `accessCommand` parses the line before dispatching",
+            "access.ts:changeRole": "an action of `access`, whose `accessCommand` parses the line before dispatching",
+            "access.ts:remove": "an action of `access`, whose `accessCommand` parses the line before dispatching",
+            "access.ts:invitesCommand": "an action of `access`, whose `accessCommand` parses the line before dispatching"
         };
 
         /** `function name(params)` and its body, by brace matching. */

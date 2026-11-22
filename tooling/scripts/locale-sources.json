@@ -1733,6 +1733,8 @@
     "studio_users_new_role": ["0097c51f","40c2556b","7f834d0a","753ea773","657aaca7","9317e389","4f4e1c70"],
     "studio_users_no_roles": ["140bedbf","db028eeb","3f695d04","7b62d6fb","4c6ca0e9","b8ce01f9","c0e976ba"],
     "studio_users_no_scopes": ["ae5b8724","52f89959","7849683f","0ee4ef3e","3734d51b","014fac31","474c1866"],
+    "studio_users_platform_granted": ["afb11987","ce0952a5","6b1d300b","d64bad8c","6e0202bf","bd2b7baf","2781bfb2"],
+    "studio_users_platform_granted_tooltip": ["47d1a587","fd13bc92","97bf03bd","092851e9","716b0eec","81c6a220","805a3a0e"],
     "studio_users_role_created": ["ef782cc1","99093d8e","c6ecac23","c90622e6","54d4004a","e07643f6","cd960150"],
     "studio_users_role_delete_failed": ["fe122c44","92e8c288","c0db3498","4187668f","c193ff06","729252ed","459b8f68"],
     "studio_users_role_deleted": ["cf978752","a1820986","839ff7df","3ffbee9d","25c5ccc2","d9d2d594","82f113c8"],

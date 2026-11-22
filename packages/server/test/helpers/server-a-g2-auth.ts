@@ -18,7 +18,7 @@ export type OptionalAuthMethod = {
 
 /** Every optional method, for a repository that implements only the required ones. */
 export const OPTIONAL_AUTH_METHODS = [
-    "unlinkUserIdentity", "firstUserIds", "listGuests", "deleteGuest", "setUserDisabled",
+    "unlinkUserIdentity", "firstUserIds", "listGuests", "deleteGuest", "mergeUserMetadata", "setUserDisabled",
     "setPendingEmailChange", "getPendingEmailChange", "findPendingEmailChange", "applyPendingEmailChange",
     "markRefreshTokenRotated", "revokeRefreshTokenSession", "pruneRefreshTokens", "getTokensValidAfter",
     "setTokensValidAfter", "getAccountAccessState", "deleteAllMagicLinkTokensForUser",
