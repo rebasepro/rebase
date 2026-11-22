@@ -46,6 +46,15 @@
  * The second-factor gate in `createSessionAndTokens` applies as on every other
  * door: an account with a verified factor gets `MFA_REQUIRED`, not a session.
  *
+ * ## Taking it back
+ *
+ * When `admin` was not already the account's, the door records that the
+ * platform granted it (`platform-grants.ts`). `POST /auth/platform-revoke`,
+ * mounted beside it, takes a token of its own scope
+ * ({@link PLATFORM_REVOKE_SCOPES}, held as tightly) when the platform removes
+ * the person's access, removes the recorded roles, and ends the account's
+ * sessions. A token carrying both scopes opens neither door.
+ *
  * @module
  */
 import { Hono } from "hono";
@@ -64,11 +73,15 @@ import { requestClientAddress, type AuthLimiters } from "./rate-limiter";
 import { redactRefreshToken } from "./cookie-utils";
 import { confirmAddressOwnership } from "./address-ownership";
 import { isDeliverableAddress } from "./deliverable-address";
+import { revokeAllSessions } from "./token-revocation";
+import { heldPlatformRoles, platformGrantedRoles, writePlatformGrantedRoles } from "./platform-grants";
 import {
+    PLATFORM_REVOKE_SCOPES,
     PLATFORM_SIGNIN_MAX_LIFETIME_SECONDS,
     PLATFORM_SIGNIN_SCOPES,
     PLATFORM_TOKEN_MAX_LIFETIME_SECONDS,
     verifyPlatformToken,
+    type PlatformCaller,
     type PlatformTokenConfig
 } from "./platform-token";
 
@@ -87,6 +100,69 @@ const invalid = () => ApiError.unauthorized(
     "This sign-in link is invalid or has expired. Open the admin again from the project's page in the console.",
     "INVALID_PLATFORM_TOKEN"
 );
+
+/** The two doors a person-bearing platform token opens, and the scope of each. */
+const DOOR_SCOPES = {
+    signin: PLATFORM_SIGNIN_SCOPES,
+    revoke: PLATFORM_REVOKE_SCOPES
+} as const;
+
+type PlatformDoor = keyof typeof DOOR_SCOPES;
+
+/**
+ * Verify a token presented at one of the doors: everything
+ * `verifyPlatformToken` checks, this door's scope and not the other's, a `jti`
+ * and a deliverable email, at most {@link PLATFORM_SIGNIN_MAX_LIFETIME_SECONDS},
+ * and spent by this, its first use. The reason for a refusal goes to the log.
+ */
+async function acceptPlatformDoorToken(
+    token: string,
+    platformSignIn: PlatformSignInConfig,
+    door: PlatformDoor
+): Promise<{ verified: PlatformCaller & { tokenId: string }; email: string } | { refused: true }> {
+    const logRefusal = (reason: string, verified?: PlatformCaller) => {
+        logger.warn(door === "signin" ? "[Auth] Platform sign-in refused" : "[Auth] Platform revocation refused", {
+            reason,
+            ...(verified ? { subject: verified.subject, jti: verified.tokenId } : {})
+        });
+        return { refused: true as const };
+    };
+
+    // Verified against both doors' scopes, so a token that also carries the
+    // other door's is seen, and refused, rather than filtered down to this one.
+    const verified = await verifyPlatformToken(token, platformSignIn.tokens, undefined, [...PLATFORM_SIGNIN_SCOPES, ...PLATFORM_REVOKE_SCOPES]);
+    if ("refusal" in verified) return logRefusal(verified.refusal);
+    const own = DOOR_SCOPES[door];
+    if (!verified.scopes.some(scope => own.includes(scope))) {
+        return logRefusal(`the token carries no ${own.join(", ")} scope`, verified);
+    }
+    if (!verified.scopes.every(scope => own.includes(scope))) {
+        return logRefusal("the token carries the scopes of both the sign-in and the revocation door", verified);
+    }
+
+    const lifetime = verified.expiresAt - verified.issuedAt;
+    const email = verified.email ? normalizeEmail(verified.email) : undefined;
+    const tokenId = verified.tokenId;
+    const refusal = !tokenId
+        ? "the token carries no jti, so it could be used twice"
+        : !email || !isDeliverableAddress(email)
+            ? "the token names no usable email"
+            : lifetime > PLATFORM_SIGNIN_MAX_LIFETIME_SECONDS
+                ? `a ${door} token may live at most ${PLATFORM_SIGNIN_MAX_LIFETIME_SECONDS} seconds`
+                : undefined;
+    if (refusal || !email || !tokenId) return logRefusal(refusal ?? "the token is incomplete", verified);
+
+    // Spent by its first use. The window outlasts any token this door
+    // accepts, whatever the clock skew, so a replay always finds the mark.
+    const spent = await platformSignIn.usedTokens.hit(
+        `platform-${door}:${tokenId}`,
+        (PLATFORM_TOKEN_MAX_LIFETIME_SECONDS + 120) * 1000,
+        1
+    );
+    if (!spent.allowed) return logRefusal("token already used", verified);
+
+    return { verified: { ...verified, tokenId }, email };
+}
 
 export function mountPlatformSignInRoutes(deps: {
     router: Hono<HonoEnv>;
@@ -115,37 +191,9 @@ export function mountPlatformSignInRoutes(deps: {
 
     router.post("/platform-signin", limiters.strict, async (c) => {
         const { token } = parseBody(platformSignInSchema, await c.req.json().catch(() => undefined));
-
-        const verified = await verifyPlatformToken(token, platformSignIn.tokens, undefined, PLATFORM_SIGNIN_SCOPES);
-        if ("refusal" in verified) {
-            logger.warn("[Auth] Platform sign-in refused", { reason: verified.refusal });
-            throw invalid();
-        }
-        const lifetime = verified.expiresAt - verified.issuedAt;
-        const email = verified.email ? normalizeEmail(verified.email) : undefined;
-        const refusal = !verified.tokenId
-            ? "the token carries no jti, so it could be used twice"
-            : !email || !isDeliverableAddress(email)
-                ? "the token names no usable email"
-                : lifetime > PLATFORM_SIGNIN_MAX_LIFETIME_SECONDS
-                    ? `a sign-in token may live at most ${PLATFORM_SIGNIN_MAX_LIFETIME_SECONDS} seconds`
-                    : undefined;
-        if (refusal || !email || !verified.tokenId) {
-            logger.warn("[Auth] Platform sign-in refused", { reason: refusal, subject: verified.subject, jti: verified.tokenId });
-            throw invalid();
-        }
-
-        // Spent by its first use. The window outlasts any token this door
-        // accepts, whatever the clock skew, so a replay always finds the mark.
-        const spent = await platformSignIn.usedTokens.hit(
-            `platform-signin:${verified.tokenId}`,
-            (PLATFORM_TOKEN_MAX_LIFETIME_SECONDS + 120) * 1000,
-            1
-        );
-        if (!spent.allowed) {
-            logger.warn("[Auth] Platform sign-in refused", { reason: "token already used", subject: verified.subject, jti: verified.tokenId });
-            throw invalid();
-        }
+        const door = await acceptPlatformDoorToken(token, platformSignIn, "signin");
+        if ("refused" in door) throw invalid();
+        const { verified, email } = door;
 
         let user = await authRepo.getUserByEmail(email);
         const created = !user;
@@ -162,6 +210,12 @@ export function mountPlatformSignInRoutes(deps: {
 
         const roleIds = await authRepo.getUserRoleIds(user.id);
         if (!roleIds.includes(ADMIN_ROLE)) {
+            // Recorded only when this door adds the role: an `admin` the
+            // account already held was granted by hand and is not the
+            // platform's to take back (`platform-grants.ts`). Written first,
+            // so a failure between the two writes leaves a record of a role
+            // not held — which revokes nothing — never an unrecorded grant.
+            await writePlatformGrantedRoles(authRepo, user, [...platformGrantedRoles(user), ADMIN_ROLE]);
             await authRepo.setUserRoles(user.id, [...roleIds, ADMIN_ROLE]);
         }
 
@@ -192,5 +246,49 @@ export function mountPlatformSignInRoutes(deps: {
         const transformed = await applyTransformHook(authResponse, "platform", c.req.raw, user.id);
         c.header("Cache-Control", "no-store");
         return c.json(redactRefreshToken(transformed, c, session.refreshToken, config.cookieAuth));
+    });
+
+    /**
+     * `POST /auth/platform-revoke`: the platform withdrew the person's access
+     * to this project. Takes back the roles the sign-in door granted their
+     * account (`platform-grants.ts`) and ends every session it holds; a role
+     * granted by hand in the app stays, and the account is never deleted.
+     * `{ revoked: false }` when there was nothing the platform had granted —
+     * no such account, or only hand-granted roles.
+     */
+    router.post("/platform-revoke", limiters.strict, async (c) => {
+        const { token } = parseBody(platformSignInSchema, await c.req.json().catch(() => undefined));
+        const door = await acceptPlatformDoorToken(token, platformSignIn, "revoke");
+        if ("refused" in door) throw invalid();
+        const { verified, email } = door;
+        c.header("Cache-Control", "no-store");
+
+        const user = await authRepo.getUserByEmail(email);
+        if (!user) {
+            logger.info("[Auth] Platform revocation", { subject: verified.subject, jti: verified.tokenId, revoked: false, reason: "no account" });
+            return c.json({ revoked: false });
+        }
+
+        const roleIds = await authRepo.getUserRoleIds(user.id);
+        const taken = heldPlatformRoles(user, roleIds);
+        if (taken.length > 0) {
+            await authRepo.setUserRoles(user.id, roleIds.filter(role => !taken.includes(role)));
+            await revokeAllSessions(authRepo, user.id);
+        }
+        // The record goes last, and whole — including a role an administrator
+        // already removed by hand — so a failure above leaves it in place for
+        // the platform's retry.
+        if (platformGrantedRoles(user).length > 0) {
+            await writePlatformGrantedRoles(authRepo, user, []);
+        }
+
+        logger.info("[Auth] Platform revocation", {
+            subject: verified.subject,
+            jti: verified.tokenId,
+            uid: user.id,
+            revoked: taken.length > 0,
+            roles: taken
+        });
+        return c.json({ revoked: taken.length > 0 });
     });
 }

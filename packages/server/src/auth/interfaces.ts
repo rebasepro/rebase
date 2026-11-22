@@ -472,6 +472,19 @@ export interface UserRepository {
     setUserRoles(uid: string, roleIds: string[]): Promise<void>;
 
     /**
+     * Set or remove individual keys of an account's `metadata`, leaving every
+     * other key as it is: a `null` value removes the key.
+     *
+     * The framework keeps a few facts about an account there that are not
+     * columns of their own — which roles the platform hosting the backend
+     * granted (`platform-grants.ts`) is one. Optional: without it those keys
+     * are written by reading the account and passing the whole `metadata` to
+     * {@link updateUser}, which a concurrent write to the same account can
+     * lose.
+     */
+    mergeUserMetadata?(uid: string, patch: Record<string, unknown>): Promise<void>;
+
+    /**
      * Assign a specific role to a new user
      */
     assignDefaultRole(uid: string, roleId: string): Promise<void>;

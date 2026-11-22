@@ -27,6 +27,7 @@ import { assertMayGrantRoles, assertMayManageAccount, callerIsAdmin, readRoleNam
 import { mayPickUsers } from "./user-picking";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
+import { forgetRemovedPlatformRoles, heldPlatformRoles } from "./platform-grants";
 import {
     prepareAdminUserValues,
     finalizeAdminUserCreation,
@@ -103,9 +104,11 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             createdAt?: Date | string;
             updatedAt?: Date | string;
             disabled?: boolean;
+            metadata?: Record<string, unknown>;
         },
         roles: string[]
     ): AdminUser {
+        const platformRoles = heldPlatformRoles(u, roles);
         return {
             uid: u.id,
             email: u.email,
@@ -114,6 +117,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             providerId: "custom",
             roles,
             disabled: u.disabled === true,
+            ...(platformRoles.length > 0 ? { platformRoles } : {}),
             createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : (u.createdAt ?? new Date().toISOString()),
             updatedAt: u.updatedAt instanceof Date ? u.updatedAt.toISOString() : (u.updatedAt ?? new Date().toISOString())
         };
@@ -529,6 +533,7 @@ values: prepResult.values },
 
         if (roles !== undefined) {
             await authRepo.setUserRoles(uid, roles);
+            await forgetRemovedPlatformRoles(authRepo, existing, roles);
         }
 
         // Disabling is how an administrator stops an account without deleting

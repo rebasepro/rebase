@@ -110,6 +110,7 @@ export function mockAuthRepository(overrides: Partial<MockAuthRepository> = {}):
         getUserByVerificationToken: jest.fn(),
         getUserRoleIds: jest.fn(),
         setUserRoles: jest.fn(),
+        mergeUserMetadata: jest.fn(),
         assignDefaultRole: jest.fn(),
         getUserWithRoles: jest.fn(),
         setUserDisabled: jest.fn(),

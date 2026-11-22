@@ -96,6 +96,17 @@ export const PLATFORM_MCP_SCOPES: readonly string[] = ["data:read", "data:write"
  */
 export const PLATFORM_SIGNIN_SCOPES: readonly string[] = ["auth:admin-signin"];
 
+/**
+ * What a platform token can be granted at the revocation door, and only there:
+ * `POST /auth/platform-revoke` (`platform-signin-routes.ts`), which takes back
+ * the roles the sign-in door granted the person it names and ends their
+ * sessions. The control plane mints it when that person's access to the
+ * project is removed. Held as tightly as {@link PLATFORM_SIGNIN_SCOPES} — email,
+ * `jti`, {@link PLATFORM_SIGNIN_MAX_LIFETIME_SECONDS}, one use — and never
+ * accepted together with it: a token carrying both is refused at both doors.
+ */
+export const PLATFORM_REVOKE_SCOPES: readonly string[] = ["auth:admin-revoke"];
+
 /** The longest `exp - iat` a sign-in token may declare. */
 export const PLATFORM_SIGNIN_MAX_LIFETIME_SECONDS = 120;
 

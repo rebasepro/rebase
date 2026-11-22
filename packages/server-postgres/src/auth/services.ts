@@ -709,6 +709,28 @@ export class UserService implements UserRepository {
     }
 
     /**
+     * @see UserRepository.mergeUserMetadata — one statement, so a concurrent
+     * write to another key is not lost: the given keys are removed, and the
+     * non-null ones set again, inside the column's own value.
+     */
+    async mergeUserMetadata(uid: string, patch: Record<string, unknown>): Promise<void> {
+        const metadataColumn = getColumn(this.usersTable, "metadata");
+        if (!metadataColumn) {
+            throw new Error(`${this.getQualifiedUsersTableName()} has no metadata column to record ${Object.keys(patch).join(", ")} in.`);
+        }
+        const keys = Object.keys(patch);
+        if (keys.length === 0) return;
+        const set = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== null && value !== undefined));
+        const column = sql.identifier(metadataColumn.name);
+        await this.withServerContext(async (db) => db.execute(sql`
+            UPDATE ${sql.raw(this.getQualifiedUsersTableName())}
+            SET ${column} = (COALESCE(${column}, '{}'::jsonb) - ARRAY[${sql.join(keys.map(key => sql`${key}`), sql`, `)}]::text[]) || ${JSON.stringify(set)}::jsonb,
+                updated_at = NOW()
+            WHERE id = ${uid}
+        `));
+    }
+
+    /**
      * Assign a specific role to new user (appends if not present)
      */
     async assignDefaultRole(uid: string, roleId: string): Promise<void> {
@@ -1634,6 +1656,10 @@ export class PostgresAuthRepository implements AuthRepository {
 
     async setUserRoles(uid: string, roleIds: string[]): Promise<void> {
         await this.userService.setUserRoles(uid, roleIds);
+    }
+
+    async mergeUserMetadata(uid: string, patch: Record<string, unknown>): Promise<void> {
+        await this.userService.mergeUserMetadata(uid, patch);
     }
 
     async assignDefaultRole(uid: string, roleId: string): Promise<void> {

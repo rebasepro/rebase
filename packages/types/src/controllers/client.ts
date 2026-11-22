@@ -179,6 +179,13 @@ export interface AdminUser {
      * it signs in nowhere and the tokens it holds are refused.
      */
     disabled?: boolean;
+    /**
+     * The roles in {@link roles} that the platform hosting this backend granted
+     * — on Rebase Cloud, `admin` given by the console's "Open admin panel" —
+     * and takes back when it removes the person's access. Absent when none
+     * did; a role granted by hand in the app is never listed.
+     */
+    platformRoles?: string[];
     metadata?: Record<string, any>;
     createdAt: string;
     updatedAt: string;
