@@ -1,13 +1,15 @@
 ---
-sourceHash: e275bf79725ed509
+sourceHash: 3c089e6c404f4635
 title: Columnas adicionales
 sidebar_label: Columnas adicionales
-description: Agregue columnas calculadas/virtuales a las tablas de colecciones que derivan valores de los datos de la entidad.
+description: Añade columnas calculadas/virtuales a las tablas de colección que derivan valores a partir de los datos de la entidad.
 ---
 
 ## Descripción general
 
-Las columnas adicionales le permiten mostrar datos calculados o derivados en la tabla de la colección sin almacenarlos en la base de datos.
+Las columnas adicionales permiten mostrar datos calculados o derivados en la tabla de la colección sin almacenarlos en la base de datos.
+
+Una columna calculada pertenece a la tabla. El registro ya muestra los valores a partir de los cuales se calcula, por lo que no está en el registro a menos que el formulario lo solicite: especifique su `key` en `form.sections` o `form.sidebar` (consulte [Form layout](/docs/frontend/form-layout/)), o en los `fields` proporcionados a un `RecordForm` o `RecordDetail`.
 
 ## Definición de columnas adicionales
 
@@ -55,13 +57,13 @@ export const productsCms = customizeTable<typeof products>("products", {
 
 | Prop | Tipo | Descripción |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | El registro tal como el servidor envía la fila: fechas como cadenas ISO, un belongsTo como su columna de clave foránea, `id` solo donde la tabla tenga esa columna. Una relación que el admin cargó se anida bajo su nombre como las propias columnas del registro relacionado |
-| `id` | `string` | El id del registro: su clave primaria como cadena, las partes de una clave compuesta unidas por `:::`. El id que aceptan `useSidePanel().open` y una ruta |
+| `row` | `Record<string, unknown>` | El registro tal como el servidor envía la fila: fechas como cadenas ISO, un belongsTo como su columna de clave foránea, `id` solo donde la tabla tiene esa columna. Una relación cargada por el admin se anida bajo su nombre como las columnas propias del registro relacionado |
+| `id` | `string` | El id del registro: su clave primaria como una cadena, las partes de una clave compuesta unidas por `:::`. El id que toman `useSidePanel().open` y una ruta |
 | `context` | `RebaseContext` | Contexto completo de Rebase |
 
 `value({ row, id, context })` recibe las mismas props.
 
-## Próximos pasos
+## Siguientes pasos
 
-- **[Acciones de entidad](/docs/frontend/entity-actions)** — Botones de acción personalizados
-- **[Campos personalizados](/docs/frontend/custom-fields)** — Campos de formulario personalizados
+- **[Entity Actions](/docs/frontend/entity-actions)** — Botones de acción personalizados
+- **[Custom Fields](/docs/frontend/custom-fields)** — Campos de formulario personalizados

@@ -1,22 +1,22 @@
 ---
-sourceHash: fd678be79444f91f
+sourceHash: ce9fefc61944ee85
 title: Firestore accanto a Postgres
 sidebar_label: Firebase
-description: "Mostra le collezioni Firestore nel CMS accanto alle tue tabelle Postgres: defineFirestoreCollection, useFirestoreDataSource, externalCollections e riferimenti che incrociano documenti Firestore e righe Postgres in entrambe le direzioni."
+description: "Mostra le collezioni Firestore nel CMS accanto alle tue tabelle Postgres: defineFirestoreCollection, useFirestoreDataSource, externalCollections e riferimenti incrociati tra documenti Firestore e righe Postgres in entrambe le direzioni."
 ---
 
 `@rebasepro/firebase` consente al CMS di leggere e scrivere collezioni Firestore nel
-browser, tramite l'SDK Firebase, accanto alle tabelle servite dal tuo backend
-Rebase. Una sola navigazione, una sola ricerca, un solo selettore di riferimenti: un operatore
-non ha bisogno di sapere in quale motore risieda un record.
+browser, tramite il Firebase SDK, accanto alle tabelle servite dal tuo backend
+Rebase. Un'unica navigazione, una sola ricerca, un solo selettore di riferimenti: un operatore non
+ha bisogno di sapere in quale motore risiede un record.
 
-In questo contesto, Firestore è una questione di frontend. Il backend non ne sa nulla e una
+Firestore qui è una questione di frontend. Il backend non ne sa nulla e una
 collezione Firestore viene dichiarata in `frontend/src/cms/`, mai in
 `backend/schema`.
 
 :::caution[Le collezioni Firestore vengono lette direttamente dal browser]
-Nulla di ciò che si trova tra il browser e Firestore appartiene a Rebase: la sicurezza a livello di riga (RLS), l'API
-REST, l'SDK generato, le funzioni, i cron e il modello di accesso allo storage non
+Nulla tra il browser e Firestore appartiene a Rebase: la row-level security,
+l'API REST, l'SDK generato, le funzioni, i cron e il modello di accesso allo storage non
 si applicano a una collezione Firestore. Chi può leggere e scrivere i suoi documenti è
 stabilito dalle **Firebase Security Rules**, scritte e distribuite in Firebase.
 :::
@@ -27,7 +27,7 @@ stabilito dalle **Firebase Security Rules**, scritte e distribuite in Firebase.
 pnpm add @rebasepro/firebase firebase
 ```
 
-Dipendenze peer: `firebase` (10, 11 o 12), `react` ≥ 19, `react-dom` ≥ 19 e,
+Peer dependency: `firebase` (10, 11 o 12), `react` ≥ 19, `react-dom` ≥ 19 e,
 opzionalmente, `typesense` per la ricerca testuale.
 
 ## Dichiarare una collezione Firestore
@@ -64,28 +64,28 @@ export const firestoreEvents = defineFirestoreCollection({
 
 | Chiave | Cosa fa |
 |---|---|
-| `slug` | Il nome della collezione nel pannello: il suo URL e il target indicato da altri riferimenti. Deve differire dallo slug di ogni tabella. |
+| `slug` | Il nome della collezione nel pannello: il suo URL e il target indicato dagli altri riferimenti. Deve essere diverso dallo slug di ogni tabella. |
 | `path` | Il percorso in cui risiedono i documenti in Firestore, quando non coincide con lo slug. |
-| `name` | L'etichetta visualizzata nella navigazione. |
-| `dataSource` | La chiave della voce `<Rebase dataSources>` che la legge: la `key` fornita a `useFirestoreDataSource`. Da omettere solo quando Firestore è la sorgente predefinita. |
+| `name` | L'etichetta nella navigazione. |
+| `dataSource` | La chiave della voce `<Rebase dataSources>` che la legge: la `key` fornita a `useFirestoreDataSource`. Omettila solo quando Firestore è la sorgente predefinita. |
 | `databaseId` | Un database Firestore diverso da quello predefinito. |
-| `fields` | I campi del documento, indicati per chiave. |
-| `subcollections` | Collezioni annidate sotto ciascun documento, mostrate come schede del documento e salvate su `<path>/<id>/<child path>`. Ciascuna è a sua volta una `defineFirestoreCollection`. |
+| `fields` | I campi del documento, per chiave. |
+| `subcollections` | Collezioni annidate sotto ogni documento, mostrate come schede del documento e memorizzate in `<path>/<id>/<child path>`. Ognuna è anch'essa un `defineFirestoreCollection`. |
 
 Il `type` di un campo è uno di quelli memorizzati da Firestore: `string`, `number`, `boolean`,
 `date`, `geopoint`, `map`, `array`, `reference` o `binary`. `required: true`
-è la sintassi abbreviata per un campo obbligatorio. Una `reference` indica la collezione a cui punta
-tramite `target`, su qualsiasi sorgente dati. Una `relation` o un `vector` appartengono a una
-tabella Postgres e qui vengono rifiutati, così come `properties` ed `engine`.
+indica in breve un campo obbligatorio. Un `reference` indica la collezione a cui punta
+tramite `target`, su qualsiasi data source. Un `relation` o un `vector` appartiene a una
+tabella Postgres e qui viene rifiutato, così come `properties` ed `engine`.
 
-Il tipo del documento viene dedotto da `fields`, pertanto le opzioni specifiche della collezione
+Il tipo del documento viene inferito da `fields`, quindi le opzioni proprie della collezione
 vengono verificate a fronte delle sue chiavi. Le opzioni di presentazione accettate da una collezione Firestore
-(icona, gruppo, viste) sono quelle del modello di collezione del pannello, non
-`customizeTable`, che è riservato alle tabelle.
+(icon, group, views) sono quelle del modello di collezione del pannello, non di
+`customizeTable`, che è destinato alle tabelle.
 
 ## Montarla accanto alle tabelle
 
-Due passaggi: registrare Firestore come sorgente dati su `<Rebase>` e passare la
+Due passaggi: registrare Firestore come data source su `<Rebase>` e passare la
 collezione a `<RebaseCMS externalCollections>`.
 
 ```tsx
@@ -127,53 +127,49 @@ export function App() {
 ```
 
 Il pannello mostra ogni tabella servita dal backend, con `postsCms` e
-`customersCms` applicati, e successivamente `fs_events`, nella stessa navigazione. Uno slug
-identifica una singola collezione: una collezione esterna avente lo slug di una tabella viene rifiutata,
+`customersCms` applicati, e poi `fs_events`, nella stessa navigazione. Uno slug
+identifica un'unica collezione: una collezione esterna con lo slug di una tabella viene rifiutata,
 indicando entrambe (vedi [collisioni](/docs/frontend/#rebasecms-props)).
 
 `useFirestoreDataSource` restituisce lo stesso oggetto a ogni render finché le sue
-opzioni rimangono invariate, quindi può essere posizionato inline in `dataSources`. Le sue opzioni:
+opzioni rimangono invariate, quindi può essere inserito inline in `dataSources`. Le sue opzioni:
 
 | Opzione | Cosa fa |
 |---|---|
-| `key` | **Obbligatoria.** Ciò a cui fa riferimento il `dataSource` di una collezione. |
-| `firebaseApp` | L'app Firebase inizializzata. Finché non è impostata, la sorgente segnala di non essere pronta. |
-| `databaseId` | Il database Firestore, quando non è quello predefinito dell'app. Il `databaseId` specificato sulla collezione ha la priorità. |
+| `key` | **Obbligatorio.** Ciò a cui fa riferimento il `dataSource` di una collezione. |
+| `firebaseApp` | L'app Firebase inizializzata. Fino a quando non è impostata, la sorgente segnala di non essere pronta. |
+| `databaseId` | Il database Firestore, quando non è quello predefinito dell'app. Il `databaseId` specifico di una collezione ha la precedenza. |
 | `label` | Un'etichetta per la sorgente, usata dove il pannello mostra i nomi delle sorgenti dati. |
-| `textSearchControllerBuilder` | Risponde alle ricerche testuali con gli ID dei documenti (Algolia, Typesense, Pinecone, ricerca Rebase). |
-| `localTextSearchEnabled` | Esegue la ricerca nel browser sui documenti stessi quando nessun controller gestisce la collezione. Legge ogni documento: adatto a collezioni di piccole dimensioni. |
-| `firestoreIndexesBuilder` | Gli indici composti presenti nel database, in modo che il pannello offra solo i filtri e gli ordinamenti che Firestore può eseguire. |
+| `textSearchControllerBuilder` | Risponde alle ricerche testuali con gli ID dei documenti (Algolia, Typesense, Pinecone, Rebase search). |
+| `localTextSearchEnabled` | Esegue la ricerca nel browser direttamente sui documenti quando nessun controller copre una collezione. Legge ogni documento: adatto per collezioni di piccole dimensioni. |
+| `firestoreIndexesBuilder` | Gli indici compositi presenti nel database, in modo che il pannello offra solo i filtri e gli ordinamenti che Firestore può eseguire. |
 
-Inoltre, registra ciò che Firestore supporta, così che alle sue collezioni non vengano
-mai proposte schede di relazione o filtri che Firestore non è in grado di eseguire.
+Inoltre registra ciò che Firestore può gestire, in modo che alle sue collezioni non vengano mai
+proposte schede di relazione o filtri che Firestore non è in grado di eseguire.
 
-## Modifica nell'editor delle collezioni
+## Modifica
 
-In fase di sviluppo, l'[editor delle collezioni](/docs/studio/) permette di modificare
-anche le collezioni Firestore: un salvataggio riscrive sul posto la chiamata
-`defineFirestoreCollection({...})` della collezione in `frontend/src/cms`,
-modificando esclusivamente ciò che hai cambiato. Funzioni, componenti personalizzati, commenti e
-import rimangono invariati; i campi definiti nel codice appaiono in sola lettura. In
-produzione, le collezioni Firestore sono in sola lettura nell'editor. Per eliminarne una,
-rimuovi il relativo file e la sua voce in `externalCollections`.
+Una collezione Firestore corrisponde alla sua chiamata `defineFirestoreCollection({...})` in
+`frontend/src/cms`: modificala lì. Per eliminarne una, rimuovi il relativo file e la sua
+voce in `externalCollections`.
 
 ## Da Firestore a una tabella
 
 `customerId: { type: "reference", target: "customers" }` punta alla
-tabella `customers`. Quando un operatore apre un evento e clicca sul chip del cliente,
-o seleziona un cliente, la ricerca viene instradata in base alla sorgente dati del target: la
-collezione `customers` è una tabella, quindi la richiesta va al backend Rebase, nel rispetto
-della sicurezza a livello di riga del chiamante.
+tabella `customers`. Quando un operatore apre un evento e fa clic sul chip del cliente,
+o seleziona un cliente, la ricerca viene instradata dalla sorgente dati della destinazione: la
+collezione `customers` è una tabella, quindi la richiesta va al backend Rebase, sotto la
+row-level security del chiamante.
 
-Un riferimento a un record su un'altra sorgente dati viene salvato nel documento come **id**
-del record, sotto forma di stringa, in modo che una query Firestore per `customerId == "42"`
-vi corrisponda. Un riferimento a un documento nello stesso database Firestore viene memorizzato
-come `DocumentReference` di Firestore, come previsto da Firestore.
+Un riferimento a un record su un'altra sorgente dati viene memorizzato nel documento come l'**id**
+del record, una stringa, in modo che una query Firestore per `customerId == "42"`
+corrisponda ad esso. Un riferimento a un documento nello stesso database Firestore viene memorizzato
+come un `DocumentReference` di Firestore, come previsto da Firestore.
 
 ## Da una tabella a Firestore
 
-Una colonna di tabella che contiene l'ID di un documento Firestore è una normale colonna di testo
-sul backend. L'opzione `referenceTo` nel suo `customizeTable` la rende un riferimento nel
+Una colonna di tabella che contiene l'ID di un documento Firestore è una semplice colonna di testo sul
+backend. `referenceTo` nel suo `customizeTable` la trasforma in un riferimento nel
 pannello:
 
 ```ts
@@ -203,16 +199,16 @@ export const customersCms = customizeTable<typeof customers>("customers", {
 });
 ```
 
-Il campo viene disegnato e selezionato come riferimento a `fs_events`, e aprendolo
+Il campo viene disegnato e selezionato come un riferimento a `fs_events`, e aprendolo
 si legge il documento tramite `firestoreSource`. La colonna continua a memorizzare l'ID come
-testo, e il backend continua a vedere una colonna di testo. `referenceTo` si applica a colonne di
-tipo text e uuid; su qualsiasi altro tipo viene ignorato, con un avviso in
+testo, e il backend continua a vedere una colonna di testo. `referenceTo` si applica alle colonne di tipo
+text e uuid; su qualsiasi altro tipo viene ignorato, con un avviso in
 fase di sviluppo.
 
 ## Un pannello solo Firestore
 
 `RebaseFirebaseApp` è un pannello completo basato esclusivamente su Firebase: accesso
-tramite Firebase Auth, routing e le collezioni passate, senza alcun backend Rebase.
+con Firebase Auth, routing e le collezioni passate, senza alcun backend Rebase.
 
 ```tsx
 import React from "react";
@@ -241,13 +237,13 @@ export default function App() {
 Un esempio funzionante è disponibile in
 [`examples/firebase`](https://github.com/rebasepro/rebase/tree/main/examples/firebase).
 In tale configurazione, nulla di quanto descritto nelle pagine dedicate al backend di questo sito si applica: le
-Firebase Security Rules sostituiscono la sicurezza a livello di riga, l'SDK Firebase sostituisce l'API
-REST e l'SDK generato, le Cloud Functions sostituiscono funzioni e cron, e lo
+Firebase Security Rules sostituiscono la row-level security, il Firebase SDK sostituisce l'API
+REST e l'SDK generato, le Cloud Functions sostituiscono le funzioni e i cron, e lo
 Studio e `rls-check` non hanno nulla da ispezionare.
 
-## Correlati
+## Risorse correlate
 
-- [Tabelle nel CMS](/docs/collections/): cosa mostra il lato Postgres senza alcuna configurazione
+- [Tabelle nel CMS](/docs/collections/): cosa mostra il versante Postgres senza alcuna configurazione
 - [customizeTable](/docs/frontend/customize-table/): `referenceTo` e tutte le altre opzioni per le tabelle
-- [Panoramica frontend](/docs/frontend/): le prop di `<Rebase dataSources>` e `<RebaseCMS>`
+- [Panoramica frontend](/docs/frontend/): proprietà di `<Rebase dataSources>` e `<RebaseCMS>`
 - [Autenticazione e Login](/docs/frontend/authentication/): l'interfaccia di accesso

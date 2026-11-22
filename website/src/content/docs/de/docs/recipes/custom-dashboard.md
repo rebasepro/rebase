@@ -1,19 +1,25 @@
 ---
-sourceHash: a9c03468852b95e3
+sourceHash: d60e60304904c8c2
 title: "Rezept: Benutzerdefiniertes Dashboard"
 sidebar_label: Benutzerdefiniertes Dashboard
-description: "Eine Dashboard-Seite mit KPI-Kacheln und Diagrammen erstellen — Zahlen in SQL berechnet, gezeichnet mit den Bausteinen aus @rebasepro/ui."
+description: "Erstellen Sie eine Dashboard-Seite mit KPI-Kacheln und Diagrammen – Zahlen in SQL berechnet, dargestellt mit den Bausteinen von @rebasepro/ui."
 ---
 
 ## Übersicht
 
-Ein Dashboard besteht aus drei Teilen: einer Backend-Funktion, die die Zahlen in SQL berechnet, einer Komponente, die sie mit `useInsightData` lädt und mit den Bausteinen aus `@rebasepro/ui` zeichnet, und einem Ort, an dem es erscheint — hier eine eigene Seite in der Seitenleiste.
+Ein Dashboard besteht aus drei Teilen: einer Backend-Funktion, die die Zahlen in
+SQL berechnet, einer Komponente, die sie mit `useInsightData` lädt und mit den
+Bausteinen von `@rebasepro/ui` darstellt, sowie einem Ort, an dem sie angezeigt werden – hier eine
+eigene Seite im Drawer.
 
-Zählen Sie auf dem Server. Zeilen in den Browser zu laden und dort zu addieren stimmt nur, solange die Tabelle in eine Ergebnisseite passt; danach ist die Summe stillschweigend falsch.
+Zählen Sie auf dem Server. Das Abrufen von Zeilen im Browser und deren Summierung funktioniert
+nur, solange die Tabelle auf eine einzige Ergebnisseite passt; darüber hinaus ist die Gesamtsumme
+stillschweigend falsch.
 
 ## Die Zahlen auf dem Server berechnen
 
-Eine Route pro gezeichnetem Element, ausgeführt als angemeldeter Benutzer, damit Berechtigungen und Row-Level Security auch für die Kennzahlen gelten:
+Eine Route pro Element, das die Seite darstellt, ausgeführt als der angemeldete Benutzer, sodass
+Berechtigungen und Row-Level Security auch für die Zahlen gelten:
 
 ```ts
 // functions/dashboard.ts
@@ -55,9 +61,11 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-## Zeichnen
+## Darstellung der Daten
 
-`useInsightData(key, load)` lädt einmal pro Schlüssel und angemeldetem Benutzer, und jede Komponente, die denselben Schlüssel liest, teilt sich das Ergebnis. Die Bausteine zeichnen ihre eigenen Lade-, Fehler- und Leerzustände:
+`useInsightData(key, load)` lädt einmal pro Schlüssel und angemeldetem Benutzer, und jede
+Komponente, die denselben Schlüssel liest, teilt sich das Ergebnis. Die Bausteine zeichnen ihre eigenen
+Lade-, Fehler- und Leerzustände:
 
 ```tsx
 import { useRebaseClient } from "@rebasepro/app";
@@ -111,9 +119,11 @@ function DashboardView() {
 }
 ```
 
-Dieselben Komponenten können auch über einer Collection-Liste oder oben auf der Startseite stehen — über `<Rebase slots>` mit `collection.widgets` oder `home.children.start` — statt auf einer eigenen Seite.
+Dieselben Komponenten können anstelle einer eigenen Seite auch über der Liste einer
+Collection oder oben auf der Startseite über `<Rebase slots>` platziert werden –
+`collection.widgets`, `home.children.start`.
 
-## Als benutzerdefinierte Ansicht registrieren
+## Als Custom View registrieren
 
 ```tsx
 const views: AppView[] = [
@@ -128,7 +138,7 @@ const views: AppView[] = [
 
 ```
 
-Übergeben Sie sie an den Navigations-Controller:
+Übergeben Sie es an den Navigation Controller:
 
 ```typescript
 const navigationStateController = useBuildNavigationStateController({
@@ -146,17 +156,22 @@ Das Dashboard erscheint nun in der Seitenleiste unter "Analytics" und ist unter 
 
 ### Die Gruppe unten anheften
 
-Gruppen mit dem Namen `"Admin"` oder `"Settings"` sinken im Drawer unter die anderen, basierend auf einem String-Vergleich des Namens. Dies kann schnell verloren gehen – wird die Beschriftung übersetzt, funktioniert die Sortierung unbemerkt nicht mehr – geben Sie es daher stattdessen explizit an:
+Gruppen mit dem Namen `"Admin"` oder `"Settings"` rutschen im Drawer durch einen
+String-Vergleich des Namens unter die anderen. Dies geht leicht verloren – übersetzt man das
+Label, funktioniert die Sortierung unbemerkt nicht mehr – geben Sie es daher stattdessen explizit an:
 
 ```tsx
 { slug: "dashboard", name: "Dashboard", view: <DashboardView />, group: "Ajustes", pinToBottom: true }
 ```
 
-Das Setzen von `pinToBottom` bei einer beliebigen Ansicht in einer Gruppe heftet die gesamte Gruppe an, da der Drawer Gruppen statt einzelner Ansichten sortiert.
+Das Setzen von `pinToBottom` bei einer beliebigen View innerhalb einer Gruppe heftet die gesamte Gruppe an,
+da der Drawer Gruppen statt einzelner Views ordnet.
 
-## Navigation aus einer benutzerdefinierten Ansicht
+## Aus einer Custom View navigieren
 
-Eine View-Komponente erhält keine Props. Um irgendwohin zu navigieren – zu einer anderen benutzerdefinierten Ansicht, einer Collection, einer Entität – verwenden Sie `useUrlController`, das aus `@rebasepro/cms` exportiert wird:
+Eine View-Komponente erhält keine Props. Um irgendwohin zu routen – eine andere Custom View, eine
+Collection, eine Entity –, greifen Sie auf `useUrlController` zurück, der aus
+`@rebasepro/cms` exportiert wird:
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
@@ -180,13 +195,17 @@ function DashboardView() {
 }
 ```
 
-Bauen Sie den Pfad dynamisch zusammen, anstatt ihn fest einzuprogrammieren: Collection-URLs haben ein Präfix (`orders` → `/c/orders`), und dieses Präfix ist nicht Teil des öffentlichen Vertrags.
+Bauen Sie den Pfad dynamisch zusammen, anstatt ihn fest zu codieren: Collection-URLs haben ein Präfix
+(`orders` → `/c/orders`) und das Präfix ist nicht Teil des öffentlichen Vertrags.
 
-`useSidePanel` öffnet eine Entität im Seitenbereich anstatt zu navigieren, was bei einer Zeile in einer Liste normalerweise das gewünschte Verhalten ist.
+`useSidePanel` öffnet eine Entity im Seitenpanel statt zu navigieren, was bei einer Zeile
+in einer Liste meist das gewünschte Verhalten ist.
 
-## Diagramme, die ihre Datensätze öffnen
+## Diagramme und Kennzahlen, die ihre Datensätze öffnen
 
-`BarChart` zeichnet Kategorien als Balken mit ihren Werten daneben. Mit `onBarClick` wird jede Zeile zu einem Button: Öffnen Sie die Liste gefiltert auf das, was der Balken zählt, oder einen Datensatz im Seitenpanel.
+`BarChart` stellt Kategorien als Balken mit den dazugehörigen Werten dar. Mit
+`onBarClick` wird jede Zeile zu einem Button: Öffnen Sie die Liste gefiltert nach dem, was der Balken
+zählt, oder einen einzelnen Datensatz im Seitenpanel.
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
@@ -209,10 +228,35 @@ function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; 
 }
 ```
 
-Die Diagramme sind SVG in den eigenen Tokens des Admin-Panels, hell und dunkel, mit einer Anzeige bei Hover und Pfeiltasten und einer Tabelle für Screenreader; eine Diagrammbibliothek ist nicht nötig. Für eine Form, die sie nicht zeichnen, funktioniert jede React-Diagrammbibliothek innerhalb einer `ChartCard`.
+Eine `KpiTile` öffnet ihre Datensätze auf dieselbe Weise. Mit `onClick` ist die gesamte
+Kachel ein Button; mit `href` ist sie ein Link, den ein modifizierter Klick in einem neuen
+Tab öffnet und ein normaler Klick an `onClick` übergibt, sodass der Router des Admins
+ohne Neuladen der Seite navigiert:
+
+```tsx
+const pending = `${urls.buildUrlCollectionPath("orders")}?status_op=${encodeURIComponent("==")}&status_value=pending`;
+
+<KpiTile
+    label="Pending orders"
+    icon="Inbox"
+    value={counts?.pending}
+    loading={loading}
+    href={pending}
+    onClick={() => urls.navigate(pending)}
+/>
+```
+
+Ohne beides ist die Kachel eine einfache Card. Umschließen Sie eine Kachel nicht mit einem
+eigenen `<button>` oder `<a>`: Das Steuerelement der Kachel wird durch ihr Label, ihren Wert
+und ihre Veränderung benannt und erhält den Fokus-Ring.
+
+Die Diagramme sind SVGs in den Design-Tokens des Admins, in Hell und Dunkel, mit Hover-
+und Pfeiltasten-Werten sowie einer Tabelle für Screenreader; eine Chart-Bibliothek ist
+nicht erforderlich. Für Darstellungsformen, die sie nicht abdecken, funktioniert jede React-Chart-Bibliothek
+innerhalb einer `ChartCard`.
 
 ## Nächste Schritte
 
-- **[Benutzerdefinierte Ansichten](/docs/frontend)** — Frontend-Übersicht
-- **[Hooks-Referenz](/docs/hooks)** — Verfügbare Hooks
-- **[Slots](/docs/frontend/slots)** — Dieselben Komponenten auf der Startseite oder über einer Collection platzieren
+- **[Custom Views](/docs/frontend)** — Frontend-Übersicht
+- **[Hooks Reference](/docs/hooks)** — Hooks-Referenz
+- **[Slots](/docs/frontend/slots)** — Platzieren derselben Komponenten auf der Startseite oder über einer Collection

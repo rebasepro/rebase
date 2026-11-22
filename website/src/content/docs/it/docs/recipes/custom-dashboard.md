@@ -1,19 +1,25 @@
 ---
-sourceHash: a9c03468852b95e3
+sourceHash: d60e60304904c8c2
 title: "Ricetta: Dashboard personalizzata"
 sidebar_label: Dashboard personalizzata
-description: "Crea una pagina dashboard con KPI e grafici: numeri calcolati in SQL e disegnati con i blocchi di @rebasepro/ui."
+description: "Crea una pagina dashboard con riquadri KPI e grafici — numeri calcolati in SQL, renderizzati con i blocchi di @rebasepro/ui."
 ---
 
 ## Panoramica
 
-Una dashboard è fatta di tre pezzi: una funzione backend che calcola i numeri in SQL, un componente che li carica con `useInsightData` e li disegna con i blocchi di `@rebasepro/ui`, e un posto dove mostrarla — qui, una pagina a sé nel menu laterale.
+Una dashboard è composta da tre elementi: una funzione backend che calcola i numeri in
+SQL, un componente che li carica con `useInsightData` e li renderizza con i
+blocchi di `@rebasepro/ui`, e un punto in cui mostrarla — in questo caso, una pagina
+dedicata nel drawer.
 
-Conta sul server. Portare le righe nel browser e sommarle è corretto solo finché la tabella sta in una pagina di risultati; oltre, il totale è sbagliato senza avvisare.
+Esegui i conteggi sul server. Recuperare le righe nel browser e sommarle funziona
+solo finché la tabella rientra in una singola pagina di risultati; oltre questo limite il totale risulterà
+silenziosamente errato.
 
 ## Calcolare i numeri sul server
 
-Una route per ogni elemento che la pagina disegna, eseguita come l'utente autenticato, così permessi e sicurezza a livello di riga valgono anche per le cifre:
+Una route per ogni elemento renderizzato dalla pagina, eseguita come utente autenticato,
+in modo che i permessi e la sicurezza a livello di riga (row-level security) si applichino anche alle cifre:
 
 ```ts
 // functions/dashboard.ts
@@ -55,9 +61,11 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-## Disegnarli
+## Renderizzarli
 
-`useInsightData(key, load)` carica una volta per chiave e per utente, e ogni componente che legge la stessa chiave condivide il risultato. I blocchi disegnano da soli gli stati di caricamento, errore e vuoto:
+`useInsightData(key, load)` effettua il caricamento una volta sola per chiave e utente autenticato, e ogni
+componente che legge la stessa chiave condivide il risultato. I blocchi gestiscono autonomamente
+i propri stati di caricamento, errore e assenza di dati:
 
 ```tsx
 import { useRebaseClient } from "@rebasepro/app";
@@ -111,9 +119,11 @@ function DashboardView() {
 }
 ```
 
-Gli stessi componenti possono stare sopra la lista di una collection o in cima alla home tramite `<Rebase slots>` — `collection.widgets`, `home.children.start` — invece che in una pagina a sé.
+Gli stessi componenti possono essere posizionati sopra l'elenco di una collection o in cima alla home
+page tramite `<Rebase slots>` — `collection.widgets`, `home.children.start` —
+invece di avere una pagina dedicata.
 
-## Registrare come vista personalizzata
+## Registrare come Custom View
 
 ```tsx
 const views: AppView[] = [
@@ -128,7 +138,7 @@ const views: AppView[] = [
 
 ```
 
-Passalo al navigation controller:
+Passalo al controller di navigazione:
 
 ```typescript
 const navigationStateController = useBuildNavigationStateController({
@@ -142,21 +152,26 @@ const navigationStateController = useBuildNavigationStateController({
 });
 ```
 
-La dashboard ora appare nella barra laterale sotto "Analytics" ed è accessibile all'indirizzo `/dashboard`.
+La dashboard compare ora nella barra laterale sotto "Analytics" ed è accessibile all'indirizzo `/dashboard`.
 
 ### Fissare il gruppo in basso
 
-I gruppi denominati `"Admin"` o `"Settings"` scivolano sotto gli altri nel drawer, in base al confronto delle stringhe sul nome. Questo comportamento si può perdere facilmente — traducendo l'etichetta l'ordinamento cessa silenziosamente di funzionare — quindi è preferibile specificarlo in modo esplicito:
+I gruppi denominati `"Admin"` o `"Settings"` vengono posizionati sotto gli altri nel drawer, tramite
+confronto di stringhe sul nome. Questo comportamento si può perdere facilmente — traducendo l'etichetta,
+l'ordinamento smette silenziosamente di funzionare — quindi è preferibile specificarlo esplicitamente:
 
 ```tsx
 { slug: "dashboard", name: "Dashboard", view: <DashboardView />, group: "Ajustes", pinToBottom: true }
 ```
 
-L'impostazione di `pinToBottom` su una qualsiasi vista di un gruppo fissa l'intero gruppo, poiché il drawer ordina i gruppi piuttosto che le singole viste.
+L'impostazione di `pinToBottom` su una qualsiasi vista di un gruppo fissa l'intero gruppo in basso, poiché
+il drawer ordina i gruppi piuttosto che le singole viste.
 
-## Navigare da una vista personalizzata
+## Navigazione da una vista personalizzata
 
-Un componente di vista non riceve props. Per instradare altrove — un'altra vista personalizzata, una collezione, un'entità — utilizza `useUrlController`, esportato da `@rebasepro/cms`:
+Un componente di visualizzazione non riceve props. Per reindirizzare altrove — un'altra vista personalizzata, una
+collection, un'entità — utilizza `useUrlController`, esportato da
+`@rebasepro/cms`:
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
@@ -180,13 +195,17 @@ function DashboardView() {
 }
 ```
 
-Costruisci il percorso anziché codificarlo manualmente (hard-coding): gli URL delle collezioni sono preceduti da un prefisso (`orders` → `/c/orders`) e tale prefisso non fa parte del contratto pubblico.
+Costruisci il percorso invece di codificarlo staticamente: gli URL delle collection hanno un prefisso
+(`orders` → `/c/orders`) e tale prefisso non fa parte del contratto pubblico.
 
-`useSidePanel` apre un'entità nel pannello laterale invece di effettuare la navigazione, il che di solito è ciò che si desidera per una riga di un elenco.
+`useSidePanel` apre un'entità nel pannello laterale invece di navigare, il che è
+generalmente ciò che si desidera per una riga all'interno di un elenco.
 
-## Grafici che aprono i loro record
+## Grafici e valori numerici che aprono i relativi record
 
-`BarChart` disegna le categorie come barre con il valore accanto. Con `onBarClick` ogni riga diventa un pulsante: apri la lista filtrata su ciò che la barra conta, oppure un record nel pannello laterale.
+`BarChart` mostra le categorie sotto forma di barre con i rispettivi valori accanto. Fornendo
+`onBarClick`, ogni riga diventa un pulsante: apre l'elenco filtrato in base a ciò che la barra
+conteggia, oppure un singolo record nel pannello laterale.
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
@@ -209,10 +228,35 @@ function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; 
 }
 ```
 
-I grafici sono SVG con i token dell'admin, in chiaro e in scuro, con una lettura al passaggio del mouse e con i tasti freccia, e una tabella per gli screen reader; non serve alcuna libreria di grafici. Per una forma che non disegnano, qualsiasi libreria di grafici React funziona dentro una `ChartCard`.
+Un `KpiTile` apre i relativi record nello stesso modo. Fornendo `onClick`, l'intero riquadro
+è un pulsante; fornendo `href`, diventa un link, che un clic con tasti di modifica apre in una nuova
+scheda e un normale clic passa a `onClick`, consentendo al router di amministrazione di navigare
+senza ricaricare la pagina:
 
-## Passaggi successivi
+```tsx
+const pending = `${urls.buildUrlCollectionPath("orders")}?status_op=${encodeURIComponent("==")}&status_value=pending`;
+
+<KpiTile
+    label="Pending orders"
+    icon="Inbox"
+    value={counts?.pending}
+    loading={loading}
+    href={pending}
+    onClick={() => urls.navigate(pending)}
+/>
+```
+
+Senza nessuna delle due opzioni, il riquadro è una semplice scheda. Non racchiudere un riquadro in un tag `<button>`
+o `<a>` personalizzato: il controllo del riquadro è denominato in base alla sua etichetta, al valore numerico e
+alla variazione, e gestisce l'anello di focus (focus ring).
+
+I grafici sono SVG stilizzati con i token di design dell'admin, in tema chiaro e scuro, con lettura
+al passaggio del mouse e tramite tasti freccia, e una tabella per gli screen reader; non è necessaria
+alcuna libreria grafica esterna. Per una rappresentazione non supportata nativamente, qualsiasi libreria grafica React funziona all'interno di un
+`ChartCard`.
+
+## Prossimi passi
 
 - **[Viste personalizzate](/docs/frontend)** — Panoramica del frontend
-- **[Riferimento degli hook](/docs/hooks)** — Hook disponibili
-- **[Slots](/docs/frontend/slots)** — Mettere gli stessi componenti nella home o sopra una collection
+- **[Riferimento degli Hook](/docs/hooks)** — Hook disponibili
+- **[Slot](/docs/frontend/slots)** — Posizionamento degli stessi componenti nella home page o sopra una collection

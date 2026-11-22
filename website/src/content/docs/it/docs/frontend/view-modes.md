@@ -1,24 +1,24 @@
 ---
-sourceHash: 2e189939df0c022e
+sourceHash: 94cc15a104ed93ec
 title: Modalità di visualizzazione
 sidebar_label: Modalità di visualizzazione
-description: "Mostra le righe di una tabella come elenco, foglio di calcolo, schede o bacheca kanban; scegli cosa inserire nel titolo, immagine, stato e data di ogni record; imposta l'ordinamento predefinito, i filtri e i preset di filtri con un clic."
+description: "Mostra le righe di una tabella come elenco, foglio di calcolo, schede o bacheca kanban; scegli cosa inserire nel titolo, immagine, stato e data di ciascun record; e imposta l'ordinamento predefinito, i filtri e i preset di filtro a clic singolo."
 ---
 
-Ogni collezione può essere visualizzata in quattro modi, tramite il selettore nella sua barra degli strumenti:
+Ogni collezione può essere mostrata in quattro modi, dal selettore nella sua barra degli strumenti:
 
-- **Tabella**: un foglio di calcolo virtualizzato con modifica inline, ordinamento, filtraggio
-  e selezione multipla. La vista in cui si apre una collezione, a meno che non sia specificato diversamente.
-- **Elenco**: una riga per record, con immagine, titolo, sottotitolo, stato e
+- **Table**: un foglio di calcolo virtualizzato con modifica inline, ordinamento, filtraggio
+  e selezione multipla. Il punto in cui si apre una collezione, a meno che non venga indicato diversamente.
+- **List**: una riga per record, con la sua immagine, titolo, sottotitolo, stato e
   data.
-- **Schede**: una griglia di schede, per contenuti ricchi di immagini.
-- **Kanban**: una bacheca raggruppata in base a una colonna con un insieme chiuso di valori.
+- **Cards**: una griglia di schede, per contenuti ricchi di immagini.
+- **Kanban**: una bacheca raggruppata per una colonna con un insieme chiuso di valori.
 
 Una collezione può anche offrire modalità di visualizzazione create da te (un calendario, una mappa, una
-galleria) nello stesso selettore, gestite dalla medesima barra degli strumenti: vedi
+galleria) nello stesso selettore, gestite dalla stessa barra degli strumenti: vedi
 [Modalità di visualizzazione personalizzate](/docs/frontend/extending#custom-view-modes).
 
-## Scelta delle visualizzazioni
+## Scelta delle viste
 
 ```ts
 // backend/schema/tasks.ts
@@ -55,20 +55,20 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
                 done:        { label: "Done", color: "green" },
             },
         },
-        __order: { hidden: true, hiddenInForm: true },
+        __order: { hidden: true },
     },
 });
 ```
 
 | Opzione | Effetto |
 |---|---|
-| `defaultViewMode` | La vista iniziale dell'utente: `"table"`, `"list"`, `"cards"`, `"kanban"` o la chiave di una vista personalizzata. |
-| `enabledViews` | Le viste disponibili nel selettore. |
+| `defaultViewMode` | Dove atterra un visitatore: `"table"`, `"list"`, `"cards"`, `"kanban"` o la chiave di una vista personalizzata. |
+| `enabledViews` | Le viste offerte dal selettore. |
 | `kanban` | `{ columnField, orderField }`: la bacheca. |
-| `defaultSize` | L'altezza della riga, descritta di seguito. |
+| `defaultSize` | L'altezza della riga, indicata sotto. |
 | `customViews` | Viste personalizzate, per valore o per chiave. |
 
-### Altezza delle righe
+### Altezza della riga
 
 | `defaultSize` | Pixel | Ideale per |
 |------|--------|----------|
@@ -80,33 +80,35 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 
 ## Kanban
 
-`kanban.columnField` indica la colonna in base alla quale la bacheca raggruppa gli elementi. Deve contenere un
+`kanban.columnField` specifica la colonna in base a cui la bacheca esegue il raggruppamento. Deve contenere un
 insieme chiuso di stringhe, un `col.enum([...])` o una colonna di testo con
 `.oneOf([...])`; qualsiasi altra cosa genera un errore di tipo. Le colonne vengono disegnate nell'ordine
-proprio della colonna, o in `enumOrder`, con le etichette e i colori definiti in
-`enumLabels`. Il trascinamento di una scheda in un'altra colonna aggiorna `columnField`.
+proprio della colonna, o in `enumOrder`, con le etichette e i colori di
+`enumLabels`. Il trascinamento di una scheda in un'altra colonna scrive in `columnField`.
 
-`kanban.orderField` indica dove viene memorizzata la posizione di una scheda **all'interno** di una colonna.
-Dichiaralo sempre: tre errori qui producono tutti una bacheca che sembra
-configurata ma non lo è.
+`kanban.orderField` specifica dove viene memorizzata la posizione di una scheda **all'interno** di una colonna.
+Dichiaralo ogni volta che tale ordine è importante: tre errori in questo punto producono tutti una bacheca
+che sembra configurata ma non lo è.
 
-**`orderField` non è opzionale.** Senza di esso una scheda può comunque essere trascinata tra le colonne,
-perché tale azione scrive `columnField`. La sua posizione all'interno di una colonna non ha però un posto in cui
-essere memorizzata, quindi viene ripristinata alla lettura successiva e la bacheca mostra una barra ambra
-che avvisa che l'ordinamento non è configurato.
+**Senza `orderField`, viene mantenuta solo la colonna.** Una scheda può comunque essere trascinata tra le
+colonne, perché ciò scrive in `columnField`, che è tutto ciò di cui una bacheca di stato ha bisogno.
+La sua posizione all'interno di una colonna non ha un luogo in cui essere memorizzata, quindi si reimposta alla
+lettura successiva. La bacheca lo segnala la prima volta che una scheda viene rilasciata in una nuova posizione
+all'interno della propria colonna, in una barra che può essere chiusa; una bacheca le cui schede si spostano
+solo tra le colonne non mostra nulla.
 
-**La colonna deve essere di tipo testo.** Il riordinamento scrive una chiave di
+**La colonna deve essere di testo.** Il riordinamento scrive una chiave di
 [fractional-indexing](https://github.com/rocicorp/fractional-indexing)
-(`"i0"`, `"i1"`, `"i0i"`), non un indice numerico. Una colonna numerica non potrà mai contenerla, quindi
-`orderField` accetta solo una colonna di testo. È un meccanismo interno, non contenuto: nascondilo,
+(`"i0"`, `"i1"`, `"i0i"`), non un indice. Una colonna numerica non potrà mai contenerne una, quindi
+`orderField` accetta solo una colonna di testo. Si tratta di meccanismi interni, non di contenuto: nascondila,
 come mostrato sopra.
 
-**Le righe create all'esterno del CMS arrivano senza chiave.** Nulla ne assegna una al momento
-dell'inserimento. Una riga scritta da un cron, da uno script di seed, da una migrazione o dalle API REST
-arriva con `__order` null, e la bacheca mostra *"Some items don't have order
-values"* con un pulsante **Initialize**. Un clic esegue il backfill della prima pagina, ma
-la successiva esecuzione del cron farà riapparire subito la barra. Se un backend crea righe per una
-bacheca, dovrebbe aggiungere la chiave autonomamente, utilizzando l'alfabeto impiegato dal CMS:
+**Le righe create all'esterno del CMS arrivano senza chiave.** Nulla ne assegna una durante
+l'inserimento. Una riga scritta da un cron, uno script di seed, una migrazione o dall'API REST
+arriva con `__order` impostato su null, e la bacheca mostra *"Some items don't have order
+values"* con un pulsante **Initialize**. Un clic esegue il backfill della prima pagina, e
+la successiva esecuzione del cron fa ricomparire subito la barra. Se un backend crea righe per una
+bacheca, dovrebbe aggiungere la chiave da sé, utilizzando l'alfabeto impiegato dal CMS:
 
 ```typescript
 import { generateKeyBetween } from "fractional-indexing";
@@ -137,20 +139,20 @@ await client.data.tasks.create({
 });
 ```
 
-Anche le righe create tramite form arrivano senza chiave; l'unica differenza è che
-vedrai la barra non appena ne aggiungi una. **Initialize** è la soluzione in questo caso; su una
-bacheca alimentata da un backend, invece, è una soluzione che si annulla a ogni esecuzione.
+Anche le righe create tramite il form arrivano prive di chiave; l'unica differenza è che
+vedi la barra nel momento stesso in cui ne aggiungi una. **Initialize** è la soluzione in quel caso;
+su una bacheca alimentata da un backend, si tratta di una soluzione che si annulla a ogni esecuzione.
 
 ## Slot di visualizzazione
 
-Ogni superficie che disegna un record utilizza alcuni dei sei slot disponibili: **title**,
-**subtitle**, **image**, **status**, **date** e **tags**. Una riga di elenco è composta da image +
-title + subtitle + status + date, una scheda è identica ma con l'immagine in alto, un
+Ogni superficie che disegna un record utilizza alcuni dei sei slot: **title**,
+**subtitle**, **image**, **status**, **date** e **tags**. Una riga di elenco è image +
+title + subtitle + status + date, una scheda è identica con l'immagine in alto, un
 selettore di riferimenti è title + subtitle, e l'intestazione di una pagina è solo il title.
 
-Il CMS popola alcuni slot a partire dalle colonne della tabella (vedi
-[slot di visualizzazione predefiniti](/docs/collections/#display-slots)). `display` consente di specificare
-uno qualsiasi di essi, come percorso di campo o come funzione:
+Il CMS compila alcuni slot dalle colonne della tabella (vedi
+[slot di visualizzazione predefiniti](/docs/collections/#display-slots)). `display` definisce ciascuno
+di essi, come percorso di campo o come funzione:
 
 ```tsx
 import { customizeTable } from "@rebasepro/cms";
@@ -166,36 +168,41 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 });
 ```
 
-Uno slot omesso mantiene il suo valore derivato.
+Uno slot tralasciato mantiene il proprio valore derivato.
 
-A un resolver viene passato `{ row, id, context }`. `row` è il record così come inviato
-dal server, tipizzato come riga della tabella: date come stringhe ISO, un belongsTo come la relativa
-colonna foreign-key. `id` è la sua chiave primaria sotto forma di stringa, con le parti di una chiave
-composita unite da `:::`. Una relazione caricata dal CMS arriva nidificata sotto il proprio nome, così come
-restituita da `include` di REST, consentendo a un resolver di leggere un campo del record correlato senza
-alcuna richiesta aggiuntiva.
+A un resolver viene passato `{ row, id, context }`. `row` è il record così come inviato dal
+server, tipizzato come riga della tabella: date come stringhe ISO, un belongsTo come la relativa
+colonna foreign-key. `id` è la sua chiave primaria come stringa, con le parti di una chiave composita
+unite da `:::`. Una relazione caricata dal CMS arriva nidificata sotto il proprio nome, come
+restituito dall'`include` di REST, in modo che un resolver possa leggere il campo di un record correlato
+senza effettuare una propria richiesta.
 
-Un resolver può essere `async`, per leggere elementi non presenti nel record. Mentre
+Un resolver può essere `async`, per leggere qualcosa che il record non contiene. Mentre
 la promise è in corso, la superficie mostra il valore derivato e lo sostituisce con quello
-risolto all'arrivo: un titolo non mostra mai uno spinner. I risultati vengono memorizzati nella cache per
-record e slot, e le richieste simultanee condividono un'unica chiamata.
+risolto non appena arriva: un titolo non è mai uno spinner di caricamento. I risultati sono memorizzati nella cache
+per record e slot, e le richieste simultanee condividono una singola chiamata.
 
-Restituisci `undefined` quando un record non ha valori per lo slot; l'interfaccia ricorrerà al
-fallback disponibile (un'intestazione usa il nome singolare della collezione, un link usa
-l'id). Un resolver che genera un errore viene trattato come `undefined` e registrato nei log una sola volta.
+Restituisci `undefined` quando un record non ha nulla per lo slot; la superficie ripiega
+su ciò che conosce (un'intestazione usa il nome singolare della collezione, un link usa
+l'id). Un resolver che genera un'eccezione viene trattato come `undefined` e registrato nei log una volta sola.
 
-Preferisci un percorso ogni volta che il valore è presente sul record: un percorso mantiene il rendering
-nativo del campo, così uno stato enum rimane un badge colorato e una data rimane formattata, cosa
-che un resolver che restituisce una stringa non può fare.
+Prediligi un percorso ogni volta che il valore è presente sul record: un percorso mantiene il rendering
+proprio del campo, quindi uno stato enum rimane un badge colorato e una data rimane formattata,
+cosa che un resolver che restituisce una stringa non può fare.
 
-Quando nessuno slot definisce il titolo, il CMS ne sceglie uno. Con `fieldOrder`, sceglie il primo
-campo in quell'ordine che può fungere da titolo: testo, una relazione a singola cardinalità o
-un riferimento. In caso contrario, i candidati vengono classificati: prima il testo la cui chiave corrisponde a un'etichetta
-(`name`, `title`, `label`…), poi il testo breve, un'email, un enum, il testo lungo,
-una relazione e un riferimento. Chiavi, colonne uuid, campi file e campi nascosti
-non sono mai idonei. Qualsiasi valore contenga il titolo viene renderizzato come testo: una data formattata, un
-array unito e una relazione come il primo tra `name`, `title`, `label` o
-`displayName` sulla riga correlata, con fallback al suo id.
+Quando nessuno slot specifica il titolo, il CMS ne sceglie uno dal testo stesso della tabella.
+Con `fieldOrder`, viene scelto il primo campo in quell'ordine che può fungere da titolo.
+Altrimenti, i candidati vengono classificati per priorità: prima il testo la cui chiave corrisponde a un'etichetta (`name`,
+`title`, `label`…), poi testo breve, un'email, un enum, testo lungo e un
+selettore utente. Chiavi, colonne uuid, foreign key, relazioni, riferimenti, documenti
+JSON, campi file e campi nascosti non sono mai idonei: una relazione indica
+un altro record, quindi un cliente che appartiene a un'agenzia non avrà mai come titolo
+l'agenzia. Una tabella priva di tutti questi elementi è intitolata con il suo id. Un nome che risiede
+all'interno di una colonna JSON, o una relazione che rappresenta effettivamente il nome della riga (una tabella
+di giunzione), viene specificato con `display.title`: `title: "data.name"`,
+`title: "agency"`. Qualsiasi cosa contenga il titolo viene visualizzata come testo: una data formattata,
+un array concatenato, e una relazione come titolo della riga correlata, con fallback
+al suo id.
 
 ## Filtri, preset e ordinamento
 
@@ -215,22 +222,21 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 
 | Opzione | Effetto |
 |---|---|
-| `sort` | L'ordinamento predefinito: una chiave e una direzione, oppure diverse in sequenza. |
-| `defaultFilter` | Il filtro di partenza per l'utente, che può essere modificato. |
-| `fixedFilter` | Un filtro che l'utente non può modificare. I filtri applicati su altri campi vengono combinati con esso. |
+| `sort` | L'ordinamento predefinito: una chiave e una direzione, o diverse in sequenza. |
+| `defaultFilter` | Il filtro da cui parte un visitatore, e che può modificare. |
+| `fixedFilter` | Un filtro che il visitatore non può modificare. I filtri applicati su altri campi vengono combinati con questo. |
 | `filterPresets` | Filtri con un clic nella barra degli strumenti: `{ label?, filterValues, sort? }`. Senza un'etichetta, ne viene generata una a partire dal filtro. |
-| `pagination` | Caricamento a pagine (`true`, o la dimensione della pagina), o tutto in una volta (`false`). |
+| `pagination` | Carica a pagine (`true`, o la dimensione della pagina), o tutto in una volta (`false`). |
 
-Ogni chiave viene verificata rispetto ai campi della tabella. La proprietà `filterOperators`
-di un campo restringe le opzioni di filtro disponibili su di esso, mentre `[]` ne disattiva il filtraggio.
+Ogni chiave viene verificata rispetto ai campi della tabella. Il parametro `filterOperators` del campo stesso
+restringe ciò che può essere filtrato su di esso, e `[]` ne disattiva il filtraggio.
 
-Un `fixedFilter` limita ciò che il CMS *richiede*. Non è una barriera di sicurezza: ciò che
-un chiamante può leggere è stabilito dalla [row-level security](/docs/collections/security-rules/)
-della tabella, per ogni chiamante.
+Un `fixedFilter` restringe ciò che il CMS *richiede*. Non è una barriera di sicurezza: ciò che un
+chiamante può leggere è deciso dalla [row-level security](/docs/collections/security-rules/) della tabella, per ciascun chiamante.
 
 ## Passaggi successivi
 
 - [customizeTable](/docs/frontend/customize-table/): tutte le opzioni
-- [Personalizzazione dell'admin](/docs/frontend/customizing/): modalità di visualizzazione, pagine e azioni personalizzate
-- [Viste dell'entità](/docs/frontend/entity-views/): tab su un record
-- [Azioni dell'entità](/docs/frontend/entity-actions/): pulsanti su un record
+- [Personalizzazione dell'admin](/docs/frontend/customizing/): le tue modalità di visualizzazione, pagine e azioni personalizzate
+- [Entity views](/docs/frontend/entity-views/): schede su un record
+- [Entity actions](/docs/frontend/entity-actions/): pulsanti su un record

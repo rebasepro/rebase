@@ -1,19 +1,25 @@
 ---
-sourceHash: a9c03468852b95e3
+sourceHash: d60e60304904c8c2
 title: "Receta: Dashboard personalizado"
 sidebar_label: Dashboard personalizado
-description: "Crea una página de dashboard con KPIs y gráficos: números calculados en SQL y dibujados con los bloques de @rebasepro/ui."
+description: "Cree una página de dashboard con mosaicos de KPI y gráficos: números calculados en SQL, dibujados con los bloques de @rebasepro/ui."
 ---
 
-## Descripción general
+## Visión general
 
-Un dashboard tiene tres piezas: una función de backend que calcula los números en SQL, un componente que los carga con `useInsightData` y los dibuja con los bloques de `@rebasepro/ui`, y un lugar donde mostrarlo — aquí, una página propia en el menú lateral.
+Un dashboard consta de tres partes: una función de backend que calcula los números en
+SQL, un componente que los carga con `useInsightData` y los dibuja con los
+bloques de `@rebasepro/ui`, y un lugar donde mostrarlo —aquí, una página
+propia en el menú lateral (drawer)—.
 
-Cuenta en el servidor. Traer filas al navegador y sumarlas solo es correcto mientras la tabla cabe en una página de resultados; a partir de ahí el total es incorrecto sin avisar.
+Calcule en el servidor. Obtener filas en el navegador y sumarlas solo es correcto
+mientras la tabla quepa en una sola página de resultados; a partir de ahí, el total
+será silenciosamente erróneo.
 
 ## Calcular los números en el servidor
 
-Una ruta por cada cosa que dibuja la página, ejecutada como el usuario que ha iniciado sesión, para que los permisos y la seguridad a nivel de fila también se apliquen a las cifras:
+Una ruta por cada elemento que dibuja la página, ejecutada como el usuario con sesión
+iniciada, para que los permisos y la seguridad a nivel de fila también se apliquen a las cifras:
 
 ```ts
 // functions/dashboard.ts
@@ -57,7 +63,9 @@ export default defineFunction((app, { rebase }) => {
 
 ## Dibujarlos
 
-`useInsightData(key, load)` carga una vez por clave y por usuario, y todos los componentes que leen la misma clave comparten el resultado. Los bloques dibujan sus propios estados de carga, error y vacío:
+`useInsightData(key, load)` carga una vez por clave y usuario autenticado, y cada
+componente que lee la misma clave comparte el resultado. Los bloques dibujan sus
+propios estados de carga, error y vacío:
 
 ```tsx
 import { useRebaseClient } from "@rebasepro/app";
@@ -111,7 +119,9 @@ function DashboardView() {
 }
 ```
 
-Los mismos componentes pueden ir sobre la lista de una colección o en la parte superior de la página de inicio mediante `<Rebase slots>` — `collection.widgets`, `home.children.start` — en lugar de en una página propia.
+Los mismos componentes pueden ubicarse encima de la lista de una colección o en la parte
+superior de la página de inicio mediante `<Rebase slots>` —`collection.widgets`,
+`home.children.start`— en lugar de tener su propia página.
 
 ## Registrar como una vista personalizada
 
@@ -128,7 +138,7 @@ const views: AppView[] = [
 
 ```
 
-Pásalo al controlador de navegación:
+Páselo al controlador de navegación:
 
 ```typescript
 const navigationStateController = useBuildNavigationStateController({
@@ -142,21 +152,26 @@ const navigationStateController = useBuildNavigationStateController({
 });
 ```
 
-El dashboard ahora aparece en la barra lateral debajo de "Analytics" y es accesible en `/dashboard`.
+El dashboard ahora aparece en la barra lateral bajo "Analytics" y es accesible en `/dashboard`.
 
 ### Fijar el grupo en la parte inferior
 
-Los grupos llamados `"Admin"` o `"Settings"` se ubican por debajo de los demás en el menú lateral (drawer), mediante una comparación de cadenas sobre el nombre. Esto es fácil de perder —si traduces la etiqueta, el ordenamiento deja de aplicarse silenciosamente—, así que indícalo explícitamente en su lugar:
+Los grupos llamados `"Admin"` o `"Settings"` se sitúan por debajo de los demás en el menú lateral,
+mediante una comparación de cadenas sobre el nombre. Esto es fácil de perder —si traduce la etiqueta,
+el ordenamiento dejará de aplicarse silenciosamente—, por lo que es preferible indicarlo de forma explícita:
 
 ```tsx
 { slug: "dashboard", name: "Dashboard", view: <DashboardView />, group: "Ajustes", pinToBottom: true }
 ```
 
-Establecer `pinToBottom` en cualquiera de las vistas de un grupo fija todo el grupo, ya que el drawer ordena grupos en lugar de vistas individuales.
+Establecer `pinToBottom` en cualquiera de las vistas de un grupo fija a todo el grupo,
+ya que el menú lateral ordena grupos en lugar de vistas individuales.
 
 ## Navegar desde una vista personalizada
 
-Un componente de vista no recibe props. Para navegar a algún lugar —otra vista personalizada, una colección, una entidad—, recurre a `useUrlController`, que se exporta desde `@rebasepro/cms`:
+Un componente de vista no recibe props. Para enrutar a algún lugar —otra vista personalizada, una
+colección, una entidad—, utilice `useUrlController`, que se exporta desde
+`@rebasepro/cms`:
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
@@ -180,13 +195,17 @@ function DashboardView() {
 }
 ```
 
-Construye la ruta en lugar de escribirla manualmente (hard-code): las URLs de las colecciones tienen prefijo (`orders` → `/c/orders`) y el prefijo no forma parte del contrato público.
+Construya la ruta en lugar de escribirla de forma fija (hard-code): las URL de las colecciones
+tienen prefijo (`orders` → `/c/orders`) y el prefijo no forma parte del contrato público.
 
-`useSidePanel` abre una entidad en el panel lateral en lugar de navegar, que suele ser lo que se desea para una fila de una lista.
+`useSidePanel` abre una entidad en el panel lateral en lugar de navegar, lo que normalmente
+es lo que se busca para una fila en una lista.
 
-## Gráficos que abren sus registros
+## Gráficos y cifras que abren sus registros
 
-`BarChart` dibuja categorías como barras con su valor al lado. Con `onBarClick`, cada fila es un botón: abre la lista filtrada a lo que cuenta la barra, o un registro en el panel lateral.
+`BarChart` dibuja categorías en forma de barras con sus valores al lado. Al proporcionar
+`onBarClick`, cada fila se convierte en un botón: abra la lista filtrada según lo que
+cuenta la barra, o un único registro en el panel lateral.
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
@@ -209,10 +228,35 @@ function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; 
 }
 ```
 
-Los gráficos son SVG con los tokens del propio panel de administración, en claro y oscuro, con lectura al pasar el ratón y con las flechas del teclado, y una tabla para lectores de pantalla; no hace falta ninguna librería de gráficos. Para una forma que no dibujan, cualquier librería de gráficos de React funciona dentro de un `ChartCard`.
+Un `KpiTile` abre sus registros de la misma manera. Al proporcionarle `onClick`, todo el mosaico
+es un botón; con `href`, es un enlace, el cual un clic con teclas modificadoras abre en una nueva
+pestaña y un clic simple transfiere a `onClick`, de modo que el enrutador del panel de administración
+navega sin recargar la página:
+
+```tsx
+const pending = `${urls.buildUrlCollectionPath("orders")}?status_op=${encodeURIComponent("==")}&status_value=pending`;
+
+<KpiTile
+    label="Pending orders"
+    icon="Inbox"
+    value={counts?.pending}
+    loading={loading}
+    href={pending}
+    onClick={() => urls.navigate(pending)}
+/>
+```
+
+Sin ninguno de los dos, el mosaico es una simple tarjeta. No envuelva un mosaico en su propio
+`<button>` o `<a>`: el control del mosaico se nombra por su etiqueta, cifra y variación,
+y toma el anillo de foco.
+
+Los gráficos son SVG basados en los propios tokens del administrador, en modo claro y oscuro,
+con lectura al pasar el cursor y mediante teclas de dirección, además de una tabla para lectores
+de pantalla; no se requiere ninguna biblioteca de gráficos externa. Para un formato que no dibujen,
+cualquier biblioteca de gráficos de React funciona dentro de un `ChartCard`.
 
 ## Próximos pasos
 
-- **[Vistas personalizadas](/docs/frontend)** — Descripción general del frontend
+- **[Vistas personalizadas](/docs/frontend)** — Información general del frontend
 - **[Referencia de hooks](/docs/hooks)** — Hooks disponibles
-- **[Slots](/docs/frontend/slots)** — Colocar los mismos componentes en la página de inicio o sobre una colección
+- **[Slots](/docs/frontend/slots)** — Ubicación de los mismos componentes en la página de inicio o encima de una colección

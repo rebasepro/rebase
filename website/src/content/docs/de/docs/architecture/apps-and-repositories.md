@@ -1,5 +1,5 @@
 ---
-sourceHash: 3036d8c7d3f98d60
+sourceHash: e3293eb3c0e15be1
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt ist ein Backend plus die Apps, die damit kommunizieren, welche jeweils in ihrem eigenen Repository liegen können.
@@ -8,38 +8,38 @@ description: Ein Projekt ist ein Backend plus die Apps, die damit kommunizieren,
 ## Projekte und Apps
 
 Ein **Projekt** ist das Backend: die Datenbank, Auth, Storage, Realtime und
-Funktionen. Eine **App** ist etwas, das damit kommuniziert.
+Functions. Eine **App** ist etwas, das damit kommuniziert.
 
 | Typ | Was es ist |
 | --- | --- |
-| `backend` | Die Tabellen, Hooks und Funktionen, die die API definieren. Genau eine pro Projekt. |
-| `static` | Ein gebautes Client-Bundle – eine SPA oder statische Website, ausgeliefert unter einem eigenen Pfad oder auf einem eigenen Hostnamen. |
+| `backend` | Die Tabellen, Hooks und Functions, die die API definieren. Genau eines pro Projekt. |
+| `static` | Ein gebautes Client-Bundle – eine SPA oder statische Website, bereitgestellt unter einem eigenen Pfad oder auf einem eigenen Hostnamen. |
 
-Das ist die gesamte Liste. Das Admin-Panel ist eine `static`-App wie jede andere: Es wird
-in Ihrem Repository mit Ihren `frontend/src/cms`-Anpassungen gebaut, weshalb
-benutzerdefinierte Felder und benutzerdefinierte Ansichten vom ersten Tag an darin funktionieren.
+Das ist die gesamte Liste. Das Admin-Panel ist eine `static` App wie jede andere: Es wird
+in Ihrem Repository mit Ihren `frontend/src/cms`-Anpassungen gebaut,
+weshalb benutzerdefinierte Felder und benutzerdefinierte Ansichten darin vom ersten Tag an funktionieren.
 
-Wer Eigentümer des Serverprozesses ist, ist eine Eigenschaft des Backends, kein separater
+Wem der Serverprozess gehört, ist eine Eigenschaft des Backends, kein separater
 App-Typ:
 
 | `runtime` | Was es bedeutet |
 | --- | --- |
-| `managed` | Das Runtime-Image der Plattform führt Ihr Bundle aus. Sie stellen Tabellen, Funktionen, Crons und Schemas bereit. |
-| `custom` | Sie stellen den Server bereit: Ihr eigenes Dockerfile und Ihren eigenen Entrypoint. `rebase eject` richtet dies ein. |
+| `managed` | Das Runtime-Image der Plattform führt Ihr Bundle aus. Sie stellen Tabellen, Functions, Crons und das Schema bereit. |
+| `custom` | Sie stellen den Server bereit: Ihr eigenes Dockerfile und Ihren Entrypoint. `rebase eject` richtet dies ein. |
 
-Dies ist unabhängig davon, *wo* es läuft. Beides läuft auf Rebase Cloud und beides
-lässt sich selbst hosten – das Ziel befindet sich in `.rebase/cloud.json`, nicht im Manifest.
+Dies ist unabhängig davon, *wo* es ausgeführt wird. Beide laufen auf Rebase Cloud und beide
+können selbst gehostet werden – das Ziel befindet sich in `.rebase/cloud.json`, nicht im Manifest.
 
-Der entscheidende Punkt ist, wer die Liste *besitzt*. Ein Repository deklariert nur die Apps,
-die es enthält; das Projekt besitzt die Menge der existierenden Apps. Zwei Repositories müssen
-niemals voneinander wissen – sie müssen nur das Projekt kennen. Das macht ein
-separates Frontend-Repository oder eine mobile App ganz ohne Repository-Bezug
-zu einem Regelfall statt zu einem Sonderfall.
+Der wichtige Teil ist, wem die Liste *gehört*. Ein Repository deklariert nur die Apps,
+die es enthält; dem Projekt gehört die Menge der existierenden Apps. Zwei Repositories müssen
+nie voneinander wissen – sie müssen nur das Projekt kennen. Das ist es,
+was ein separates Frontend-Repository oder eine mobile App ganz ohne Repository-Beziehung
+zu einem Normalfall statt zu einem Sonderfall macht.
 
 ## `rebase.json`
 
 Das Manifest deklariert die Topologie und sonst nichts. Schema, Sicherheitsregeln, Hooks
-und Funktionen verbleiben in TypeScript, wo ein Typsystem sie prüfen kann.
+und Functions bleiben in TypeScript, wo ein Typsystem sie überprüfen kann.
 
 ```jsonc
 {
@@ -65,34 +65,45 @@ und Funktionen verbleiben in TypeScript, wo ein Typsystem sie prüfen kann.
 }
 ```
 
-Ein einziger Prozess liefert alles aus: die API unter `/api`, die Website unter `/`, den Admin-Bereich unter
-`/admin`. Das ist das Self-Hosting-Modell und eine absolut solide Einstiegsstufe auf
+Ein einziger Prozess bedient alles: die API unter `/api`, die Website unter `/`, den Admin-Bereich unter
+`/admin`. Das ist das Self-Hosting-Modell und ein absolut solides kleines Tier auf
 Rebase Cloud.
 
-## Festlegen, wo sich das CMS befindet
+Der `path` einer statischen App nimmt eine von zwei Formen an:
 
-`cms` ist der URL-Pfad, unter dem eine App `<RebaseCMS>` mountet. Es ist optional, es ist
-das einzige Feld hier, das beschreibt, was sich *innerhalb* einer App befindet, anstatt wo die
-App liegt, und es existiert, weil nichts anderes dies ermitteln kann.
+| `path` | Wo die App antwortet |
+| --- | --- |
+| `"/"`, `"/admin"` | Unter diesem Pfad auf jedem Hostnamen, auf dem das Projekt bereitgestellt wird. |
+| `"https://www.example.com"`, `"https://admin.example.com/cms"` | Nur auf diesem Hostnamen, unter dem Pfad dahinter. Siehe [Eine App auf einem eigenen Hostnamen](#eine-app-auf-einem-eigenen-hostnamen). |
+
+Die URL-Form ist die Methode, mit der ein Projekt mit einer Website pro Domain, wie beispielsweise ein Vercel- oder
+Netlify-Projekt pro Domain, zu einem einzigen Rebase-Projekt wird: eine statische App pro
+Hostname, die alle über dasselbe Deployment bereitgestellt werden.
+
+## Angeben, wo sich das CMS befindet
+
+`cms` ist der URL-Pfad, an dem eine App `<RebaseCMS>` einbindet. Es ist optional, es ist
+das einzige Feld hier, das beschreibt, was sich *in* einer App befindet, anstatt wo die
+App liegt, und es existiert, weil nichts anderes dies herausfinden kann.
 
 Das CMS ist eine React-Komponente in Ihrem eigenen Frontend, seine Adresse ist also eine
 clientseitige Route. Es ist keine Server-Route, keine Datei im Build und nicht
-von jedem anderen nicht zugeordneten Pfad unter einer SPA zu unterscheiden – eine Anfrage an
-`/admin` erhält dieselbe `index.html` wie eine Anfrage an `/anything-else`. Kein
-Deployment, kein laufender Server und keinerlei Probing kann daher feststellen, wo sich Ihr Admin-Panel
+unterscheidbar von jedem anderen nicht übereinstimmenden Pfad unter einer SPA – eine Anfrage an
+`/admin` erhält dasselbe `index.html` wie eine Anfrage an `/anything-else`. Kein
+Deployment, kein laufender Server und keine Menge an Überprüfungen kann also feststellen, wo sich Ihr Admin-Panel
 befindet. Wenn Sie es nicht notieren, weiß es niemand.
 
-Wer diesen Pfad kennt, nutzt ihn:
+Was es weiß, nutzt es auch:
 
-- **Rebase Cloud** platziert einen *Open CMS*-Link im Projekt-Header und führt die
-  Adresse in der Übersicht des Projekts auf – auf dem eigenen Hostnamen der App, wenn sie
-  einen hat. Ohne `cms` kann die Konsole nur den Projekt-Host anbieten – was
-  das CMS nur dann erreicht, wenn sich das CMS zufällig im Root-Verzeichnis davon befindet.
-- **`rebase dev`** gibt die CMS-URL in seinem Start-Banner aus, wenn es sich nicht
-  einfach um die Startseite des Frontends handelt.
-- **`rebase apps list`** zeigt sie neben der App an, die sie ausliefert.
+- **Rebase Cloud** platziert einen *Open CMS*-Link in der Kopfzeile des Projekts und listet die
+  Adresse in der Übersicht des Projekts auf – auf dem eigenen Hostnamen der App, sofern sie
+  einen hat. Ohne `cms` kann die Konsole nur den Projekt-Host anbieten – welcher
+  das CMS nur erreicht, wenn das CMS zufällig im Root-Verzeichnis davon liegt.
+- **`rebase dev`** gibt die CMS-URL im Start-Banner aus, wenn es nicht
+  einfach die Startseite des Frontends ist.
+- **`rebase apps list`** zeigt es neben der App an, die es bereitstellt.
 
-Drei Varianten, und alle davon sind ganz gewöhnlich.
+Drei Formen, und alle davon sind gewöhnlich.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -106,16 +117,16 @@ Drei Varianten, und alle davon sind ganz gewöhnlich.
 ```
 
 Der Wert ist der Pfad, den Sie nach dem Hostnamen eingeben würden, kein relativer Pfad
-zu `path`, und er muss sich innerhalb der deklarierenden App befinden – der SPA-Fallback
+zu `path`, und er muss innerhalb der App liegen, die ihn deklariert – das SPA-Fallback
 dieser App ist das, was dort antwortet. Es ist immer ein Pfad, selbst wenn der `path` der App
-eine URL ist: Das CMS befindet sich dann auf diesem Pfad auf dem Hostnamen der App, sodass `"cms": "/"`
-oben `https://admin.example.com/` bedeutet. Ein Projekt hat ein CMS; ein zweites zu deklarieren
-ist ein Fehler und kein Münzwurf darüber, worauf die Konsole verlinkt.
+eine URL ist: Das CMS befindet sich dann auf diesem Pfad auf dem Hostnamen der App, `"cms": "/"`
+oben bedeutet also `https://admin.example.com/`. Ein Projekt hat genau ein CMS; ein zweites
+zu deklarieren ist ein Fehler statt ein Münzwurf darüber, auf welches die Konsole verlinkt.
 
-`path` ist sowohl eine Eingabe zur **Build-Zeit** als auch für die Auslieferung. Eine unter
-`/admin` gemountete App muss für `/admin` *gebaut* werden, sonst lädt `index.html` und jedes Asset
-liefert einen 404-Fehler – eine weiße Seite ohne jegliche Fehlermeldung. `rebase build` übergibt den Wert als
-`REBASE_APP_BASE`, was Ihr Bundler als seinen Basis-Pfad liest:
+`path` ist sowohl eine **Build-Time**- als auch eine Serving-Eingabe. Eine unter
+`/admin` eingebundene App muss für `/admin` *gebaut* werden, andernfalls lädt `index.html` und jedes Asset
+erzeugt einen 404-Fehler – eine weiße Seite ohne Fehlermeldung. `rebase build` übergibt den Wert als
+`REBASE_APP_BASE`, den Ihr Bundler als Basispfad liest:
 
 ```ts
 // vite.config.ts
@@ -125,30 +136,29 @@ export default defineConfig({
 });
 ```
 
-und weigert sich, einen Build auszuliefern, der ihn ignoriert hat.
+und weigert sich, einen Build auszuliefern, der dies ignoriert hat.
 
-Ein bestehendes Projekt benötigt kein Manifest. Die CLI leitet dasselbe Layout aus der
-Verzeichnisstruktur ab, und `rebase apps init` schreibt es fest, wenn Sie es
-explizit wünschen:
+Ein bestehendes Projekt benötigt keines. Die CLI leitet dasselbe Layout aus der
+Verzeichnisstruktur ab, und `rebase apps init` schreibt es auf, wenn Sie es
+explizit haben möchten:
 
 ```bash
 rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
 
-Zwei Dinge kann die Ableitung nicht wissen, die das `rebase.json` eines Scaffolds
-festlegt. Sie nennt die statische App `web`, wo ein Scaffold sie `admin` nennt, und
-sie kann die `cms`-Route der App nicht kennen. Der Name ändert sich nicht: Rebase
-Cloud hat `web` für jedes Projekt registriert, das ohne `rebase.json` deployt wurde.
-`rebase apps init --force`
-behält die Namen, den `path`, das `cms`, die `routes` und die `frameAncestors` der
-Apps, die die Datei deklariert, die es ersetzt, und benennt eine App, die es nicht
-mehr findet, als entfernt.
+Die automatische Erkennung kann zwei Dinge nicht wissen, die das `rebase.json` eines Scaffolds deklariert. Sie benennt
+die statische App `web`, wo ein Scaffold sie `admin` nennt, und sie kann die
+`cms`-Route der App nicht kennen. Der Name ändert sich nicht: Rebase Cloud hat `web` für
+jedes Projekt registriert, das ohne `rebase.json` bereitgestellt wurde.
+`rebase apps init --force` behält die Namen, `path`, `cms`, `routes`,
+`frameAncestors`, <span class="since-badge" data-since="0.35">Seit 0.35</span> `redirects` und `cleanUrls` der Apps bei, die die zu ersetzende Datei
+deklariert, und kennzeichnet eine App, die nicht mehr gefunden wird, als entfernt.
 
 ## Eine App auf einem eigenen Hostnamen
 
-`path` kann auch eine vollständige `https://`-URL sein, was der App einen eigenen Hostnamen
-gibt:
+`path` kann auch eine vollständige `https://`-URL sein, was der App einen eigenen
+Hostnamen gibt:
 
 ```jsonc
 {
@@ -174,78 +184,78 @@ gibt:
 }
 ```
 
-`https://admin.example.com` liefert `admin` aus. Jeder andere Hostname, auf dem das Projekt
+`https://admin.example.com` bedient `admin`. Jeder andere Hostname, auf dem das Projekt
 antwortet – `example.com` oder die eigene Adresse des Projekts auf Rebase Cloud –
-liefert `web` aus, und `admin` ist dort überhaupt nicht erreichbar. Es handelt sich immer noch um einen
-einzelnen Prozess und ein einzelnes Deployment; der Hostname entscheidet lediglich, welche App auf eine Anfrage antwortet.
+bedient `web`, und `admin` ist dort überhaupt nicht erreichbar. Es ist immer noch ein
+einziger Prozess und ein einziges Deployment; der Hostname entscheidet lediglich, welche App eine Anfrage beantwortet.
 
 Zwei Regeln entscheiden darüber:
 
 - Eine App mit einem Hostnamen antwortet nur auf diesem Hostnamen. Eine App ohne Hostnamen
   antwortet auf jedem Hostnamen.
-- Von den verbleibenden Apps gewinnt wie bisher diejenige mit dem längsten Pfad. Bei
+- Von den verbleibenden Apps gewinnt diejenige mit dem längsten Pfad, wie schon immer. Bei
   gleichem Pfad gewinnt die App, die den Hostnamen angibt, gegenüber derjenigen, die dies nicht tut.
 
-Im Beispiel liegen beide Apps auf `/`, daher wählt die zweite Regel auf `admin.example.com`
-`admin` aus. Deklarieren Sie den Admin-Bereich stattdessen unter `"https://admin.example.com/cms"`,
-antwortet er auf diesem Hostnamen nur unter `/cms`: `admin.example.com/pricing`
+Im Beispiel liegen beide Apps auf `/`, daher wählt auf `admin.example.com` die zweite Regel
+`admin`. Deklarieren Sie den Admin stattdessen unter `"https://admin.example.com/cms"`,
+antwortet er nur unter `/cms` auf diesem Hostnamen: `admin.example.com/pricing`
 geht an `web`. Ein Hostname schränkt ein, wo eine App antwortet; er übergibt der
-App nicht alles auf diesem Hostnamen. Keine zwei Apps dürfen sich sowohl einen Hostnamen als auch einen
+App nicht automatisch alles auf diesem Hostnamen. Keine zwei Apps dürfen sich sowohl einen Hostnamen als auch einen
 Pfad teilen.
 
 Das Backend ist keine App, und ein Hostname verschiebt es nicht. `/api`, `/health`
-und die anderen vom Backend reservierten Pfade werden auf jedem Hostnamen beantwortet,
-bevor irgendeine App konsultiert wird. Daher ist `https://admin.example.com/api` dieselbe
-API wie `https://example.com/api`. Eine App, die ihren eigenen Origin aufruft – das
+und die anderen vom Backend reservierten Pfade werden beantwortet, bevor irgendeine App
+konsultiert wird, und zwar auf jedem Hostnamen, sodass `https://admin.example.com/api` dieselbe
+API wie `https://example.com/api` ist. Eine App, die ihren eigenen Origin aufruft – die
 leere `VITE_API_URL` des Scaffolds –, benötigt keine eigene API-URL und keine
-CORS-Einstellung. Aus demselben Grund werden diese Pfade nach einem Hostnamen genauso abgelehnt wie
-alleinstehend: `https://admin.example.com/api` ist genauso unzulässig wie
+CORS-Einstellung. Aus demselben Grund werden diese Pfade nach einem Hostnamen genauso abgelehnt
+wie alleinstehend: `https://admin.example.com/api` ist nicht gültiger als
 `/api`.
 
 Alles andere bezüglich `path` gilt für den Teil nach dem Hostnamen. Die App
-wird weiterhin dafür gebaut: `https://admin.example.com` wird mit
-`REBASE_APP_BASE` auf `/` gesetzt gebaut, `https://admin.example.com/cms` mit `/cms/`, und
-ein Bundler, der dies ignoriert, liefert Ihnen nach wie vor eine weiße Seite. `cms` ist ein Pfad auf dem
+wird weiterhin dafür gebaut: `https://admin.example.com` wird gebaut mit
+`REBASE_APP_BASE` gesetzt auf `/`, `https://admin.example.com/cms` mit `/cms/`, und
+ein Bundler, der dies ignoriert, liefert weiterhin eine weiße Seite. `cms` ist ein Pfad auf dem
 Hostnamen der App innerhalb dieses Pfadteils. Die URL muss `https://` sein und einen
-Hostnamen sowie einen Pfad enthalten und sonst nichts – keinen Port, keine Query und kein Fragment. Ein bloßes
-`admin.example.com` wird abgelehnt, zusammen mit der URL, die es hätte sein sollen.
+Hostnamen sowie einen Pfad enthalten und sonst nichts – keinen Port, Query-Parameter oder Fragment. Ein reines
+`admin.example.com` wird abgelehnt, mit dem Hinweis auf die URL, die es hätte sein sollen.
 
 Unter `rebase dev` wird nichts nach Hostnamen geroutet. Es führt die App in
-`frontend/` wie gewohnt im Root-Verzeichnis eines localhost-Ports aus, und für eine App
-mit einem Hostnamen gibt sein Banner zusätzlich die `https://`-Adresse aus, die sie nach dem
-Deployment haben wird.
+`frontend/` an der Root eines Localhost-Ports aus, wie bisher, und für eine App
+mit einem Hostnamen gibt das Banner auch die `https://`-Adresse aus, die sie
+nach dem Deployment haben wird.
 
-`rebase start` verhält sich anders, da es das gebaute Bundle über dieselbe
-Runtime ausführt wie ein Deployment – Routing nach Hostnamen inklusive. Eine App mit einem Hostnamen
-antwortet nur auf Anfragen, deren `Host`-Header dieser Hostname ist. Daher
-zeigt `http://localhost:3001/` die App ohne Hostnamen, und ein Bundle, dessen einzige App
-einen Hostnamen angibt, liefert dort 404 zurück. Um sie lokal zu erreichen, senden Sie den Header
-selbst:
+`rebase start` verhält sich anders, da es das gebaute Bundle durch dieselbe
+Runtime ausführt wie ein Deployment – einschließlich Hostname-Routing. Eine App mit einem Hostnamen
+antwortet nur auf Anfragen, deren `Host`-Header dieser Hostname ist, sodass
+`http://localhost:3001/` die App ohne Hostnamen anzeigt, und ein Bundle, dessen einzige App
+einen Hostnamen deklariert, dort mit 404 antwortet. Um sie lokal zu erreichen, senden Sie den Header
+selbst mit:
 
 ```bash
 curl -H "Host: admin.example.com" http://localhost:3001/
 ```
 
-oder verweisen Sie in `/etc/hosts` mit dem Hostnamen auf `127.0.0.1` und öffnen Sie
-`http://admin.example.com:3001/`. Es gibt ganz bewusst keinen Query-Parameter oder
-Header, der das Routing überschreibt: Ein Parameter, der lokal funktionierte, würde auch
-bei einem Deployment funktionieren, und die Auswahl der App über etwas anderes als den tatsächlichen `Host`
-ist genau das, was das Routing verhindern soll.
+oder leiten Sie den Hostnamen in `/etc/hosts` auf `127.0.0.1` um und öffnen Sie
+`http://admin.example.com:3001/`. Es gibt bewusst keinen Query-Parameter oder
+Header, der das Routing überschreibt: Einer, der lokal funktionierte, würde auch
+gegen ein Deployment funktionieren, und die Auswahl der App anhand von etwas anderem als dem echten `Host` ist
+genau das, was das Routing verhindern soll.
 
-Im Self-Hosting-Betrieb trifft der Prozess dieselbe Entscheidung anhand des `Host`-Headers
-jeder Anfrage. Das Verweisen des Hostnamens auf den Server und die Bereitstellung eines Zertifikats
-liegen in Ihrer Verantwortung, ebenso wie für den Haupt-Hostnamen des Projekts. Ein Reverse-Proxy
+Im Self-Hosting-Modus trifft der Prozess dieselbe Entscheidung anhand des `Host`-Headers
+jeder Anfrage. Den Hostnamen auf den Server zu verweisen und ihm ein Zertifikat zuzuweisen,
+liegt in Ihrer Verantwortung, genau wie beim Haupt-Hostnamen des Projekts, und ein Reverse-Proxy
 davor muss den ursprünglichen `Host` weiterleiten – Caddy tut dies standardmäßig,
-nginx benötigt `proxy_set_header Host $host;`. `X-Forwarded-Host` wird nicht ausgelesen,
-da jeder Client einen solchen Header senden kann.
+nginx benötigt `proxy_set_header Host $host;`. `X-Forwarded-Host` wird nicht gelesen,
+da jeder Client diesen senden kann.
 
 ### Auf Rebase Cloud
 
-`rebase cloud deploy` registriert den Hostnamen im Projekt – genau das, was
+`rebase cloud deploy` registriert den Hostnamen im Projekt – was auch
 `rebase cloud domains add` tut –, sodass kein separater Schritt vergessen werden kann. Was
 als Nächstes passiert, hängt vom DNS ab:
 
-- **Die Records existieren bereits.** Das Deployment verifiziert den Hostnamen und er ist
+- **Die Records existieren bereits.** Das Deployment verifiziert den Hostnamen, und er ist
   live, sobald das Deployment abgeschlossen ist.
 - **Sie existieren nicht.** Das Deployment wird fortgesetzt und gibt die beiden zu erstellenden Records aus:
   einen TXT-Record, der beweist, dass der Name Ihnen gehört, und einen CNAME, der auf das
@@ -259,40 +269,44 @@ rebase cloud domains verify admin.example.com
 
 `rebase cloud domains list` gibt die Records erneut aus, falls Sie sie verlieren. Ein
 Hostname, der nicht innerhalb von 7 Tagen nach der Registrierung verifiziert wird, wird freigegeben,
-und das nächste Deployment registriert ihn erneut. Sobald die
+und das nächste Deployment registriert ihn erneut. Wenn die
 Verifizierung erfolgreich ist, stellt die Plattform das HTTPS-Zertifikat für den
 Hostnamen aus; es muss nichts hochgeladen werden. Bis dahin antwortet `admin` nirgendwo, da
 der einzige Hostname, auf dem es antwortet, das Projekt noch nicht erreicht – der Rest
 des Projekts ist in jedem Fall live.
 
-Die Konsole folgt der App auf ihren Hostnamen: Der Link *Open CMS* und die CMS-Adresse
+Die Konsole folgt der App auf ihren Hostnamen: Der *Open CMS*-Link und die CMS-Adresse
 in der Übersicht des Projekts lauten `https://admin.example.com/`, nicht der
 Projekt-Host.
 
-Ein Hostname, den bereits ein anderes Projekt verifiziert hat, bricht das Deployment ab, bevor irgendetwas
-ausgerollt wird, ebenso wie ein Hostname unter der plattformeigenen Domain. Ein Hostname, den ein anderes
+Ein Hostname, den ein anderes Projekt verifiziert hat, lässt das Deployment fehlschlagen, bevor etwas
+ausgerollt wird, ebenso wie ein Hostname unter der plattform-eigenen Domain. Ein Hostname, den ein anderes
 Projekt registriert und nie verifiziert hat, steht Ihnen nicht im Weg: Die Ablehnung
-liefert Ihnen einen TXT-Record für Ihr Projekt, und sobald dieser existiert, übernimmt das nächste Deployment (oder
+gibt Ihnen einen TXT-Record für Ihr Projekt, und sobald dieser existiert, übernimmt das nächste Deployment (oder
 `rebase cloud domains add`) den Hostnamen. Das Hinzufügen eines Hostnamens,
-den das Projekt noch nicht hat, ändert die Domains des Projekts, was ein mit
-`--can deploy` erstellter Access Token nicht darf: Fügen Sie den Hostnamen aus der CI heraus einmalig mit
-`rebase cloud domains add` hinzu, während Sie angemeldet sind, und das Token stellt ihn anschließend wie
-jeden Hostnamen bereit, der bereits im Projekt vorhanden ist. Das Entfernen der App
+den das Projekt noch nicht hat, ändert die Domains des Projekts, was ein Zugriffstoken,
+das mit `--can deploy` erstellt wurde, nicht tun darf: Fügen Sie den Hostnamen von CI aus einmal mit
+`rebase cloud domains add` hinzu, während Sie angemeldet sind, und das Token deployt ihn dann wie
+jeden Hostnamen, der sich bereits im Projekt befindet. Das Entfernen der App
 aus `rebase.json` belässt den Hostnamen im Projekt registriert; entfernen Sie ihn mit
 `rebase cloud domains remove admin.example.com`.
 
 ### Ein Hostname gehört zu einer App, nicht zu einer Route
 
-Ein Hostname wird einer gesamten App zugewiesen. Er kann nicht auf eine Route innerhalb einer App zeigen. Wenn
-das CMS eine Route einer einzelnen SPA ist – `web` unter `/` mit `"cms": "/admin"` –,
+Ein Hostname wird einer gesamten App zugewiesen. Er kann nicht auf eine Route innerhalb einer App verweisen. Wenn
+das CMS eine Route einer einzelnen SPA ist – `web` auf `/` mit `"cms": "/admin"` –,
 befindet es sich unter `/admin` auf jedem Hostnamen, auf dem das Projekt antwortet. Würde man dieser App
 `https://admin.example.com` zuweisen, würde die gesamte SPA dorthin verschoben, wobei das CMS weiterhin
-darunter unter `/admin` läge. Um dem CMS einen eigenen Hostnamen zu geben, machen Sie es zu einer
+unter `/admin` darunter läge. Um dem CMS einen eigenen Hostnamen zu geben, machen Sie es zu einer
 eigenen App mit eigenem Build, wie im obigen Beispiel.
 
-## Eine Funktion unter einem Pfad einer App ausliefern
+## Eine Function unter einem Pfad auf einer App bereitstellen
 
-Eine Custom Function antwortet unter `/api/functions/<name>`, und eine statische App kann `/api` nicht beanspruchen. Eine Publishing-Site braucht aber einige Pfade, die kein Build enthalten kann: eine Sitemap und einen Feed mit den neuesten Beiträgen, eine aus der Datenbank gerenderte Seite. `routes` liefert die Antwort einer Funktion unter einem Pfad auf der eigenen Adresse der App aus:
+Eine benutzerdefinierte Function antwortet unter `/api/functions/<name>`, und eine statische App kann
+`/api` nicht beanspruchen. Eine Publishing-Website benötigt einige Pfade, die kein Build enthalten kann – eine
+Sitemap und einen Feed, die die neuesten Beiträge auflisten, eine aus der
+Datenbank gerenderte Seite. `routes` liefert die Antwort einer Function unter einem Pfad auf der
+eigenen Adresse der App aus:
 
 ```jsonc
 "site": {
@@ -308,19 +322,54 @@ Eine Custom Function antwortet unter `/api/functions/<name>`, und eine statische
 }
 ```
 
-`https://www.example.com/sitemap.xml` ist dann das, was `functions/sitemap.ts` zurückgibt, mit eigenem `Content-Type`, Status und eigenen Headern. Alles andere auf dem Hostname ist wie bisher der Build der Site.
+`https://www.example.com/sitemap.xml` ist dann das, was `functions/sitemap.ts`
+zurückgibt, mit eigenem `Content-Type`, Status und Headern. Alles andere auf
+dem Hostnamen ist der Build der Website, wie zuvor.
 
-- **Exakt oder mit Wildcard.** `/sitemap.xml` passt nur auf genau diesen Pfad. `/blog/*` passt auf `/blog` und jeden Pfad darunter und übergibt der Funktion den Rest: `/blog/hello` erreicht die Route `/:slug` der Funktion mit `slug` gleich `hello`, und `/blog` erreicht ihre Route `/`.
-- **Die Funktion sieht einen gewöhnlichen Aufruf.** Die Anfrage erreicht sie, als wäre sie an `/api/functions/<name>` gegangen, mit derselben Authentifizierung, denselben Scope-Prüfungen, demselben Rate-Limit und Timeout. Methode, Header, Body und Query-String werden durchgereicht, ebenso `Host`, sodass `new URL(c.req.url).origin` der Origin der Site ist – daraus baut eine Sitemap ihre absoluten URLs. Die Funktion antwortet weiterhin auch unter `/api/functions/<name>`.
-- **Die spezifischste Route gewinnt**: ein exakter Pfad vor jeder Wildcard, und eine längere Wildcard vor einer kürzeren. Eine Route gewinnt auch gegen eine Datei mit demselben Pfad im Build, sodass eine veraltete `public/sitemap.xml` sie nicht verdecken kann.
-- **Nur dort, wo die App antwortet.** Eine Route gilt für Anfragen, die die App selbst beantworten würde – auf ihrem Hostname, falls sie einen hat, und nicht unter dem Pfad einer anderen App. `rebase.json` wird abgelehnt, wenn eine Route dort liegt, wo eine andere App antwortet.
-- **Innerhalb der App und nie auf Pfaden des Backends.** Der Pfad einer Route ist absolut, liegt innerhalb des `path` der App und darf nicht unter `/api`, `/health`, `/healthz`, `/livez`, `/readyz` oder `/metrics` liegen und kein Segment haben, das mit `.` beginnt. Eine Wildcard darf nicht die ganze App abdecken, sonst würde ihr Build nie ausgeliefert.
+- **Exakt oder Wildcard.** `/sitemap.xml` passt nur auf diesen Pfad. `/blog/*`
+  passt auf `/blog` und jeden Pfad darunter und übergibt der Function den Rest:
+  `/blog/hello` erreicht die Route `/:slug` der Function, wobei `slug` auf
+  `hello` gesetzt ist, und `/blog` erreicht deren Route `/`.
+- **Die Function sieht einen ganz normalen Aufruf.** Die Anfrage erreicht sie so, als wäre sie
+  an `/api/functions/<name>` gestellt worden, durch dieselbe Authentifizierung, Scope-Prüfungen,
+  Rate-Limits und Timeouts. Ihre Methode, Header, Body und Query-String werden
+  durchgereicht, ebenso wie `Host`, sodass `new URL(c.req.url).origin` der Origin
+  der Website ist – woraus die absoluten URLs einer Sitemap aufgebaut sind. Die Function antwortet
+  weiterhin auch unter `/api/functions/<name>`.
+- **Die spezifischste Route gewinnt**: ein exakter Pfad vor jeder Wildcard und eine
+  längere Wildcard vor einer kürzeren. Eine Route gewinnt auch gegenüber einer Datei mit
+  demselben Pfad im Build, sodass ein veraltetes `public/sitemap.xml` sie nicht verdecken kann.
+- **Nur dort, wo die App antwortet.** Eine Route gilt für Anfragen, die die App selbst
+  beantworten würde – auf ihrem Hostnamen, sofern sie einen hat, und nicht unter dem Pfad
+  einer anderen App. `rebase.json` wird abgelehnt, wenn eine Route dort liegt, wo eine andere App antwortet.
+- **Innerhalb der App und niemals des Backends.** Der Pfad einer Route ist absolut,
+  innerhalb des `path` der App, und darf nicht unter `/api`, `/health`, `/healthz`,
+  `/livez`, `/readyz` oder `/metrics` liegen, noch ein Segment enthalten, das mit `.` beginnt. Eine
+  Wildcard darf nicht die gesamte App abdecken, was ihren Build unbedient lassen würde.
 
-Routen werden vom Backend-Prozess ausgeliefert, in den die App eingebettet ist, denn dort laufen die Funktionen: `rebase build` und `rebase cloud deploy` betten jede statische App in das Bundle des Backends ein, und der Build schlägt fehl, wenn eine Route eine Funktion nennt, die das Backend nicht hat. Eine statische App, die allein deployt wird, hat keine Funktionen, die sie aufrufen könnte; deshalb lehnt `rebase cloud deploy` eine solche App mit Routen ab, und die Runtime verweigert den Start eines rein statischen Bundles, das welche deklariert.
+Routes werden von dem Backend-Prozess bedient, in den die App integriert ist, da
+dort die Functions ausgeführt werden: `rebase build` und `rebase cloud deploy` integrieren jede
+statische App in das Bundle des Backends, und der Build schlägt fehl, wenn eine Route eine
+Function benennt, die das Backend nicht hat. Eine statische App, die für sich allein bereitgestellt wird, hat keine
+Functions zum Aufrufen, daher verweigert `rebase cloud deploy` eine mit Routes, und die
+Runtime weigert sich, ein reines statisches Bundle zu starten, das solche deklariert.
 
-Eine geroutete Antwort, die keine `Content-Security-Policy` sendet, bekommt die der App, sodass die Origins in ihren [`frameAncestors`](/docs/deployment/self-hosting/#letting-another-origin-frame-an-app) eine serverseitig gerenderte Seite genauso einbetten können wie den Rest der Site.
+Eine geroutete Antwort, die keine `Content-Security-Policy` sendet, erhält die der App selbst,
+sodass die Origins in ihren [`frameAncestors`](/docs/deployment/self-hosting/#letting-another-origin-frame-an-app)
+eine serverseitig gerenderte Seite ebenso einbetten (frame) können wie den Rest der Website.
 
-Unter `rebase dev` liefert der eigene Dev-Server der App sie aus, und der weiß nichts von den Routen; rufen Sie die Funktion dort unter `/api/functions/<name>` auf, oder testen Sie die Routen mit `rebase start` gegen einen Build.
+Unter `rebase dev` wird die App von ihrem eigenen Dev-Server bedient, der nichts
+von den Routes weiß; rufen Sie die Function dort unter `/api/functions/<name>` auf oder testen Sie
+die Routes gegen einen Build mit `rebase start`.
+
+## Redirects und Clean URLs
+
+<span class="since-badge" data-since="0.35">Seit 0.35</span>
+
+Eine statische App akzeptiert `redirects` (`{ "from": "/blog/:slug", "to": "/posts/:slug" }`,
+auch zu einer anderen Domain) und `cleanUrls: true` (`/x` bedient `x.html`). Siehe
+[Redirects and clean URLs](/docs/architecture/redirects-and-clean-urls/), wo auch beschrieben wird,
+wie eine `vercel.json` auf `rebase.json` abgebildet wird.
 
 ## Apps bauen und deployen
 
@@ -330,17 +379,17 @@ rebase build backend      # just the bundle
 rebase build admin        # just that app's static assets
 ```
 
-Das Backend wird zuerst gebaut, da der Build einer Client-App ein SDK
-verwenden kann, das aus dessen Tabellen generiert wurde.
+Das Backend wird zuerst gebaut, da der Build einer Client-App ein SDK verwenden kann,
+das aus seinen Tabellen generiert wurde.
 
 ## Mehrere Repositories
 
 Das Monorepo bleibt der Standard: Ein Repository mit einem Backend und einem Admin-Panel
-ist die einfachste funktionierende Lösung, und `rebase init` richtet genau das ein. Die Aufteilung ist
-der nächste Entwicklungsschritt, keine Voraussetzung.
+ist das Einfachste, was funktioniert, und `rebase init` richtet dies ein. Das Aufteilen ist
+ein Folgeschritt, keine Voraussetzung.
 
 In einem separaten Frontend-Repository benötigen Sie zwei Dinge – ein Manifest, das deklariert,
-was dieses Repository beiträgt, und einen Link zum Projekt:
+was dieses Repository beiträgt, und eine Verknüpfung zum Projekt:
 
 ```jsonc
 // rebase.json
@@ -363,35 +412,35 @@ rebase cloud link                           # or pick a Rebase Cloud project
 ```
 
 Der Link wird in `.rebase/cloud.json` geschrieben und wird **nicht committet** – er gilt
-pro Checkout, ähnlich wie ein Git-Remote. Das Manifest wird committet; der Link nicht.
+pro Checkout, wie ein Git-Remote. Das Manifest wird committet; der Link nicht.
 
 ## Typisierte Clients ohne die Tabellen
 
-Dies ist der Mechanismus, der Multi-Repo-Setups ermöglicht. Ein Repository, das keine
-Tabellen enthält, generiert sein typisiertes SDK direkt aus dem Projekt:
+Dies ist der Mechanismus, der Multi-Repo ermöglicht. Ein Repository, das keine
+Tabellen enthält, generiert sein typisiertes SDK aus dem Projekt selbst:
 
 ```bash
 rebase generate-sdk --from link
 rebase generate-sdk --from https://api.example.com --token $REBASE_SERVICE_KEY
 ```
 
-Die CLI ruft `/api/meta/contract` ab und liest dessen `tables` aus – die kompilierten
+Die CLI ruft `/api/meta/contract` ab und liest dessen `tables` – die kompilierten
 Deskriptoren inklusive Relationszielen, die der Typgenerator benötigt, um zu
-entscheiden, ob ein Fremdschlüssel ein String oder eine Zahl ist – und erzeugt exakt
-dieselbe Ausgabe, die sie auch aus lokalen Quelldateien generiert hätte.
+entscheiden, ob ein Fremdschlüssel ein String oder eine Zahl ist – und erzeugt exakt dieselbe
+Ausgabe, die er aus dem lokalen Quellcode erzeugt hätte.
 
-Der Contract-Endpunkt erfordert den Scope `schema:read`, über den Administratoren verfügen. Er
+Der Contract-Endpunkt benötigt den Scope `schema:read`, über den ein Admin verfügt. Er
 beschreibt jede Tabelle,
 Spalte und Relation im Projekt, einschließlich derer, die keine Sicherheitsregel jemals
-offenlegen würde; das ist eine Karte der Datenbank, keine öffentliche API-Dokumentation.
+offenlegen würde; dies ist eine Übersicht der Datenbank, keine öffentliche API-Dokumentation.
 
-## Schema-Drift erkennen
+## Drift erkennen
 
-Die Aufteilung von Repositories hat einen nennenswerten Nachteil: Eine Schemaänderung und das
+Das Aufteilen von Repositories kostet Sie eine Sache, die erwähnenswert ist: Eine Schema-Änderung und das
 Frontend, das sie verwendet, landen nicht mehr im selben Commit. Das Backend kann eine
-Änderung deployen, die einen Client ins Leere laufen lässt, der gegen die alte Struktur gebaut wurde.
+Änderung ausrollen, die einen Client blockiert oder beschädigt, der gegen die alte Struktur gebaut wurde.
 
-Jedes generierte SDK zeichnet das Schema auf, aus dem es stammt:
+Jedes generierte SDK zeichnet das Schema auf, aus dem es entstanden ist:
 
 ```ts
 // generated/sdk/schema.meta.ts — generated
@@ -406,10 +455,10 @@ curl -s https://api.example.com/api/meta/schema-version
 # {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.34.2","contract":1}}
 ```
 
-Ein Vergleich der beiden Werte in der CI verwandelt eine unbemerkte Diskrepanz in einen fehlgeschlagenen Check. Der Stempel
+Der Vergleich der beiden in CI verwandelt eine unbemerkte Diskrepanz in eine fehlgeschlagene Prüfung. Der Stempel
 ändert sich, wenn sich die generierten Typen ändern könnten – eine neue Eigenschaft, eine geänderte
-Relation – und ganz bewusst *nicht*, wenn sich ein Hook, eine Sicherheitsregel oder ein Icon
-ändert, damit kein falscher Alarm ausgelöst wird.
+Relation – und bewusst *nicht*, wenn sich ein Hook, eine Sicherheitsregel oder ein Icon
+ändert, sodass kein falscher Alarm ausgelöst wird.
 
 ## Client-Konfiguration
 
@@ -417,10 +466,10 @@ Relation – und ganz bewusst *nicht*, wenn sich ein Hook, eine Sicherheitsregel
 rebase apps config web
 ```
 
-Gibt aus, was ein Client benötigt, um das Projekt zu erreichen. Es gibt niemals Secrets aus: Die
-API-URL und die veröffentlichbare Identität einer App sind dafür gedacht, innerhalb eines Client-Bundles
+Gibt aus, was ein Client benötigt, um das Projekt zu erreichen. Es gibt niemals ein Secret aus: Die
+API-URL und die öffentlich nutzbare Identität einer App sind dafür gedacht, innerhalb eines Client-Bundles
 ausgeliefert zu werden, und alles, was dort nicht sicher ist, gehört nicht in eine Ausgabe, die
-letztlich in einer committeten `.env`-Datei landet.
+am Ende in einer committeten `.env` landet.
 
 ## Verwandte Themen
 

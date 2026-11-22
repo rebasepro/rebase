@@ -1,15 +1,17 @@
 ---
-sourceHash: e275bf79725ed509
+sourceHash: 3c089e6c404f4635
 title: Zusätzliche Spalten
 sidebar_label: Zusätzliche Spalten
-description: Fügen Sie Collection-Tabellen berechnete/virtuelle Spalten hinzu, die Werte aus Entitätsdaten ableiten.
+description: Fügen Sie Sammlungs-Tabellen berechnete/virtuelle Spalten hinzu, die Werte aus Entitätsdaten ableiten.
 ---
 
 ## Übersicht
 
-Mit zusätzlichen Spalten können Sie berechnete oder abgeleitete Daten in der Collection-Tabelle anzeigen, ohne diese in der Datenbank zu speichern.
+Zusätzliche Spalten ermöglichen es Ihnen, berechnete oder abgeleitete Daten in der Sammlungs-Tabelle anzuzeigen, ohne sie in der Datenbank zu speichern.
 
-## Zusätzliche Spalten definieren
+Eine berechnete Spalte gehört zur Tabelle. Der Datensatz zeigt bereits die Werte an, aus denen sie berechnet wird, daher befindet sie sich nicht auf dem Datensatz, es sei denn, das Formular fordert sie an: Benennen Sie ihren `key` in `form.sections` oder `form.sidebar` (siehe [Formular-Layout](/docs/frontend/form-layout/)) oder in den `fields`, die einem `RecordForm` oder `RecordDetail` übergeben werden.
+
+## Definieren zusätzlicher Spalten
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -42,7 +44,7 @@ export const productsCms = customizeTable<typeof products>("products", {
 });
 ```
 
-| Key | Beschreibung |
+| Key | Funktion |
 |---|---|
 | `key` | Identifiziert die Spalte. Geben Sie ihn in `fieldOrder` oder `listFields` als `"total" as AdditionalFieldKey` an. |
 | `name` | Die Spaltenüberschrift. |
@@ -55,13 +57,13 @@ export const productsCms = customizeTable<typeof products>("products", {
 
 | Prop | Typ | Beschreibung |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | Der Datensatz, wie der Server die Zeile sendet: Datumsangaben als ISO-Strings, ein belongsTo als Fremdschlüsselspalte, `id` nur dort, wo die Tabelle diese Spalte besitzt. Eine vom Admin geladene Relation wird unter ihrem Namen als eigene Spalten des zugehörigen Datensatzes verschachtelt |
-| `id` | `string` | Die ID des Datensatzes: sein Primärschlüssel als String, bei einem zusammengesetzten Schlüssel werden die Teile mit `:::` verbunden. Die ID, die `useSidePanel().open` und eine Route erwarten |
+| `row` | `Record<string, unknown>` | Der Datensatz, wie der Server die Zeile sendet: Datumsangaben als ISO-Strings, ein belongsTo als dessen Fremdschlüssel-Spalte, `id` nur dort, wo die Tabelle diese Spalte hat. Eine Relation, die der Admin geladen hat, ist unter ihrem Namen als die eigenen Spalten des verknüpften Datensatzes verschachtelt |
+| `id` | `string` | Die ID des Datensatzes: sein Primärschlüssel als String, bei einem zusammengesetzten Schlüssel die durch `:::` verbundenen Teile. Die ID, die `useSidePanel().open` und eine Route entgegennehmen |
 | `context` | `RebaseContext` | Vollständiger Rebase-Kontext |
 
-`value({ row, id, context })` erhält dieselben Props.
+`value({ row, id, context })` empfängt dieselben Props.
 
 ## Nächste Schritte
 
-- **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen
+- **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktions-Buttons
 - **[Custom Fields](/docs/frontend/custom-fields)** — Benutzerdefinierte Formularfelder
