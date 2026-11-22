@@ -47,6 +47,34 @@ resumable uploads always need a caller. Elsewhere the answer is `401`.
 Policies satisfy the production boot guard on their own, and a malformed pattern
 fails the boot rather than the first upload.
 
+### As data: `STORAGE_POLICIES`
+
+The managed runtime cannot read a predicate from your code, and a project on
+Rebase Cloud's stock backend has no code to read. So the same rules can be set
+as JSON in the `STORAGE_POLICIES` environment variable, with the two predicates
+nearly every app writes named instead of coded:
+
+```bash
+STORAGE_POLICIES='[
+  { "path": "public/**", "operations": ["read"], "allow": "public" },
+  { "path": "users/:uid/**", "allow": "owner" },
+  { "path": "**", "allow": { "roles": ["admin"] } }
+]'
+```
+
+| `allow` | Grants |
+|---|---|
+| `"public"` | anyone the route lets in |
+| `"authenticated"` | any signed-in caller |
+| `"owner"` | the signed-in caller whose uid is the key's `:uid` segment — the `path` must capture one |
+| `{ "roles": [...] }` | a signed-in caller holding any of these roles |
+
+They compile to `storagePolicies`, so matching, order and the fallback to
+`storageAuthorize` are the code form's: a key no rule covers is asked of the
+hook if the project has one, and refused if not. A value that is not a valid
+list refuses the boot, naming each problem; Rebase Cloud refuses to save one,
+and its console edits the list under **File storage → Access rules**.
+
 ## The hook
 
 `requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an authorization hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model. Worse, they can `GET /storage/list?prefix=` first, so the keys do not even have to be guessed.
@@ -101,7 +129,7 @@ Worth knowing:
 - **A path is public when the key it names is.** The `public/` prefix is tested on the canonical key the route serves — after a leading `default/` bucket segment is read off and `//`, `./` and a leading `/` are folded away — never on the URL as written. `/api/storage/file/notes://public/x.txt` names the private key `notes:/public/x.txt`, and the key `default/public/x.txt` (reached as `/api/storage/file/default/default/public/x.txt`) lies in a folder called `default`; neither is public. In a hook, test the `key` you are handed with `isPublicStorageKey` from `@rebasepro/types` — `isPublicStoragePath` reads a client-side path or URL, and reads both of those as public.
 - **`list` is gated on the prefix.** Listing is how you discover keys nobody told you about.
 - **Resumable (TUS) uploads are gated at create time**, so a denied upload leaves no temp file behind.
-- Omitting the hook (and `storagePolicies`) leaves no per-object check, so production refuses to boot unless `storagePublicRead` or `storageInsecureAllowAnyAuthenticated` is set.
+- Omitting the hook (and `storagePolicies`, and `STORAGE_POLICIES`) leaves no per-object check, so production refuses to boot unless `storagePublicRead` or `storageInsecureAllowAnyAuthenticated` is set.
 
 ## API keys and tokens
 

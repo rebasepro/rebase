@@ -85,6 +85,7 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 | `auth` | `JWT_SECRET`, the `OAUTH_*` variables, and the table `backend/schema` declares with `defineAuthTable` |
 | `storage` | the `STORAGE_*` variables, plus a `bucket("<key>")` declaration in `backend/resources.ts` for every bucket beyond the default |
 | `storageAuthorize` | `export const storageAuthorize` from `backend/storage.ts` |
+| `storagePolicies` | `STORAGE_POLICIES`, as JSON rules — see [Storage authorization](/docs/backend/storage-authorization/#as-data-storage_policies) |
 | `storagePublicRead` | `STORAGE_PUBLIC_READ` |
 | `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |
 | `storageInsecureAllowAnyAuthenticated` | `STORAGE_ALLOW_ANY_AUTHENTICATED` |

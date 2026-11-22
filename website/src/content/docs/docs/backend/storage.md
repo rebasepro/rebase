@@ -15,7 +15,7 @@ Rebase supports three storage backends:
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffix any of them `__<KEY>` for a named source), plus a `bucket("<key>")` declaration in `backend/resources.ts` for every bucket beyond the default, and `export const storageAuthorize` from `backend/storage.ts`. `storageAuthorize` has no environment form on purpose: no variable can express "this user may read this key".
+**Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffix any of them `__<KEY>` for a named source), plus a `bucket("<key>")` declaration in `backend/resources.ts` for every bucket beyond the default, and `export const storageAuthorize` from `backend/storage.ts`. Per-object rules can also be set as data in `STORAGE_POLICIES` — "public", "authenticated", "owner" (the key's `:uid` segment is the caller) and roles — see [Storage authorization](/docs/backend/storage-authorization/#as-data-storage_policies).
 
 **Ejected** — the `storage` block on `initializeRebaseBackend({ … })`. `storagePolicies` and `storageTriggers` are ejected-only.
 
@@ -320,6 +320,7 @@ protocol, what it answers and how it behaves across instances.
 | `STORAGE_MAX_FILE_SIZE` | Largest file the source accepts, in bytes (default `52428800`, 50 MB). Suffix `__<KEY>` for a named source. A value that is not a whole number of bytes refuses the boot. See [How large a file may be](#how-large-a-file-may-be) |
 | `FORCE_LOCAL_STORAGE` | Allow `STORAGE_TYPE=local` in production — see below |
 | `STORAGE_PUBLIC_READ` | Serve stored objects to unauthenticated readers. The env spelling of `storagePublicRead`, and one of the three ways to satisfy the [production boot guard](#per-object-authorization). |
+| `STORAGE_POLICIES` | Storage access rules as JSON: `[{ "path", "operations"?, "allow" }]`, `allow` being `"public"`, `"authenticated"`, `"owner"` or `{ "roles": [...] }`. Deny by default; satisfies the [production boot guard](#per-object-authorization). An invalid list refuses the boot. See [Storage authorization](/docs/backend/storage-authorization/#as-data-storage_policies). |
 | `STORAGE_ALLOW_ANY_AUTHENTICATED` | Opt out of the boot guard, restoring the behaviour where any signed-in user may read, overwrite, delete or list any key. The env spelling of `storageInsecureAllowAnyAuthenticated`. Only defensible when every signed-in user is trusted with every file. |
 
 ## Several Buckets

@@ -307,8 +307,10 @@ only thing separating two users' files is key unguessability — which
 `GET /storage/list?prefix=` defeats. Any one of these satisfies it:
 
 - a **`storageAuthorize` hook** (or `storagePolicies`) in your project's config,
-  which is the real answer and what the scaffold ships in `backend/storage.ts` —
-  no environment variable can express "this user may read this key";
+  which is what the scaffold ships in `backend/storage.ts`;
+- **`STORAGE_POLICIES`**, the same rules as JSON — "owner" for a folder per
+  user, roles for admins (see
+  [Storage authorization](/docs/backend/storage-authorization/#as-data-storage_policies));
 - **`STORAGE_PUBLIC_READ=true`**, for a bucket that genuinely is a public
   read-only CDN;
 - **`STORAGE_ALLOW_ANY_AUTHENTICATED=true`**, for a single-tenant app where

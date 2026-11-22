@@ -323,6 +323,7 @@ export * from "./storage";
 // `StorageAuthorize`, so a project can build one and pass it either way.
 export { compileStoragePolicies, resolveStorageAccessControl, StoragePolicyError } from "./storage/policies";
 export type { StoragePolicy, StoragePolicyContext, StoragePolicyPredicate } from "./storage/policies";
+export { storageRuleProblems, storagePoliciesFromRules, storagePoliciesFromEnv } from "./storage/policy-rules";
 
 // The scheduled RLS audit. The scanner itself is not re-exported — it is
 // supplied by the caller, so this package never depends on it.

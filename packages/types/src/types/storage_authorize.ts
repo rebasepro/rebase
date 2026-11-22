@@ -85,3 +85,61 @@ export interface StorageAuthorizeData {
  * Return false (or throw) to deny. Denials surface as 403.
  */
 export type StorageAuthorize = (ctx: StorageAuthorizeContext) => boolean | Promise<boolean>;
+
+/**
+ * Who a {@link StorageRule} grants to — data only, so it can live in an
+ * environment variable and be edited in a console:
+ *
+ * - `"public"` — anyone, signed in or not
+ * - `"authenticated"` — any signed-in caller
+ * - `"owner"` — the signed-in caller whose uid is the key's `:uid` segment
+ *   (the rule's `path` must capture one)
+ * - `{ roles: [...] }` — a signed-in caller holding any of these roles
+ *
+ * @group Storage
+ */
+export type StorageRuleAllow = "public" | "authenticated" | "owner" | { roles: string[] };
+
+/**
+ * One storage access rule, as data: the form `STORAGE_POLICIES` takes (a JSON
+ * array of these), for a deployment that runs no code of its own — the managed
+ * runtime, Rebase Cloud's console. The same deny-by-default list as
+ * `storagePolicies`: a key no rule matches is refused, and a rule that matched
+ * and did not grant is a denial.
+ *
+ * ```json
+ * [
+ *   { "path": "public/**", "operations": ["read"], "allow": "public" },
+ *   { "path": "users/:uid/**", "allow": "owner" },
+ *   { "path": "**", "allow": { "roles": ["admin"] } }
+ * ]
+ * ```
+ *
+ * @group Storage
+ */
+export interface StorageRule {
+    /**
+     * A key pattern, matched segment by segment: a literal matches itself,
+     * `*` one segment, `:name` one segment and captures it, `**` the rest
+     * (final segment only).
+     */
+    path: string;
+    /** Which operations it grants. Every one of them when omitted. */
+    operations?: StorageOperation[];
+    allow: StorageRuleAllow;
+}
+
+/**
+ * Where a project with no storage rules of its own starts — what Rebase
+ * Cloud gives a new project and what its console offers as "recommended":
+ * a `public/` folder anyone may read, a `users/<uid>/` folder only its user
+ * may touch, and every key to admins. Rules are deny-by-default, so this is
+ * also everything a caller may do.
+ *
+ * @group Storage
+ */
+export const RECOMMENDED_STORAGE_RULES: readonly StorageRule[] = Object.freeze([
+    { path: "public/**", operations: ["read"], allow: "public" },
+    { path: "users/:uid/**", allow: "owner" },
+    { path: "**", allow: { roles: ["admin"] } }
+] satisfies StorageRule[]);

@@ -141,6 +141,13 @@ export const bootEnvExtension = z.object({
      */
     STORAGE_ALLOW_ANY_AUTHENTICATED: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     /**
+     * Storage access rules as data: a JSON array of `{ path, operations?, allow }`,
+     * `allow` being "public", "authenticated", "owner" or `{ "roles": [...] }`.
+     * Deny by default, like `storagePolicies`, which they compile to; checked in
+     * full at boot (see `storage/policy-rules.ts`). Unset is no rules.
+     */
+    STORAGE_POLICIES: z.string().optional(),
+    /**
      * How long a private file's download URL works, in seconds: the lifetime of
      * the token `/api/storage/metadata` mints. 300 unless set. A private
      * `<video>` that plays longer than this asks for its next range with an
