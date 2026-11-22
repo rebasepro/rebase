@@ -1745,6 +1745,8 @@ export const de: RebaseTranslations = {
     studio_auth_service_key_hint: "Jede Anfrage hier läuft mit dem Dienstschlüssel des Projekts. Es gibt keinen angemeldeten Benutzer, als der sie laufen könnte, und ohne Anmeldedaten kann sie nicht gesendet werden.",
     studio_users_header_description: "Anmeldekonten, Rollen und Zugriffsbereiche werden hier verwaltet.",
     studio_users_columns_in_content: "Die eigenen Spalten jedes Benutzers werden als Inhalt bearbeitet, in {{collection}}.",
+    studio_users_platform_granted: "Über Rebase Cloud",
+    studio_users_platform_granted_tooltip: "{{roles}} vergeben durch „Admin-Panel öffnen“ in Rebase Cloud. Wird entzogen, wenn der Cloud-Zugang dieser Person zum Projekt entfernt wird.",
     studio_schema_visualizer_fit_view: "An Ansicht anpassen",
     studio_schema_visualizer_history_enabled: "Verlauf aktiviert",
     studio_rls_served_tables: "Bereitgestellte Tabellen",

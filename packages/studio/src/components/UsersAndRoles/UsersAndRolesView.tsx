@@ -48,6 +48,8 @@ interface AdminUserRow {
     email: string;
     displayName: string | null;
     roles: string[];
+    /** The roles Rebase Cloud granted (`AdminUser.platformRoles`), and takes back when the person's Cloud access goes. */
+    platformRoles: string[];
     disabled: boolean;
     emailVerified: boolean;
     createdAt: string | null;
@@ -71,6 +73,7 @@ function parseUser(raw: unknown): AdminUserRow | null {
         email: asString(raw.email),
         displayName: asNullableString(raw.displayName ?? raw.display_name),
         roles: asStringArray(raw.roles),
+        platformRoles: asStringArray(raw.platformRoles),
         disabled: asBoolean(raw.disabled, false),
         emailVerified: asBoolean(raw.emailVerified ?? raw.email_verified, false),
         createdAt: asNullableString(raw.createdAt ?? raw.created_at)
@@ -425,6 +428,13 @@ export function UsersAndRolesView() {
                                                                 {r}
                                                             </Chip>
                                                         ))}
+                                                        {u.platformRoles.length > 0 && (
+                                                            <Tooltip title={t("studio_users_platform_granted_tooltip", { roles: u.platformRoles.join(", ") })}>
+                                                                <Chip size="small" colorScheme="grayLight">
+                                                                    {t("studio_users_platform_granted")}
+                                                                </Chip>
+                                                            </Tooltip>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>

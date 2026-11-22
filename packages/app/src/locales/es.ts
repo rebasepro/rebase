@@ -1753,6 +1753,8 @@ export const es: RebaseTranslations = {
     studio_auth_service_key_hint: "Cada petición aquí se ejecuta con la clave de servicio del proyecto. No hay un usuario con sesión iniciada con el que ejecutarla, y no se puede enviar sin credencial.",
     studio_users_header_description: "Aquí se gestionan las cuentas de acceso, los roles y los ámbitos de acceso.",
     studio_users_columns_in_content: "Las columnas propias de cada usuario se editan como contenido, en {{collection}}.",
+    studio_users_platform_granted: "Vía Rebase Cloud",
+    studio_users_platform_granted_tooltip: "{{roles}} concedido por «Abrir panel de administración» de Rebase Cloud. Se retira cuando se retira el acceso de esta persona al proyecto en Cloud.",
     studio_schema_visualizer_fit_view: "Ajustar a la vista",
     studio_schema_visualizer_history_enabled: "Historial activado",
     studio_rls_served_tables: "Tablas servidas",

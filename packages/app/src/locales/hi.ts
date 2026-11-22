@@ -1745,6 +1745,8 @@ export const hi: RebaseTranslations = {
     studio_auth_service_key_hint: "यहाँ हर अनुरोध प्रोजेक्ट की सर्विस कुंजी से चलता है। ऐसा कोई साइन-इन उपयोगकर्ता नहीं है जिसके रूप में इसे चलाया जाए, और इसे बिना क्रेडेंशियल के नहीं भेजा जा सकता।",
     studio_users_header_description: "साइन-इन खाते, भूमिकाएँ और एक्सेस स्कोप यहाँ प्रबंधित होते हैं।",
     studio_users_columns_in_content: "हर उपयोगकर्ता के अपने कॉलम कंटेंट के रूप में {{collection}} में संपादित होते हैं।",
+    studio_users_platform_granted: "Rebase Cloud से",
+    studio_users_platform_granted_tooltip: "{{roles}} Rebase Cloud के “एडमिन पैनल खोलें” से दिया गया। इस व्यक्ति की प्रोजेक्ट तक Cloud पहुँच हटाने पर यह हट जाता है।",
     studio_schema_visualizer_fit_view: "व्यू में फ़िट करें",
     studio_schema_visualizer_history_enabled: "इतिहास सक्षम",
     studio_rls_served_tables: "सर्व की गई टेबल्स",
