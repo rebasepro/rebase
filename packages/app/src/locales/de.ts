@@ -1743,6 +1743,8 @@ export const de: RebaseTranslations = {
     studio_schema_visualizer_source: "Aus den Tabellen gezeichnet, die Ihr Backend bereitstellt: Tabellen, Spalten, Typen und Relationen so, wie es sie deklariert. Nur die RLS-Markierungen werden aus der Datenbank gelesen.",
     studio_auth_service_key: "Dienstschlüssel",
     studio_auth_service_key_hint: "Jede Anfrage hier läuft mit dem Dienstschlüssel des Projekts. Es gibt keinen angemeldeten Benutzer, als der sie laufen könnte, und ohne Anmeldedaten kann sie nicht gesendet werden.",
+    studio_users_header_description: "Anmeldekonten, Rollen und Zugriffsbereiche werden hier verwaltet.",
+    studio_users_columns_in_content: "Die eigenen Spalten jedes Benutzers werden als Inhalt bearbeitet, in {{collection}}.",
     studio_schema_visualizer_fit_view: "An Ansicht anpassen",
     studio_schema_visualizer_history_enabled: "Verlauf aktiviert",
     studio_rls_served_tables: "Bereitgestellte Tabellen",

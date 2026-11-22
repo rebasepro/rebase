@@ -32,7 +32,7 @@ import {
     Typography,
     UsersIcon
 } from "@rebasepro/ui";
-import { useSnackbarController, useTranslation } from "@rebasepro/app";
+import { useSnackbarController, useStudioCollectionRegistry, useTableDescriptors, useTranslation } from "@rebasepro/app";
 import { BUILT_IN_SCOPES } from "@rebasepro/types";
 import {
     asBoolean,
@@ -100,6 +100,14 @@ export function UsersAndRolesView() {
     const { requestJson } = useAdminFetch();
     const snackbar = useSnackbarController();
     const { t } = useTranslation();
+
+    // A project with the CMS edits the same accounts in two places: this view
+    // owns sign-in, roles and scopes; the users table's own columns are
+    // content, edited in its collection. Say so when that collection exists.
+    const { tables: descriptors } = useTableDescriptors();
+    const collectionRegistry = useStudioCollectionRegistry();
+    const authTable = descriptors.find((d) => d.auth !== undefined);
+    const usersCollectionName = authTable ? collectionRegistry.getCollection(authTable.slug)?.name : undefined;
 
     const [tab, setTab] = useState<"users" | "roles">("users");
 
@@ -333,7 +341,8 @@ export function UsersAndRolesView() {
                     <div>
                         <Typography variant="h6">{t("studio_tool_users")}</Typography>
                         <Typography variant="caption" color="secondary">
-                            {t("studio_users_subtitle")}
+                            {t("studio_users_header_description")}
+                            {usersCollectionName !== undefined && ` ${t("studio_users_columns_in_content", { collection: usersCollectionName })}`}
                         </Typography>
                     </div>
                 </div>

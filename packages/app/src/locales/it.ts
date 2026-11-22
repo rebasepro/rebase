@@ -1743,6 +1743,8 @@ export const it: RebaseTranslations = {
     studio_schema_visualizer_source: "Disegnato dalle tabelle che il tuo backend serve: tabelle, colonne, tipi e relazioni come le dichiara. Solo gli indicatori RLS sono letti dal database.",
     studio_auth_service_key: "Chiave di servizio",
     studio_auth_service_key_hint: "Ogni richiesta qui viene eseguita con la chiave di servizio del progetto. Non c'è un utente connesso per conto del quale eseguirla, e non può essere inviata senza credenziali.",
+    studio_users_header_description: "Qui si gestiscono gli account di accesso, i ruoli e gli ambiti di accesso.",
+    studio_users_columns_in_content: "Le colonne proprie di ogni utente si modificano come contenuto, in {{collection}}.",
     studio_schema_visualizer_fit_view: "Adatta alla vista",
     studio_schema_visualizer_history_enabled: "Cronologia attiva",
     studio_rls_served_tables: "Tabelle servite",

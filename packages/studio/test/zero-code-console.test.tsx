@@ -8,6 +8,7 @@ import { render, screen } from "@testing-library/react";
 const snackbarOpen = jest.fn();
 
 jest.mock("@rebasepro/app", () => ({
+    useStudioCollectionRegistry: () => ({ getCollection: () => undefined }),
     useApiBase: () => "/api",
     useApiConfig: () => ({ apiUrl: "http://localhost:3000", getAuthToken: async () => "test-token" }),
     useAuthController: () => ({ getAuthToken: async () => "test-token" }),
