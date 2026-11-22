@@ -1,4 +1,5 @@
 import type { SQLAdmin } from "@rebasepro/types";
+import { revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../utils/logger";
 
 /** Postgres LISTEN/NOTIFY channel fired whenever DDL or catalog metadata changes. */
@@ -13,6 +14,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * Idempotent (`CREATE TABLE IF NOT EXISTS`): safe to run on every boot when
  * `provision` is enabled, and never alters or drops existing data.
  */
+/** The zero-code catalog's tables, all in `rebase`. */
+const BAAS_CATALOG_TABLES = ["table_meta", "storage_policies", "webhooks", "cron_jobs", "roles"] as const;
+
 export async function ensureBaasCatalogTables(admin: SQLAdmin): Promise<void> {
     await admin.executeSql(`CREATE SCHEMA IF NOT EXISTS "rebase"`);
 
@@ -93,7 +97,21 @@ export async function ensureBaasCatalogTables(admin: SQLAdmin): Promise<void> {
             "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     `);
+
+    // The catalog is the server's, read and written on the owner connection on
+    // an admin's behalf. The driver grants `rebase_user` DML across `rebase`
+    // (and default privileges hand it tables created later, as these are), so
+    // without this any signed-in caller's SQL (`getSql`) could read the
+    // webhooks and rewrite the roles and storage policies: `rls:check` called
+    // all five `[critical] rls-disabled`. Revoked on every boot, as
+    // `metric_samples` is, which also repairs a database provisioned before.
+    // Not added to REBASE_INTERNAL_TABLES: those names are unqualified, and
+    // `roles` or `webhooks` in a project's own schema are its data.
+    for (const table of BAAS_CATALOG_TABLES) {
+        await admin.executeSql(revokeInternalTableSql("rebase", table));
+    }
 }
+
 
 /**
  * Best-effort installation of a PostgreSQL DDL event trigger that emits

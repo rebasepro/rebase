@@ -82,10 +82,14 @@ export function SelectFieldBinding({
                         : null;
                     return setValue(newValue);
                 }}
+                // With the label inside, the value sits on the line under it,
+                // and the box is a text field's height: 40px of padding at the
+                // form's size leaves 24px, a medium chip. A large one (32px)
+                // made the select 8px taller than the text fields beside it.
                 renderValue={(enumKey: string) => <EnumValuesChip
                     enumKey={enumKey}
                     enumValues={enumValues}
-                    size={size}/>}
+                    size={label ? (size === "large" ? "medium" : "small") : size}/>}
             >
                 {enumValues && enumValues.map((option) => {
                     return <SelectItem
