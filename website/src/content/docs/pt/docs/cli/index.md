@@ -1,5 +1,5 @@
 ---
-sourceHash: 174c7e210e0d7d49
+sourceHash: 4afe718897048683
 title: Referência da CLI
 sidebar_label: CLI
 description: Comandos da CLI do Rebase para inicialização de projetos, geração de schemas, migrações de banco de dados e geração de SDK.
@@ -64,7 +64,7 @@ Uma aplicação estática no `rebase.json` sem etapa de build (sem `build`, e o 
 a sua `root`, como um site HTML simples) é servida pelo backend a partir desse
 diretório, em seu `path`, assim como `rebase start` a serve a partir do bundle, e
 `FRONTEND_URL` é definida para ela (na porta do backend) para que links enviados por e-mail caiam lá.
-<span class="since-badge" data-since="0.35">Desde 0.35</span> Seus [`redirects` e `cleanUrls`](/docs/architecture/redirects-and-clean-urls/) também são servidos, e uma aplicação que declara redirecionamentos não precisa de `index.html`.
+Seus [`redirects` e `cleanUrls`](/docs/architecture/redirects-and-clean-urls/) também são servidos, e uma aplicação que declara redirecionamentos não precisa de `index.html`.
 Uma aplicação com build é executada no Vite em sua própria porta, e `FRONTEND_URL` é a do Vite.
 
 Uma edição no `.env` reinicia o backend, que lê o arquivo novamente, da mesma forma que o painel de administração faz. O que

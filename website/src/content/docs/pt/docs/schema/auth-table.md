@@ -1,5 +1,5 @@
 ---
-sourceHash: e934bb43a5bf4916
+sourceHash: a7b5b5daa103ef94
 title: A tabela de usuários
 sidebar_label: Tabela de usuários
 description: "O defineAuthTable declara a tabela na qual a autenticação armazena os usuários: as colunas de que a autenticação precisa, uma política de auto-leitura, colunas de privilégio exclusivas para admin e o modelo de acesso — roles, escopos da aplicação, chaves pessoais e os hooks do ciclo de vida do usuário."
@@ -68,8 +68,6 @@ Regras em outras tabelas podem referenciar as colunas da tabela de usuários com
 própria tabela de usuários também pode referenciar todas as colunas de autenticação, declaradas ou não.
 
 ## Sem uma tabela de usuários
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 Declarar uma é opcional. A autenticação funciona de qualquer forma: sem nenhum `defineAuthTable`,
 ela mantém os seus usuários em `rebase.users`, e as contas e roles são gerenciadas no

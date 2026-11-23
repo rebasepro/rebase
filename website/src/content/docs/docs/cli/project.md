@@ -97,7 +97,7 @@ rebase users guests prune --older-than 30d --yes
 
 ### Importing accounts
 
-<span class="since-badge" data-since="0.35">Since 0.35</span> `import` brings accounts over from another system and keeps their ids, so the rows that point at a user still point at the same one. It takes a CSV, a JSON array or NDJSON (`--format`, else the extension), with these columns:
+`import` brings accounts over from another system and keeps their ids, so the rows that point at a user still point at the same one. It takes a CSV, a JSON array or NDJSON (`--format`, else the extension), with these columns:
 
 | Column | |
 |---|---|

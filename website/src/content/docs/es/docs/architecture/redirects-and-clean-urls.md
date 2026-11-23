@@ -1,11 +1,9 @@
 ---
-sourceHash: 8250c897b7861c24
+sourceHash: bd5ca4ed0e47d867
 title: Redirecciones y URLs limpias
 sidebar_label: Redirecciones y URLs limpias
 description: "Una aplicación estática en rebase.json puede responder solicitudes con redirecciones (coincidencia de :param al estilo Vercel, condiciones de host, host negado y consulta) y servir x.html en /x con cleanUrls."
 ---
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 Una aplicación estática puede responder a ciertas solicitudes con una redirección en lugar de un archivo, y servir sus páginas HTML sin el `.html`:
 
@@ -27,8 +25,6 @@ Una aplicación estática puede responder a ciertas solicitudes con una redirecc
 
 ## `redirects`
 
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
-
 - **`from`** es una ruta en la dirección de la aplicación, absoluta y dentro de su `path`. `:name` coincide con un segmento y `:name*`, como último segmento, coincide con el resto de la ruta, ninguno incluido: `/docs/:path*` coincide con `/docs`, `/docs/start` y `/docs/a/b`. Se ignora una barra final en la solicitud y la coincidencia distingue entre mayúsculas y minúsculas.
 - **`to`** es una ruta en la misma dirección o una URL absoluta `http://` o `https://`. Cada `:name` en ella se reemplaza por lo que capturó `from`, en su ruta o consulta. Se rechaza un parámetro en el nombre de host de una URL.
 - **`status`** es `301`, `302`, `307` o `308`. Si se omite, es `308`: permanente y se mantiene el método.
@@ -39,8 +35,6 @@ Una aplicación estática puede responder a ciertas solicitudes con una redirecc
 La cadena de consulta de la solicitud se transfiere a menos que `to` tenga una propia. Las redirecciones se evalúan en el orden en que están escritas, antes de cualquier archivo de la compilación, y responde la primera que coincida. Una ruta que una de las [`routes`](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) de la aplicación envía a una función pertenece a la función, y las rutas del backend (`/api`, `/health` y el resto) nunca se redirigen. `rebase.json` se rechaza cuando una redirección nunca podría coincidir (un `from` fuera de la aplicación o bajo la ruta de otra aplicación), cuando dos redirecciones coinciden con las mismas solicitudes y cuando una redirección envía una solicitud a una ruta con la que su propio `from` vuelve a coincidir, lo que crearía un bucle infinito.
 
 ## Una ruta, una página distinta por nombre de host
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 Una aplicación servida en varios nombres de host puede enviar la misma ruta a una página distinta en cada uno. Aquí `/` abre la aplicación en `app.example.com` y la demo en cualquier otro nombre de host:
 
@@ -54,8 +48,6 @@ Una aplicación servida en varios nombres de host puede enviar la misma ruta a u
 Sin `notHost`, la segunda redirección podría no tener ninguna condición: responde la primera que coincida, así que solo ve lo que la primera dejó pasar. `notHost` hace que cada redirección diga por sí sola dónde se aplica, como lo hace una condición `missing` de `vercel.json`, de modo que el orden deja de importar.
 
 ## Enviar un dominio a otro
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 Una aplicación cuyo único propósito es una redirección envía el dominio raíz a `www`, conservando la ruta y la consulta:
 
@@ -77,8 +69,6 @@ Una aplicación cuyo único propósito es una redirección envía el dominio ra�
 Con `"cleanUrls": true`, `/privacidad` sirve `privacidad.html` y `/legal/terms` sirve `legal/terms.html`. Una solicitud que especifique el archivo, `/privacidad.html`, responde `308` hacia `/privacidad`, conservando la consulta. Primero se sirve un archivo o directorio con el nombre exacto de la solicitud, por lo que `/about` aún sirve `about/index.html` cuando este existe, y `/docs/index.html` responde `308` hacia `/docs/`. Sin esto, `/privacidad` es una ruta sin archivo, a la cual un sitio con `spa: false` responde con un 404.
 
 ## Si vienes de Vercel
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 `vercel.json`:
 

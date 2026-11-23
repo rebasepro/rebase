@@ -1,5 +1,5 @@
 ---
-sourceHash: 14ada28ef46dc73c
+sourceHash: 9acb2b3f441697d7
 title: Ambiente e Configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -170,8 +170,6 @@ richieste autenticate verso il server di sviluppo sfruttando la sua sessione e l
 | `CAPTCHA_ROUTES` | Elenco separato da virgole delle route di autenticazione da proteggere (ad esempio `register,login`). Se non impostata, protegge il set predefinito del provider. | — |
 
 ### Storage
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 :::caution[Lo storage non dispone di row-level security, quindi richiede un modello di accesso]
 Le tabelle sono protette dalla RLS di Postgres. L'object storage non ha un equivalente —

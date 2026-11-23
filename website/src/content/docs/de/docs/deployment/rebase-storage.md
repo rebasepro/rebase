@@ -1,5 +1,5 @@
 ---
-sourceHash: c01ec36e7192bb7f
+sourceHash: 527ed0c2f1a85b8e
 title: Rebase Storage
 sidebar_label: Rebase Storage
 description: "S3-kompatibler Objektspeicher in Rebase Cloud: der Endpunkt, Buckets und Schlüssel, die unterstützten S3-Operationen, Limits, Preise, Speicherort der Daten und wie Sie aws-cli, rclone, boto3 und das AWS SDK für JavaScript verbinden."
@@ -38,8 +38,6 @@ Buckets werden nicht über den S3-Aufruf `CreateBucket` erstellt. `CreateBucket`
 einen Bucket, den Sie bereits besitzen, antwortet mit `BucketAlreadyOwnedByYou`.
 
 ## Schlüssel
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 Rebase stellt die Zugriffsschlüssel aus. Jeder Schlüssel ist entweder **read-only**
 oder **read-write** und deckt entweder einen einzelnen Bucket oder alle Buckets des Projekts ab.
@@ -156,8 +154,6 @@ fügt keine hinzu. Verschlüsseln Sie sensible Daten auf dem Client, bevor Sie s
 
 ## Einen bestehenden Bucket importieren
 
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
-
 `rebase cloud storage import` kopiert einen Bucket von jedem S3-kompatiblen Dienst
 nach Rebase Storage:
 
@@ -190,8 +186,6 @@ Verwenden Sie für Google Cloud Storage dessen S3-Interoperabilitätsendpunkt
 zeigt, wie die Anmeldeinformationen der Quelle übergeben werden.
 
 ## Einen Client verbinden
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 Die folgenden Beispiele verwenden einen Schlüssel, der mit `rebase cloud storage keys create` erstellt wurde.
 

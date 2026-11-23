@@ -1,5 +1,5 @@
 ---
-sourceHash: 174c7e210e0d7d49
+sourceHash: 4afe718897048683
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de la CLI de Rebase para la inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -60,7 +60,7 @@ Inicia tanto el frontend como el backend con recarga en caliente (hot reloading)
 Ambos puertos se derivan de la ruta del proyecto para que varios proyectos de Rebase puedan ejecutarse en paralelo. Utiliza las URLs que imprime `rebase dev`. Fija uno con `rebase dev --port 3001`.
 
 Una aplicación estática en `rebase.json` sin paso de compilación (sin `build`, y `output` es su `root`, como un sitio HTML plano) es servida por el backend desde ese directorio, en su `path`, tal como `rebase start` la sirve desde el bundle, y `FRONTEND_URL` se establece hacia ella (en el puerto del backend) para que los enlaces enviados por correo aterricen allí.
-<span class="since-badge" data-since="0.35">Desde 0.35</span> Sus [`redirects` y `cleanUrls`](/docs/architecture/redirects-and-clean-urls/) también se sirven, y una aplicación que declara redirecciones no necesita un `index.html`.
+Sus [`redirects` y `cleanUrls`](/docs/architecture/redirects-and-clean-urls/) también se sirven, y una aplicación que declara redirecciones no necesita un `index.html`.
 Una aplicación con compilación se ejecuta en Vite en su propio puerto, y `FRONTEND_URL` es el de Vite.
 
 Una edición en `.env` reinicia el backend, que vuelve a leer el archivo, al igual que hace el panel de administración. Lo que `rebase dev` establece por sí mismo se conserva hasta que lo reinicies: `PORT`, y `DATABASE_URL` cuando está en la base de datos gestionada o en Docker.

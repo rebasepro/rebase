@@ -1,5 +1,5 @@
 ---
-sourceHash: 2f5cbd6a266650c4
+sourceHash: 77300c47e9692bd9
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud es el mismo Rebase, operado para ti. Qué es, cómo se vincula y despliega un proyecto, y qué no incluye aún la beta privada.
@@ -441,8 +441,6 @@ verifique su dirección primero. Desde un terminal:
 lo indica cuando la dirección no tiene cuenta.
 
 ## Acceso a Cloud y los usuarios de tu app
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 Hay dos grupos independientes de personas involucrados, al igual que en Firebase y Supabase:
 

@@ -1,11 +1,9 @@
 ---
-sourceHash: 3daf2012ee7cd662
+sourceHash: 690d0ebb30684b40
 title: Fonctions SQL en tant que RPC
 sidebar_label: Fonctions SQL (RPC)
 description: "Exposer une fonction Postgres sur POST /api/rpc/<name> avec defineRpc : déclarée par fonction, arguments validés, exécutée en tant qu'appelant sous la sécurité au niveau des lignes, celles publiques limitées en débit."
 ---
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 Une fonction SQL déclarée avec `defineRpc` est exposée à l'adresse `POST /api/rpc/<name>`,
 avec ses arguments nommés dans le corps JSON. Elle s'exécute en tant qu'appelant, de la même façon
@@ -18,8 +16,6 @@ Seules les fonctions déclarées peuvent être appelées. Une fonction présente
 mais qui n'a pas été déclarée renvoie `404 RPC_NOT_FOUND`.
 
 ## Déclarer une fonction
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 Les déclarations résident aux côtés des tables, dans `backend/schema/`, et l'index du schéma
 les exporte :

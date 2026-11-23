@@ -1,5 +1,5 @@
 ---
-sourceHash: 3790dd4c336ab1f2
+sourceHash: 009626aee0f3e697
 title: API REST
 sidebar_label: API REST
 description: Endpoints de API REST autogenerados para cada tabla, con filtrado, ordenación, paginación e inclusión de relaciones.
@@ -375,7 +375,7 @@ GET /api/meta/contract
 ```
 
 ```json
-{ "schemaVersion": "v2:…", "runtime": { "version": "0.34.2", "contract": 2 }, "tables": [ … ] }
+{ "schemaVersion": "v2:…", "runtime": { "version": "0.35.0", "contract": 2 }, "tables": [ … ] }
 ```
 
 Requiere el permiso **`schema:read`**, que posee un administrador, y en un despliegue sin autenticación configurada no se sirve en absoluto (404 `CONTRACT_UNAVAILABLE`) en lugar de exponer el esquema a cualquiera. Las versiones del esquema comienzan con `v2:` desde la versión 0.31: se calculan a partir de las tablas compiladas, por lo que la versión de cada proyecto cambió una vez. Su endpoint hermano devuelve una cadena de versión que representa el esquema sin describirlo, y es deliberadamente accesible sin credenciales, lo cual es lo que sondea una tarea de CI:

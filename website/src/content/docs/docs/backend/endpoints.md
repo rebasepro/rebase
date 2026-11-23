@@ -318,8 +318,6 @@ inventory of a deployment's custom endpoints is not public.
 
 ## RPC
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 | Method | Path | Gate | More |
 |---|---|---|---|
 | `POST` | `/api/rpc/<name>` | the RPC's `access`: none for `"public"` (rate-limited), session for `"authenticated"`; then RLS inside the function. An API key also needs `data:read` (`data:write` for a `write: true` RPC) | [SQL functions as RPC](/docs/backend/rpc/) |

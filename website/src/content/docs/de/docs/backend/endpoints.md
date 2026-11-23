@@ -1,5 +1,5 @@
 ---
-sourceHash: de16b1769a8a5662
+sourceHash: c2fabe52d7bfc689
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend bereitstellt – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -321,8 +321,6 @@ Sitzung, einen API-Schlüssel oder den Service-Schlüssel – und antwortet alle
 Übersicht der benutzerdefinierten Endpunkte eines Deployments ist nicht öffentlich.
 
 ## RPC
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|

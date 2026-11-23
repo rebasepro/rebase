@@ -1,5 +1,5 @@
 ---
-sourceHash: a657ab288833ddd3
+sourceHash: 6cf201fcae853f37
 title: Runtime backend gestito
 sidebar_label: Runtime gestito
 description: Cosa può e non può fare un backend con runtime "managed" su Rebase Cloud — pacchetti e binari, memoria e CPU, timeout e dimensioni del body, filesystem, stato in memoria, segreti, archiviazione per i file generati e rete in uscita.
@@ -225,7 +225,6 @@ Alcuni dettagli:
   per intero: inviala quindi in streaming o servila dallo storage.
 
 ### Monitor e attività pianificate in `/metrics`
-<span class="since-badge" data-since="0.35">Da 0.35</span>
 
 Una richiesta proveniente da un noto monitor di uptime (riconosciuto tramite `User-Agent`), o che contiene un header `x-rebase-probe` con qualsiasi valore, viene servita ma conteggiata in `rebase_probe_requests_total` anziché in `rebase_requests_total`, evitando così che un monitor venga conteggiato come traffico effettivo. `rebase_scheduled_jobs` rappresenta il numero di cron job abilitati e registrati nell'app e `rebase_background_workers` è pari a 1 mentre questo processo esegue un worker della coda di job; entrambi si arrestano quando una distribuzione viene scalata a zero, motivo per cui una piattaforma che sospende i progetti inattivi legge questi valori.
 

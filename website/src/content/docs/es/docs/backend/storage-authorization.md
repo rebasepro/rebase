@@ -1,5 +1,5 @@
 ---
-sourceHash: 31645b4c27077651
+sourceHash: 20aec4c8317aa338
 title: Autorización de almacenamiento
 sidebar_label: Autorización de almacenamiento
 description: Decide quién puede leer, escribir, eliminar o listar cada objeto de almacenamiento con storagePolicies y el hook storageAuthorize, y qué scopes de almacenamiento necesita una clave API.
@@ -40,8 +40,6 @@ Las políticas satisfacen la protección de arranque en producción por sí sola
 
 ### Como datos: `STORAGE_POLICIES`
 
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
-
 El entorno de ejecución administrado no puede leer un predicado de tu código, y un proyecto en el backend estándar de Rebase Cloud no tiene código para leer. Por lo tanto, las mismas reglas se pueden configurar como JSON en la variable de entorno `STORAGE_POLICIES`, nombrando en lugar de codificar los dos predicados que casi todas las aplicaciones escriben:
 
 ```bash
@@ -62,8 +60,6 @@ STORAGE_POLICIES='[
 Se compilan a `storagePolicies`, por lo que la coincidencia, el orden y el fallback a `storageAuthorize` son idénticos a la versión en código: una clave que ninguna regla cubre se consulta al hook si el proyecto tiene uno, y se rechaza si no. Un valor que no sea una lista válida impide el arranque, indicando cada problema; Rebase Cloud se niega a guardar uno no válido, y su consola edita la lista en **File storage → Access rules**.
 
 ## El hook
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 `requireAuth` y `publicRead` son interruptores *globales*: deciden si un llamador debe haber iniciado sesión, no qué puede tocar ese llamador. Sin un hook de autorización, **cualquier usuario autenticado puede leer cualquier clave que pueda nombrar** — lo único que separa los archivos de dos inquilinos (tenants) es la imposibilidad de adivinar la clave, lo cual no es un modelo de control de acceso. Peor aún, pueden hacer `GET /storage/list?prefix=` primero, por lo que ni siquiera es necesario adivinar las claves.
 

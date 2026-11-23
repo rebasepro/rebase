@@ -1,5 +1,5 @@
 ---
-sourceHash: 5ee5cd26135e6556
+sourceHash: a439eb40c100e881
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et ce qu'il faut faire — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -316,8 +316,6 @@ Tout le reste — une connexion perdue, une colonne manquante, un problème de p
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | Ce processus relaie les fonctions vers un autre processus en proxy, qui n'a pas répondu. | Vérifiez que l'unité d'exécution des fonctions est bien en cours d'exécution. |
 
 ## Fonctions SQL en tant que RPC
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 `POST /api/rpc/<name>` — voir [Fonctions SQL en tant que RPC](/docs/backend/rpc/). Un argument incorrect produit `VALIDATION_CONSTRAINT` (400), avec `details.violations` nommant chaque champ, comme sur l'API de données ; des identifiants sans `data:read` produisent `SCOPE_MISSING` (403) ; un RPC public dépassant sa limite de débit produit `RATE_LIMITED` (429).
 

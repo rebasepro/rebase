@@ -1,5 +1,5 @@
 ---
-sourceHash: 6670d26e763252ab
+sourceHash: 4acb34e54a96f397
 title: "Recette : Migrer depuis Supabase"
 sidebar_label: Migrer depuis Supabase
 description: "Migrez un projet Supabase vers Rebase : introspectez le schéma, appliquez les objets SQL qui ne sont pas des tables, copiez les données en conservant les identifiants utilisateurs, portez les fonctions edge et déployez, le tout depuis la CLI."
@@ -58,7 +58,6 @@ rebase db push
 ```
 
 ## 3. Appliquer les objets SQL
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 Modifiez `backend/sql/_introspected-left-behind.sql` de la même manière que les tables ont été
 modifiées : `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, pas de
@@ -73,7 +72,7 @@ rebase db push
 `rebase db push` applique chaque fichier `.sql` de `backend/sql` dans l'ordre de leur nom, après les tables et avant les policies, et enregistre chacun par son hachage dans `rebase.sql_files`, de sorte qu'un fichier ne s'exécute à nouveau que lorsqu'il change. Un déploiement les applique de la même manière (étape 8).
 
 Une fonction appelée par le navigateur avec `supabase.rpc('fn')` est déclarée avec
-<span class="since-badge" data-since="0.35">Depuis 0.35</span> [`defineRpc`](/docs/backend/rpc/), aux côtés des tables. Elle est ensuite servie sur
+[`defineRpc`](/docs/backend/rpc/), aux côtés des tables. Elle est ensuite servie sur
 `POST /api/rpc/<name>` et s'exécute en tant qu'appelant sous row-level security, de sorte qu'une
 fonction `SECURITY DEFINER` se comporte comme elle le faisait sur Supabase :
 
@@ -170,7 +169,6 @@ sur Cloud). Sans ces variables, la route répond 503, et `rebase cloud status`
 indique `blockedOn: email_not_configured`.
 
 ## 8. Déployer
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 ```bash
 rebase cloud projects create --name Triptelier --link

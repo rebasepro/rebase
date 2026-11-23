@@ -323,8 +323,6 @@ other than the selected one.
 
 ### Project access
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 ```bash
 rebase cloud access [list]
 rebase cloud access invite <email> [--role admin|developer|viewer]

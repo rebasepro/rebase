@@ -1,5 +1,5 @@
 ---
-sourceHash: 6670d26e763252ab
+sourceHash: 4acb34e54a96f397
 title: "Receta: Migración desde Supabase"
 sidebar_label: Migración desde Supabase
 description: "Mueve un proyecto de Supabase a Rebase: haz introspección del esquema, aplica los objetos SQL que no son tablas, copia los datos manteniendo los id de usuario, porta las edge functions y despliega, todo desde la CLI."
@@ -44,7 +44,6 @@ rebase db push
 ```
 
 ## 3. Aplicar los objetos SQL
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 Edita `backend/sql/_introspected-left-behind.sql` del mismo modo en que se editaron las tablas: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, sin `GRANT … TO anon, authenticated`. Las funciones que llamaban a `pg_net` es mejor implementarlas como una [función personalizada](/docs/backend/custom-functions/). Haz que cada sentencia sea segura de ejecutar otra vez (`DROP TRIGGER IF EXISTS` antes de cada `CREATE TRIGGER`), luego renombra el archivo sin el `_` inicial y haz push:
 
@@ -55,7 +54,7 @@ rebase db push
 
 `rebase db push` aplica cada archivo `.sql` de `backend/sql` por orden de nombre, después de las tablas y antes de las políticas, y registra cada uno por hash en `rebase.sql_files`, de modo que un archivo se ejecuta de nuevo solo cuando cambia. Un despliegue los aplica del mismo modo (paso 8).
 
-Una función a la que el navegador llamaba con `supabase.rpc('fn')` se declara con <span class="since-badge" data-since="0.35">Desde 0.35</span> [`defineRpc`](/docs/backend/rpc/), junto a las tablas. Luego se sirve en `POST /api/rpc/<name>` y se ejecuta como el llamador bajo seguridad a nivel de fila, de modo que una función `SECURITY DEFINER` se comporta como lo hacía en Supabase:
+Una función a la que el navegador llamaba con `supabase.rpc('fn')` se declara con [`defineRpc`](/docs/backend/rpc/), junto a las tablas. Luego se sirve en `POST /api/rpc/<name>` y se ejecuta como el llamador bajo seguridad a nivel de fila, de modo que una función `SECURITY DEFINER` se comporta como lo hacía en Supabase:
 
 ```ts
 // backend/schema/rpc.ts, exported from backend/schema/index.ts
@@ -129,7 +128,6 @@ Pasa `getSignal(c)` al `fetch` que llama al modelo, de modo que la llamada se de
 El inicio de sesión mediante enlace mágico (magic link) y código de correo electrónico requiere un servicio de correo electrónico. Configura `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` y `SMTP_FROM` (`rebase cloud env set` en Cloud). Sin ellos, la ruta responde con 503 y `rebase cloud status` informa `blockedOn: email_not_configured`.
 
 ## 8. Desplegar
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 ```bash
 rebase cloud projects create --name Triptelier --link

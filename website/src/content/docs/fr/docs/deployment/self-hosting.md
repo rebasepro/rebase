@@ -1,5 +1,5 @@
 ---
-sourceHash: 7cfed3fdc9ab52e4
+sourceHash: 320830830681a3a2
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image runtime officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.
@@ -84,7 +84,7 @@ Puisqu'elles sont déjà présentes, vous pouvez monter le bundle en lecture seu
 Pour un véritable déploiement, préférez intégrer les deux dans une image, ce qui fige également exactement ce qui s'exécute :
 
 ```dockerfile
-FROM rebasepro/server:0.34.2
+FROM rebasepro/server:0.35.0
 COPY dist-bundle /bundle
 ```
 
@@ -178,8 +178,6 @@ L'image crée `/storage` pour l'utilisateur non privilégié `node` sous lequel 
 
 ### Le stockage nécessite un modèle de contrôle d'accès
 
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
-
 Dès qu'un bucket **est** configuré, le runtime **refuse de démarrer en production** tant que le déploiement ne précise pas comment les objets sont protégés. Le stockage n'est pas soumis au RLS (sécurité au niveau des lignes) et ses clés partagent un espace de noms plat unique ; sans règle, la seule barrière entre les fichiers de deux utilisateurs repose sur l'imprévisibilité des clés — ce que `GET /storage/list?prefix=` rend caduc. N'importe laquelle de ces options satisfait cette exigence :
 
 - un **hook `storageAuthorize`** (ou `storagePolicies`) dans la configuration de votre projet, ce que fournit le scaffold dans `backend/storage.ts` ;
@@ -202,7 +200,7 @@ Le runtime est un conteneur standard qui écoute sur `$PORT`, donc tout système
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.34.2 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.35.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -331,7 +329,7 @@ Tout ce qui précède décrit un conteneur unique servant l'intégralité du pro
 ## Mise à niveau
 
 ```yaml
-image: rebasepro/server:0.34.2
+image: rebasepro/server:0.35.0
 ```
 
 Redémarrez. Votre bundle reste inchangé. Au sein d'une même version majeure du contrat de runtime, un bundle validé continue de fonctionner — voir [Compatibilité](/docs/architecture/runtime-and-bundles/#compatibility).

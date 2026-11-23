@@ -1,5 +1,5 @@
 ---
-sourceHash: 444e25d42cbff83f
+sourceHash: 507686b3cd49d852
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt besteht aus einem Backend und den damit kommunizierenden Apps, die jeweils in einem eigenen Repository liegen können.
@@ -162,7 +162,7 @@ nennt, und sie kann die `cms`-Route der App nicht kennen. Der Name ändert sich
 nicht: Rebase Cloud hat `web` für jedes Projekt registriert, das ohne
 `rebase.json` deployed wurde.
 `rebase apps init --force` behält die Namen, `path`, `cms`, `routes`,
-`frameAncestors`, <span class="since-badge" data-since="0.35">Seit 0.35</span> `redirects` und `cleanUrls` der Apps bei, die von der ersetzten Datei
+`frameAncestors`, `redirects` und `cleanUrls` der Apps bei, die von der ersetzten Datei
 deklariert wurden, und kennzeichnet eine App, die es nicht mehr findet, als
 entfernt.
 
@@ -400,8 +400,6 @@ einen Build.
 
 ## Redirects und Clean URLs
 
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
-
 Eine statische App akzeptiert `redirects` (`{ "from": "/blog/:slug", "to": "/posts/:slug" }`,
 einschließlich Weiterleitungen zu einer anderen Domain) und `cleanUrls: true`
 (`/x` liefert `x.html` aus). Siehe
@@ -409,8 +407,6 @@ einschließlich Weiterleitungen zu einer anderen Domain) und `cleanUrls: true`
 auch ein `vercel.json` auf `rebase.json` abgebildet wird.
 
 ## App Links, Universal Links und andere `/.well-known`-Dateien
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 Android App Links und iOS Universal Links werden verifiziert, indem eine Datei
 vom Origin der Website abgerufen wird:
@@ -544,7 +540,7 @@ da ein Versionsstempel nichts über das Schema verrät, für das er steht:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.34.2","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.35.0","contract":1}}
 ```
 
 Ein Vergleich der beiden in der CI verwandelt eine unbemerkte Diskrepanz in

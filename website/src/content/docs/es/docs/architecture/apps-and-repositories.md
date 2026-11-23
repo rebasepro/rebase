@@ -1,5 +1,5 @@
 ---
-sourceHash: 444e25d42cbff83f
+sourceHash: 507686b3cd49d852
 title: Aplicaciones y repositorios
 sidebar_label: Apps y repositorios
 description: Un proyecto es un backend más las aplicaciones que se comunican con él, las cuales pueden residir cada una en su propio repositorio.
@@ -152,7 +152,7 @@ a la aplicación estática `web`, donde un scaffold la nombra `admin`, y no pued
 ruta `cms` de la aplicación. El nombre no cambia: Rebase Cloud registró `web` para
 cada proyecto que se desplegó sin un `rebase.json`.
 `rebase apps init --force` conserva los nombres, `path`, `cms`, `routes`,
-`frameAncestors`, <span class="since-badge" data-since="0.35">Desde 0.35</span> `redirects` y `cleanUrls` de las aplicaciones que declara el
+`frameAncestors`, `redirects` y `cleanUrls` de las aplicaciones que declara el
 archivo al que reemplaza, y nombra como eliminada a cualquier aplicación que ya no encuentre.
 
 ## Una aplicación en su propio hostname
@@ -364,16 +364,12 @@ rutas contra una compilación con `rebase start`.
 
 ## Redirecciones y URLs limpias
 
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
-
 Una aplicación estática acepta `redirects` (`{ "from": "/blog/:slug", "to": "/posts/:slug" }`,
 incluso hacia otro dominio) y `cleanUrls: true` (`/x` sirve `x.html`). Consulta
 [Redirects and clean URLs](/docs/architecture/redirects-and-clean-urls/), que
 también mapea un `vercel.json` a `rebase.json`.
 
 ## App Links, Universal Links y otros archivos `/.well-known`
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 Los App Links de Android y los Universal Links de iOS se verifican obteniendo un archivo del
 origen del sitio: `https://<host>/.well-known/assetlinks.json` y
@@ -496,7 +492,7 @@ marca de versión no revela nada sobre el esquema que representa:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.34.2","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.35.0","contract":1}}
 ```
 
 Comparar ambos en CI convierte un desajuste silencioso en una verificación fallida. La marca

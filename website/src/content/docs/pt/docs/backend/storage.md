@@ -1,5 +1,5 @@
 ---
-sourceHash: 1eae92c45ebedd91
+sourceHash: bbee7bded8a1462e
 title: Configuração de Storage
 sidebar_label: Configuração de Storage
 description: Configure backends de sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -14,8 +14,6 @@ O Rebase oferece suporte a três backends de storage:
 - **Google Cloud Storage / Firebase Storage** — Suporte nativo ao GCS via `@google-cloud/storage`
 
 ## Configuração
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 :::note[Onde isso fica]
 **Runtime gerenciado** — as variáveis `STORAGE_*` no `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — adicione o sufixo `__<KEY>` a qualquer uma delas para uma fonte nomeada), além de uma declaração `bucket("<key>")` em `backend/resources.ts` para cada bucket além do padrão, e `export const storageAuthorize` de `backend/storage.ts`. Regras por objeto também podem ser definidas como dados em `STORAGE_POLICIES` — "public", "authenticated", "owner" (o segmento `:uid` da chave é o chamador) e roles — consulte [Autorização de storage](/docs/backend/storage-authorization/#as-data-storage_policies).
@@ -302,8 +300,6 @@ maiores que 8 MiB de forma retomável. Consulte
 protocolo, o que ele responde e como se comporta entre diferentes instâncias.
 
 ## Variáveis de Ambiente
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 | Variável | Descrição |
 |----------|-----------|

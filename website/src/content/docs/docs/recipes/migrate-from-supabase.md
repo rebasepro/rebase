@@ -57,7 +57,6 @@ rebase db push
 ```
 
 ## 3. Apply the SQL objects
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 Edit `backend/sql/_introspected-left-behind.sql` the way the tables were
 edited: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, no
@@ -77,7 +76,7 @@ the tables and before the policies, and records each by hash in
 them the same way (step 8).
 
 A function the browser called with `supabase.rpc('fn')` is declared with
-<span class="since-badge" data-since="0.35">Since 0.35</span> [`defineRpc`](/docs/backend/rpc/), beside the tables. It is then served at
+[`defineRpc`](/docs/backend/rpc/), beside the tables. It is then served at
 `POST /api/rpc/<name>` and runs as the caller under row-level security, so a
 `SECURITY DEFINER` function behaves as it did on Supabase:
 
@@ -174,7 +173,6 @@ on Cloud). Without them the route answers 503, and `rebase cloud status`
 reports `blockedOn: email_not_configured`.
 
 ## 8. Deploy
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 ```bash
 rebase cloud projects create --name Triptelier --link

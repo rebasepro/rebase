@@ -1,5 +1,5 @@
 ---
-sourceHash: de16b1769a8a5662
+sourceHash: c2fabe52d7bfc689
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Tutte le route HTTP montate da un backend Rebase — dati, autenticazione, storage, admin, meta — con il gate associato a ciascuna e la pagina di approfondimento.
@@ -321,8 +321,6 @@ sessione, una chiave API o la service key — e risponde a chiunque altro con `4
 inventario degli endpoint personalizzati di un deployment non è pubblico.
 
 ## RPC
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 | Metodo | Percorso | Gate | Dettagli |
 |---|---|---|---|

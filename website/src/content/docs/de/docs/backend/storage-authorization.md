@@ -1,5 +1,5 @@
 ---
-sourceHash: 31645b4c27077651
+sourceHash: 20aec4c8317aa338
 title: Storage-Autorisierung
 sidebar_label: Storage-Autorisierung
 description: Entscheiden Sie mit storagePolicies und dem storageAuthorize-Hook, wer jedes Storage-Objekt lesen, schreiben, löschen oder auflisten darf und welche Storage-Scopes ein API-Schlüssel benötigt.
@@ -40,8 +40,6 @@ Policies erfüllen die Boot-Schutzprüfung für die Produktion bereits für sich
 
 ### Als Daten: `STORAGE_POLICIES`
 
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
-
 Die verwaltete Runtime kann kein Prädikat aus Ihrem Code lesen, und ein Projekt auf dem Standard-Backend von Rebase Cloud verfügt über keinen Code, der gelesen werden könnte. Daher können dieselben Regeln als JSON in der Umgebungsvariablen `STORAGE_POLICIES` hinterlegt werden, wobei die beiden Prädikate, die nahezu jede App benötigt, über Namen statt Code definiert werden:
 
 ```bash
@@ -62,8 +60,6 @@ STORAGE_POLICIES='[
 Diese werden zu `storagePolicies` kompiliert, daher entsprechen Musterabgleich, Reihenfolge und der Fallback auf `storageAuthorize` der Code-Form: Ein Schlüssel, der von keiner Regel abgedeckt wird, wird an den Hook übergeben, sofern das Projekt über einen verfügt, andernfalls wird er abgelehnt. Ein Wert, der keine gültige Liste darstellt, verhindert den Systemstart unter Angabe des jeweiligen Problems; Rebase Cloud verweigert das Speichern eines solchen Werts, und die Konsole ermöglicht das Bearbeiten der Liste unter **File storage → Access rules**.
 
 ## Der Hook
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 `requireAuth` und `publicRead` sind *globale* Schalter: Sie entscheiden, ob ein Aufrufer angemeldet sein muss, nicht, worauf dieser Aufrufer zugreifen darf. Ohne einen Autorisierungs-Hook kann **jeder authentifizierte Benutzer jeden Schlüssel lesen, den er benennen kann** – das Einzige, was die Dateien zweier Mandanten trennt, ist die Unvorhersehbarkeit der Schlüssel, was kein Zugriffskontrollmodell darstellt. Schlimmer noch: Aufrufer können zuerst `GET /storage/list?prefix=` ausführen, sodass die Schlüssel nicht einmal erraten werden müssen.
 

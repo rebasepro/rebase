@@ -1,5 +1,5 @@
 ---
-sourceHash: 1eae92c45ebedd91
+sourceHash: bbee7bded8a1462e
 title: Configurazione dello storage
 sidebar_label: Configurazione dello storage
 description: Configura backend di storage su filesystem locale, compatibili con S3 o GCS/Firebase per il caricamento di file, immagini e contenuti multimediali.
@@ -14,8 +14,6 @@ Rebase supporta tre backend di storage:
 - **Google Cloud Storage / Firebase Storage** — Supporto nativo GCS tramite `@google-cloud/storage`
 
 ## Configurazione
-
-<span class="since-badge" data-since="0.35">Da 0.35</span>
 
 :::note[Dove va configurato]
 **Runtime gestito** — le variabili `STORAGE_*` in `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — aggiungi il suffisso `__<KEY>` a ciascuna di esse per una sorgente con nome), più una dichiarazione `bucket("<key>")` in `backend/resources.ts` per ogni bucket oltre a quello predefinito, ed `export const storageAuthorize` da `backend/storage.ts`. Le regole per singolo oggetto possono anche essere impostate come dati in `STORAGE_POLICIES` — "public", "authenticated", "owner" (il segmento `:uid` della chiave corrisponde al chiamante) e ruoli — consulta [Autorizzazione dello storage](/docs/backend/storage-authorization/#as-data-storage_policies).
@@ -205,8 +203,6 @@ STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 La quantità di file che il server trattiene contemporaneamente in memoria dipende dal punto di accesso. `POST /api/storage/upload` consiste in un unico corpo multipart analizzato per intero dal server: da tre a cinque volte la dimensione del file in memoria. Un caricamento ripristinabile (TUS) mantiene in memoria un blocco alla volta. `client.storage.putObject()` e il pannello di amministrazione inviano i file superiori a 8 MiB tramite caricamento ripristinabile. Consulta [Caricamenti ripristinabili (TUS)](/docs/backend/storage-resumable-uploads/) per il protocollo, le risposte fornite e il comportamento su più istanze.
 
 ## Variabili d'ambiente
-
-<span class="since-badge" data-since="0.35">Da 0.35</span>
 
 | Variabile | Descrizione |
 |-----------|-------------|

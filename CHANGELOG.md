@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-23
+
 ### Added
 
 - **`rebase upgrade` refreshes the project's agent skills.** The skills ship inside `@rebasepro/cli`, so an upgrade moved the CLI and left `.claude/skills`, `.cursor/rules` and the rest describing the release before, and an agent went on writing code for the old API until someone remembered `rebase skills install`. Once it has installed, `rebase upgrade` runs the project's newly installed CLI's `skills install` for every assistant whose skills an install wrote, keeping skill files you edited. A project already on the release is refreshed too. `--json` reports it as `skills` (`{ agents, refreshed, reason? }`, or `null` with no skills installed); a refresh that fails is reported and never fails the upgrade.

@@ -130,7 +130,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.34.2
+FROM rebasepro/server:0.35.0
 COPY dist-bundle /bundle
 ```
 
@@ -300,8 +300,6 @@ mounts it this way.
 
 ### Storage needs an access-control model
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 Once a bucket **is** configured, the runtime **refuses to boot in production**
 until the deployment states how objects are protected. Storage is not under
 row-level security and its keys share one flat namespace, so with no rule the
@@ -340,7 +338,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.34.2 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.35.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -540,7 +538,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ## Upgrading
 
 ```yaml
-image: rebasepro/server:0.34.2
+image: rebasepro/server:0.35.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that

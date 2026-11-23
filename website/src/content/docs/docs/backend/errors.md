@@ -348,8 +348,6 @@ the message names the constraint.
 
 ## SQL functions as RPC
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 `POST /api/rpc/<name>` — see [SQL functions as RPC](/docs/backend/rpc/). A bad argument is `VALIDATION_CONSTRAINT` (400), with `details.violations` naming each field, as on the data API; a credential without `data:read` is `SCOPE_MISSING` (403); a public RPC over its limit is `RATE_LIMITED` (429).
 
 | Code | Status | Means | Do |

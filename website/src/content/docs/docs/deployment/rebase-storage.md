@@ -37,8 +37,6 @@ a bucket you already own answers `BucketAlreadyOwnedByYou`.
 
 ## Keys
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 Rebase issues the access keys. Each key is either **read-only** or
 **read-write**, and covers either one bucket or every bucket of the project.
 
@@ -154,8 +152,6 @@ not add any. For sensitive data, encrypt it on the client before you upload it.
 
 ## Importing an existing bucket
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 `rebase cloud storage import` copies a bucket from any S3-compatible service
 into Rebase Storage:
 
@@ -188,8 +184,6 @@ For Google Cloud Storage, use its S3 interoperability endpoint
 import --help` shows how to pass the source's credentials.
 
 ## Connecting a client
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 The examples below use a key created with `rebase cloud storage keys create`.
 

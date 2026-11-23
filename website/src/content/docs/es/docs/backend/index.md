@@ -1,5 +1,5 @@
 ---
-sourceHash: c9afeee7ed06431e
+sourceHash: f3631ce64dd803f5
 title: Descripción general del Backend
 sidebar_label: Backend
 description: El backend de Rebase proporciona un servidor completo con API REST, autenticación, almacenamiento, tiempo real mediante WebSockets e historial de entidades — todo inicializado con una única llamada a función.
@@ -78,7 +78,7 @@ Ambas vías desembocan en el mismo `RebaseBackendConfig`. Este es el mapa comple
 |---|---|
 | `basePath` | `REBASE_BASE_PATH` (por defecto `/api`) |
 | `tables`, `schemaDir`, `defaultRls` | el directorio `backend/schema/` (la clave `tables` de `rebase.json`): las tablas y el `defaultRls` que exporta su `index.ts` |
-| `rpc` | <span class="since-badge" data-since="0.35">Desde 0.35</span> las declaraciones `defineRpc` que exporta `backend/schema/index.ts` — consulte [Funciones SQL como RPC](/docs/backend/rpc/) |
+| `rpc` | las declaraciones `defineRpc` que exporta `backend/schema/index.ts` — consulte [Funciones SQL como RPC](/docs/backend/rpc/) |
 | `functions`, `functionsDir` | `backend/functions/` |
 | `functionsTimeoutMs` | `REBASE_FUNCTIONS_TIMEOUT_MS` |
 | `crons`, `cronsDir` | `backend/crons/` |
@@ -135,7 +135,7 @@ Tras la inicialización, se montan las siguientes rutas:
 | `/api/schema/tables` | Las tablas que sirve este backend, según los permisos del usuario — consulte [Endpoints](/docs/backend/endpoints/#schema) |
 | `/api/meta/contract` | La versión del schema, el runtime y cada tabla según la vista de un administrador (requiere `schema:read`) |
 | `/api/meta/schema-version` | Cadena de versión para dicho schema (sin autenticación) |
-| `/api/rpc/:name` | <span class="since-badge" data-since="0.35">Desde 0.35</span> Las funciones SQL declaradas con `defineRpc`, ejecutadas con la identidad del solicitante — consulte [Funciones SQL como RPC](/docs/backend/rpc/) |
+| `/api/rpc/:name` | Las funciones SQL declaradas con `defineRpc`, ejecutadas con la identidad del solicitante — consulte [Funciones SQL como RPC](/docs/backend/rpc/) |
 | `/api/functions/*` | Rutas de funciones personalizadas (cuando `functions` o `functionsDir` está configurado) |
 | `/api/push/*` | Suscripciones a [notificaciones push](/docs/backend/push-notifications/) (cuando `push` está habilitado) |
 | `/api/admin/cron/*` | Gestión de tareas cron (`cron:read` / `cron:write`, cuando `crons` o `cronsDir` está configurado) |
@@ -215,7 +215,7 @@ incluye `/livez` a menos que usted lo añada.
 
 ## Referencia de configuración
 
-<span class="since-badge" data-since="0.35">Desde 0.35</span> La opción `rpc` a continuación.
+La opción `rpc` a continuación.
 
 ```typescript
 interface RebaseBackendConfig {

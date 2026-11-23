@@ -1,5 +1,5 @@
 ---
-sourceHash: 31645b4c27077651
+sourceHash: 20aec4c8317aa338
 title: Autorisation de stockage
 sidebar_label: Autorisation de stockage
 description: Déterminez qui peut lire, écrire, supprimer ou lister chaque objet de stockage avec storagePolicies et le hook storageAuthorize, ainsi que les portées de stockage requises pour une clé API.
@@ -40,8 +40,6 @@ Les politiques satisfont à elles seules la vérification de démarrage en produ
 
 ### Sous forme de données : `STORAGE_POLICIES`
 
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
-
 Le runtime managé ne peut pas lire de prédicat depuis votre code, et un projet utilisant le backend standard de Rebase Cloud n'a aucun code à lire. Les mêmes règles peuvent donc être définies sous forme de JSON dans la variable d'environnement `STORAGE_POLICIES`, les deux prédicats que presque toutes les applications écrivent étant nommés plutôt que codés :
 
 ```bash
@@ -62,8 +60,6 @@ STORAGE_POLICIES='[
 Elles se compilent en `storagePolicies`, de sorte que la correspondance, l'ordre et le repli sur `storageAuthorize` sont identiques à la forme en code : une clé qu'aucune règle ne couvre est soumise au hook si le projet en possède un, et refusée sinon. Une valeur qui n'est pas une liste valide bloque le démarrage en indiquant chaque problème ; Rebase Cloud refuse d'en enregistrer une invalide, et sa console permet de modifier la liste sous **File storage → Access rules**.
 
 ## Le hook
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 `requireAuth` et `publicRead` sont des commutateurs *globaux* : ils déterminent si un appelant doit être connecté, et non ce à quoi il a le droit d'accéder. Sans hook d'autorisation, **tout utilisateur authentifié peut lire n'importe quelle clé dont il connaît le nom** — la seule chose qui sépare les fichiers de deux locataires (tenants) est l'impossibilité de deviner la clé, ce qui ne constitue pas un modèle de contrôle d'accès. Pire encore, ils peuvent d'abord exécuter `GET /storage/list?prefix=`, de sorte que les clés n'ont même pas besoin d'être devinées.
 

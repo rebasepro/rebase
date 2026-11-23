@@ -1,5 +1,5 @@
 ---
-sourceHash: 174c7e210e0d7d49
+sourceHash: 4afe718897048683
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -59,7 +59,7 @@ Startet sowohl Frontend als auch Backend mit Hot-Reloading und generiert das Dri
 
 Beide Ports werden aus dem Pfad des Projekts abgeleitet, sodass mehrere Rebase-Projekte nebeneinander laufen können. Verwenden Sie die URLs, die `rebase dev` ausgibt. Legen Sie einen Port mit `rebase dev --port 3001` fest.
 
-Eine statische App in `rebase.json` ohne Build-Schritt (kein `build` und `output` entspricht ihrem `root`, wie etwa eine reine HTML-Website) wird vom Backend aus diesem Verzeichnis unter ihrem `path` bereitgestellt, genau wie `rebase start` sie aus dem Bundle bereitstellt. `FRONTEND_URL` wird darauf gesetzt (auf den Port des Backends), damit per E-Mail versendete Links dort landen. <span class="since-badge" data-since="0.35">Seit 0.35</span> Ihre [`redirects` und `cleanUrls`](/docs/architecture/redirects-and-clean-urls/) werden ebenfalls bereitgestellt, und eine App, die Weiterleitungen deklariert, benötigt keine `index.html`. Eine App mit Build-Schritt läuft in Vite auf ihrem eigenen Port, und `FRONTEND_URL` ist der von Vite.
+Eine statische App in `rebase.json` ohne Build-Schritt (kein `build` und `output` entspricht ihrem `root`, wie etwa eine reine HTML-Website) wird vom Backend aus diesem Verzeichnis unter ihrem `path` bereitgestellt, genau wie `rebase start` sie aus dem Bundle bereitstellt. `FRONTEND_URL` wird darauf gesetzt (auf den Port des Backends), damit per E-Mail versendete Links dort landen. Ihre [`redirects` und `cleanUrls`](/docs/architecture/redirects-and-clean-urls/) werden ebenfalls bereitgestellt, und eine App, die Weiterleitungen deklariert, benötigt keine `index.html`. Eine App mit Build-Schritt läuft in Vite auf ihrem eigenen Port, und `FRONTEND_URL` ist der von Vite.
 
 Eine Bearbeitung von `.env` startet das Backend neu, welches die Datei erneut einliest, ebenso wie das Admin-Panel. Was `rebase dev` selbst setzt, bleibt bis zu einem Neustart erhalten: `PORT` und `DATABASE_URL`, wenn es sich um die verwaltete Datenbank oder Docker handelt.
 
