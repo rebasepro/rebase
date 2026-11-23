@@ -662,14 +662,6 @@ jobs:
           fi
           echo "✅ All packages clean — safe to publish."
 
-      # ── Publish ─────────────────────────────────────────────
-      # No NODE_AUTH_TOKEN — see the canary job's publish step.
-      - name: Publish to npm
-        if: ${{ !inputs.dry_run }}
-        run: |
-          # No `--filter` — see the canary job's publish step.
-          pnpm -r publish --no-git-checks --access public --report-summary
-
       - name: Commit version bump, tag, and push
         id: bump
         if: ${{ !inputs.dry_run }}
@@ -695,6 +687,20 @@ jobs:
           # is this one — the one `v$VERSION` points at — and not
           # `github.sha`, which is the checkout from before the bump.
           echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      # ── Publish ─────────────────────────────────────────────
+      # No NODE_AUTH_TOKEN — see the canary job's publish step.
+      #
+      # AFTER the bump push, never before. On 2026-11-23 npm went first: main
+      # moved during the run, the atomic push was refused, and 0.35.0 was
+      # already on npm — built from a commit main never tagged, missing the
+      # commits that had just landed. With the push first, a moved main stops
+      # the run before anything is published, and the release simply runs again.
+      - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
+        run: |
+          # No `--filter` — see the canary job's publish step.
+          pnpm -r publish --no-git-checks --access public --report-summary
 
       # ── Self-host runtime image ─────────────────────────────
       #

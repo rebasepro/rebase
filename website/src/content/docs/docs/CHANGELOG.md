@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.35.1] - 2026-11-23
+
 ### Changed
 
 - **A runtime needs a quarter of the heap to boot.** Node's ESM loader re-reads and re-parses the nearest `package.json` for every `.js` file it resolves, all of its `exports` included, and drizzle-orm's is 177 KB across some two hundred files: 326 MB of the 409 MB a boot allocated was that parse. It was all garbage, but the heap grew to about 280 MB committed to hold it while keeping 35 MB, and a pod's memory limit had to allow for that peak at every start. The runtime image's entrypoint, `rebase-server` and `runFromBundle` now install a resolve hook first (`@rebasepro/server/esm-resolve-cache`) that answers those lookups from a per-package cache and returns the URL and format Node would. Booting the example app, the heap peaks at about 70 MB committed instead of 280 MB, resident memory in the seconds after boot is about 145 MB instead of 300 MB, and boot takes about 0.7 s instead of 1.1 s. A process started with `--preserve-symlinks` is left on Node's resolver.

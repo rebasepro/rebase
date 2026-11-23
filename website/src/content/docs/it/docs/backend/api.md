@@ -1,5 +1,5 @@
 ---
-sourceHash: 009626aee0f3e697
+sourceHash: 621ab8c5f03927d7
 title: REST API
 sidebar_label: REST API
 description: Endpoint API REST generati automaticamente per ogni tabella, con filtri, ordinamento, paginazione e inclusione delle relazioni.
@@ -374,7 +374,7 @@ GET /api/meta/contract
 ```
 
 ```json
-{ "schemaVersion": "v2:…", "runtime": { "version": "0.35.0", "contract": 2 }, "tables": [ … ] }
+{ "schemaVersion": "v2:…", "runtime": { "version": "0.35.1", "contract": 2 }, "tables": [ … ] }
 ```
 
 Richiede lo scope **`schema:read`**, posseduto dagli amministratori, e nelle installazioni prive di autenticazione configurata non viene fornito affatto (404 `CONTRACT_UNAVAILABLE`) per evitare di esporre lo schema pubblicamente. Dalla versione 0.31 le versioni dello schema iniziano con `v2:`: essendo calcolate a partire dalle tabelle compilate, la versione di ogni progetto è cambiata una volta. L'endpoint correlato restituisce una stringa di versione che identifica lo schema senza descriverlo, ed è accessibile senza alcuna credenziale — ideale per il polling da parte dei job di CI:
