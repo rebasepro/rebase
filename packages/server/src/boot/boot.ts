@@ -726,7 +726,10 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
                 // so the "/"-rooted app's catch-all would otherwise answer a
                 // verifier's fetch with index.html — a 200 of HTML, which
                 // reads as "this issuer has no keys" rather than as a routing
-                // mistake.
+                // mistake. The app at "/" still answers `/.well-known/<name>`
+                // from its build's `.well-known/` directory (App Links,
+                // Universal Links), with a file or a 404, and never for a name
+                // the backend serves; see `wellKnownFileName` in serve-spa.
                 excludePaths: [
                     "/health",
                     "/livez",

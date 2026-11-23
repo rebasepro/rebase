@@ -171,8 +171,9 @@ export interface StaticAppRequest {
  * `/.git/config` because they are files under the root it was given, and the
  * one thing that distinguishes them from `/assets/app.js` is the leading dot
  * that every convention uses to mean "not content". A build has no legitimate
- * dot-file to serve — `.well-known` is the one exception people reach for, and
- * it is mounted as its own route rather than fished out of the SPA build.
+ * dot-file to serve except under `/.well-known/`, which an app at "/" answers
+ * itself, before this check, with {@link wellKnownFileName} deciding what may
+ * be served from there.
  *
  * **Encoded traversal.** `%2e%2e%2f` decodes to `../` after routing, so a
  * check on the raw path misses it while the file server does not. The path is
@@ -188,6 +189,72 @@ function isForbiddenStaticPath(requestPath: string): boolean {
         return true;
     }
     return decoded.split(/[/\\]/).some(segment => segment.startsWith("."));
+}
+
+/**
+ * The `/.well-known/` names the backend answers, or that something in front of
+ * it does. A build never serves one of them, even in a process where the
+ * backend's own route is not mounted (HMAC tokens publish no JWKS; a split
+ * deployment mounts `auth` and `mcp` in another process). A file in a build
+ * must not be able to publish keys verifiers would trust, or OAuth metadata
+ * that sends clients elsewhere. Matched on the first segment, so everything
+ * beneath one is covered too: RFC 9728's path-suffixed
+ * `oauth-protected-resource/mcp`, and the ACME HTTP-01 tokens under
+ * `acme-challenge/`, which cert-manager's solver answers at the ingress.
+ */
+const BACKEND_WELL_KNOWN_NAMES: ReadonlySet<string> = new Set([
+    "jwks.json",
+    "oauth-protected-resource",
+    "oauth-authorization-server",
+    "openid-configuration",
+    "acme-challenge"
+]);
+
+/**
+ * The path under the build's `.well-known/` directory that a request for
+ * `/.well-known/…` may be answered from, or `null` when it may not be.
+ *
+ * What an app at "/" publishes there is the set of documents a platform
+ * fetches from the origin rather than the app: `assetlinks.json` for Android
+ * App Links, `apple-app-site-association` for iOS Universal Links,
+ * `security.txt`, and the like. The rest of the dot-file rule
+ * ({@link isForbiddenStaticPath}) holds beneath it: no segment after
+ * `.well-known` may start with a dot, none may be empty, and the path is
+ * decoded before it is judged, so `%2e%2e` is `..` here too. A name the backend
+ * answers ({@link BACKEND_WELL_KNOWN_NAMES}) is never the build's.
+ */
+export function wellKnownFileName(requestPath: string): string | null {
+    let decoded: string;
+    try {
+        decoded = decodeURIComponent(requestPath);
+    } catch {
+        return null;
+    }
+    if (decoded.includes("\\") || decoded.includes("\0")) return null;
+    const segments = decoded.split("/");
+    if (segments[0] !== "" || segments[1] !== ".well-known") return null;
+    const rest = segments.slice(2);
+    if (rest.length === 0 || rest.some(segment => segment === "" || segment.startsWith("."))) return null;
+    if (BACKEND_WELL_KNOWN_NAMES.has(rest[0])) return null;
+    return rest.join("/");
+}
+
+/** Under `/.well-known` at all, whether or not {@link wellKnownFileName} would serve it. */
+function isWellKnownPath(requestPath: string): boolean {
+    return requestPath === "/.well-known" || requestPath.startsWith("/.well-known/");
+}
+
+/**
+ * The `Content-Type` of a `.well-known` file. `apple-app-site-association`
+ * has no extension and must still be JSON: Apple's fetcher reads it as such,
+ * and a type sniffed or defaulted to `application/octet-stream` is a common
+ * reason Universal Links never verify. Any other name with no type of its own
+ * is `application/octet-stream`.
+ */
+function wellKnownContentType(fileName: string): string {
+    const baseName = fileName.slice(fileName.lastIndexOf("/") + 1);
+    if (baseName === "apple-app-site-association" || baseName.endsWith(".json")) return "application/json";
+    return getMimeType(baseName) ?? "application/octet-stream";
 }
 
 /**
@@ -705,11 +772,53 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
     const buildRoot = buildRootOf(frontendPath);
     const precompressed = buildHasPrecompressedFiles(frontendPath);
 
+    /** One file from the build's `.well-known/`; see {@link wellKnownFileName}. */
+    const serveWellKnownFile = async (c: Context, requestPath: string): Promise<Response> => {
+        const name = c.req.method === "GET" || c.req.method === "HEAD" ? wellKnownFileName(requestPath) : null;
+        if (name === null) return c.text("Not found", 404);
+        const relative = `./.well-known/${name}`;
+        const target = path.join(frontendPath, relative);
+        // A directory is not a document, and `.well-known/` has no index.
+        const isFile = await fsp.stat(target).then(stats => stats.isFile(), () => false);
+        if (!isFile) return c.text("Not found", 404);
+        if (!await resolvesInsideBuild(buildRoot, frontendPath, relative)) {
+            logger.warn(
+                `[static] Refused ${c.req.path}: it resolves outside the build directory ` +
+                `(${frontendPath}). A symlink in a build is a way out of it.`
+            );
+            return c.text("Not found", 404);
+        }
+        const file = await statStaticFile(target);
+        if (!file) return c.text("Not found", 404);
+        // Not content-hashed, and a platform caches what it verified against:
+        // revalidate, so a changed fingerprint is seen on the next fetch.
+        c.header("Cache-Control", REVALIDATE_CACHE);
+        if (isNotModified(c, file.etag, file.mtimeMs)) return notModified(c, file);
+        const contents = new Uint8Array(await fsp.readFile(target));
+        return c.body(contents, 200, {
+            "Content-Type": wellKnownContentType(name),
+            "Content-Length": String(contents.byteLength),
+            ETag: file.etag,
+            "Last-Modified": file.lastModified
+        });
+    };
+
     // Before `serveStatic`, because it is what `serveStatic` will otherwise
     // answer. See {@link isForbiddenStaticPath} and {@link resolvesInsideBuild}.
     app.use(scope, async (c, next) => {
         if (declines(c)) return next();
         const requestPath = isRoot ? c.req.path : (c.req.path.slice(basePath.length) || "/");
+
+        // `/.well-known/…` is the origin's, so only the app at "/" answers it,
+        // from its build's `.well-known/` directory, with a real file or a 404:
+        // never the SPA fallback, never another dot path, and never a name the
+        // backend answers. The backend's own documents are routes registered
+        // before any static app, so they have answered already where they are
+        // mounted. An app under a prefix gets no exception: `/admin/.well-known`
+        // is not a URL anything fetches, and stays a dot path like any other.
+        if (isRoot && isWellKnownPath(requestPath)) {
+            return serveWellKnownFile(c, requestPath);
+        }
 
         if (isForbiddenStaticPath(requestPath)) {
             return c.text("Not found", 404);

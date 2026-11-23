@@ -370,6 +370,50 @@ including to another domain) and `cleanUrls: true` (`/x` serves `x.html`). See
 [Redirects and clean URLs](/docs/architecture/redirects-and-clean-urls/), which
 also maps a `vercel.json` onto `rebase.json`.
 
+## App Links, Universal Links and other `/.well-known` files
+
+<span class="since-badge" data-since="0.35">Since 0.35</span>
+
+Android App Links and iOS Universal Links are verified by fetching a file from
+the site's origin: `https://<host>/.well-known/assetlinks.json` and
+`https://<host>/.well-known/apple-app-site-association`. Until a platform can
+fetch it, a tapped or scanned link opens in the browser instead of the
+installed app. Put the files in the build's `.well-known/` folder (with Vite,
+`public/.well-known/`) and the app at `/` serves them:
+
+```text
+site/dist/
+  index.html
+  .well-known/
+    assetlinks.json
+    apple-app-site-association
+```
+
+- **A file or a 404.** `/.well-known/<name>` answers with that file of the
+  build, or 404 when the build has none, never the app's `index.html` and never
+  a redirect. Files ending in `.json` and the extensionless
+  `apple-app-site-association` are sent as `application/json`; others by their
+  extension (`security.txt` as `text/plain`). Each carries an `ETag` and
+  `Cache-Control: no-cache`.
+- **The backend's documents win.** `jwks.json`, `oauth-protected-resource`,
+  `oauth-authorization-server`, `openid-configuration` and `acme-challenge/`
+  are never served from a build, even in a process where the backend does not
+  serve them itself, so a build cannot publish signing keys or OAuth metadata.
+- **No other dot-file.** A segment starting with `.` beneath `.well-known`
+  (`/.well-known/.secret`), and every other dot path (`/.env`, `/.git/config`),
+  are still refused, encoded or not, and a file that is a symlink out of the
+  build is not served.
+- **Only the app at `/`.** `/.well-known` belongs to the origin, so an app
+  under a path (`/admin`) publishes nothing from its `.well-known/` folder. With
+  [apps on their own hostnames](#an-app-on-its-own-hostname), each hostname's
+  app at `/` serves its own, so `admin.example.com` and `www.example.com` can
+  publish different files.
+
+The files are served by the backend process the app is folded into
+(`rebase start`, a self-hosted or Cloud deployment), as the rest of the build
+is. A route's path cannot be under `/.well-known`; to generate one of these
+documents, write it into the build.
+
 ## Building and deploying apps
 
 ```bash

@@ -535,7 +535,7 @@ export function validateStaticRoute(value: unknown, appPath: string): StaticRout
         return { ok: false, field: "path", reason: "must have no empty segment and no trailing slash" };
     }
     if (prefix.split("/").some(segment => segment.startsWith("."))) {
-        return { ok: false, field: "path", reason: 'must have no segment starting with "." — the backend serves /.well-known, and an app serves no dot-file' };
+        return { ok: false, field: "path", reason: 'must have no segment starting with "." — an app serves no dot-file; for /.well-known, put the file in the .well-known/ folder of the build and the app at "/" serves it' };
     }
     const reserved = reservedPrefixFor(prefix);
     if (reserved) {
@@ -632,7 +632,7 @@ function parseRedirectFrom(from: string): { ok: true; segments: RedirectSegment[
             continue;
         }
         if (part.startsWith(".")) {
-            return { ok: false, reason: 'must have no segment starting with "." — the backend serves /.well-known, and an app serves no dot-file' };
+            return { ok: false, reason: 'must have no segment starting with "." — an app serves no dot-file; for /.well-known, put the file in the .well-known/ folder of the build and the app at "/" serves it' };
         }
         if (REDIRECT_LITERAL_FORBIDDEN.test(part)) {
             return {
