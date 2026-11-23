@@ -148,8 +148,12 @@ export function describePending(open: MaintenanceBatch | null | undefined): stri
     return `${open.summary} — applies ${when}`;
 }
 
-/** How long a database restart takes, and what clients see: the control plane's measured bound. */
-export const DATABASE_RESTART_IMPACT = "about 30 seconds to 3 minutes; connections are dropped and reconnect";
+/**
+ * How long a database restart takes, and what clients see: the control plane's measured bound
+ * (3 min 15 s and 7 min 35 s for single-instance resizes on 2026-11-23, first refused connection
+ * to first healthy answer).
+ */
+export const DATABASE_RESTART_IMPACT = "usually 3 to 8 minutes; the app answers with an error until it is back";
 
 /** What `compute set` and `compute apply` say before they restart the database. */
 export const DATABASE_RESTART_NOTICE = `The database restarts to apply it (${DATABASE_RESTART_IMPACT}).`;

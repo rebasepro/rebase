@@ -1275,8 +1275,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         summary:
             "Apply again a database size change that was confirmed and has not finished: one whose restart failed "
             + "or never started. It sends the consent alone (`acknowledgeDatabaseRestart`), and the control plane "
-            + "applies the size the dials already ask for. The database restarts (about 30 seconds to 3 minutes; "
-            + "connections are dropped and reconnect), then the app.",
+            + "applies the size the dials already ask for. The database restarts (usually 3 to 8 minutes, "
+            + "and the app answers with an error until it is back), then the app.",
         flags: [],
         examples: ["rebase cloud compute apply", "rebase cloud compute apply --yes --json"],
         notes: [
@@ -1348,7 +1348,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "It asks before changing anything, with the €/month the control plane quotes for the new dials beside what it quotes now. "
                 + "`--yes`, the global flag listed below, skips the question, and is required off a terminal.",
             "Applied immediately: the app rolls its pods and the subscription is prorated from today. A database change applies now; billed at the current size until it is running.",
-            "A new database CPU or memory, or fewer database instances, restarts the database (about 30 seconds to 3 minutes; connections are dropped and reconnect). "
+            "A new database CPU or memory, or fewer database instances, restarts the database (usually 3 to 8 minutes; the app answers with an error until it is back). "
                 + "The question says so, and a yes is sent as `acknowledgeDatabaseRestart` on the same change; off a terminal `--yes` is that consent. "
                 + "Without it the control plane saves nothing (409 `database_restart_unconfirmed`).",
             "On Belgium (europe-west1) the default reserves 100m CPU and 384Mi and can burst to 2 CPU and 2 GiB; in Falkenstein and Helsinki memory may stretch to 1.4× the request and CPU to 10× (at most 1.7 vCPU). `rebase cloud compute` shows your project's numbers.",
