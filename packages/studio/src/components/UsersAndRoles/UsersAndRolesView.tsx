@@ -356,12 +356,12 @@ export function UsersAndRolesView() {
                         </IconButton>
                     </Tooltip>
                     {tab === "users" ? (
-                        <Button size="small" variant="filled" onClick={openCreateUser}>
+                        <Button size="small" color="primary" variant="filled" onClick={openCreateUser}>
                             <PlusIcon size={iconSize.small} />
                             {t("create_user")}
                         </Button>
                     ) : (
-                        <Button size="small" variant="filled" onClick={openCreateRole}>
+                        <Button size="small" color="primary" variant="filled" onClick={openCreateRole}>
                             <PlusIcon size={iconSize.small} />
                             {t("studio_users_new_role")}
                         </Button>
@@ -373,13 +373,13 @@ export function UsersAndRolesView() {
                 value={tab}
                 onValueChange={(v) => { if (v === "users" || v === "roles") setTab(v); }}
                 variant="boxy"
-                className="border-b border-hairline px-4"
+                className="border-b border-hairline px-4 bg-surface-sheet shrink-0"
             >
                 <Tab value="users">{t("studio_users_tab_users", { count: users.length })}</Tab>
                 <Tab value="roles">{t("studio_users_tab_roles", { count: roles.length })}</Tab>
             </Tabs>
 
-            <div className="flex-1 overflow-auto p-5">
+            <div className="flex-1 overflow-auto p-5 bg-surface-card">
                 {tab === "users" && (
                     <div className="flex flex-col gap-4">
                         <div className="max-w-sm">

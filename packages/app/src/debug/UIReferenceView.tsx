@@ -573,8 +573,8 @@ export function UIReferenceView() {
                         {/* Boxy variant — exact pattern from SQLEditorSidebar, JSEditorSidebar, RLSEditor */}
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">variant=&quot;boxy&quot; (Editor Standard)</Typography>
-                            <div className={cls("border rounded-lg overflow-hidden w-[320px]", defaultBorderMixin)}>
-                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-hairline">
+                            <div className={cls("border rounded-lg overflow-hidden w-[320px] bg-surface-card", defaultBorderMixin)}>
+                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-hairline px-2 bg-surface-sheet">
                                     <Tab value="schema">Schema</Tab>
                                     <Tab value="snippets">Snippets</Tab>
                                     <Tab value="history">History</Tab>
@@ -595,7 +595,7 @@ export function UIReferenceView() {
                         {/* Toolbar tabs — from SQLEditor/JSEditor main toolbar */}
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Toolbar Tabs (boxy, inline with controls)</Typography>
-                            <div className={cls("border rounded-lg overflow-hidden flex items-center justify-between pr-2 bg-surface-card", defaultBorderMixin)}>
+                            <div className={cls("border rounded-lg overflow-hidden flex items-center justify-between pl-2 pr-2 bg-surface-sheet", defaultBorderMixin)}>
                                 <div className="flex items-center">
                                     <Tabs value="query1" onValueChange={() => {}} variant="boxy" className="w-[unset] flex-shrink-0">
                                         <Tab value="query1" className="flex items-center gap-1.5">
@@ -635,8 +635,8 @@ export function UIReferenceView() {
                         {/* SQL Editor Sidebar replica */}
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-1">SQL Editor Sidebar</Typography>
-                            <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden", defaultBorderMixin)}>
-                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-hairline">
+                            <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden bg-surface-card", defaultBorderMixin)}>
+                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-hairline px-2 bg-surface-sheet">
                                     <Tab value="schema">Schema</Tab>
                                     <Tab value="snippets">Snippets</Tab>
                                     <Tab value="history">History</Tab>
@@ -670,8 +670,8 @@ export function UIReferenceView() {
                         {/* RLS Editor Sidebar replica */}
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-1">RLS Editor Sidebar</Typography>
-                            <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden", defaultBorderMixin)}>
-                                <Tabs value="tables" onValueChange={() => {}} variant="boxy" className="border-b border-hairline">
+                            <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden bg-surface-card", defaultBorderMixin)}>
+                                <Tabs value="tables" onValueChange={() => {}} variant="boxy" className="border-b border-hairline px-2 bg-surface-sheet">
                                     <Tab value="tables">Tables</Tab>
                                     <Tab value="info">Info</Tab>
                                 </Tabs>

@@ -173,7 +173,7 @@ icon }}
             </div>
 
             {/* ── Columns ── */}
-            <div className="divide-y divide-surface-100 dark:divide-surface-950/60">
+            <div className="divide-y divide-hairline">
                 {(columns as ColumnInfo[]).map((col: ColumnInfo) => (
                     <div
                         key={col.name}

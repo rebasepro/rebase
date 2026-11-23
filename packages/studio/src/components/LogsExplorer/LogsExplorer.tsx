@@ -120,7 +120,7 @@ export function LogsExplorer() {
     }, [logs, autoScroll]);
 
     return (
-        <div className="flex flex-col h-[calc(100vh-64px)] w-full bg-surface-sheet">
+        <div className="flex flex-col h-full w-full bg-surface-sheet">
             {/* Toolbar */}
             <div className={cls(
                 "flex gap-2 p-3 border-b items-center flex-wrap shrink-0 bg-surface-sheet",

@@ -208,10 +208,21 @@ export class HistoryService {
         // Non-blocking prune for this specific row. Outside the try, and
         // deliberately not awaited: a prune that fails leaves *extra* history,
         // which is not a loss and is fixed by the next write to this row.
+        // Deferred until after commit when inside a write transaction so it
+        // never races the commit or runs on a single-connection DB (e.g. PGlite)
+        // while `SET LOCAL ROLE rebase_user` is still active.
         if (!this.pruneOnRecord) return;
-        this.pruneEntity(tableName, id).catch(err =>
-            logger.error("History prune failed", { error: err })
-        );
+        const runPrune = () => {
+            this.pruneEntity(tableName, id).catch(err =>
+                logger.error("History prune failed", { error: err })
+            );
+        };
+        const scope = currentWriteScope();
+        if (scope) {
+            scope.afterCommit(runPrune);
+        } else {
+            runPrune();
+        }
     }
 
     /**

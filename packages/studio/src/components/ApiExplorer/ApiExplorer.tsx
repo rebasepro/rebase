@@ -187,28 +187,27 @@ allEndpoints: [] };
                 )}
             >
                 {/* Header */}
-                <div className="p-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                        <BookOpenIcon size={iconSize.medium} className="text-primary dark:text-primary-dark" />
-                        <Typography variant="subtitle2" className="font-semibold">
+                <div className={cls("h-12 px-4 border-b bg-surface-sheet flex items-center justify-between gap-2 shrink-0", defaultBorderMixin)}>
+                    <div className="flex items-center gap-2 min-w-0">
+                        <BookOpenIcon size={iconSize.medium} className="text-primary dark:text-primary-dark shrink-0" />
+                        <Typography variant="subtitle2" className="font-semibold truncate">
                             {spec.info?.title ?? "API Reference"}
                         </Typography>
                     </div>
                     {spec.info?.version && (
-                        <Chip size="smallest" colorScheme="cyanDarker">
+                        <Chip size="smallest" colorScheme="cyanDarker" className="shrink-0">
                             v{spec.info.version}
                         </Chip>
                     )}
-                    {/* Search */}
-                    <div className="mb-2">
-                        <SearchBar
-                            placeholder="Filter endpoints…"
-                            size="small"
-                            onTextSearch={(val) => setSidebarFilter(val ?? "")}
-                        />
-                    </div>
+                </div>
 
-                    {/* Auth status removed to avoid redundancy with the AuthSimulationSelector */}
+                {/* Search */}
+                <div className={cls("p-2 border-b shrink-0", defaultBorderMixin)}>
+                    <SearchBar
+                        placeholder="Filter endpoints…"
+                        size="small"
+                        onTextSearch={(val) => setSidebarFilter(val ?? "")}
+                    />
                 </div>
 
                 {/* Endpoint list */}
@@ -272,7 +271,7 @@ allEndpoints: [] };
                         {/* Top bar */}
                         <div
                             className={cls(
-                                "flex items-center justify-between px-5 py-3 gap-4 shrink-0 border-b z-10",
+                                "flex items-center justify-between px-5 h-12 gap-4 shrink-0 border-b z-10",
                                 defaultBorderMixin,
                                 "bg-surface-sheet/90 backdrop-blur-md sticky top-0"
                             )}

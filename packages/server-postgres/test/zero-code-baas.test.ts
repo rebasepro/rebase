@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "@jest/globals";
 import { createServer } from "node:http";
 import { Hono } from "hono";
 import { PGlite } from "@electric-sql/pglite";
-import type { SQLAdmin, TableDescriptor } from "@rebasepro/types";
+import { isSQLAdmin, type SQLAdmin, type TableDescriptor } from "@rebasepro/types";
 import type { HonoEnv } from "../../server/src/api/types";
 import {
     createZeroCodeBundle,
@@ -30,6 +30,7 @@ import {
     createCronJobsStore
 } from "../../server/src/baas";
 import { createPostgresAdapter } from "../src/PostgresAdapter";
+import { openPostgresDriver } from "../src/PostgresBootstrapper";
 import { introspectTables } from "../src/schema/introspect-tables";
 import { applyTableMetaOverlays, readTableMetaOverlays } from "../src/schema/table-meta-overlay";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
@@ -489,6 +490,14 @@ describe("Zero-code BaaS foundation (PGlite)", () => {
             const patchedRow = await patchRowRes.json() as { priority: number };
             expect(patchedRow.priority).toBe(9);
 
+            // 6b. Per-table history enabled via `rebase.table_meta` records create + update automatically
+            const historyRes = await app.request(`/api/data/tasks/${rowId}/history`, {
+                headers: authHeaders
+            });
+            expect(historyRes.status).toBe(200);
+            const historyBody = await historyRes.json() as { data: Array<{ action: string }> };
+            expect(historyBody.data.map(h => h.action)).toEqual(expect.arrayContaining(["create", "update"]));
+
             // 7. Create a default signup role in `rebase.roles` via POST /api/admin/roles and verify GET /api/admin/roles is not shadowed
             const createRoleRes = await app.request("/api/admin/roles", {
                 method: "POST",
@@ -614,6 +623,119 @@ describe("Zero-code BaaS foundation (PGlite)", () => {
             await e2eDb.close();
             if (prevJwtSecret === undefined) delete process.env.JWT_SECRET;
             else process.env.JWT_SECRET = prevJwtSecret;
+        }
+    });
+
+    it("executes multi-statement DDL atomically via PostgresBackendDriver.admin.executeSqlTransaction and rolls back on failure", async () => {
+        const txDb = new PGlite();
+        await txDb.waitReady;
+        try {
+            const opened = await openPostgresDriver(
+                { connection: pgliteNodePg(txDb), rls: { grants: "managed" } },
+                { introspectCollections: true, provision: true, realtime: false }
+            );
+            const sqlAdmin = opened.driver.admin;
+            expect(isSQLAdmin(sqlAdmin)).toBe(true);
+            if (!isSQLAdmin(sqlAdmin) || !sqlAdmin.executeSqlTransaction) {
+                throw new Error("Expected SQLAdmin with executeSqlTransaction");
+            }
+
+            // Failing second statement must roll back the first CREATE TABLE
+            await expect(sqlAdmin.executeSqlTransaction([
+                `CREATE TABLE "public"."atomic_rollback_test" ("id" integer PRIMARY KEY)`,
+                `ALTER TABLE "public"."does_not_exist" ADD COLUMN "x" text`
+            ])).rejects.toThrow();
+
+            const afterRollback = await txDb.query<{ table_name: string }>(
+                `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'atomic_rollback_test'`
+            );
+            expect(afterRollback.rows).toHaveLength(0);
+
+            // Succeeding batch commits all statements together
+            await sqlAdmin.executeSqlTransaction([
+                `CREATE TABLE "public"."atomic_commit_test" ("id" integer PRIMARY KEY, "name" text NOT NULL)`,
+                `ALTER TABLE "public"."atomic_commit_test" ENABLE ROW LEVEL SECURITY`
+            ]);
+            const afterCommit = await txDb.query<{ relrowsecurity: boolean }>(
+                `SELECT c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relname = 'atomic_commit_test'`
+            );
+            expect(afterCommit.rows[0]?.relrowsecurity).toBe(true);
+        } finally {
+            await txDb.close();
+        }
+    });
+
+    it("fires passive TableMutationListener on insert, update, and hard delete for watched tables and skips unwatched tables", async () => {
+        const hookDb = new PGlite();
+        await hookDb.waitReady;
+        try {
+            for (const statement of RLS_BOOTSTRAP_STATEMENTS) await hookDb.exec(statement);
+            await hookDb.exec(`
+                CREATE TABLE "public"."watched_items" (
+                    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                    "label" text NOT NULL
+                );
+                ALTER TABLE "public"."watched_items" ENABLE ROW LEVEL SECURITY;
+                CREATE POLICY "watched_all" ON "public"."watched_items" FOR ALL USING (true) WITH CHECK (true);
+
+                CREATE TABLE "public"."unwatched_items" (
+                    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                    "label" text NOT NULL
+                );
+                ALTER TABLE "public"."unwatched_items" ENABLE ROW LEVEL SECURITY;
+                CREATE POLICY "unwatched_all" ON "public"."unwatched_items" FOR ALL USING (true) WITH CHECK (true);
+            `);
+
+            const opened = await openPostgresDriver(
+                { connection: pgliteNodePg(hookDb), rls: { grants: "managed" } },
+                { introspectCollections: true, provision: true, realtime: false }
+            );
+
+            const events: Array<{ op: string; slug: string; id: string; label?: unknown }> = [];
+            opened.tableRegistry?.addMutationListener?.({
+                watches: (slug) => slug === "watched_items",
+                afterSave: async ({ table, status, id, values }) => {
+                    events.push({ op: status === "existing" ? "UPDATE" : "INSERT", slug: table.slug, id: String(id), label: values.label });
+                },
+                afterDelete: async ({ table, id, values }) => {
+                    events.push({ op: "DELETE", slug: table.slug, id: String(id), label: values.label });
+                }
+            });
+
+            // Insert, update, and hard delete on watched_items
+            const created = await opened.driver.save({
+                path: "watched_items",
+                values: { label: "v1" },
+                status: "new"
+            });
+            const watchedId = String(created.id);
+            const updated = await opened.driver.save({
+                path: "watched_items",
+                id: watchedId,
+                values: { label: "v2" },
+                status: "existing"
+            });
+            await opened.driver.delete({
+                row: { id: watchedId, path: "watched_items" }
+            });
+
+            // Insert and hard delete on unwatched_items -> listener must NOT fire
+            const unwatched = await opened.driver.save({
+                path: "unwatched_items",
+                values: { label: "ignored" },
+                status: "new"
+            });
+            await opened.driver.delete({
+                row: { id: String(unwatched.id), path: "unwatched_items" }
+            });
+
+            expect(events).toEqual([
+                { op: "INSERT", slug: "watched_items", id: watchedId, label: "v1" },
+                { op: "UPDATE", slug: "watched_items", id: watchedId, label: "v2" },
+                { op: "DELETE", slug: "watched_items", id: watchedId, label: "v2" }
+            ]);
+        } finally {
+            await hookDb.close();
         }
     });
 });

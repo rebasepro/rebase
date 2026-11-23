@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const snackbarOpen = jest.fn();
 
@@ -82,12 +82,33 @@ function fakeResponse(body: unknown, status = 200) {
     };
 }
 
-function installFetch(handler: (url: string) => ReturnType<typeof fakeResponse>) {
+interface RecordedRequest {
+    url: string;
+    method: string;
+    body: unknown;
+}
+
+function installFetch(handler: (url: string, init?: RequestInit) => ReturnType<typeof fakeResponse>) {
+    const calls: RecordedRequest[] = [];
     Object.defineProperty(globalThis, "fetch", {
         configurable: true,
         writable: true,
-        value: async (input: RequestInfo | URL) => handler(String(input))
+        value: async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url = String(input);
+            const method = (init?.method ?? "GET").toUpperCase();
+            let body: unknown = undefined;
+            if (typeof init?.body === "string") {
+                try {
+                    body = JSON.parse(init.body);
+                } catch {
+                    body = init.body;
+                }
+            }
+            calls.push({ url, method, body });
+            return handler(url, init);
+        }
     });
+    return calls;
 }
 
 describe("Zero-code Studio console views", () => {
@@ -264,5 +285,149 @@ describe("Zero-code Studio console views", () => {
 
         expect(await screen.findByText("admin@rebase.pro")).toBeTruthy();
         expect(await screen.findByText("Admin User")).toBeTruthy();
+    });
+
+    it("DirectRlsPoliciesPanel submits explicit operation + using/withCheck to POST /api/admin/db/tables/:table/policies", async () => {
+        const calls = installFetch((url, init) => {
+            if (url.endsWith("/api/admin/db/tables")) {
+                return fakeResponse({
+                    tables: [
+                        {
+                            schema: "public",
+                            name: "orders",
+                            rlsEnabled: true,
+                            policies: []
+                        }
+                    ]
+                });
+            }
+            if (url.endsWith("/api/admin/db/tables/orders/policies") && init?.method === "POST") {
+                return fakeResponse({ ok: true }, 201);
+            }
+            return fakeResponse({});
+        });
+
+        render(<DirectRlsPoliciesPanel />);
+        await screen.findByText("public.orders");
+
+        // Open create policy dialog and click the Admin full access template
+        const createButtons = screen.getAllByRole("button", { name: /studio_rls_create_policy|New policy/i });
+        fireEvent.click(createButtons[0]);
+
+        const nameInput = screen.getByLabelText("studio_policy_name");
+        fireEvent.change(nameInput, { target: { value: "orders_admin_all" } });
+        const usingInput = screen.getByLabelText("studio_policy_using_expr");
+        fireEvent.change(usingInput, { target: { value: "'admin' = ANY(string_to_array(rebase.roles(), ','))" } });
+
+        const submitBtn = screen.getAllByRole("button", { name: "studio_rls_create_policy" }).at(-1)!;
+        fireEvent.click(submitBtn);
+
+        await waitFor(() => {
+            const post = calls.find(c => c.method === "POST" && c.url.endsWith("/api/admin/db/tables/orders/policies"));
+            expect(post).toBeDefined();
+            expect(post?.body).toMatchObject({
+                name: "orders_admin_all",
+                operation: "ALL",
+                using: "'admin' = ANY(string_to_array(rebase.roles(), ','))"
+            });
+        });
+    });
+
+    it("StoragePoliciesPanel submits policy name, pathPattern, operations, and rule to POST /api/admin/storage/policies", async () => {
+        const calls = installFetch((url, init) => {
+            if (url.endsWith("/api/admin/storage/policies") && (!init?.method || init.method === "GET")) {
+                return fakeResponse({ policies: [] });
+            }
+            if (url.endsWith("/api/admin/storage/policies") && init?.method === "POST") {
+                return fakeResponse({ policy: { id: "sp-new" } }, 201);
+            }
+            return fakeResponse({});
+        });
+
+        render(<StoragePoliciesPanel />);
+        const addBtn = await screen.findByRole("button", { name: "studio_new_policy" });
+        fireEvent.click(addBtn);
+
+        fireEvent.change(screen.getByLabelText("studio_policy_name"), { target: { value: "Private user files" } });
+        fireEvent.change(screen.getByLabelText("studio_storage_policies_path_pattern"), { target: { value: "users/:uid/**" } });
+
+        fireEvent.click(screen.getByRole("button", { name: "studio_policy_save" }));
+
+        await waitFor(() => {
+            const post = calls.find(c => c.method === "POST" && c.url.endsWith("/api/admin/storage/policies"));
+            expect(post).toBeDefined();
+            expect(post?.body).toMatchObject({
+                name: "Private user files",
+                bucket: "default",
+                pathPattern: "users/:uid/**",
+                enabled: true
+            });
+        });
+    });
+
+    it("WebhooksView submits POST /api/admin/webhooks with table + events + url", async () => {
+        const calls = installFetch((url, init) => {
+            if (url.endsWith("/api/admin/webhooks") && (!init?.method || init.method === "GET")) {
+                return fakeResponse({ webhooks: [] });
+            }
+            if (url.endsWith("/api/admin/webhooks") && init?.method === "POST") {
+                return fakeResponse({ webhook: { id: "wh-new" } }, 201);
+            }
+            return fakeResponse({});
+        });
+
+        render(<WebhooksView />);
+        const addButtons = await screen.findAllByRole("button", { name: "studio_webhooks_new" });
+        fireEvent.click(addButtons[0]);
+
+        fireEvent.change(screen.getByLabelText("name"), { target: { value: "Task alerts" } });
+        fireEvent.change(screen.getByLabelText("studio_webhooks_destination_url"), { target: { value: "https://hooks.example.com/tasks" } });
+
+        const saveBtn = screen.getAllByRole("button", { name: "studio_webhooks_create" }).at(-1)!;
+        fireEvent.click(saveBtn);
+
+        await waitFor(() => {
+            const post = calls.find(c => c.method === "POST" && c.url.endsWith("/api/admin/webhooks"));
+            expect(post).toBeDefined();
+            expect(post?.body).toMatchObject({
+                name: "Task alerts",
+                url: "https://hooks.example.com/tasks",
+                events: ["INSERT", "UPDATE", "DELETE"],
+                table: "*",
+                enabled: true
+            });
+        });
+    });
+
+    it("DbCronJobsPanel submits POST /api/admin/cron/jobs with SQL config", async () => {
+        const calls = installFetch((url, init) => {
+            if (url.endsWith("/api/admin/cron/jobs") && (!init?.method || init.method === "GET")) {
+                return fakeResponse({ jobs: [] });
+            }
+            if (url.endsWith("/api/admin/cron/jobs") && init?.method === "POST") {
+                return fakeResponse({ job: { id: "cj-new" } }, 201);
+            }
+            return fakeResponse({});
+        });
+
+        render(<DbCronJobsPanel />);
+        const addBtn = await screen.findByRole("button", { name: "studio_cron_db_new" });
+        fireEvent.click(addBtn);
+
+        fireEvent.change(screen.getByLabelText("studio_cron_db_job_name"), { target: { value: "nightly_cleanup" } });
+        fireEvent.change(screen.getAllByLabelText("studio_cron_db_kind_sql").at(-1)!, { target: { value: "SELECT 1;" } });
+        fireEvent.click(screen.getByRole("button", { name: "studio_cron_db_save" }));
+
+        await waitFor(() => {
+            const post = calls.find(c => c.method === "POST" && c.url.endsWith("/api/admin/cron/jobs"));
+            expect(post).toBeDefined();
+            expect(post?.body).toMatchObject({
+                name: "nightly_cleanup",
+                schedule: "*/5 * * * *",
+                kind: "sql",
+                config: { sql: "SELECT 1;" },
+                enabled: true
+            });
+        });
     });
 });

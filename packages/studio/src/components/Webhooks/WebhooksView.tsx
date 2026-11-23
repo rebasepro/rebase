@@ -262,14 +262,14 @@ export function WebhooksView() {
                             <RefreshCwIcon size={iconSize.small} />
                         </IconButton>
                     </Tooltip>
-                    <Button size="small" variant="filled" onClick={openCreate}>
+                    <Button size="small" color="primary" variant="filled" onClick={openCreate}>
                         <PlusIcon size={iconSize.small} />
                         {t("studio_webhooks_new")}
                     </Button>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-auto p-5 flex flex-col gap-4">
+            <div className="flex-1 overflow-auto p-5 flex flex-col gap-4 bg-surface-card">
                 {error && <Alert color="error">{error}</Alert>}
 
                 {loading ? (

@@ -162,8 +162,8 @@ export function BranchDiffView({ branch, details, onMerged }: BranchDiffViewProp
 
     return (
         <div className="flex flex-col flex-1 min-h-0">
-            <div className="flex items-end justify-between gap-3 px-5 pt-3">
-                <Tabs value={tab} onValueChange={(value) => setTab(value === "data" || value === "details" ? value : "schema")} variant="boxy" className="border-b border-hairline flex-1 min-w-0">
+            <div className="flex items-end justify-between gap-3 px-5 border-b border-hairline bg-surface-sheet shrink-0">
+                <Tabs value={tab} onValueChange={(value) => setTab(value === "data" || value === "details" ? value : "schema")} variant="boxy" className="flex-1 min-w-0">
                     <Tab value="schema" innerClassName="flex items-center gap-1.5">
                         {t("studio_branch_diff_tab_schema")}
                         {diff && diff.schema.length > 0 && <Chip size="smallest">{diff.schema.length}</Chip>}

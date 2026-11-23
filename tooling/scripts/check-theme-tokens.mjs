@@ -42,7 +42,7 @@ const ROOT = path.resolve(import.meta.dirname, "..", "..");
  */
 const ALL_TRACKED = execFileSync("git", ["ls-files"], {
     cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28
-}).trim().split("\n").filter(Boolean);
+}).trim().split("\n").filter((f) => f && fs.existsSync(path.join(ROOT, f)));
 const tracked = (re) => ALL_TRACKED.filter((f) => re.test(f));
 
 /** Utility prefixes that take a colour. */

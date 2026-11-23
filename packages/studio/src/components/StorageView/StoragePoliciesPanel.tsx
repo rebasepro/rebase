@@ -244,7 +244,7 @@ export function StoragePoliciesPanel() {
     };
 
     return (
-        <div className="flex flex-col gap-4 p-5 h-full overflow-auto">
+        <div className="flex flex-col gap-4 p-5 h-full overflow-auto bg-surface-card">
             <div className="flex items-center justify-between gap-4">
                 <div>
                     <Typography variant="subtitle1" className="font-semibold">
@@ -260,7 +260,7 @@ export function StoragePoliciesPanel() {
                             <RefreshCwIcon size={iconSize.small} />
                         </IconButton>
                     </Tooltip>
-                    <Button size="small" variant="filled" onClick={openCreate}>
+                    <Button size="small" color="primary" variant="filled" onClick={openCreate}>
                         <PlusIcon size={iconSize.small} />
                         {t("studio_new_policy")}
                     </Button>

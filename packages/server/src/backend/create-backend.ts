@@ -1262,10 +1262,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     });
 
     let historyConfigResult: { historyService: HistoryService } | undefined = undefined;
-    if (config.history) {
+    // Zero-code BaaS mode can enable per-table history dynamically via `rebase.table_meta`,
+    // so initialize history by default unless the caller explicitly turned it off (`history: false`).
+    const effectiveHistory = config.history ?? (introspectCollections && defaultBootstrapper.initializeHistory ? true : undefined);
+    if (effectiveHistory) {
         if (defaultBootstrapper.initializeHistory) {
             logger.debug("Bootstrapping entity history via driver protocol");
-            historyConfigResult = await defaultBootstrapper.initializeHistory(config.history, defaultDriverResult) as { historyService: HistoryService } | undefined;
+            historyConfigResult = await defaultBootstrapper.initializeHistory(effectiveHistory, defaultDriverResult) as { historyService: HistoryService } | undefined;
 
             // Inject the historyService into the driver so save/delete can record history.
             // The driver was created during initializeDriver() (before history was initialized),
@@ -4857,7 +4860,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let authTokenSweep: { stop(): Promise<void> | void } | undefined;
     let historyRetentionSweep: { stop(): Promise<void> | void } | undefined;
     let stopSchemaChangeListener: (() => Promise<void>) | undefined;
+    let schemaChangeListenPending: Promise<void> | undefined;
     let schemaChangeDebounce: ReturnType<typeof setTimeout> | undefined;
+    let shuttingDown = false;
 
     const start = (): void => {
         // A process that only runs timers — a `worker` — serves too.
@@ -4956,28 +4961,37 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             || (cronJobsStore !== undefined && ownership.cronScheduler);
         if (readsLiveCatalog && baasCatalogReady && defaultSqlAdmin?.listen) {
             const scheduleReload = () => {
+                if (shuttingDown) return;
                 if (schemaChangeDebounce) clearTimeout(schemaChangeDebounce);
                 schemaChangeDebounce = setTimeout(() => {
                     schemaChangeDebounce = undefined;
+                    if (shuttingDown) return;
                     const task = introspectCollections ? reloadSchema() : reloadCatalogStores();
                     void task.catch((err) => {
+                        if (shuttingDown) return;
                         logger.warn("[baas] Auto reload failed after LISTEN notification", {
                             error: err instanceof Error ? err.message : String(err)
                         });
                     });
                 }, 150);
             };
-            defaultSqlAdmin.listen(SCHEMA_CHANGE_CHANNEL, () => {
+            schemaChangeListenPending = defaultSqlAdmin.listen(SCHEMA_CHANGE_CHANNEL, () => {
                 scheduleReload();
             }, {
                 onReconnect: () => {
                     scheduleReload();
                 }
-            }).then((stop) => {
+            }).then(async (stop) => {
+                if (shuttingDown) {
+                    await stop().catch(() => undefined);
+                    return;
+                }
                 stopSchemaChangeListener = stop;
                 logger.debug(`[baas] Listening on PostgreSQL channel "${SCHEMA_CHANGE_CHANNEL}" for live DDL reloads`);
             }).catch((err: unknown) => {
                 logger.debug(`[baas] Live DDL LISTEN skipped (${err instanceof Error ? err.message : String(err)})`);
+            }).finally(() => {
+                schemaChangeListenPending = undefined;
             });
         }
     };
@@ -4988,9 +5002,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // As this backend: one that never served says nothing at info as it goes.
     const shutdown = (timeoutMs?: number, shutdownOptions: { server?: Server } = {}): Promise<void> =>
         announcements.run(async () => {
+            shuttingDown = true;
             if (schemaChangeDebounce) {
                 clearTimeout(schemaChangeDebounce);
                 schemaChangeDebounce = undefined;
+            }
+            if (schemaChangeListenPending) {
+                await schemaChangeListenPending.catch(() => undefined);
             }
             if (stopSchemaChangeListener) {
                 const stop = stopSchemaChangeListener;
