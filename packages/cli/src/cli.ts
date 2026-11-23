@@ -1,11 +1,12 @@
 import chalk from "chalk";
 import arg from "arg";
 import { errorClass, isEnabled, recordEvent } from "./telemetry";
-import { failAsJson, requireProjectRoot, wantsJsonOutput } from "./utils/project";
+import { failAsJson, findProjectRoot, requireProjectRoot, wantsJsonOutput } from "./utils/project";
 import { parseCommandArgs, UsageError } from "./utils/args";
 import { refuseRemovedCollectionsFlag } from "./utils/path-flags";
 import { unknownCommand } from "./utils/unknown-command";
 import { cliVersion } from "./utils/version";
+import { installReleaseNotice } from "./release-notice";
 import path from "path";
 
 /**
@@ -195,6 +196,14 @@ export async function entry(args: string[]) {
     const subcommand = command === undefined
         ? undefined
         : resolveSubcommand(parsedArgs._.slice(commandAt + 1), (await commandVocabulary(command)).subcommands);
+
+    // "Rebase X is out", printed as the process exits — see release-notice.ts.
+    // A notice is never worth a failed command, so nothing here may throw.
+    try {
+        installReleaseNotice({ command, current: cliVersion(), inProject: findProjectRoot() !== null });
+    } catch {
+        // ignored
+    }
 
     // Show global help only when no command given, or --help with no recognized command
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {

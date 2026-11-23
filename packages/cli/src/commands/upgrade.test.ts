@@ -73,12 +73,19 @@ function project(): void {
     process.chdir(root);
 }
 
-function io(overrides: Partial<UpgradeIo> = {}): UpgradeIo & { npmView: ReturnType<typeof vi.fn>; install: ReturnType<typeof vi.fn> } {
+type FakeIo = UpgradeIo & {
+    npmView: ReturnType<typeof vi.fn>;
+    install: ReturnType<typeof vi.fn>;
+    runProjectCli: ReturnType<typeof vi.fn>;
+};
+
+function io(overrides: Partial<UpgradeIo> = {}): FakeIo {
     return {
         npmView: vi.fn(async () => "0.21.0"),
         install: vi.fn(async () => undefined),
+        runProjectCli: vi.fn(async () => undefined),
         ...overrides
-    } as UpgradeIo & { npmView: ReturnType<typeof vi.fn>; install: ReturnType<typeof vi.fn> };
+    } as FakeIo;
 }
 
 /** Run the command with `line` as the whole of `process.argv`, the way `cli.ts` does. */
@@ -102,7 +109,7 @@ describe("rebase upgrade --json", () => {
         expect(await run(["--to", "0.21.0", "--no-install", "--json"], fake)).toBe(0);
 
         const doc = JSON.parse(stdout.join("\n"));
-        expect(Object.keys(doc)).toEqual(["target", "changed", "skipped", "overrides", "unreadable", "installed", "dryRun", "wouldRefuse"]);
+        expect(Object.keys(doc)).toEqual(["target", "changed", "skipped", "overrides", "unreadable", "installed", "dryRun", "wouldRefuse", "skills"]);
         expect(doc).toMatchObject({ target: "0.21.0", installed: false, dryRun: false, wouldRefuse: null });
         expect(doc.changed).toEqual([
             { file: "backend/package.json", name: "@rebasepro/server", field: "dependencies", from: "^0.19.1", to: "^0.21.0" },
@@ -588,5 +595,118 @@ describe("npmFailure", () => {
 
     it("falls back to the message when npm said nothing", () => {
         expect(npmFailure(new Error("spawn npm ENOENT"))).toBe("spawn npm ENOENT");
+    });
+});
+
+describe("rebase upgrade refreshes the project's agent skills", () => {
+    /** Skills installed for one agent directory, as `rebase skills install` leaves them. */
+    function skillsFor(targetDir: string): void {
+        write(`${targetDir}/.rebase-skills.json`, JSON.stringify({ version: 1, files: {} }) + "\n");
+    }
+
+    /** The project's own `@rebasepro/cli`, as an install leaves it in node_modules. */
+    function projectCli(version = "0.21.0"): string {
+        write("node_modules/@rebasepro/cli/package.json", JSON.stringify({ name: "@rebasepro/cli", version, bin: { rebase: "bin/rebase.js" } }));
+        write("node_modules/@rebasepro/cli/bin/rebase.js", "");
+        return path.join(root, "node_modules/@rebasepro/cli/bin/rebase.js");
+    }
+
+    it("runs the newly installed CLI's `skills install` for every assistant with skills, and reports it", async () => {
+        project();
+        skillsFor(".claude/skills");
+        skillsFor(".cursor/rules");
+        const bin = projectCli();
+        const fake = io();
+
+        expect(await run(["--to", "0.21.0", "--json"], fake)).toBe(0);
+
+        // After the install: the CLI it runs is the one that install put there.
+        expect(fake.install.mock.invocationCallOrder[0]).toBeLessThan(fake.runProjectCli.mock.invocationCallOrder[0]);
+        expect(fake.runProjectCli).toHaveBeenCalledWith(bin, ["skills", "install", "--agent", "cursor,claude"], root, true);
+        expect(JSON.parse(stdout.join("\n")).skills).toEqual({ agents: ["cursor", "claude"], refreshed: true });
+    });
+
+    it("names a shared directory once: Gemini and Codex both read .agents/skills", async () => {
+        project();
+        skillsFor(".agents/skills");
+        projectCli();
+        const fake = io();
+
+        expect(await run(["--to", "0.21.0", "--json"], fake)).toBe(0);
+
+        expect(fake.runProjectCli.mock.calls[0][1]).toEqual(["skills", "install", "--agent", "gemini"]);
+    });
+
+    it("leaves an agent directory no install wrote alone", async () => {
+        project();
+        write(".cursor/settings.json", "{}\n");
+        projectCli();
+        const fake = io();
+
+        expect(await run(["--to", "0.21.0", "--json"], fake)).toBe(0);
+
+        expect(fake.runProjectCli).not.toHaveBeenCalled();
+        expect(JSON.parse(stdout.join("\n")).skills).toBeNull();
+    });
+
+    it("refreshes a project already on the release too", async () => {
+        project();
+        write("package.json", JSON.stringify({ devDependencies: { "@rebasepro/cli": "0.21.0" } }, null, 2) + "\n");
+        write("backend/package.json", JSON.stringify({ dependencies: { "@rebasepro/server": "^0.21.0" } }, null, 2) + "\n");
+        skillsFor(".claude/skills");
+        projectCli();
+        const fake = io();
+
+        expect(await run(["--to", "0.21.0", "--json"], fake)).toBe(0);
+
+        expect(fake.install).not.toHaveBeenCalled();
+        expect(JSON.parse(stdout.join("\n")).skills).toEqual({ agents: ["claude"], refreshed: true });
+    });
+
+    it("does not refresh from the old CLI when the install was skipped, and says what to run", async () => {
+        project();
+        skillsFor(".claude/skills");
+        projectCli("0.19.1");
+        const fake = io();
+
+        expect(await run(["--to", "0.21.0", "--no-install"], fake)).toBe(0);
+
+        expect(fake.runProjectCli).not.toHaveBeenCalled();
+        expect(stdout.join("\n")).toContain("after installing, run `rebase skills install`");
+    });
+
+    it("touches nothing on a dry run", async () => {
+        project();
+        skillsFor(".claude/skills");
+        projectCli();
+        const fake = io();
+
+        expect(await run(["--to", "0.21.0", "--dry-run", "--json"], fake)).toBe(0);
+
+        expect(fake.runProjectCli).not.toHaveBeenCalled();
+        expect(JSON.parse(stdout.join("\n")).skills).toEqual({ agents: ["claude"], refreshed: false, reason: "dry_run" });
+    });
+
+    it("says so when the project does not install the CLI itself", async () => {
+        project();
+        skillsFor(".claude/skills");
+        const fake = io();
+
+        expect(await run(["--to", "0.21.0"], fake)).toBe(0);
+
+        expect(fake.runProjectCli).not.toHaveBeenCalled();
+        expect(stdout.join("\n")).toContain("which the project does not install itself");
+    });
+
+    it("keeps the upgrade when the refresh fails, and names the command", async () => {
+        project();
+        skillsFor(".claude/skills");
+        projectCli();
+        const fake = io({ runProjectCli: vi.fn(async () => { throw new Error("exit 1"); }) });
+
+        expect(await run(["--to", "0.21.0"], fake)).toBe(0);
+
+        expect(read("package.json")).toContain("0.21.0");
+        expect(stdout.join("\n")).toContain("were not refreshed. Run `rebase skills install`");
     });
 });

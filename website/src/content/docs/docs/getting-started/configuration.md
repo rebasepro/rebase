@@ -423,6 +423,7 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `DO_NOT_TRACK` | The cross-tool convention. Set to anything but `0` and the CLI sends no telemetry. | — |
 | `REBASE_TELEMETRY_DISABLED` | The same, for Rebase specifically. Needs no file, which is why it is the one to use in CI and in an image. | — |
 | `REBASE_TELEMETRY_ENDPOINT` | Where telemetry is sent, for a self-hosted collector. | — |
+| `REBASE_NO_UPDATE_CHECK` | `1` stops the CLI asking the npm registry, once a day in the background, whether a newer `@rebasepro/cli` is out, and hides the "Rebase X is out" line commands end with. Off in CI already; `NO_UPDATE_NOTIFIER` does the same. | — |
 
 ## Secrets in development
 

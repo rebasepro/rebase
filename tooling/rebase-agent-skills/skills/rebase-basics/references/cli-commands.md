@@ -18,9 +18,15 @@
 | `rebase dev` | Start development server (backend + frontend concurrently) |
 | `rebase build` | Build the apps declared in rebase.json into a deployable bundle |
 | `rebase start` | Run the built bundle, as a deployment does, in the `NODE_ENV` you set (the scaffold's `.env` says `development`) |
-| `rebase upgrade` | Move every `@rebasepro/*` pin in the project to one release (`--to <version\|tag>`, default `latest`), then install. `--dry-run`, `--no-install`, `--allow-downgrade`, `--drop-local-overrides`, `--json` |
+| `rebase upgrade` | Move every `@rebasepro/*` pin in the project to one release (`--to <version\|tag>`, default `latest`), then install, then refresh the project's agent skills from the new CLI. `--dry-run`, `--no-install`, `--allow-downgrade`, `--drop-local-overrides`, `--json` |
 | `rebase apps list` | Show the apps `rebase.json` declares and their build outputs. `apps init` writes a `rebase.json` inferred from the project and takes no app name; `--force` replaces an existing one, keeping each app's name, `path` and `cms` (0.25+); `apps config <app>` prints an app's client configuration |
 | `rebase eject [app]` | Take ownership of the server process: writes the backend entrypoint and a Dockerfile, and sets `runtime: "custom"`. One-way — platform runtime upgrades stop reaching the project. `--dry-run` lists the changes |
+
+When a command ends with "Rebase X is out; this CLI is Y", tell the person and
+offer to upgrade: read the changelog entries between the two versions
+(https://rebase.pro/docs/changelog/) for breaking changes, run `rebase upgrade`,
+then `rebase verify` and the project's tests, and fix what the release changed.
+The upgrade refreshes these skills, so re-read the ones you rely on afterwards.
 
 `rebase normalize-imports <dir>` completes the relative imports in compiled
 output so Node ESM can load it; `--check` reports instead of rewriting.

@@ -12,6 +12,7 @@ import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { failAsJson, requireProjectRoot, type JsonFailureIssue } from "../utils/project";
 import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
 import { legacyCollectionsDir, MIGRATE_COMMAND } from "../utils/legacy-layout";
+import { projectCli } from "../utils/project-cli";
 import {
     applyUpgradePlan,
     detectInstaller,
@@ -72,6 +73,12 @@ ${chalk.bold("What it changes")}
   are the entries of pnpm-workspace.yaml's catalog: and catalogs: blocks, which is
   where a catalog: pin's version lives.
 
+${chalk.bold("Agent skills")}
+  Once installed, the skills this project has from \`rebase skills install\`
+  (.claude/skills, .cursor/rules, .agents/skills, …) are refreshed from the CLI
+  just installed, for every assistant they are installed for. Skill files you
+  edited are kept. A project already on the release gets the refresh too.
+
 ${chalk.bold("Examples")}
   rebase upgrade                          Move to the newest release on this project's channel
   rebase upgrade --to latest --allow-downgrade   Move a canary project back to stable
@@ -95,6 +102,33 @@ export interface UpgradeResult {
      * run sets it: a real run that refuses prints that envelope instead.
      */
     wouldRefuse: UpgradeRefusal | null;
+    /**
+     * The project's agent skills, refreshed from the CLI just installed — or
+     * why not. `null` when the project has none installed.
+     */
+    skills: SkillsRefresh | null;
+}
+
+/**
+ * What `rebase upgrade` did about the agent skills a project has installed.
+ *
+ * The skills ship inside `@rebasepro/cli`, so moving the pins and installing
+ * changes the CLI and leaves the copies in `.claude/skills`, `.cursor/rules`
+ * and the rest describing the release before. An agent then writes code for
+ * an API the project no longer has. The refresh is part of the upgrade for
+ * that reason, not a step for the reader to remember.
+ */
+export interface SkillsRefresh {
+    /** The assistants the project has Rebase skills for (`claude`, `cursor`, …). */
+    agents: string[];
+    refreshed: boolean;
+    /**
+     * Why they were not, when they were not: `dry_run`; `not_installed`
+     * (`--no-install`, so the new CLI is not there to copy from);
+     * `no_project_cli` (the project does not install `@rebasepro/cli`
+     * itself); `failed`.
+     */
+    reason?: "dry_run" | "not_installed" | "no_project_cli" | "failed";
 }
 
 /** A refusal `rebase upgrade` answers with, as its `--json` envelope carries it. */
@@ -113,6 +147,8 @@ export interface UpgradeIo {
     npmView: (spec: string, cwd: string) => Promise<string>;
     /** `quietStdout`: route the installer's stdout to stderr, so `--json` keeps stdout to itself. */
     install: (command: [string, string[]], cwd: string, quietStdout: boolean) => Promise<void>;
+    /** Run the project's own CLI (`bin`, its `bin/rebase.js`) with `args`. */
+    runProjectCli: (bin: string, args: string[], cwd: string, quietStdout: boolean) => Promise<void>;
 }
 
 const defaultIo: UpgradeIo = {
@@ -127,6 +163,15 @@ const defaultIo: UpgradeIo = {
     },
     install: async ([bin, args], cwd, quietStdout) => {
         await execa(bin, args, { cwd, stdio: quietStdout ? ["ignore", 2, "inherit"] : "inherit" });
+    },
+    runProjectCli: async (bin, args, cwd, quietStdout) => {
+        await execa(process.execPath, [bin, ...args], {
+            cwd,
+            stdio: quietStdout ? ["ignore", 2, "inherit"] : "inherit",
+            // The release notice belongs to the command the reader typed, not
+            // to the CLI it runs for itself.
+            env: { ...process.env, REBASE_RELEASE_NOTICE_SHOWN: "1" }
+        });
     }
 };
 
@@ -293,6 +338,8 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
         }
     }
 
+    const skills = await refreshSkills(projectRoot, { dryRun, wrote, installed, json }, io);
+
     const result: UpgradeResult = {
         target: plan.target,
         changed: plan.changed,
@@ -301,7 +348,8 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
         unreadable: plan.unreadable,
         installed,
         dryRun,
-        wouldRefuse: dryRun ? downgradeRefusal : null
+        wouldRefuse: dryRun ? downgradeRefusal : null,
+        skills
     };
 
     const databaseNotice = wrote ? await runningDatabaseNotice(projectRoot, plan.target) : [];
@@ -314,6 +362,11 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
     }
 
     printOutcome(plan, { dryRun, wrote, installed, installLine, wouldRefuse: dryRun ? downgradeRefusal : null, migrateFirst: legacyNotice.length > 0 });
+    const skillsNotice = skillsRefreshNotice(skills);
+    if (skillsNotice.length > 0) {
+        for (const line of skillsNotice) console.log(skills?.reason === "failed" ? chalk.yellow(line) : chalk.gray(line));
+        console.log("");
+    }
     if (legacyNotice.length > 0) {
         for (const line of legacyNotice) console.log(chalk.yellow(line));
         console.log("");
@@ -321,6 +374,60 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
     if (databaseNotice.length > 0) {
         for (const line of databaseNotice) console.log(chalk.yellow(line));
         console.log("");
+    }
+}
+
+/**
+ * Refresh the agent skills the project has installed, with the CLI it now
+ * pins.
+ *
+ * Run through the project's own `@rebasepro/cli` rather than in this process:
+ * this process is the release the upgrade moved away from, and the skills it
+ * would copy are the ones it shipped with. Runs whenever the project's
+ * `node_modules` matches its pins — after an install, and also when nothing
+ * moved, so `rebase upgrade` on a project already on the newest release still
+ * brings skills a dependency bot left behind up to it.
+ *
+ * Never fails the upgrade: the pins moved and installed, and a skills copy
+ * that did not refresh is said, with the command that does it.
+ */
+async function refreshSkills(
+    projectRoot: string,
+    state: { dryRun: boolean; wrote: boolean; installed: boolean; json: boolean },
+    io: UpgradeIo
+): Promise<SkillsRefresh | null> {
+    const { agentsWithInstalledSkills } = await import("./skills");
+    const agents: string[] = agentsWithInstalledSkills(projectRoot);
+    if (agents.length === 0) return null;
+    if (state.dryRun) return { agents, refreshed: false, reason: "dry_run" };
+    if (state.wrote && !state.installed) return { agents, refreshed: false, reason: "not_installed" };
+    const cli = projectCli(projectRoot);
+    if (!cli) return { agents, refreshed: false, reason: "no_project_cli" };
+    if (!state.json) console.log(chalk.gray(`  Refreshing agent skills with @rebasepro/cli ${cli.version}...`));
+    try {
+        await io.runProjectCli(cli.bin, ["skills", "install", "--agent", agents.join(",")], projectRoot, state.json);
+        return { agents, refreshed: true };
+    } catch {
+        return { agents, refreshed: false, reason: "failed" };
+    }
+}
+
+/** What to say about the skills refresh, after the outcome line; nothing when it went as expected. */
+export function skillsRefreshNotice(skills: SkillsRefresh | null): string[] {
+    if (!skills || skills.refreshed) return [];
+    const which = skills.agents.join(", ");
+    switch (skills.reason) {
+        case "dry_run":
+            return [`  A real run also refreshes this project's agent skills (${which}) from the new CLI.`];
+        case "not_installed":
+            return [`  This project's agent skills (${which}) come from the CLI: after installing, run \`rebase skills install\` to bring them to the new release.`];
+        case "no_project_cli":
+            return [
+                `  This project's agent skills (${which}) come from @rebasepro/cli, which the project does not install itself.`,
+                "  Update the CLI you run it with, then run `rebase skills install`."
+            ];
+        default:
+            return [`⚠ The agent skills (${which}) were not refreshed. Run \`rebase skills install\` to bring them to the new release.`];
     }
 }
 

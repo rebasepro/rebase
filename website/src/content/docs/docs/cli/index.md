@@ -139,6 +139,27 @@ flagged as a downgrade. A `--dry-run` of an upgrade the real run would refuse
 shows what would move and exits 0, and under `--json` its document carries the
 refusal as `wouldRefuse` (`{ code, message, hint }`).
 
+The agent skills a project has from [`rebase skills install`](#rebase-skills-install)
+ship inside `@rebasepro/cli`, so `rebase upgrade` refreshes them too, once it has
+installed: it runs the project's own, newly installed CLI's `rebase skills
+install` for every assistant whose skills directory an install wrote
+(`.claude/skills`, `.cursor/rules`, `.agents/skills`, …). Skill files you edited
+are kept, as they are by `rebase skills install`. A project already on the
+release gets the refresh too, so `rebase upgrade` after a dependency bot moved the
+pins brings the skills along. Under `--json` the document's `skills` says what
+happened: `{ agents, refreshed }`, with a `reason` when it did not (`dry_run`;
+`not_installed` after `--no-install`; `no_project_cli` when the project does not
+install `@rebasepro/cli` itself; `failed`), or `null` when the project has no
+skills installed. A refresh that fails never fails the upgrade.
+
+Every other command ends with one line on stderr while a newer release is out on
+the CLI's channel, such as "Rebase 0.35.0 is out; this CLI is 0.34.2", followed by
+the command that moves the project to it, `rebase upgrade`. Nothing waits on the
+network for it: the answer comes from `~/.rebase/release-check.json`, which a
+background process refreshes from the npm registry (or `npm_config_registry`)
+once a day, asking for `@rebasepro/cli`'s dist-tags and sending nothing else. It
+is off in CI and with `REBASE_NO_UPDATE_CHECK=1` or `NO_UPDATE_NOTIFIER`.
+
 ### `rebase start`
 
 Run the built bundle the way a deployment runs it:

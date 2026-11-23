@@ -392,6 +392,30 @@ export function detectAgents(projectDir: string): AgentKey[] {
     });
 }
 
+/**
+ * The assistants this project already has Rebase skills installed for: one
+ * per target directory that holds an install manifest ({@link SKILLS_MANIFEST}).
+ *
+ * Stricter than {@link detectAgents} on purpose. That answers "which
+ * assistants does this project use?" for someone who just ran `rebase skills
+ * install`; this answers "whose skills would an upgrade leave behind?" for a
+ * command that refreshes them unasked, so only a directory an install wrote
+ * counts. A `.cursor/` holding the developer's own settings is not a reason to
+ * write 21 rule files into it.
+ *
+ * Gemini and Codex share `.agents/skills`, so the directory is named by its
+ * first agent only: the files are the same whichever key wrote them.
+ */
+export function agentsWithInstalledSkills(projectDir: string): AgentKey[] {
+    const seen = new Set<string>();
+    return AGENT_KEYS.filter((key) => {
+        const { targetDir } = AGENTS[key];
+        if (seen.has(targetDir)) return false;
+        seen.add(targetDir);
+        return fs.existsSync(path.join(projectDir, targetDir, SKILLS_MANIFEST));
+    });
+}
+
 /** What `detectInstalledAgents` found for one assistant. */
 export interface InstalledAgent {
     key: AgentKey;
@@ -914,8 +938,9 @@ async function skillsInstall(rawArgs: string[] = []) {
     console.log("");
     console.log(chalk.gray("  Skills are project-local. Commit them to share with your team."));
     // The skills ship inside the CLI's own pinned `@rebasepro/agent-skills`,
-    // so a re-run reinstalls that version; newer ones come with a newer CLI.
-    console.log(chalk.gray("  Re-run this command to restore them. Upgrade @rebasepro/cli for newer skills."));
+    // so a re-run reinstalls that version; newer ones come with a newer CLI,
+    // and `rebase upgrade` refreshes them once it has installed one.
+    console.log(chalk.gray("  Re-run this command to restore them. `rebase upgrade` moves the project to a newer release and refreshes them."));
     if (!withMcp) {
         // Only the agents whose config does not have the server yet: on a
         // project `init --agent` set up, a refresh says nothing about it.

@@ -124,11 +124,19 @@ Commit them. They are part of the repo the same way a lint config is: every
 contributor's assistant then works from the same understanding of the codebase,
 including contributors who never ran the command.
 
-**Re-run the command to update** after a Rebase upgrade:
+**`rebase upgrade` updates them.** The skills ship inside `@rebasepro/cli`, so
+after it installs the new release, [`rebase upgrade`](/docs/cli/#rebase-upgrade)
+runs the new CLI's `rebase skills install` for every assistant the project has
+skills for. If you moved the pins some other way (a dependency bot, a hand edit),
+run `rebase upgrade` anyway, or the install yourself:
 
 ```bash
-rebase skills install --agent all
+rebase skills install
 ```
+
+With no `--agent` it refreshes the assistants whose directories the project
+already has. Commands also end with a line when a newer Rebase is out, so an
+assistant working in the project learns about the release without being told.
 
 Each target directory holds a `.rebase-skills.json` manifest of what the
 command wrote, so a re-run can tell an edit from an older release's copy. Commit

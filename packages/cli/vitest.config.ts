@@ -21,7 +21,10 @@ import { defineConfig } from "vitest/config";
  */
 // REBASE_ROOT_RULES: some suites scaffold inside this repository, and a
 // scaffold below a repository root writes into that root's CLAUDE.md and AGENTS.md.
-export const TEST_ENV = { REBASE_TELEMETRY_DISABLED: "1", REBASE_ROOT_RULES: "0" };
+// REBASE_NO_UPDATE_CHECK: a spawned CLI would otherwise ask the npm registry
+// for dist-tags in the background, and end its stderr with "Rebase X is out"
+// whenever the developer's ~/.rebase/release-check.json says so.
+export const TEST_ENV = { REBASE_TELEMETRY_DISABLED: "1", REBASE_ROOT_RULES: "0", REBASE_NO_UPDATE_CHECK: "1" };
 
 /**
  * `@rebasepro/<name>` → `packages/<name>/src/index.ts`, for every workspace
