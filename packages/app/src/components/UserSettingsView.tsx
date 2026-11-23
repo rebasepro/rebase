@@ -8,6 +8,7 @@ import {
     Chip,
     CircularProgress,
     cls,
+    Container,
     IconButton,
     LoadingButton,
     Tab,
@@ -213,7 +214,10 @@ export function UserSettingsView() {
     if (!user) return null;
 
     return (
-        <div className="flex-grow max-w-4xl w-full mx-auto p-4 sm:p-6 md:p-12">
+        // The same container as every other page in the panel (home, saved
+        // apps, collections): 6xl, the kit's side padding. It was a 4xl column
+        // with its own 48px padding, so its title sat inside everyone else's.
+        <Container maxWidth="6xl" className="flex-grow w-full py-6">
             <Typography variant="h4" className="mb-8">{t("account_settings")}</Typography>
 
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ActiveTab)} className="mb-8">
@@ -384,6 +388,6 @@ export function UserSettingsView() {
                     )}
                 </div>
             )}
-        </div>
+        </Container>
     );
 }
