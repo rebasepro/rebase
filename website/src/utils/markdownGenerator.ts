@@ -98,6 +98,15 @@ Built by the Rebase team, each on a Postgres database its owner controls.
 
 ## Rebase Cloud
 
+${inline(tr("cloud.home.title"))} — ${cleanHtml(tr("cloud.home.subtitle"))}
+
+- **${inline(tr("cloud.home.hetzner.title"))}** — ${cleanHtml(tr("cloud.home.hetzner.desc"))}
+- **${inline(tr("cloud.home.storage.title"))}** — ${cleanHtml(tr("cloud.home.storage.desc"))}
+- **${inline(tr("cloud.home.postgres.title"))}** — ${cleanHtml(tr("cloud.home.postgres.desc"))}
+- **${inline(tr("cloud.home.dials.title"))}** — ${cleanHtml(tr("cloud.home.dials.desc"))}
+- **${inline(tr("cloud.home.deploys.title"))}** — ${cleanHtml(tr("cloud.home.deploys.desc"))}
+- **${inline(tr("cloud.home.exit.title"))}** — ${cleanHtml(tr("cloud.home.exit.desc"))}
+
 ${cleanHtml(tr(offerKey("cloud.status")))}
 
 ## Where to run it
@@ -107,6 +116,61 @@ ${cleanHtml(tr(offerKey("cloud.status")))}
 - **${inline(tr("cta.lane.cloud.title"))}** — ${cleanHtml(tr(offerKey("cta.lane.cloud.desc")))}
 
 \`pnpm dlx @rebasepro/cli init\`
+`;
+  }
+
+  if (page === "cloud") {
+    return `# ${cleanHtml(tr("cloud.meta.title"))}
+
+${cleanHtml(tr("cloud.meta.description"))}
+
+## ${inline(tr("cloud.page.hero.title"))}
+
+${cleanHtml(tr("cloud.page.hero.lead"))}
+
+${cleanHtml(tr("cloud.page.hero.sub"))}
+
+## ${inline(tr("cloud.page.topo.title"))}
+
+${cleanHtml(tr("cloud.page.topo.desc"))}
+
+## ${inline(tr("cloud.page.hetzner.title"))}
+
+${cleanHtml(tr("cloud.page.hetzner.p1"))}
+
+${cleanHtml(tr("cloud.page.hetzner.p2"))}
+
+## ${inline(tr("cloud.page.storage.title"))}
+
+${cleanHtml(tr("cloud.page.storage.desc"))}
+
+- **${inline(tr("cloud.page.storage.p1.title"))}** — ${cleanHtml(tr("cloud.page.storage.p1.desc"))}
+- **${inline(tr("cloud.page.storage.p2.title"))}** — ${cleanHtml(tr("cloud.page.storage.p2.desc"))}
+- **${inline(tr("cloud.page.storage.p3.title"))}** — ${cleanHtml(tr("cloud.page.storage.p3.desc"))}
+
+## ${inline(tr("cloud.page.pg.title"))}
+
+${cleanHtml(tr("cloud.page.pg.desc"))}
+
+- **${inline(tr("cloud.page.pg.p1.title"))}** — ${cleanHtml(tr("cloud.page.pg.p1.desc"))}
+- **${inline(tr("cloud.page.pg.p2.title"))}** — ${cleanHtml(tr("cloud.page.pg.p2.desc"))}
+- **${inline(tr("cloud.page.pg.p3.title"))}** — ${cleanHtml(tr("cloud.page.pg.p3.desc"))}
+- **${inline(tr("cloud.page.pg.p4.title"))}** — ${cleanHtml(tr("cloud.page.pg.p4.desc"))}
+
+## ${inline(tr("cloud.page.ops.title"))}
+
+${cleanHtml(tr("cloud.page.ops.desc"))}
+
+- **${inline(tr("cloud.page.ops.i1.title"))}** — ${cleanHtml(tr("cloud.page.ops.i1.desc"))}
+- **${inline(tr("cloud.page.ops.i2.title"))}** — ${cleanHtml(tr("cloud.page.ops.i2.desc"))}
+- **${inline(tr("cloud.page.ops.i3.title"))}** — ${cleanHtml(tr("cloud.page.ops.i3.desc"))}
+- **${inline(tr("cloud.page.ops.i4.title"))}** — ${cleanHtml(tr("cloud.page.ops.i4.desc"))}
+- **${inline(tr("cloud.page.ops.i5.title"))}** — ${cleanHtml(tr("cloud.page.ops.i5.desc"))}
+- **${inline(tr("cloud.page.ops.i6.title"))}** — ${cleanHtml(tr("cloud.page.ops.i6.desc"))}
+
+## Status
+
+${cleanHtml(tr("cloud.status"))}
 `;
   }
 

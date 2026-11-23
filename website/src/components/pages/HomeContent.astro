@@ -15,6 +15,7 @@ import {
     ArrowRight, TerminalSquare,
     KeyRound, HardDrive, Code2, Clock, Sparkles, GitBranch, History, ArchiveRestore,
     Braces, Radio, LayoutPanelLeft, Bot,
+    Server, Database, SlidersHorizontal, Rocket, Box,
 } from "lucide-react";
 import { DEMO_URL } from "../../utils/links";
 
@@ -58,11 +59,21 @@ const SERVICES = [
 const [INSTALL_RUNNER, INSTALL_PACKAGE, INSTALL_VERB] =
     INSTALL_COMMAND.match(/^(\S+ \S+) (\S+) (\S+)$/)!.slice(1);
 const SELFHOST_COMMAND = "docker compose up -d";
+const CLOUD_DEPLOY_COMMAND = "rebase cloud deploy";
+
+const CLOUD_PILLARS = [
+    { title: "cloud.home.hetzner.title", desc: "cloud.home.hetzner.desc", Icon: Server, handle: "eu-central-1 · fsn1" },
+    { title: "cloud.home.storage.title", desc: "cloud.home.storage.desc", Icon: HardDrive, handle: "S3 API · /api/storage" },
+    { title: "cloud.home.postgres.title", desc: "cloud.home.postgres.desc", Icon: Database, handle: "PostgreSQL 17 · nbg1 backups" },
+    { title: "cloud.home.dials.title", desc: "cloud.home.dials.desc", Icon: SlidersHorizontal, handle: "shared · reserved · dedicated" },
+    { title: "cloud.home.deploys.title", desc: "cloud.home.deploys.desc", Icon: Rocket, handle: "rebase cloud deploy" },
+    { title: "cloud.home.exit.title", desc: "cloud.home.exit.desc", Icon: Box, handle: "docker compose up -d" },
+] as const;
 
 ---
 <div class="isolate text-tone-max">
     {/* ============================================================
-        HOME PAGE SPINE — five numbered chapters, one close.
+        HOME PAGE SPINE — six numbered chapters, one close.
 
           hero      the AI-era backend for your Postgres — built for your team,
                     safe for your agents
@@ -74,6 +85,8 @@ const SELFHOST_COMMAND = "docker compose up -d";
           04        AGENT ERA — MCP + CLI under the same access rules (the 0.29
                     Claude-apps section moved off the home page to /ai, 2026-11-23)
           05        CUSTOMERS — case studies
+          06        REBASE CLOUD — managed hosting on Hetzner in Europe,
+                    managed S3 storage, dedicated Postgres 17 & zero lock-in
           close     the three lanes, the terms, and the ask
 
         Colour is spent twice and only twice: the blue slab on 03 and the coral
@@ -271,7 +284,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="chapter-rule">
                         <p class="eyebrow flex items-center gap-2.5"><span class="dot text-primary-light" aria-hidden="true"></span>{t("engine.badge")}</p>
-                        <span class="chapter-index">01 / 05</span>
+                        <span class="chapter-index">01 / 06</span>
                     </div>
                     <div class="mt-lead max-w-[42rem] animate-on-scroll fade-in-up">
                         <h2 class="font-headers text-display-2 text-balance">
@@ -345,7 +358,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="chapter-rule">
                         <p class="eyebrow flex items-center gap-2.5"><span class="dot" aria-hidden="true"></span>{t("security.badge")}</p>
-                        <span class="chapter-index">02 / 05</span>
+                        <span class="chapter-index">02 / 06</span>
                     </div>
                     <div class="mt-lead grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
                         <div class="lg:col-span-5">
@@ -461,7 +474,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="chapter-rule">
                         <p class="eyebrow flex items-center gap-2.5"><span class="dot text-cyan-300" aria-hidden="true"></span>{t("panel.badge")}</p>
-                        <span class="chapter-index">03 / 05</span>
+                        <span class="chapter-index">03 / 06</span>
                     </div>
                     <div class="mt-lead max-w-[42rem] animate-on-scroll fade-in-up">
                         <h2 class="font-headers text-display-2 text-balance">
@@ -532,7 +545,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="chapter-rule">
                         <p class="eyebrow flex items-center gap-2.5"><span class="dot text-amber-300" aria-hidden="true"></span>{t("agentera.badge")}</p>
-                        <span class="chapter-index">04 / 05</span>
+                        <span class="chapter-index">04 / 06</span>
                     </div>
                     <div class="mt-lead grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
                         <div class="lg:col-span-5">
@@ -566,6 +579,130 @@ const SELFHOST_COMMAND = "docker compose up -d";
              wrapper keeps only the hairline. -->
         <div class="chapter border-t border-tone-max/8">
             <CaseStudiesCarousel t={t} />
+        </div>
+
+        <!-- CHAPTER 06 — REBASE CLOUD. Managed hosting on Hetzner in Germany,
+             built-in S3-compatible object storage, dedicated Postgres 17 with
+             off-site WAL backups, and resource-based pricing. Sits on
+             `ground-raised` between Customers (base ground) and the coral
+             close so adjacent sections never share a ground. -->
+        <div>
+            <section id="s-cloud" class="chapter drafted relative ground-raised border-t border-tone-max/8 py-chapter">
+                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+                    <div class="chapter-rule">
+                        <p class="eyebrow flex items-center gap-2.5"><span class="dot text-emerald-400" aria-hidden="true"></span>{t("cloud.home.badge")}</p>
+                        <span class="chapter-index">06 / 06</span>
+                    </div>
+
+                    <div class="mt-lead grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-end">
+                        <div class="lg:col-span-7 min-w-0 animate-on-scroll fade-in-up">
+                            <h2 class="font-headers text-display-2 text-balance">
+                                {t("cloud.home.title")}
+                            </h2>
+                            <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed">
+                                {t("cloud.home.subtitle")}
+                            </p>
+                        </div>
+
+                        {/* Drafted project footprint card. No headings inside so
+                            the heading ladder steps cleanly from h2 to the h3s
+                            in the capability grid below. */}
+                        <div class="lg:col-span-5 min-w-0 animate-on-scroll fade-in-up delay-100">
+                            <div class="rounded-xl border border-tone-max/10 bg-surface-frame/85">
+                                <div class="mx-4 flex items-center justify-between gap-3 border-b border-tone-max/8 py-3.5">
+                                    <span class="flex min-w-0 items-center gap-2.5 font-mono text-2xs uppercase tracking-[0.16em] text-tone-200">
+                                        <span class="dot text-emerald-400" aria-hidden="true"></span>
+                                        <span class="truncate">{t("cloud.home.spec.title")}</span>
+                                    </span>
+                                    <span class="flex-none font-mono text-2xs text-tone-400">eu-central-1 · Hetzner</span>
+                                </div>
+                                <ul class="flex flex-col gap-1.5 p-3">
+                                    <li class="flex items-center justify-between gap-4 rounded-lg bg-tone-max/[0.035] px-3 py-2.5">
+                                        <span class="flex min-w-0 items-center gap-2.5 text-sm text-tone-50">
+                                            <span class="dot text-primary-light" aria-hidden="true"></span>
+                                            <span class="truncate">{t("cloud.home.spec.app")}</span>
+                                        </span>
+                                        <span class="shrink-0 text-right font-mono text-2xs text-tone-400">Falkenstein · fsn1</span>
+                                    </li>
+                                    <li class="flex items-center justify-between gap-4 rounded-lg bg-tone-max/[0.035] px-3 py-2.5">
+                                        <span class="flex min-w-0 items-center gap-2.5 text-sm text-tone-50">
+                                            <span class="dot text-cyan-300" aria-hidden="true"></span>
+                                            <span class="truncate">{t("cloud.home.spec.db")}</span>
+                                        </span>
+                                        <span class="shrink-0 text-right font-mono text-2xs text-tone-400">CNPG · WAL → nbg1</span>
+                                    </li>
+                                    <li class="flex items-center justify-between gap-4 rounded-lg bg-tone-max/[0.035] px-3 py-2.5">
+                                        <span class="flex min-w-0 items-center gap-2.5 text-sm text-tone-50">
+                                            <span class="dot text-emerald-400" aria-hidden="true"></span>
+                                            <span class="truncate">{t("cloud.home.spec.storage")}</span>
+                                        </span>
+                                        <span class="shrink-0 text-right font-mono text-2xs text-tone-400">Hetzner S3 · /api/storage</span>
+                                    </li>
+                                </ul>
+                                <div class="mx-3 mb-3 flex items-center gap-2 rounded-lg border border-tone-max/10 bg-tone-max/[0.02] pl-3 pr-1.5 py-1.5 font-mono text-xs text-tone-200">
+                                    <span class="select-none text-tone-500">$</span>
+                                    <code class="select-all min-w-0 flex-1 truncate">{CLOUD_DEPLOY_COMMAND}</code>
+                                    <button
+                                        type="button"
+                                        data-track-copy="cloud-home-deploy"
+                                        data-command={CLOUD_DEPLOY_COMMAND}
+                                        data-copy-done-label={t("copy.command.done")}
+                                        class="copy-btn inline-flex shrink-0 items-center gap-1.5 rounded-md border border-tone-max/10 bg-tone-max/[0.055] px-2 py-1 font-sans text-2xs font-medium text-tone-400 transition-colors hover:border-tone-max/20 hover:bg-tone-max/[0.09] hover:text-tone-max focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                        aria-label={`Copy "${CLOUD_DEPLOY_COMMAND}" to the clipboard`}
+                                        title="Copy to clipboard"
+                                    >
+                                        <svg data-copy-idle class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+                                        <svg data-copy-done hidden class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M20 6 9 17l-5-5"/>
+                                        </svg>
+                                        <span data-copy-label>{t("copy.command")}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <ul class="cloud-grid mt-content grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-tone-max/8 animate-on-scroll fade-in-up">
+                        {CLOUD_PILLARS.map(({ title, desc, Icon, handle }) => (
+                            <li class="cloud-cell border-r border-b border-tone-max/8 p-6">
+                                <h3 class="flex items-center gap-2.5 font-headers text-base text-tone-100">
+                                    <Icon size={16} class="shrink-0 text-tone-400" aria-hidden="true" />
+                                    <span>{t(title)}</span>
+                                </h3>
+                                <p class="mt-2.5 text-sm text-page-copy leading-relaxed">{t(desc)}</p>
+                                <p class="mt-4 font-mono text-2xs text-tone-400">{handle}</p>
+                            </li>
+                        ))}
+                    </ul>
+
+                    <div class="mt-10 flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
+                        <div class="flex flex-wrap items-center gap-x-8 gap-y-3">
+                            <a href={translatePath("/cloud")} class="accent-link">
+                                {t("cloud.home.link.explore")}
+                                <ArrowRight size={15} aria-hidden="true" />
+                            </a>
+                            <a href="#footer-waitlist" class="text-sm font-semibold text-tone-400 transition-colors hover:text-tone-max">
+                                {t("cta.lane.cloud.link")}
+                            </a>
+                            <a href={translatePath("/pricing")} class="text-sm font-semibold text-tone-400 transition-colors hover:text-tone-max">
+                                {t("cloud.home.link.pricing")}
+                            </a>
+                            <a href={translatePath("/europe")} class="text-sm font-semibold text-tone-400 transition-colors hover:text-tone-max">
+                                {t("trust.europe.link")}
+                            </a>
+                        </div>
+                        <p class="flex items-center gap-2.5 text-xs text-tone-400">
+                            <span class="rounded-md border border-tone-max/10 bg-tone-max/[0.04] px-2 py-0.5 font-mono text-3xs uppercase tracking-[0.1em] text-tone-300">
+                                {t("cta.lane.cloud.badge")}
+                            </span>
+                            <span>{t("cloud.home.statusNote")}</span>
+                        </p>
+                    </div>
+                </div>
+            </section>
         </div>
 
         {/* The roadmap used to run here. It is not in SITE-STORY's beat table,
@@ -704,3 +841,13 @@ const SELFHOST_COMMAND = "docker compose up -d";
             </div>
         </section>
     </div>
+
+<style>
+    .cloud-cell {
+        grid-row: span 3;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        grid-template-rows: subgrid;
+        min-inline-size: 0;
+    }
+</style>
