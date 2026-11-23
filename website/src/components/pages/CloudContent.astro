@@ -1,57 +1,125 @@
 ---
+/**
+ * /cloud — what Rebase Cloud is, what a project gets, how sizes and billing
+ * work, and how to start. The pricing page owns the numbers; this page quotes
+ * one (the default project) and links there for the rest.
+ *
+ * Every claim here is one the control plane makes true today, and each block
+ * names its source so the next edit can check it:
+ *
+ * - Region and provider: `REGION_FACTS[CLOUD_FLAGS.region]` (cloud-flags.ts),
+ *   so this page and /pricing move together when the flag flips.
+ * - Default sizes, the default project's price and the included allowances:
+ *   `cloud-prices.json`, generated from the rate card that bills.
+ * - App resize without downtime: saas `TENANT_ROLLOUT_STRATEGY`
+ *   (`maxUnavailable: 0, maxSurge: 1`, backend/src/k8s/orchestrator.ts).
+ * - Database resize, one copy, "about a minute, a few minutes at worst", and
+ *   confirmed first: measured 31 s and 33 s on hz-canary on 2026-11-23 after
+ *   the two restart fixes (shutdown waits 10 s, saas restart-behaviour.ts
+ *   `smartShutdownTimeout`; the primary keeps its network identity). The
+ *   console's `DATABASE_RESTART_SENTENCE` (backend/src/utils/database-applied.ts)
+ *   says the same from the deploy that ships those fixes; it said "usually 3
+ *   to 8 minutes", measured before them.
+ * - Two copies: `--db-instances 2` adds an automatic standby; a resize is a
+ *   switchover (`primaryUpdateMethod: switchover`, restart-behaviour.ts); the
+ *   copies are spread across servers by a soft rule (`databaseAntiAffinity`),
+ *   hence "whenever the cluster has one".
+ * - CPU bursts: `fixedNodeBurst` (provider-profile.ts) — 10x the request, at
+ *   most half a server — on Falkenstein; the Belgium default bursts to 2 vCPU
+ *   (docs deployment/cloud.md "Compute, and what it costs"). `offerKey` picks
+ *   the regional sentence.
+ * - Billing: prorated, a database change billed at the running size until it
+ *   runs (docs deployment/cloud.md; CLI `compute set` help).
+ * - 30-day point-in-time restore: `HERO_CLAIM_SOURCES` in cloud-offer.ts.
+ *
+ * Not live, so not on this page: database autoscale, size recommendations,
+ * the new size picker, sleeping projects (`CLOUD_FLAGS.sleep`).
+ *
+ * Customer words only (SITE-STORY, tenancy vocabulary): servers, copies,
+ * sizes — never pods, nodes, namespaces or the operator's name.
+ */
 const { lang, t } = Astro.props;
 
 import { useTranslatedPath } from "../../i18n/ui";
-import { CLOUD_FLAGS, CLOUD_SIGNUP_URL, offerKey } from "../../data/cloud-offer";
+import {
+    CLOUD_FLAGS, CLOUD_PRICES, CLOUD_SIGNUP_URL, REGION_FACTS,
+    cpuLabel, eur, fill, memoryLabel, offerKey, regionPrices,
+} from "../../data/cloud-offer";
 import HeroBackdrop from "../HeroBackdrop.astro";
 import ChapterRule from "../ChapterRule.astro";
 import ClosingCta from "../ClosingCta.astro";
-import CloudTopologyDemo, { CLOUD_TOPOLOGY_STRINGS } from "../demos/CloudTopologyDemo";
 import {
-    ArrowRight, Server, HardDrive, Database, SlidersHorizontal,
-    Rocket, GitBranch, Activity, Bell, Box, ShieldCheck, Globe,
+    ArrowRight, Server, HardDrive, Database, Check, Globe, Activity, Users, Bell,
 } from "lucide-react";
 
 const translatePath = useTranslatedPath(lang);
 const CLOUD_DEPLOY_COMMAND = "rebase cloud deploy";
 
-const HETZNER_FACTS = [
-    { label: "cloud.page.hetzner.row1.label", value: "eu-central-1 · Falkenstein, Germany (Hetzner)" },
-    { label: "cloud.page.hetzner.row2.label", value: "nbg1 · Nuremberg, Germany (Hetzner Object Storage)" },
-    { label: "cloud.page.hetzner.row3.label", value: "FireCMS S.L. · Madrid, Spain (EU law)" },
-    { label: "cloud.page.hetzner.row4.label", value: "Cilium network policies · per-project namespace" },
-    { label: "cloud.page.hetzner.row5.label", value: "Fixed outbound IPv4 · custom domains & TLS" },
-] as const;
+const facts = REGION_FACTS[CLOUD_FLAGS.region];
+const prices = regionPrices();
+const defaults = prices.examples.default;
+const size = (s: { cpu: string; memory: string }) => `${memoryLabel(s.memory)} · ${cpuLabel(s.cpu)}`;
 
-const STORAGE_POINTS = [
-    { title: "cloud.page.storage.p1.title", desc: "cloud.page.storage.p1.desc", handle: "Hetzner Object Storage" },
-    { title: "cloud.page.storage.p2.title", desc: "cloud.page.storage.p2.desc", handle: "/api/storage · rebase_user" },
-    { title: "cloud.page.storage.p3.title", desc: "cloud.page.storage.p3.desc", handle: "S3 · R2 · GCS (BYOS)" },
-] as const;
-
-const POSTGRES_POINTS = [
-    { title: "cloud.page.pg.p1.title", desc: "cloud.page.pg.p1.desc", handle: "CloudNativePG · PostgreSQL 17" },
-    { title: "cloud.page.pg.p2.title", desc: "cloud.page.pg.p2.desc", handle: "WAL archiving · PITR · nbg1" },
-    { title: "cloud.page.pg.p3.title", desc: "cloud.page.pg.p3.desc", handle: "10 GiB+ online volume growth" },
-    { title: "cloud.page.pg.p4.title", desc: "cloud.page.pg.p4.desc", handle: "rebase db branch · pg_dump" },
-] as const;
-
-const OPS_ITEMS = [
-    { title: "cloud.page.ops.i1.title", desc: "cloud.page.ops.i1.desc", Icon: Rocket, handle: "rebase cloud deploy" },
-    { title: "cloud.page.ops.i2.title", desc: "cloud.page.ops.i2.desc", Icon: GitBranch, handle: "rebase cloud previews" },
-    { title: "cloud.page.ops.i3.title", desc: "cloud.page.ops.i3.desc", Icon: Activity, handle: "rebase cloud metrics" },
-    { title: "cloud.page.ops.i4.title", desc: "cloud.page.ops.i4.desc", Icon: Bell, handle: "disk · certs · dead-man" },
-    { title: "cloud.page.ops.i5.title", desc: "cloud.page.ops.i5.desc", Icon: SlidersHorizontal, handle: "shared · reserved · dedicated" },
-    { title: "cloud.page.ops.i6.title", desc: "cloud.page.ops.i6.desc", Icon: Box, handle: "docker compose up -d" },
-] as const;
-
-const topologyStrings = Object.fromEntries(
-    CLOUD_TOPOLOGY_STRINGS.map((k) => [k, t(k)])
-) as Record<(typeof CLOUD_TOPOLOGY_STRINGS)[number], string>;
 // Self-serve open (CLOUD_FLAGS.selfServe): the CTA signs up; before that it
 // points at the footer's waitlist, like every other Cloud surface.
 const cloudCtaHref = CLOUD_FLAGS.selfServe ? CLOUD_SIGNUP_URL : "#footer-waitlist";
 const cloudCtaLabel = CLOUD_FLAGS.selfServe ? t("pricing.cloud.cta.open") : t("cta.lane.cloud.link");
+
+const PARTS = [
+    { Icon: Server, title: "cloud.page.get.app.title", desc: "cloud.page.get.app.desc", handle: "deploy · deploy --preview · rollback", dot: "text-primary-light" },
+    { Icon: Database, title: "cloud.page.get.db.title", desc: "cloud.page.get.db.desc", handle: "db pitr · db connect", dot: "text-cyan-300" },
+    { Icon: HardDrive, title: "cloud.page.get.files.title", desc: "cloud.page.get.files.desc", handle: "storage create · storage attach", dot: "text-emerald-400" },
+] as const;
+
+const EXTRAS = [
+    { Icon: Globe, key: "cloud.page.get.extra1" },
+    { Icon: Activity, key: "cloud.page.get.extra2" },
+    { Icon: Users, key: "cloud.page.get.extra3" },
+    { Icon: Bell, key: "cloud.page.get.extra4" },
+] as const;
+
+// The availability track under each row: the share of the strip that is
+// offline. Illustrative widths, not a timescale.
+const RESIZE_ROWS = [
+    { label: "cloud.page.size.app.label", value: "cloud.page.size.app.value", note: "cloud.page.size.app.note", gap: 0, tone: "text-emerald-400" },
+    { label: "cloud.page.size.db1.label", value: "cloud.page.size.db1.value", note: "cloud.page.size.db1.note", gap: 12, tone: "text-amber-300" },
+    { label: "cloud.page.size.db2.label", value: "cloud.page.size.db2.value", note: "cloud.page.size.db2.note", gap: 1.5, tone: "text-emerald-400" },
+] as const;
+
+// ── The burst chart ─────────────────────────────────────────────────────────
+// A made-up day of CPU, in multiples of the reservation, sampled every half
+// hour: quiet most of the time, two spikes. Drawn on a 0–10x scale so the
+// reservation is the thin band at the bottom and the ceiling the top line.
+const USAGE = [
+    0.4, 0.35, 0.3, 0.3, 0.32, 0.3, 0.35, 0.45, 0.6, 0.7, 0.75, 0.8, 0.7, 1.2,
+    3.6, 6.4, 2.2, 0.9, 0.7, 0.65, 0.7, 0.8, 0.75, 0.7, 0.85, 0.9, 0.8, 0.75,
+    0.9, 1.7, 9.2, 4.1, 1.3, 0.8, 0.7, 0.75, 0.9, 2.4, 1.1, 0.8, 0.6, 0.55,
+    0.5, 0.45, 0.4, 0.4, 0.35, 0.35,
+];
+const CHART = { w: 640, h: 220, left: 8, right: 632, top: 18, bottom: 204, max: 10 };
+const xAt = (i: number) => CHART.left + (i / (USAGE.length - 1)) * (CHART.right - CHART.left);
+const yAt = (v: number) => CHART.bottom - (v / CHART.max) * (CHART.bottom - CHART.top);
+const usageLine = USAGE.map((v, i) => `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`).join(" ");
+const usageArea = `${usageLine} L${CHART.right},${CHART.bottom} L${CHART.left},${CHART.bottom} Z`;
+const reservedY = yAt(1);
+
+const BILL_POINTS = [
+    { title: "cloud.page.bill.p1.title", desc: t("cloud.page.bill.p1.desc") },
+    { title: "cloud.page.bill.p2.title", desc: t("cloud.page.bill.p2.desc") },
+    {
+        title: "cloud.page.bill.p3.title",
+        desc: fill(t("cloud.page.bill.p3.desc"), {
+            requests: `${(CLOUD_PRICES.included.requestsPerMonth / 1_000_000).toLocaleString("en")} million`,
+            files: String(CLOUD_PRICES.included.filesGb),
+        }),
+    },
+] as const;
+
+const START_COMMANDS = [
+    "rebase cloud login",
+    "rebase cloud billing setup",
+    "rebase cloud projects create --link",
+];
 ---
 
 <div class="drafted-page flex flex-col isolate">
@@ -70,16 +138,17 @@ const cloudCtaLabel = CLOUD_FLAGS.selfServe ? t("pricing.cloud.cta.open") : t("c
                 {t("cloud.page.hero.title")}
             </h1>
 
-            <p class="mb-4 max-w-[40rem] text-lg leading-8 text-tone-300">
-                {t("cloud.page.hero.lead")}
+            <p class="mb-4 max-w-[42rem] text-lg leading-8 text-tone-300">
+                {fill(t("cloud.page.hero.lead"), { place: facts.place, provider: facts.provider })}
             </p>
-            <p class="mb-10 max-w-[40rem] text-base leading-7 text-page-copy">
+            <p class="mb-10 max-w-[42rem] text-base leading-7 text-page-copy">
                 {t("cloud.page.hero.sub")}
             </p>
 
             <div class="flex flex-wrap items-center gap-3">
                 <a
                     href={cloudCtaHref}
+                    data-track="cloud-hero-cta"
                     class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-primary px-7 min-h-(--control-large) text-base font-semibold text-white shadow-[0_8px_28px_-6px_rgb(0_112_244/0.65)] transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
                     {cloudCtaLabel}
@@ -115,148 +184,281 @@ const cloudCtaLabel = CLOUD_FLAGS.selfServe ? t("pricing.cloud.cta.open") : t("c
         </div>
     </section>
 
-    <!-- ═══════════════════════ 01 / 05 — INTERACTIVE TOPOLOGY ═══════════════════════ -->
+    <!-- ═══════════════════════ 01 / 05 — WHAT YOU GET ═══════════════════════ -->
     <section class="relative z-0 ground-raised border-y border-tone-max/8 py-chapter">
         <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
-            <ChapterRule label={t("cloud.page.topo.badge")} index="01 / 05" dot="text-primary-light" />
+            <ChapterRule label={t("cloud.page.get.badge")} index="01 / 05" dot="text-primary-light" />
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-10 max-w-[42rem]">
-                <h2 class="mb-4 text-3xl sm:text-4xl text-tone-max text-balance">{t("cloud.page.topo.title")}</h2>
-                <p class="text-base leading-relaxed text-page-copy">{t("cloud.page.topo.desc")}</p>
+                <h2 class="mb-4 text-3xl sm:text-4xl text-tone-max text-balance">{t("cloud.page.get.title")}</h2>
+                <p class="text-base leading-relaxed text-page-copy">{t("cloud.page.get.desc")}</p>
             </div>
 
-            <CloudTopologyDemo client:visible s={topologyStrings} />
+            <ul class="cloud-subgrid grid grid-cols-1 md:grid-cols-3 border-t border-l border-tone-max/8">
+                {PARTS.map(({ Icon, title, desc, handle, dot }) => (
+                    <li class="cloud-subgrid-cell border-r border-b border-tone-max/8 p-6">
+                        <h3 class="flex items-center gap-2.5 font-headers text-base text-tone-100">
+                            <Icon size={16} class={`shrink-0 ${dot}`} aria-hidden="true" />
+                            <span>{t(title)}</span>
+                        </h3>
+                        <p class="cloud-prose mt-2.5 text-sm leading-relaxed text-page-copy" set:html={t(desc)} />
+                        <p class="mt-4 font-mono text-2xs text-tone-400">rebase cloud {handle}</p>
+                    </li>
+                ))}
+            </ul>
+
+            <div class="mt-8 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8">
+                <p class="eyebrow">{t("cloud.page.get.extras")}</p>
+                <ul class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-x-7">
+                    {EXTRAS.map(({ Icon, key }) => (
+                        <li class="flex items-center gap-2 text-sm text-tone-200">
+                            <Icon size={15} class="shrink-0 text-tone-400" aria-hidden="true" />
+                            {t(key)}
+                        </li>
+                    ))}
+                </ul>
+            </div>
         </div>
     </section>
 
-    <!-- ═══════════════════════ 02 / 05 — HETZNER IN GERMANY ═══════════════════════ -->
+    <!-- ═══════════════════════ 02 / 05 — SIZES ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
         <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
-            <ChapterRule label={t("cloud.page.hetzner.badge")} index="02 / 05" dot="text-cyan-300" />
+            <ChapterRule label={t("cloud.page.size.badge")} index="02 / 05" dot="text-cyan-300" />
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                 <div class="lg:col-span-5 min-w-0">
-                    <h2 class="mb-5 text-3xl sm:text-4xl text-tone-max text-balance">{t("cloud.page.hetzner.title")}</h2>
-                    <p class="mb-4 text-base leading-relaxed text-page-copy">{t("cloud.page.hetzner.p1")}</p>
-                    <p class="mb-6 text-base leading-relaxed text-page-copy">{t("cloud.page.hetzner.p2")}</p>
-                    <a href={translatePath("/europe")} class="accent-link">
-                        {t("trust.europe.link")}
+                    <h2 class="mb-5 text-3xl sm:text-4xl text-tone-max text-balance">{t("cloud.page.size.title")}</h2>
+                    <p
+                        class="cloud-prose mb-6 text-base leading-relaxed text-page-copy"
+                        set:html={fill(t("cloud.page.size.desc"), { app: size(defaults.app), db: size(defaults.database) })}
+                    />
+                    <p class="cmd-chip"><span class="select-none text-tone-500">$ </span>rebase cloud compute set --memory 1Gi --db-memory 2Gi</p>
+                </div>
+
+                <figure class="lg:col-span-7 min-w-0 frame overflow-hidden">
+                    <figcaption class="frame-head">
+                        <span>{t("cloud.page.size.figTitle")}</span>
+                    </figcaption>
+                    <ol class="divide-y divide-tone-max/8">
+                        {RESIZE_ROWS.map(({ label, value, note, gap, tone }) => (
+                            <li class="px-5 py-5">
+                                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                                    <span class="text-sm font-semibold text-tone-100">{t(label)}</span>
+                                    <span class={`font-mono text-xs ${tone}`}>{t(value)}</span>
+                                </div>
+                                <div class="resize-track mt-3" aria-hidden="true">
+                                    {gap > 0 ? (
+                                        <>
+                                            <span class="resize-on" style={`flex-grow:${(100 - gap) / 2}`}></span>
+                                            <span class="resize-off" style={`flex-grow:${gap}`}></span>
+                                            <span class="resize-on" style={`flex-grow:${(100 - gap) / 2}`}></span>
+                                        </>
+                                    ) : (
+                                        <span class="resize-on" style="flex-grow:100"></span>
+                                    )}
+                                </div>
+                                <p class="mt-3 text-sm leading-relaxed text-page-copy">{t(note)}</p>
+                            </li>
+                        ))}
+                    </ol>
+                </figure>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ 03 / 05 — CPU BURSTS ═══════════════════════ -->
+    <section class="relative z-0 ground-raised border-y border-tone-max/8 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("cloud.page.burst.badge")} index="03 / 05" dot="text-emerald-400" />
+        </div>
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="mb-10 max-w-[42rem]">
+                <h2 class="mb-4 text-3xl sm:text-4xl text-tone-max text-balance">{t("cloud.page.burst.title")}</h2>
+                <p class="text-base leading-relaxed text-page-copy">{t(offerKey("cloud.page.burst.desc"))}</p>
+            </div>
+
+            <figure class="frame overflow-hidden">
+                <figcaption class="frame-head">
+                    <span>{t("cloud.page.burst.fig.title")}</span>
+                </figcaption>
+                <div class="px-4 pt-5 pb-4 sm:px-6">
+                    <svg
+                        viewBox={`0 0 ${CHART.w} ${CHART.h}`}
+                        class="block h-auto w-full"
+                        role="img"
+                        aria-label={t("cloud.page.burst.fig.title")}
+                    >
+                        <defs>
+                            <clipPath id="burst-above">
+                                <rect x="0" y="0" width={CHART.w} height={reservedY} />
+                            </clipPath>
+                            <clipPath id="burst-below">
+                                <rect x="0" y={reservedY} width={CHART.w} height={CHART.h - reservedY} />
+                            </clipPath>
+                        </defs>
+
+                        <line x1={CHART.left} x2={CHART.right} y1={CHART.top} y2={CHART.top}
+                              class="text-tone-500" stroke="currentColor" stroke-width="1" stroke-dasharray="2 5" />
+
+                        <rect x={CHART.left} y={reservedY} width={CHART.right - CHART.left} height={CHART.bottom - reservedY}
+                              class="text-primary-light" fill="currentColor" fill-opacity="0.16" />
+
+                        <path d={usageArea} clip-path="url(#burst-above)" class="text-emerald-400" fill="currentColor" fill-opacity="0.22" />
+                        <path d={usageArea} clip-path="url(#burst-below)" class="text-primary-light" fill="currentColor" fill-opacity="0.32" />
+
+                        <line x1={CHART.left} x2={CHART.right} y1={reservedY} y2={reservedY}
+                              class="text-primary-light" stroke="currentColor" stroke-width="1.5" />
+
+                        <path d={usageLine} class="text-tone-max" fill="none" stroke="currentColor" stroke-width="1.75"
+                              stroke-linejoin="round" stroke-linecap="round" />
+
+                        <line x1={CHART.left} x2={CHART.right} y1={CHART.bottom} y2={CHART.bottom}
+                              class="text-tone-600" stroke="currentColor" stroke-width="1" />
+                    </svg>
+
+                    <ul class="mt-4 flex flex-col gap-2 text-xs text-tone-300 sm:flex-row sm:flex-wrap sm:gap-x-6">
+                        <li class="flex items-center gap-2">
+                            <span class="h-2.5 w-4 rounded-sm bg-primary-light/40" aria-hidden="true"></span>
+                            {t("cloud.page.burst.fig.reserved")}
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="h-2.5 w-4 rounded-sm bg-emerald-400/35" aria-hidden="true"></span>
+                            {t("cloud.page.burst.fig.free")}
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="h-0.5 w-4 bg-tone-max" aria-hidden="true"></span>
+                            {t("cloud.page.burst.fig.used")}
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="w-4 border-t border-dashed border-tone-500" aria-hidden="true"></span>
+                            {t("cloud.page.burst.fig.ceiling")}
+                        </li>
+                    </ul>
+                </div>
+            </figure>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ 04 / 05 — TWO DATABASE COPIES ═══════════════════════ -->
+    <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("cloud.page.ha.badge")} index="04 / 05" dot="text-cyan-300" />
+        </div>
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+                <div class="lg:col-span-5 min-w-0">
+                    <h2 class="mb-5 text-3xl sm:text-4xl text-tone-max text-balance">{t("cloud.page.ha.title")}</h2>
+                    <p class="mb-4 text-base leading-relaxed text-page-copy">{t("cloud.page.ha.desc")}</p>
+                    <p class="mb-6 text-base leading-relaxed text-page-copy">{t("cloud.page.ha.cost")}</p>
+                    <p class="cmd-chip"><span class="select-none text-tone-500">$ </span>rebase cloud compute set --db-instances 2</p>
+                </div>
+
+                <div class="lg:col-span-7 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <figure class="frame flex flex-col overflow-hidden">
+                        <figcaption class="frame-head"><span>{t("cloud.page.ha.one")}</span></figcaption>
+                        <div class="flex flex-1 flex-col p-5">
+                            <div class="db-copy">
+                                <Database size={15} class="text-cyan-300" aria-hidden="true" />
+                                <span class="text-sm text-tone-100">{t("cloud.page.ha.primary")}</span>
+                                <span class="ml-auto font-mono text-2xs text-tone-400">{fill(t("cloud.page.ha.server"), { n: "1" })}</span>
+                            </div>
+                            <p class="db-link db-link-none" aria-hidden="true">&nbsp;</p>
+                            <div class="db-copy db-copy-empty">
+                                <span class="font-mono text-2xs text-tone-500">{t("cloud.page.ha.none")}</span>
+                            </div>
+                            <p class="mt-auto pt-2 text-sm leading-relaxed text-amber-300">{t("cloud.page.ha.one.fail")}</p>
+                        </div>
+                    </figure>
+
+                    <figure class="frame flex flex-col overflow-hidden">
+                        <figcaption class="frame-head"><span>{t("cloud.page.ha.two")}</span></figcaption>
+                        <div class="flex flex-1 flex-col p-5">
+                            <div class="db-copy">
+                                <Database size={15} class="text-cyan-300" aria-hidden="true" />
+                                <span class="text-sm text-tone-100">{t("cloud.page.ha.primary")}</span>
+                                <span class="ml-auto font-mono text-2xs text-tone-400">{fill(t("cloud.page.ha.server"), { n: "1" })}</span>
+                            </div>
+                            <p class="db-link font-mono text-2xs text-tone-400">{t("cloud.page.ha.sync")}</p>
+                            <div class="db-copy">
+                                <Database size={15} class="text-tone-400" aria-hidden="true" />
+                                <span class="text-sm text-tone-100">{t("cloud.page.ha.standby")}</span>
+                                <span class="ml-auto font-mono text-2xs text-tone-400">{fill(t("cloud.page.ha.server"), { n: "2" })}</span>
+                            </div>
+                            <p class="mt-auto pt-2 text-sm leading-relaxed text-emerald-400">{t("cloud.page.ha.two.fail")}</p>
+                        </div>
+                    </figure>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ 05 / 05 — BILLING AND HOW TO START ═══════════════════════ -->
+    <section class="relative z-0 ground-raised border-t border-tone-max/8 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("cloud.page.bill.badge")} index="05 / 05" dot="text-amber-300" />
+        </div>
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+                <div class="lg:col-span-7 min-w-0">
+                    <h2 class="mb-5 text-3xl sm:text-4xl text-tone-max text-balance">{t("cloud.page.bill.title")}</h2>
+                    <p class="mb-8 text-base leading-relaxed text-page-copy">{t("cloud.page.bill.desc")}</p>
+                    <ul class="flex flex-col gap-5">
+                        {BILL_POINTS.map(({ title, desc }) => (
+                            <li class="flex gap-3">
+                                <Check size={17} class="mt-0.5 shrink-0 text-primary-light" aria-hidden="true" />
+                                <div>
+                                    <h3 class="font-headers text-base text-tone-100">{t(title)}</h3>
+                                    <p class="mt-1 text-sm leading-relaxed text-page-copy">{desc}</p>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
+                <div class="lg:col-span-5 min-w-0 frame p-6 sm:p-7">
+                    <p class="text-sm text-tone-300">{t("cloud.page.bill.default.label")}</p>
+                    <p class="mt-2 flex flex-wrap items-baseline gap-x-2">
+                        <span class="text-4xl text-tone-max">{eur(defaults.monthlyEur)}</span>
+                        <span class="text-sm text-tone-400">{t("cloud.page.bill.default.per")}</span>
+                    </p>
+                    <p class="mt-3 font-mono text-2xs text-tone-400">
+                        {size(defaults.app)} · {size(defaults.database)} · {defaults.diskGi} GB disk
+                    </p>
+                    <a href={translatePath("/pricing")} class="accent-link mt-6">
+                        {t("cloud.page.bill.pricingLink")}
                         <ArrowRight size={15} aria-hidden="true" />
                     </a>
                 </div>
-
-                <div class="lg:col-span-7 min-w-0">
-                    <div class="frame overflow-hidden">
-                        <div class="frame-head">
-                            <span class="flex items-center gap-2">
-                                <Globe size={14} class="text-cyan-300" aria-hidden="true" />
-                                {t("cloud.page.hetzner.cardTitle")}
-                            </span>
-                            <span class="ml-auto font-mono text-2xs text-tone-400">fsn1 · nbg1</span>
-                        </div>
-                        <dl class="divide-y divide-tone-max/8">
-                            {HETZNER_FACTS.map(({ label, value }) => (
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-6 px-5 py-4">
-                                    <dt class="text-sm text-tone-300">{t(label)}</dt>
-                                    <dd class="font-mono text-xs text-tone-100 sm:text-right">{value}</dd>
-                                </div>
-                            ))}
-                        </dl>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══════════════════════ 03 / 05 — MANAGED STORAGE ═══════════════════════ -->
-    <section class="relative z-0 ground-raised border-y border-tone-max/8 py-chapter">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
-            <ChapterRule label={t("cloud.page.storage.badge")} index="03 / 05" dot="text-emerald-400" />
-        </div>
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="max-w-[42rem] mb-10">
-                <h2 class="mb-4 text-3xl sm:text-4xl text-tone-max text-balance">{t("cloud.page.storage.title")}</h2>
-                <p class="text-base leading-relaxed text-page-copy">{t("cloud.page.storage.desc")}</p>
             </div>
 
-            <ul class="cloud-subgrid grid grid-cols-1 md:grid-cols-3 border-t border-l border-tone-max/8">
-                {STORAGE_POINTS.map(({ title, desc, handle }) => (
-                    <li class="cloud-subgrid-cell border-r border-b border-tone-max/8 p-6">
-                        <h3 class="flex items-center gap-2.5 font-headers text-base text-tone-100">
-                            <HardDrive size={16} class="shrink-0 text-emerald-400" aria-hidden="true" />
-                            <span>{t(title)}</span>
-                        </h3>
-                        <p class="mt-2.5 text-sm leading-relaxed text-page-copy">{t(desc)}</p>
-                        <p class="mt-4 font-mono text-2xs text-tone-400">{handle}</p>
+            <div class="mt-16 border-t border-tone-max/8 pt-12">
+                <h3 class="mb-8 text-2xl text-tone-max">{t("cloud.page.start.title")}</h3>
+                <ol class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                    <li class="min-w-0">
+                        <p class="chapter-index mb-2">01</p>
+                        <p class="mb-4 text-sm leading-relaxed text-page-copy">{t(offerKey("cloud.page.start.s1"))}</p>
+                        <a href={cloudCtaHref} class="accent-link">
+                            {cloudCtaLabel}
+                            <ArrowRight size={15} aria-hidden="true" />
+                        </a>
                     </li>
-                ))}
-            </ul>
-        </div>
-    </section>
-
-    <!-- ═══════════════════════ 04 / 05 — DEDICATED POSTGRES 17 ═══════════════════════ -->
-    <section class="relative z-0 py-chapter">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
-            <ChapterRule label={t("cloud.page.pg.badge")} index="04 / 05" dot="text-primary-light" />
-        </div>
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="max-w-[42rem] mb-10">
-                <h2 class="mb-4 text-3xl sm:text-4xl text-tone-max text-balance">{t("cloud.page.pg.title")}</h2>
-                <p class="text-base leading-relaxed text-page-copy">{t("cloud.page.pg.desc")}</p>
-            </div>
-
-            <ul class="cloud-subgrid grid grid-cols-1 sm:grid-cols-2 border-t border-l border-tone-max/8">
-                {POSTGRES_POINTS.map(({ title, desc, handle }) => (
-                    <li class="cloud-subgrid-cell border-r border-b border-tone-max/8 p-6">
-                        <h3 class="flex items-center gap-2.5 font-headers text-base text-tone-100">
-                            <Database size={16} class="shrink-0 text-cyan-300" aria-hidden="true" />
-                            <span>{t(title)}</span>
-                        </h3>
-                        <p class="mt-2.5 text-sm leading-relaxed text-page-copy">{t(desc)}</p>
-                        <p class="mt-4 font-mono text-2xs text-tone-400">{handle}</p>
+                    <li class="min-w-0">
+                        <p class="chapter-index mb-2">02</p>
+                        <p class="mb-4 text-sm leading-relaxed text-page-copy">{t("cloud.page.start.s2")}</p>
+                        <pre class="overflow-x-auto rounded-lg border border-tone-max/10 bg-tone-max/[0.03] px-4 py-3 font-mono text-xs leading-6 text-tone-200">{START_COMMANDS.map((c) => <span class="block"><span class="select-none text-tone-500">$ </span>{c}</span>)}</pre>
                     </li>
-                ))}
-            </ul>
-        </div>
-    </section>
-
-    <!-- ═══════════════════════ 05 / 05 — DAY-TWO OPS & ZERO LOCK-IN ═══════════════════════ -->
-    <section class="relative z-0 ground-raised border-t border-tone-max/8 py-chapter">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
-            <ChapterRule label={t("cloud.page.ops.badge")} index="05 / 05" dot="text-amber-300" />
-        </div>
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="max-w-[42rem] mb-10">
-                <h2 class="mb-4 text-3xl sm:text-4xl text-tone-max text-balance">{t("cloud.page.ops.title")}</h2>
-                <p class="text-base leading-relaxed text-page-copy">{t("cloud.page.ops.desc")}</p>
-            </div>
-
-            <ul class="cloud-subgrid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-tone-max/8">
-                {OPS_ITEMS.map(({ title, desc, Icon, handle }) => (
-                    <li class="cloud-subgrid-cell border-r border-b border-tone-max/8 p-6">
-                        <h3 class="flex items-center gap-2.5 font-headers text-base text-tone-100">
-                            <Icon size={16} class="shrink-0 text-tone-400" aria-hidden="true" />
-                            <span>{t(title)}</span>
-                        </h3>
-                        <p class="mt-2.5 text-sm leading-relaxed text-page-copy">{t(desc)}</p>
-                        <p class="mt-4 font-mono text-2xs text-tone-400">{handle}</p>
+                    <li class="min-w-0">
+                        <p class="chapter-index mb-2">03</p>
+                        <p class="mb-4 text-sm leading-relaxed text-page-copy">{t("cloud.page.start.s3")}</p>
+                        <pre class="overflow-x-auto rounded-lg border border-tone-max/10 bg-tone-max/[0.03] px-4 py-3 font-mono text-xs leading-6 text-tone-200"><span class="block"><span class="select-none text-tone-500">$ </span>{CLOUD_DEPLOY_COMMAND}</span></pre>
+                        <a href="/docs/deployment/cloud" class="mt-4 inline-block text-sm font-semibold text-tone-400 transition-colors hover:text-tone-max">
+                            {t("cloud.page.docsLink")}
+                        </a>
                     </li>
-                ))}
-            </ul>
-
-            <div class="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3">
-                <a href={cloudCtaHref} class="accent-link">
-                    {cloudCtaLabel}
-                    <ArrowRight size={15} aria-hidden="true" />
-                </a>
-                <a href={translatePath("/pricing")} class="text-sm font-semibold text-tone-400 transition-colors hover:text-tone-max">
-                    {t("cloud.home.link.pricing")}
-                </a>
-                <a href="/docs/deployment/cloud" class="text-sm font-semibold text-tone-400 transition-colors hover:text-tone-max">
-                    {t("cloud.page.ops.docsLink")}
-                </a>
+                </ol>
             </div>
         </div>
     </section>
@@ -271,5 +473,72 @@ const cloudCtaLabel = CLOUD_FLAGS.selfServe ? t("pricing.cloud.cta.open") : t("c
         grid-template-rows: auto 1fr auto;
         grid-template-rows: subgrid;
         min-inline-size: 0;
+    }
+
+    .cloud-prose :global(code) {
+        font-family: var(--font-mono);
+        font-size: 0.92em;
+        color: var(--color-tone-200);
+    }
+
+    /* The availability strip under each resize row: up, down, up. */
+    .resize-track {
+        display: flex;
+        gap: 3px;
+        block-size: 8px;
+    }
+    .resize-on,
+    .resize-off {
+        flex-basis: 0;
+        border-radius: 999px;
+        min-inline-size: 3px;
+    }
+    .resize-on { background: rgb(52 211 153 / 0.55); }
+    .resize-off { background: rgb(252 211 77 / 0.75); }
+
+    .db-copy {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-block-size: 2.75rem;
+        padding-inline: 0.875rem;
+        border-radius: 0.5rem;
+        border: 1px solid color-mix(in srgb, var(--color-tone-max) 10%, transparent);
+        background: color-mix(in srgb, var(--color-tone-max) 3%, transparent);
+    }
+    .cmd-chip {
+        display: inline-block;
+        max-inline-size: 100%;
+        padding: 0.625rem 1rem;
+        border-radius: 0.5rem;
+        border: 1px solid color-mix(in srgb, var(--color-tone-max) 10%, transparent);
+        background: color-mix(in srgb, var(--color-tone-max) 3%, transparent);
+        font-family: var(--font-mono);
+        font-size: var(--text-xs, 0.75rem);
+        line-height: 1.6;
+        color: var(--color-tone-200);
+        overflow-wrap: anywhere;
+    }
+
+    /* The line between two copies: a short rule with its label beside it. */
+    .db-link {
+        position: relative;
+        margin-block: 0.25rem;
+        padding-block: 0.5rem;
+        padding-inline-start: 2.25rem;
+        line-height: 1;
+    }
+    .db-link::before {
+        content: "";
+        position: absolute;
+        inset-block: 0;
+        inset-inline-start: 1.3rem;
+        border-inline-start: 1px dashed color-mix(in srgb, var(--color-tone-max) 25%, transparent);
+    }
+    .db-link-none::before { display: none; }
+
+    .db-copy-empty {
+        border-style: dashed;
+        background: transparent;
     }
 </style>

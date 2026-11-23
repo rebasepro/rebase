@@ -120,59 +120,68 @@ ${cleanHtml(tr(offerKey("cloud.status")))}
   }
 
   if (page === "cloud") {
+    const facts = REGION_FACTS[CLOUD_FLAGS.region];
+    const def = regionPrices().examples.default;
+    const sz = (x: { cpu: string; memory: string }) => `${memoryLabel(x.memory)} · ${cpuLabel(x.cpu)}`;
+    const requests = `${(CLOUD_PRICES.included.requestsPerMonth / 1_000_000).toLocaleString("en")} million`;
     return `# ${cleanHtml(tr("cloud.meta.title"))}
 
 ${cleanHtml(tr("cloud.meta.description"))}
 
 ## ${inline(tr("cloud.page.hero.title"))}
 
-${cleanHtml(tr("cloud.page.hero.lead"))}
+${cleanHtml(fill(tr("cloud.page.hero.lead"), { place: facts.place, provider: facts.provider }))}
 
 ${cleanHtml(tr("cloud.page.hero.sub"))}
 
-## ${inline(tr("cloud.page.topo.title"))}
+## ${inline(tr("cloud.page.get.title"))}
 
-${cleanHtml(tr("cloud.page.topo.desc"))}
+${cleanHtml(tr("cloud.page.get.desc"))}
 
-## ${inline(tr("cloud.page.hetzner.title"))}
+- **${inline(tr("cloud.page.get.app.title"))}** — ${cleanHtml(tr("cloud.page.get.app.desc"))}
+- **${inline(tr("cloud.page.get.db.title"))}** — ${cleanHtml(tr("cloud.page.get.db.desc"))}
+- **${inline(tr("cloud.page.get.files.title"))}** — ${cleanHtml(tr("cloud.page.get.files.desc"))}
 
-${cleanHtml(tr("cloud.page.hetzner.p1"))}
+${inline(tr("cloud.page.get.extras"))}: ${[1, 2, 3, 4].map((n) => inline(tr(`cloud.page.get.extra${n}`))).join(", ")}.
 
-${cleanHtml(tr("cloud.page.hetzner.p2"))}
+## ${inline(tr("cloud.page.size.title"))}
 
-## ${inline(tr("cloud.page.storage.title"))}
+${cleanHtml(fill(tr("cloud.page.size.desc"), { app: sz(def.app), db: sz(def.database) }))}
 
-${cleanHtml(tr("cloud.page.storage.desc"))}
+- **${inline(tr("cloud.page.size.app.label"))}: ${inline(tr("cloud.page.size.app.value"))}** — ${cleanHtml(tr("cloud.page.size.app.note"))}
+- **${inline(tr("cloud.page.size.db1.label"))}: ${inline(tr("cloud.page.size.db1.value"))}** — ${cleanHtml(tr("cloud.page.size.db1.note"))}
+- **${inline(tr("cloud.page.size.db2.label"))}: ${inline(tr("cloud.page.size.db2.value"))}** — ${cleanHtml(tr("cloud.page.size.db2.note"))}
 
-- **${inline(tr("cloud.page.storage.p1.title"))}** — ${cleanHtml(tr("cloud.page.storage.p1.desc"))}
-- **${inline(tr("cloud.page.storage.p2.title"))}** — ${cleanHtml(tr("cloud.page.storage.p2.desc"))}
-- **${inline(tr("cloud.page.storage.p3.title"))}** — ${cleanHtml(tr("cloud.page.storage.p3.desc"))}
+## ${inline(tr("cloud.page.burst.title"))}
 
-## ${inline(tr("cloud.page.pg.title"))}
+${cleanHtml(tr(offerKey("cloud.page.burst.desc")))}
 
-${cleanHtml(tr("cloud.page.pg.desc"))}
+## ${inline(tr("cloud.page.ha.title"))}
 
-- **${inline(tr("cloud.page.pg.p1.title"))}** — ${cleanHtml(tr("cloud.page.pg.p1.desc"))}
-- **${inline(tr("cloud.page.pg.p2.title"))}** — ${cleanHtml(tr("cloud.page.pg.p2.desc"))}
-- **${inline(tr("cloud.page.pg.p3.title"))}** — ${cleanHtml(tr("cloud.page.pg.p3.desc"))}
-- **${inline(tr("cloud.page.pg.p4.title"))}** — ${cleanHtml(tr("cloud.page.pg.p4.desc"))}
+${cleanHtml(tr("cloud.page.ha.desc"))} ${cleanHtml(tr("cloud.page.ha.cost"))}
 
-## ${inline(tr("cloud.page.ops.title"))}
+## ${inline(tr("cloud.page.bill.title"))}
 
-${cleanHtml(tr("cloud.page.ops.desc"))}
+${cleanHtml(tr("cloud.page.bill.desc"))}
 
-- **${inline(tr("cloud.page.ops.i1.title"))}** — ${cleanHtml(tr("cloud.page.ops.i1.desc"))}
-- **${inline(tr("cloud.page.ops.i2.title"))}** — ${cleanHtml(tr("cloud.page.ops.i2.desc"))}
-- **${inline(tr("cloud.page.ops.i3.title"))}** — ${cleanHtml(tr("cloud.page.ops.i3.desc"))}
-- **${inline(tr("cloud.page.ops.i4.title"))}** — ${cleanHtml(tr("cloud.page.ops.i4.desc"))}
-- **${inline(tr("cloud.page.ops.i5.title"))}** — ${cleanHtml(tr("cloud.page.ops.i5.desc"))}
-- **${inline(tr("cloud.page.ops.i6.title"))}** — ${cleanHtml(tr("cloud.page.ops.i6.desc"))}
+- **${inline(tr("cloud.page.bill.p1.title"))}** — ${cleanHtml(tr("cloud.page.bill.p1.desc"))}
+- **${inline(tr("cloud.page.bill.p2.title"))}** — ${cleanHtml(tr("cloud.page.bill.p2.desc"))}
+- **${inline(tr("cloud.page.bill.p3.title"))}** — ${cleanHtml(fill(tr("cloud.page.bill.p3.desc"), { requests, files: String(CLOUD_PRICES.included.filesGb) }))}
+
+${inline(tr("cloud.page.bill.default.label"))}: ${eur(def.monthlyEur)} ${inline(tr("cloud.page.bill.default.per"))}. Every size and price: https://rebase.pro/pricing
+
+## ${inline(tr("cloud.page.start.title"))}
+
+1. ${cleanHtml(tr(offerKey("cloud.page.start.s1")))}
+2. ${cleanHtml(tr("cloud.page.start.s2"))} \`rebase cloud login\`, \`rebase cloud billing setup\`, \`rebase cloud projects create --link\`
+3. ${cleanHtml(tr("cloud.page.start.s3"))} \`rebase cloud deploy\`
 
 ## Status
 
-${cleanHtml(tr("cloud.status"))}
+${cleanHtml(tr(offerKey("cloud.status")))}
 `;
   }
+
 
   if (page === "compare") {
     return `# Rebase compared to the alternatives
