@@ -1,5 +1,5 @@
 ---
-sourceHash: de16b1769a8a5662
+sourceHash: c2fabe52d7bfc689
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Todas as rotas HTTP que um backend Rebase disponibiliza — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso em cada uma e a página que a explica.
@@ -319,8 +319,6 @@ sessão, uma chave de API ou a chave de serviço — e responde a qualquer outro
 inventário dos endpoints personalizados de uma implantação não é público.
 
 ## RPC
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 | Método | Caminho | Gate | Mais informações |
 |---|---|---|---|

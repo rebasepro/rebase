@@ -1,5 +1,5 @@
 ---
-sourceHash: be35acd402d34ec0
+sourceHash: a1e48da6a746fb71
 title: Génération de schéma
 sidebar_label: Génération de schéma
 description: Générez des schémas Drizzle ORM à partir des tables dans backend/schema, créez des migrations SQL, introspectez une base de données existante dans des fichiers defineTable, et maintenez votre base de données synchronisée avec la CLI Rebase.
@@ -213,7 +213,7 @@ rebase db push
   modification du schéma et avant toute étape susceptible d'échouer, de sorte qu'un push interrompu en cours de route laisse une nouvelle table
   refusant toute requête plutôt que totalement ouverte
 - Applique les politiques RLS issues de la compilation du `rls` de vos tables, et **supprime les politiques remplacées par un push antérieur**
-- <span class="since-badge" data-since="0.35">Depuis la version 0.35</span> Avec `--prune-policies`, supprime également les politiques sur les tables déclarées qu'aucune table ne déclare — celles que l'exécution à blanc liste comme « left in force », telles que les politiques propres à la base de données après le passage d'une table à `rls: "admin-only"` — dans la transaction qui applique les politiques déclarées. L'exécution à blanc liste chacune d'elles sous « Planned row-level security changes », et le push les soumet au même contrôle qu'une colonne supprimée (il demande confirmation sur un terminal, et nécessite ailleurs `--allow-destructive`) : supprimer une politique modifie qui peut lire et écrire les lignes, et la suppression d'une politique `RESTRICTIVE` élargit les accès. Une table que `backend/schema` ne déclare pas, ainsi que le schéma `rebase`, ne sont jamais touchés
+- Avec `--prune-policies`, supprime également les politiques sur les tables déclarées qu'aucune table ne déclare — celles que l'exécution à blanc liste comme « left in force », telles que les politiques propres à la base de données après le passage d'une table à `rls: "admin-only"` — dans la transaction qui applique les politiques déclarées. L'exécution à blanc liste chacune d'elles sous « Planned row-level security changes », et le push les soumet au même contrôle qu'une colonne supprimée (il demande confirmation sur un terminal, et nécessite ailleurs `--allow-destructive`) : supprimer une politique modifie qui peut lire et écrire les lignes, et la suppression d'une politique `RESTRICTIVE` élargit les accès. Une table que `backend/schema` ne déclare pas, ainsi que le schéma `rebase`, ne sont jamais touchés
 - Laisse chaque
   contrainte CHECK et EXCLUDE sur une table déclarée telle quelle. Une table
   ne pouvant déclarer ni l'une ni l'autre, il s'agit des règles propres à la base de données, écrites à la main

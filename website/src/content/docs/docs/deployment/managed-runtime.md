@@ -226,7 +226,6 @@ Some details:
   one piece, so stream it or serve it from storage.
 
 ### Monitors and scheduled work in `/metrics`
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 A request from a well-known uptime monitor (matched on its `User-Agent`), or one carrying an `x-rebase-probe` header with any value, is served but counted in `rebase_probe_requests_total` instead of `rebase_requests_total`, so a monitor does not read as traffic. `rebase_scheduled_jobs` is the number of enabled cron jobs registered in the app and `rebase_background_workers` is 1 while this process runs a job-queue worker; both stop while a deployment is scaled to zero, which is why a platform that sleeps idle projects reads them.
 

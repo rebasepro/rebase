@@ -1,5 +1,5 @@
 ---
-sourceHash: 6670d26e763252ab
+sourceHash: 4acb34e54a96f397
 title: "Receita: Migrando do Supabase"
 sidebar_label: Migrando do Supabase
 description: "Mova um projeto do Supabase para o Rebase: faça a introspecção do esquema, aplique os objetos SQL que não são tabelas, copie os dados mantendo os IDs de usuário, porte edge functions e faça o deploy, tudo a partir da CLI."
@@ -58,7 +58,6 @@ rebase db push
 ```
 
 ## 3. Aplicar os objetos SQL
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 Edite `backend/sql/_introspected-left-behind.sql` da mesma forma que as tabelas foram
 editadas: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, sem
@@ -78,7 +77,7 @@ nome, depois das tabelas e antes das políticas, e registra cada um por hash em
 aplica da mesma forma (passo 8).
 
 Uma função que o navegador chamava com `supabase.rpc('fn')` é declarada com
-<span class="since-badge" data-since="0.35">Desde 0.35</span> [`defineRpc`](/docs/backend/rpc/), junto às tabelas. Ela é então servida em
+[`defineRpc`](/docs/backend/rpc/), junto às tabelas. Ela é então servida em
 `POST /api/rpc/<name>` e executa como o chamador sob row-level security, de modo que
 uma função `SECURITY DEFINER` se comporte exatamente como no Supabase:
 
@@ -175,7 +174,6 @@ no Cloud). Sem essas configurações, a rota responderá com 503, e `rebase clou
 reportará `blockedOn: email_not_configured`.
 
 ## 8. Deploy
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 ```bash
 rebase cloud projects create --name Triptelier --link

@@ -1,5 +1,5 @@
 ---
-sourceHash: be35acd402d34ec0
+sourceHash: a1e48da6a746fb71
 title: Generazione dello Schema
 sidebar_label: Generazione dello Schema
 description: Genera schemi Drizzle ORM dalle tabelle in backend/schema, crea migrazioni SQL, esegui l'introspezione di un database esistente in file defineTable e mantieni il tuo database sincronizzato con la CLI di Rebase.
@@ -213,7 +213,7 @@ rebase db push
   la modifica allo schema e prima di qualsiasi passaggio che potrebbe fallire, in modo che un push interrotto
   a metà lasci la nuova tabella in uno stato che nega ogni richiesta anziché lasciarla accessibile a tutti
 - Applica le policy RLS generate dal blocco `rls` delle tue tabelle e **rimuove le policy superate da un push precedente**
-- <span class="since-badge" data-since="0.35">Da 0.35</span> Con `--prune-policies`, elimina anche le policy sulle tabelle dichiarate che nessuna tabella dichiara più — quelle che il dry run elenca come "left in force", come ad esempio le policy proprie del database dopo che una tabella è passata a `rls: "admin-only"` — all'interno della medesima transazione che applica quelle dichiarate. Il dry run elenca ciascuna di esse sotto "Planned row-level security changes", e il push le sottopone a verifica come per le colonne eliminate (chiede conferma su terminale, e richiede altrove `--allow-destructive`): eliminare una policy modifica chi può leggere e scrivere le righe, e l'eliminazione di una policy `RESTRICTIVE` amplia l'accesso. Una tabella non dichiarata in `backend/schema`, così come lo schema `rebase`, non vengono mai toccati
+- Con `--prune-policies`, elimina anche le policy sulle tabelle dichiarate che nessuna tabella dichiara più — quelle che il dry run elenca come "left in force", come ad esempio le policy proprie del database dopo che una tabella è passata a `rls: "admin-only"` — all'interno della medesima transazione che applica quelle dichiarate. Il dry run elenca ciascuna di esse sotto "Planned row-level security changes", e il push le sottopone a verifica come per le colonne eliminate (chiede conferma su terminale, e richiede altrove `--allow-destructive`): eliminare una policy modifica chi può leggere e scrivere le righe, e l'eliminazione di una policy `RESTRICTIVE` amplia l'accesso. Una tabella non dichiarata in `backend/schema`, così come lo schema `rebase`, non vengono mai toccati
 - Mantiene invariato ogni
   vincolo CHECK ed EXCLUDE presente su una tabella dichiarata. Poiché una tabella
   non può dichiarare nessuno dei due, si tratta di regole proprie del database, scritte a mano

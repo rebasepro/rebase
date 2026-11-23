@@ -1,5 +1,5 @@
 ---
-sourceHash: 444e25d42cbff83f
+sourceHash: 507686b3cd49d852
 title: Apps e Repositórios
 sidebar_label: Apps & Repositórios
 description: Um projeto é um backend mais os apps que se comunicam com ele, que podem viver, cada um, em seu próprio repositório.
@@ -152,7 +152,7 @@ o app estático como `web`, onde um scaffold o nomeia como `admin`, e não pode 
 rota `cms` do app. O nome não muda: o Rebase Cloud registrou `web` para
 cada projeto que fez deploy sem um `rebase.json`.
 `rebase apps init --force` mantém os nomes, `path`, `cms`, `routes`,
-`frameAncestors`, <span class="since-badge" data-since="0.35">Since 0.35</span> `redirects` e `cleanUrls` dos apps declarados no arquivo que ele substitui,
+`frameAncestors`, `redirects` e `cleanUrls` dos apps declarados no arquivo que ele substitui,
 e marca como removido qualquer app que não encontrar mais.
 
 ## Um app em seu próprio hostname
@@ -363,16 +363,12 @@ rotas contra um build com `rebase start`.
 
 ## Redirecionamentos e clean URLs
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 Um app estático aceita `redirects` (`{ "from": "/blog/:slug", "to": "/posts/:slug" }`,
 inclusive para outro domínio) e `cleanUrls: true` (`/x` serve `x.html`). Veja
 [Redirecionamentos e clean URLs](/docs/architecture/redirects-and-clean-urls/), que
 também mapeia um `vercel.json` para o `rebase.json`.
 
 ## App Links, Universal Links e outros arquivos `/.well-known`
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 Android App Links e iOS Universal Links são verificados buscando um arquivo na
 origem do site: `https://<host>/.well-known/assetlinks.json` e
@@ -494,7 +490,7 @@ marca de versão não revela nada sobre o schema que ela representa:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.34.2","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.35.0","contract":1}}
 ```
 
 Comparar os dois no CI transforma uma incompatibilidade silenciosa em uma verificação com falha. A marcação

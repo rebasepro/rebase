@@ -1,5 +1,5 @@
 ---
-sourceHash: 6670d26e763252ab
+sourceHash: 4acb34e54a96f397
 title: "Rezept: Migration von Supabase"
 sidebar_label: Migration von Supabase
 description: "Migrieren Sie ein Supabase-Projekt zu Rebase: Schema introspektieren, SQL-Objekte anwenden, die keine Tabellen sind, Daten unter Beibehaltung der Benutzer-IDs kopieren, Edge Functions portieren und deployen – alles über das CLI."
@@ -44,7 +44,6 @@ rebase db push
 ```
 
 ## 3. SQL-Objekte anwenden
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 Bearbeiten Sie `backend/sql/_introspected-left-behind.sql` analog zur Anpassung der Tabellen: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, kein `GRANT … TO anon, authenticated`. Funktionen, die `pg_net` aufgerufen haben, eignen sich besser als [Custom Function](/docs/backend/custom-functions/). Machen Sie jede Anweisung gefahrlos wiederholbar (`DROP TRIGGER IF EXISTS` vor jedem `CREATE TRIGGER`), benennen Sie die Datei dann ohne das führende `_` um und pushen Sie:
 
@@ -55,7 +54,7 @@ rebase db push
 
 `rebase db push` wendet jede `.sql`-Datei in `backend/sql` in Namensreihenfolge an, nach den Tabellen und vor den Policies, und erfasst jede per Hash in `rebase.sql_files`, sodass eine Datei nur erneut läuft, wenn sie sich ändert. Ein Deploy wendet sie genauso an (Schritt 8).
 
-Eine Funktion, die der Browser mit `supabase.rpc('fn')` aufgerufen hat, wird mit <span class="since-badge" data-since="0.35">Seit 0.35</span> [`defineRpc`](/docs/backend/rpc/) neben den Tabellen deklariert. Sie wird dann unter `POST /api/rpc/<name>` bereitgestellt und als Aufrufer unter Row-Level-Security ausgeführt, sodass sich eine `SECURITY DEFINER`-Funktion wie in Supabase verhält:
+Eine Funktion, die der Browser mit `supabase.rpc('fn')` aufgerufen hat, wird mit [`defineRpc`](/docs/backend/rpc/) neben den Tabellen deklariert. Sie wird dann unter `POST /api/rpc/<name>` bereitgestellt und als Aufrufer unter Row-Level-Security ausgeführt, sodass sich eine `SECURITY DEFINER`-Funktion wie in Supabase verhält:
 
 ```ts
 // backend/schema/rpc.ts, exported from backend/schema/index.ts
@@ -129,7 +128,6 @@ export default defineFunction((app) => {
 Die Anmeldung per Magic-Link und E-Mail-Code erfordert einen E-Mail-Dienst. Setzen Sie `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` und `SMTP_FROM` (mittels `rebase cloud env set` in der Cloud). Ohne diese Einstellungen antwortet die Route mit 503 und `rebase cloud status` meldet `blockedOn: email_not_configured`.
 
 ## 8. Deployment
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 ```bash
 rebase cloud projects create --name Triptelier --link

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5ee5cd26135e6556
+sourceHash: a439eb40c100e881
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Handlungsanweisungen – plus Response-Envelope, X-Request-ID und die Details-Regeln.
@@ -351,8 +351,6 @@ unten aufgeführten Codes sind diejenigen, denen ein Client in der Praxis begegn
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | Dieser Prozess leitet Funktionen per Proxy an einen anderen weiter, der nicht geantwortet hat. | Prüfen Sie, ob die Functions-Einheit ausgeführt wird. |
 
 ## SQL-Funktionen als RPC
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 `POST /api/rpc/<name>` — siehe [SQL-Funktionen als RPC](/docs/backend/rpc/). Ein fehlerhaftes Argument führt zu `VALIDATION_CONSTRAINT` (400), wobei `details.violations` jedes Feld benennt, genau wie bei der Daten-API; Zugangsdaten ohne `data:read` führen zu `SCOPE_MISSING` (403); ein öffentlicher RPC über seinem Limit führt zu `RATE_LIMITED` (429).
 

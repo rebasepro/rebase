@@ -171,8 +171,6 @@ answers.
 
 ### Storage
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 :::caution[Storage has no row-level security, so it needs an access model]
 Tables are protected by Postgres RLS. Object storage has no equivalent —
 keys share one flat namespace — so with a bucket configured and no access model

@@ -1,5 +1,5 @@
 ---
-sourceHash: 174c7e210e0d7d49
+sourceHash: 4afe718897048683
 title: Riferimento CLI
 sidebar_label: CLI
 description: Comandi della CLI di Rebase per l'inizializzazione del progetto, la generazione dello schema, le migrazioni del database e la generazione dell'SDK.
@@ -60,7 +60,7 @@ Avvia sia il frontend che il backend con hot reloading, e rigenera lo schema Dri
 Entrambe le porte sono derivate dal percorso del progetto, consentendo l'esecuzione affiancata di più progetti Rebase. Usa gli URL stampati da `rebase dev`. Fissane una con `rebase dev --port 3001`.
 
 Un'app statica in `rebase.json` senza fase di build (nessun `build`, e `output` corrisponde al suo `root`, come un semplice sito HTML) viene servita dal backend da quella directory, al suo `path`, così come `rebase start` la serve dal bundle, e `FRONTEND_URL` viene impostato su di essa (sulla porta del backend) in modo che i link inviati via email puntino lì.
-<span class="since-badge" data-since="0.35">Da 0.35</span> Vengono serviti anche i suoi [`redirects` e `cleanUrls`](/docs/architecture/redirects-and-clean-urls/), e un'app che dichiara reindirizzamenti non ha bisogno di un file `index.html`.
+Vengono serviti anche i suoi [`redirects` e `cleanUrls`](/docs/architecture/redirects-and-clean-urls/), e un'app che dichiara reindirizzamenti non ha bisogno di un file `index.html`.
 Un'app con una fase di build viene eseguita in Vite sulla propria porta, e `FRONTEND_URL` corrisponde a quella di Vite.
 
 Una modifica a `.env` riavvia il backend, che rilegge il file, come fa il pannello di amministrazione. Ciò che `rebase dev` imposta autonomamente viene mantenuto fino al riavvio: `PORT` e `DATABASE_URL` quando si trova sul database gestito o su Docker.

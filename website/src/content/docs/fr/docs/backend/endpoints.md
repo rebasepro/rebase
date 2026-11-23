@@ -1,5 +1,5 @@
 ---
-sourceHash: de16b1769a8a5662
+sourceHash: c2fabe52d7bfc689
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec le contrôle d'accès sur chacune et la page qui l'explique.
@@ -328,8 +328,6 @@ par `401` : l'inventaire des points de terminaison personnalisés d'un déploiem
 n'est pas public.
 
 ## RPC
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 | Méthode | Chemin | Contrôle | En savoir plus |
 |---|---|---|---|

@@ -1,11 +1,9 @@
 ---
-sourceHash: 8250c897b7861c24
+sourceHash: bd5ca4ed0e47d867
 title: Redirect e clean URL
 sidebar_label: Redirect & Clean URL
 description: "Un'app statica in rebase.json può rispondere alle richieste con dei redirect (matching dei :param in stile Vercel, condizioni su host, host negato e query) e servire x.html su /x con cleanUrls."
 ---
-
-<span class="since-badge" data-since="0.35">Da 0.35</span>
 
 Un'app statica può rispondere ad alcune richieste con un redirect invece che con un file, e
 servire le sue pagine HTML senza `.html`:
@@ -27,8 +25,6 @@ servire le sue pagine HTML senza `.html`:
 ```
 
 ## `redirects`
-
-<span class="since-badge" data-since="0.35">Da 0.35</span>
 
 - **`from`** è un percorso sull'indirizzo dell'app, assoluto e all'interno del suo `path`.
   `:name` corrisponde a un singolo segmento e `:name*`, come ultimo segmento, corrisponde al
@@ -61,8 +57,6 @@ alle stesse richieste, o quando un redirect invia una richiesta a un percorso a 
 
 ## Un percorso, una pagina diversa per hostname
 
-<span class="since-badge" data-since="0.35">Da 0.35</span>
-
 Un'app servita su più hostname può inviare lo stesso percorso a una pagina diversa su ciascuno. Qui `/` apre l'app su `app.example.com` e la demo su tutti gli altri hostname:
 
 ```json
@@ -75,8 +69,6 @@ Un'app servita su più hostname può inviare lo stesso percorso a una pagina div
 Senza `notHost`, il secondo redirect può non avere alcuna condizione: risponde la prima corrispondenza, quindi vede solo ciò che il primo ha lasciato passare. `notHost` fa sì che ogni redirect dica da sé dove si applica, come fa una condizione `missing` di `vercel.json`, così l'ordine non conta più.
 
 ## Reindirizzare un dominio verso un altro
-
-<span class="since-badge" data-since="0.35">Da 0.35</span>
 
 Un'app il cui unico scopo è un redirect invia il bare domain a `www`, mantenendo
 percorso e query:
@@ -111,8 +103,6 @@ directory con il nome esatto della richiesta viene servito per primo, quindi `/a
 sito con `spa: false` risponde con un 404.
 
 ## Se provieni da Vercel
-
-<span class="since-badge" data-since="0.35">Da 0.35</span>
 
 `vercel.json`:
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: c01ec36e7192bb7f
+sourceHash: 527ed0c2f1a85b8e
 title: Rebase Storage
 sidebar_label: Rebase Storage
 description: "Almacenamiento de objetos compatible con S3 en Rebase Cloud: el endpoint, buckets y claves, las operaciones S3 compatibles, límites, precios, dónde se almacenan los datos y cómo conectar aws-cli, rclone, boto3 y el AWS SDK para JavaScript."
@@ -32,8 +32,6 @@ Los nombres de los buckets son globales en todo Rebase Storage: de 3 a 63 caract
 Los buckets no se crean mediante la llamada `CreateBucket` de S3. `CreateBucket` para un bucket del que ya eres propietario responde con `BucketAlreadyOwnedByYou`.
 
 ## Claves
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 Rebase emite las claves de acceso. Cada clave es de **solo lectura** o de **lectura y escritura**, y cubre un solo bucket o todos los buckets del proyecto.
 
@@ -124,8 +122,6 @@ Los objetos no se cifran en reposo: el almacenamiento de objetos del proveedor n
 
 ## Importar un bucket existente
 
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
-
 `rebase cloud storage import` copia un bucket desde cualquier servicio compatible con S3 hacia Rebase Storage:
 
 ```bash
@@ -147,8 +143,6 @@ Los objetos ya copiados que tengan el mismo tamaño se omiten, por lo que una se
 Para Google Cloud Storage, utiliza su endpoint de interoperabilidad S3 (`https://storage.googleapis.com`) junto con una clave HMAC. `rebase cloud storage import --help` muestra cómo proporcionar las credenciales del origen.
 
 ## Conectar un cliente
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 Los siguientes ejemplos utilizan una clave creada con `rebase cloud storage keys create`.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5ee5cd26135e6556
+sourceHash: a439eb40c100e881
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con relativo stato HTTP, significato e azioni da intraprendere — oltre all'envelope della risposta, X-Request-ID e le regole per details.
@@ -348,8 +348,6 @@ il messaggio identifica il vincolo violato.
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | Questo processo funge da proxy per le funzioni verso un altro processo, che non ha risposto. | Verifica che il processo responsabile delle funzioni sia attivo e operativo. |
 
 ## Funzioni SQL come RPC
-
-<span class="since-badge" data-since="0.35">Da 0.35</span>
 
 `POST /api/rpc/<name>` — consulta [Funzioni SQL come RPC](/docs/backend/rpc/). Un argomento non valido restituisce `VALIDATION_CONSTRAINT` (400), con `details.violations` che elenca i singoli campi non conformi, analogamente all'API dei dati; credenziali prive di `data:read` restituiscono `SCOPE_MISSING` (403); una RPC pubblica che supera la soglia consentita genera `RATE_LIMITED` (429).
 

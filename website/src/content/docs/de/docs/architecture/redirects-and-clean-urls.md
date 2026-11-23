@@ -1,11 +1,9 @@
 ---
-sourceHash: 8250c897b7861c24
+sourceHash: bd5ca4ed0e47d867
 title: Weiterleitungen und Clean URLs
 sidebar_label: Weiterleitungen & Clean URLs
 description: "Eine statische App in rebase.json kann Anfragen mit Weiterleitungen beantworten (Vercel-ähnliches :param-Matching, Host-, negierte Host- und Query-Bedingungen) und mit cleanUrls x.html unter /x bereitstellen."
 ---
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 Eine statische App kann bestimmte Anfragen mit einer Weiterleitung statt einer Datei beantworten und ihre HTML-Seiten ohne das `.html` bereitstellen:
 
@@ -26,8 +24,6 @@ Eine statische App kann bestimmte Anfragen mit einer Weiterleitung statt einer D
 ```
 
 ## `redirects`
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 - **`from`** ist ein Pfad auf der Adresse der App, absolut und innerhalb ihres `path`.
   `:name` entspricht einem Segment und `:name*`, als letztes Segment, entspricht dem
@@ -60,8 +56,6 @@ dieselben Anfragen zutreffen, und wenn eine Weiterleitung eine Anfrage an einen 
 
 ## Ein Pfad, auf jedem Hostnamen eine andere Seite
 
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
-
 Eine App, die unter mehreren Hostnamen bereitgestellt wird, kann denselben Pfad auf jedem zu einer anderen Seite weiterleiten. Hier öffnet `/` auf `app.example.com` die App und auf jedem anderen Hostnamen die Demo:
 
 ```json
@@ -74,8 +68,6 @@ Eine App, die unter mehreren Hostnamen bereitgestellt wird, kann denselben Pfad 
 Ohne `notHost` kann die zweite Weiterleitung ganz ohne Bedingung auskommen: Die erste Übereinstimmung antwortet, daher sieht sie nur, was die erste durchgelassen hat. Mit `notHost` legt jede Weiterleitung für sich fest, wo sie gilt, so wie es eine `missing`-Bedingung in `vercel.json` tut, sodass die Reihenfolge keine Rolle mehr spielt.
 
 ## Eine Domain an eine andere weiterleiten
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 Eine App, deren einzige Aufgabe eine Weiterleitung ist, leitet die Bare-Domain an `www` weiter,
 wobei Pfad und Query beibehalten werden:
@@ -110,8 +102,6 @@ ein Verzeichnis mit dem exakten Namen der Anfrage wird zuerst ausgeliefert, soda
 `spa: false`-Site mit einem 404 beantwortet.
 
 ## Von Vercel umsteigen
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 `vercel.json`:
 

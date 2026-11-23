@@ -1,5 +1,5 @@
 ---
-sourceHash: 1eae92c45ebedd91
+sourceHash: bbee7bded8a1462e
 title: Speicher-Konfiguration
 sidebar_label: Speicher-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible oder GCS/Firebase Storage-Backends für Datei-Uploads, Bilder und Medien.
@@ -14,8 +14,6 @@ Rebase unterstützt drei Storage-Backends:
 - **Google Cloud Storage / Firebase Storage** — Native GCS-Unterstützung via `@google-cloud/storage`
 
 ## Konfiguration
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 :::note[Wo dies hingehört]
 **Managed-Runtime** — die `STORAGE_*`-Variablen in `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — versehen Sie jede davon mit dem Suffix `__<KEY>` für eine benannte Quelle), plus eine `bucket("<key>")`-Deklaration in `backend/resources.ts` für jeden Bucket über den Standard-Bucket hinaus, sowie `export const storageAuthorize` aus `backend/storage.ts`. Regeln pro Objekt können auch als Daten in `STORAGE_POLICIES` festgelegt werden — "public", "authenticated", "owner" (das `:uid`-Segment des Schlüssels ist der Aufrufer) und Rollen — siehe [Speicher-Autorisierung](/docs/backend/storage-authorization/#as-data-storage_policies).
@@ -205,8 +203,6 @@ STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 Wie viel von einer Datei der Server gleichzeitig im Speicher hält, hängt vom Zugriffsweg ab. `POST /api/storage/upload` ist ein einzelner Multipart-Body, den der Server vollständig parst: das Drei- bis Fünffache der Dateigröße im Arbeitsspeicher. Ein wiederaufnehmbarer (TUS-)Upload hält jeweils nur einen Chunk im Speicher. `client.storage.putObject()` und das Admin-Panel senden Dateien über 8 MiB über den wiederaufnehmbaren Pfad. Siehe [Wiederaufnehmbare Uploads (TUS)](/docs/backend/storage-resumable-uploads/) für das Protokoll, die Antworten und das Verhalten über Instanzen hinweg.
 
 ## Umgebungsvariablen
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 | Variable | Beschreibung |
 |----------|-------------|

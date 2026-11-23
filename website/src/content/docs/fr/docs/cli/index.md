@@ -1,5 +1,5 @@
 ---
-sourceHash: 174c7e210e0d7d49
+sourceHash: 4afe718897048683
 title: Référence CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -59,7 +59,7 @@ Démarre à la fois le frontend et le backend avec le rechargement à chaud (hot
 
 Les deux ports sont dérivés du chemin du projet afin que plusieurs projets Rebase puissent s'exécuter côte à côte. Utilisez les URL affichées par `rebase dev`. Figez un port avec `rebase dev --port 3001`.
 
-Une application statique dans `rebase.json` sans étape de build (pas de `build`, et `output` correspond à sa `root`, comme un simple site HTML) est servie par le backend depuis ce répertoire, à son `path`, de la même manière que `rebase start` la sert depuis le bundle, et `FRONTEND_URL` est configuré vers elle (sur le port du backend) pour que les liens envoyés par e-mail y mènent. <span class="since-badge" data-since="0.35">Depuis la version 0.35</span> Ses [`redirects` et `cleanUrls`](/docs/architecture/redirects-and-clean-urls/) sont également servis, et une application qui déclare des redirections n'a pas besoin de fichier `index.html`. Une application avec un build s'exécute dans Vite sur son propre port, et `FRONTEND_URL` prend celui de Vite.
+Une application statique dans `rebase.json` sans étape de build (pas de `build`, et `output` correspond à sa `root`, comme un simple site HTML) est servie par le backend depuis ce répertoire, à son `path`, de la même manière que `rebase start` la sert depuis le bundle, et `FRONTEND_URL` est configuré vers elle (sur le port du backend) pour que les liens envoyés par e-mail y mènent. Ses [`redirects` et `cleanUrls`](/docs/architecture/redirects-and-clean-urls/) sont également servis, et une application qui déclare des redirections n'a pas besoin de fichier `index.html`. Une application avec un build s'exécute dans Vite sur son propre port, et `FRONTEND_URL` prend celui de Vite.
 
 Une modification de `.env` redémarre le backend, qui relit le fichier, tout comme le panneau d'administration. Ce que `rebase dev` définit lui-même est conservé jusqu'à ce que vous le redémarriez : `PORT`, et `DATABASE_URL` lorsqu'il utilise la base de données gérée ou Docker.
 

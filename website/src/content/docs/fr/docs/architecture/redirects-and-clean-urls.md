@@ -1,11 +1,9 @@
 ---
-sourceHash: 8250c897b7861c24
+sourceHash: bd5ca4ed0e47d867
 title: Redirections et URLs propres
 sidebar_label: Redirections & URLs propres
 description: "Une application statique dans rebase.json peut répondre aux requêtes par des redirections (correspondance :param façon Vercel, conditions d'hôte, d'hôte exclu et de requête) et servir x.html à l'adresse /x avec cleanUrls."
 ---
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 Une application statique peut répondre à certaines requêtes par une redirection au lieu d'un fichier, et servir ses pages HTML sans le `.html` :
 
@@ -26,8 +24,6 @@ Une application statique peut répondre à certaines requêtes par une redirecti
 ```
 
 ## `redirects`
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 - **`from`** est un chemin sur l'adresse de l'application, absolu et situé dans son `path`.
   `:name` correspond à un segment et `:name*`, en tant que dernier segment, correspond au
@@ -60,8 +56,6 @@ aux mêmes requêtes, et lorsqu'une redirection envoie une requête vers un chem
 
 ## Un chemin, une page différente par nom d'hôte
 
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
-
 Une application servie sur plusieurs noms d'hôte peut envoyer le même chemin vers une page différente sur chacun. Ici, `/` ouvre l'application sur `app.example.com` et la démo sur tous les autres noms d'hôte :
 
 ```json
@@ -74,8 +68,6 @@ Une application servie sur plusieurs noms d'hôte peut envoyer le même chemin v
 Sans `notHost`, la seconde redirection peut n'avoir aucune condition : la première qui correspond répond, donc elle ne voit que ce que la première a laissé passer. `notHost` fait que chaque redirection dit d'elle-même où elle s'applique, comme le fait une condition `missing` de `vercel.json`, si bien que l'ordre n'a plus d'importance.
 
 ## Rediriger un domaine vers un autre
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 Une application dont le seul rôle est une redirection envoie le domaine nu vers `www`, en conservant
 le chemin et la requête :
@@ -110,8 +102,6 @@ répertoire portant le nom exact de la requête est servi en priorité, de sorte
 avec `spa: false` répond par une 404.
 
 ## Venant de Vercel
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 `vercel.json` :
 

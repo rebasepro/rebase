@@ -1,5 +1,5 @@
 ---
-sourceHash: 14ada28ef46dc73c
+sourceHash: 9acb2b3f441697d7
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -171,8 +171,6 @@ respostas.
 | `CAPTCHA_ROUTES` | Rotas de autenticação separadas por vírgula a serem protegidas (por exemplo, `register,login`). Não definido protege o conjunto padrão do provedor. | — |
 
 ### Storage
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 :::caution[O Storage não possui segurança em nível de linha, portanto precisa de um modelo de acesso]
 As tabelas são protegidas pelo RLS do Postgres. O armazenamento de objetos não tem equivalente —

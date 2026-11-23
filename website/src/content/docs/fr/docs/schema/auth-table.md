@@ -1,5 +1,5 @@
 ---
-sourceHash: e934bb43a5bf4916
+sourceHash: a7b5b5daa103ef94
 title: La table des utilisateurs
 sidebar_label: Table des utilisateurs
 description: "defineAuthTable déclare la table dans laquelle l'authentification stocke les utilisateurs : les colonnes nécessaires à l'authentification, une stratégie d'auto-lecture, des colonnes de privilèges réservées aux administrateurs, ainsi que le modèle d'accès — rôles, scopes applicatifs, clés personnelles et hooks de cycle de vie des utilisateurs."
@@ -68,8 +68,6 @@ Les règles définies sur d'autres tables peuvent faire référence aux colonnes
 la table des utilisateurs elle-même peut également cibler chaque colonne d'authentification, déclarée ou non.
 
 ## Sans table d'utilisateurs
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 En déclarer une est facultatif. L'authentification fonctionne dans les deux cas : sans `defineAuthTable`,
 elle conserve ses utilisateurs dans `rebase.users`, et les comptes ainsi que les rôles sont gérés dans la section

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7cfed3fdc9ab52e4
+sourceHash: 320830830681a3a2
 title: Autoalojamiento
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial del runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS estándar.
@@ -84,7 +84,7 @@ Dado que ya están allí, puedes montar el bundle en modo solo lectura; vale la 
 Para un despliegue real, es preferible empaquetar ambos dentro de una imagen, lo que también fija con exactitud lo que se ejecuta:
 
 ```dockerfile
-FROM rebasepro/server:0.34.2
+FROM rebasepro/server:0.35.0
 COPY dist-bundle /bundle
 ```
 
@@ -179,8 +179,6 @@ La imagen crea `/storage` para el usuario sin privilegios `node` con el que se e
 
 ### El almacenamiento requiere un modelo de control de acceso
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 Una vez que un bucket **está** configurado, el runtime **se niega a arrancar en producción** hasta que el despliegue declare cómo se protegen los objetos. El almacenamiento no está cubierto por la seguridad a nivel de fila y sus claves comparten un único espacio de nombres plano, por lo que sin ninguna regla, lo único que separa los archivos de dos usuarios es la dificultad para adivinar las claves, algo que `GET /storage/list?prefix=` invalida. Cualquiera de las siguientes opciones satisface este requisito:
 
 - un **hook `storageAuthorize`** (o `storagePolicies`) en la configuración de tu proyecto, que es lo que incluye el scaffold en `backend/storage.ts`;
@@ -203,7 +201,7 @@ El runtime es un contenedor ordinario que escucha en `$PORT`, por lo que cualqui
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.34.2 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.35.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -331,7 +329,7 @@ Todo lo anterior consiste en un único contenedor que sirve todo el proyecto, qu
 ## Actualización
 
 ```yaml
-image: rebasepro/server:0.34.2
+image: rebasepro/server:0.35.0
 ```
 
 Reinicia. Tu bundle no cambia. Dentro de una misma versión principal del contrato del runtime, un bundle que haya sido validado seguirá funcionando; consulta [Compatibility](/docs/architecture/runtime-and-bundles/#compatibility).

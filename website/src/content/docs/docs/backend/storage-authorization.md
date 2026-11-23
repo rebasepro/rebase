@@ -49,8 +49,6 @@ fails the boot rather than the first upload.
 
 ### As data: `STORAGE_POLICIES`
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 The managed runtime cannot read a predicate from your code, and a project on
 Rebase Cloud's stock backend has no code to read. So the same rules can be set
 as JSON in the `STORAGE_POLICIES` environment variable, with the two predicates
@@ -78,8 +76,6 @@ list refuses the boot, naming each problem; Rebase Cloud refuses to save one,
 and its console edits the list under **File storage → Access rules**.
 
 ## The hook
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 `requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an authorization hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model. Worse, they can `GET /storage/list?prefix=` first, so the keys do not even have to be guessed.
 

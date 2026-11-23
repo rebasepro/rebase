@@ -1,5 +1,5 @@
 ---
-sourceHash: 5ee5cd26135e6556
+sourceHash: a439eb40c100e881
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, o que significam e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -316,8 +316,6 @@ Todas as outras falhas — queda de conexão, coluna ausente, problemas de privi
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | Este processo atua como proxy das funções para outra instância, que não respondeu. | Verifique se a unidade de execução das funções está ativa. |
 
 ## Funções SQL como RPC
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 `POST /api/rpc/<name>` — veja [SQL functions as RPC](/docs/backend/rpc/). Argumentos inválidos retornam `VALIDATION_CONSTRAINT` (400), com `details.violations` indicando cada campo, similar à API de dados; credenciais sem `data:read` retornam `SCOPE_MISSING` (403); RPC público que exceda o limite retorna `RATE_LIMITED` (429).
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 444e25d42cbff83f
+sourceHash: 507686b3cd49d852
 title: Applications et dépôts
 sidebar_label: Applications & Dépôts
 description: Un projet est un backend plus les applications qui communiquent avec lui, chacune pouvant vivre dans son propre dépôt.
@@ -152,7 +152,7 @@ l'application statique `web`, là où un échafaudage la nomme `admin`, et elle 
 la route `cms` de l'application. Le nom ne change pas : Rebase Cloud a enregistré `web` pour
 chaque projet déployé sans `rebase.json`.
 `rebase apps init --force` conserve les noms, `path`, `cms`, `routes`,
-`frameAncestors`, <span class="since-badge" data-since="0.35">Depuis 0.35</span> `redirects` et `cleanUrls` des applications déclarées par le fichier qu'il remplace,
+`frameAncestors`, `redirects` et `cleanUrls` des applications déclarées par le fichier qu'il remplace,
 et marque comme supprimée une application qu'il ne trouve plus.
 
 ## Une application sur son propre nom d'hôte
@@ -364,16 +364,12 @@ routes sur un build avec `rebase start`.
 
 ## Redirections et URL propres
 
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
-
 Une application statique accepte `redirects` (`{ "from": "/blog/:slug", "to": "/posts/:slug" }`,
 y compris vers un autre domaine) et `cleanUrls: true` (`/x` sert `x.html`). Voir
 [Redirections et URL propres](/docs/architecture/redirects-and-clean-urls/), qui
 explique également comment faire correspondre un `vercel.json` avec un `rebase.json`.
 
 ## App Links, Universal Links et autres fichiers `/.well-known`
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 Les App Links Android et Universal Links iOS sont vérifiés en récupérant un fichier depuis
 l'origine du site : `https://<host>/.well-known/assetlinks.json` et
@@ -496,7 +492,7 @@ indicateur de version ne révèle rien sur le schéma qu'il représente :
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.34.2","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.35.0","contract":1}}
 ```
 
 Comparer les deux dans la CI transforme une incompatibilité silencieuse en une vérification échouée. L'indicateur

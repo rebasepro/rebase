@@ -1,5 +1,5 @@
 ---
-sourceHash: 444e25d42cbff83f
+sourceHash: 507686b3cd49d852
 title: App e repository
 sidebar_label: App e repository
 description: Un progetto è un backend insieme alle app che comunicano con esso, ciascuna delle quali può risiedere nel proprio repository.
@@ -156,7 +156,7 @@ Chiama l'app statica `web`, mentre lo scaffolding la chiama `admin`, e non può 
 la route `cms` dell'app. Il nome non cambia: Rebase Cloud ha registrato `web` per
 ogni progetto distribuito senza un `rebase.json`.
 `rebase apps init --force` mantiene i nomi, `path`, `cms`, `routes`,
-`frameAncestors`, <span class="since-badge" data-since="0.35">Since 0.35</span> `redirects` e `cleanUrls` delle app dichiarate dal file che sostituisce,
+`frameAncestors`, `redirects` e `cleanUrls` delle app dichiarate dal file che sostituisce,
 e contrassegna come rimossa un'app che non trova più.
 
 ## An app on its own hostname
@@ -372,16 +372,12 @@ prova le route a fronte di una build con `rebase start`.
 
 ## Redirect e clean URL
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 Un'app statica supporta `redirects` (`{ "from": "/blog/:slug", "to": "/posts/:slug" }`,
 anche verso un altro dominio) e `cleanUrls: true` (`/x` serve `x.html`). Consulta
 [Redirects and clean URLs](/docs/architecture/redirects-and-clean-urls/), che
 illustra anche la mappatura di un `vercel.json` su `rebase.json`.
 
 ## App Link, Universal Link e altri file `/.well-known`
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 Gli Android App Link e gli iOS Universal Link vengono verificati recuperando un
 file dall'origine del sito: `https://<host>/.well-known/assetlinks.json` e
@@ -507,7 +503,7 @@ di versione non rivela nulla sullo schema che rappresenta:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.34.2","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.35.0","contract":1}}
 ```
 
 Il confronto dei due in CI trasforma una discrepanza silenziosa in un controllo

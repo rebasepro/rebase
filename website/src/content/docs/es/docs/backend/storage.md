@@ -1,5 +1,5 @@
 ---
-sourceHash: 1eae92c45ebedd91
+sourceHash: bbee7bded8a1462e
 title: Configuración de almacenamiento
 sidebar_label: Configuración de almacenamiento
 description: Configure backends de almacenamiento en sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para la subida de archivos, imágenes y contenido multimedia.
@@ -14,8 +14,6 @@ Rebase admite tres backends de almacenamiento:
 - **Google Cloud Storage / Firebase Storage** — Soporte nativo de GCS a través de `@google-cloud/storage`
 
 ## Configuración
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 :::note[Dónde va esto]
 **Runtime administrado** — las variables `STORAGE_*` en `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — agregue a cualquiera de ellas el sufijo `__<KEY>` para una fuente nombrada), además de una declaración `bucket("<key>")` en `backend/resources.ts` para cada bucket más allá del predeterminado, y `export const storageAuthorize` desde `backend/storage.ts`. Las reglas por objeto también se pueden configurar como datos en `STORAGE_POLICIES` — "public", "authenticated", "owner" (el segmento `:uid` de la clave es el llamador) y roles — consulte [Autorización de almacenamiento](/docs/backend/storage-authorization/#as-data-storage_policies).
@@ -205,8 +203,6 @@ STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 La cantidad de un archivo que el servidor retiene a la vez depende de la vía de entrada. `POST /api/storage/upload` es un único cuerpo multipart, que el servidor analiza por completo: de tres a cinco veces el tamaño del archivo en su memoria. Una subida reanudable (TUS) retiene un fragmento a la vez. `client.storage.putObject()` y el panel de administración envían archivos de más de 8 MiB mediante el método reanudable. Consulte [Subidas reanudables (TUS)](/docs/backend/storage-resumable-uploads/) para conocer el protocolo, qué responde y cómo se comporta entre instancias.
 
 ## Variables de entorno
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 | Variable | Descripción |
 |----------|-------------|

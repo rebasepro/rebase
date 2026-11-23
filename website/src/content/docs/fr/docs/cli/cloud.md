@@ -1,5 +1,5 @@
 ---
-sourceHash: e7c1160ad556017c
+sourceHash: 21c6a414fb5571e4
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Les groupes de commandes pour Rebase Cloud dans la CLI — auth, liaison de projet, déploiements, notifications, config, organisations, bases de données, ressources, compute, stockage, clusters, facturation et utilisation.
@@ -321,8 +321,6 @@ nécessite d'être owner, et le dernier owner ne peut pas être retiré. `--org 
 autre que celle actuellement sélectionnée.
 
 ### Accès aux projets
-
-<span class="since-badge" data-since="0.35">Depuis 0.35</span>
 
 ```bash
 rebase cloud access [list]

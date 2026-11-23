@@ -1,5 +1,5 @@
 ---
-sourceHash: e934bb43a5bf4916
+sourceHash: a7b5b5daa103ef94
 title: La tabella utenti
 sidebar_label: Tabella utenti
 description: "defineAuthTable dichiara la tabella in cui auth memorizza gli utenti: le colonne necessarie ad auth, un criterio di auto-lettura, colonne di privilegio per soli amministratori e il modello di accesso — ruoli, ambiti dell'app, chiavi personali e hook del ciclo di vita dell'utente."
@@ -70,8 +70,6 @@ come di consueto. Anche una regola definita sulla tabella degli utenti stessa pu
 riferimento a ciascuna colonna di auth, dichiarata o meno.
 
 ## Senza una tabella utenti
-
-<span class="since-badge" data-since="0.35">A partire da 0.35</span>
 
 Dichiararne una è facoltativo. Auth funziona in entrambi i casi: in assenza di `defineAuthTable`,
 mantiene i suoi utenti in `rebase.users`, mentre account e ruoli vengono gestiti

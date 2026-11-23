@@ -441,8 +441,6 @@ says so when the address has no account.
 
 ## Cloud access and your app's users
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 Two separate sets of people are involved, as in Firebase and Supabase:
 
 - **Cloud access** is who can work on the project in Rebase Cloud. An

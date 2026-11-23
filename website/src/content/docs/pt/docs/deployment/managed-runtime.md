@@ -1,5 +1,5 @@
 ---
-sourceHash: a657ab288833ddd3
+sourceHash: 6cf201fcae853f37
 title: Runtime de backend gerenciado
 sidebar_label: Runtime Gerenciado
 description: O que um backend com runtime "managed" pode e não pode fazer no Rebase Cloud — pacotes e binários, memória e CPU, limites de tempo e tamanhos de corpo, o sistema de arquivos, estado em memória, segredos, armazenamento para arquivos gerados e rede de saída.
@@ -141,7 +141,6 @@ Alguns detalhes:
 - **Tamanho da resposta.** Nem o runtime nem o edge definem um limite no tamanho da resposta. Ainda assim, uma resposta grande é mantida na memória se o seu handler a construir inteira de uma só vez; portanto, envie-a via stream ou sirva-a a partir do storage.
 
 ### Monitores e tarefas agendadas em `/metrics`
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 Uma requisição vinda de um monitor de uptime conhecido (identificado pelo seu `User-Agent`), ou uma que carregue o cabeçalho `x-rebase-probe` com qualquer valor, é atendida mas contabilizada em `rebase_probe_requests_total` em vez de `rebase_requests_total`, para que um monitor não seja interpretado como tráfego. `rebase_scheduled_jobs` é o número de cron jobs ativados e registrados no aplicativo, e `rebase_background_workers` é 1 enquanto esse processo executa um worker de fila de jobs; ambos param enquanto uma implantação é escalada para zero, razão pela qual uma plataforma que suspende projetos inativos os lê.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1eae92c45ebedd91
+sourceHash: bbee7bded8a1462e
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez les backends de stockage sur système de fichiers local, compatibles S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -14,8 +14,6 @@ Rebase prend en charge trois backends de stockage :
 - **Google Cloud Storage / Firebase Storage** — Prise en charge native de GCS via `@google-cloud/storage`
 
 ## Configuration
-
-<span class="since-badge" data-since="0.35">Depuis la version 0.35</span>
 
 :::note[Où placer ces éléments]
 **Runtime géré** — les variables `STORAGE_*` dans `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — ajoutez le suffixe `__<KEY>` à n'importe laquelle d'entre elles pour une source nommée), plus une déclaration `bucket("<key>")` dans `backend/resources.ts` pour chaque bucket en plus de celui par défaut, et `export const storageAuthorize` depuis `backend/storage.ts`. Les règles par objet peuvent également être définies sous forme de données dans `STORAGE_POLICIES` — "public", "authenticated", "owner" (le segment `:uid` de la clé correspond à l'appelant) et les rôles — voir [Autorisation de stockage](/docs/backend/storage-authorization/#as-data-storage_policies).
@@ -207,8 +205,6 @@ STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 La quantité de données d'un fichier que le serveur garde simultanément en mémoire dépend du point d'entrée. `POST /api/storage/upload` représente un corps multipart unique, analysé intégralement par le serveur : soit trois à cinq fois la taille du fichier en mémoire. Un téléversement avec reprise (TUS) ne conserve qu'un segment à la fois. `client.storage.putObject()` et le panneau d'administration transmettent les fichiers de plus de 8 Mio via le protocole avec reprise. Consultez la section [Téléversements avec reprise (TUS)](/docs/backend/storage-resumable-uploads/) pour découvrir le protocole, ses réponses et son comportement entre plusieurs instances.
 
 ## Variables d'environnement
-
-<span class="since-badge" data-since="0.35">Depuis la version 0.35</span>
 
 | Variable | Description |
 |----------|-------------|

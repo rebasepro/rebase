@@ -1,5 +1,5 @@
 ---
-sourceHash: e934bb43a5bf4916
+sourceHash: a7b5b5daa103ef94
 title: Die Benutzertabelle
 sidebar_label: Benutzertabelle
 description: "defineAuthTable deklariert die Tabelle, in der die Authentifizierung Benutzer speichert: die Spalten, die Auth benötigt, eine Self-Read-Policy, Admin-exklusive Berechtigungsspalten und das Zugriffsmodell – Rollen, App-Scopes, persönliche Schlüssel und die Benutzer-Lifecycle-Hooks."
@@ -51,8 +51,6 @@ Ein Benutzer besitzt eine Rolle, wenn seine Spalte `roles` diese auflistet. Wenn
 Regeln für andere Tabellen können wie gewohnt Spalten der Benutzertabelle referenzieren. Eine Regel für die Benutzertabelle selbst kann ebenfalls jede Auth-Spalte referenzieren, unabhängig davon, ob sie deklariert ist oder nicht.
 
 ## Ohne eine Benutzertabelle
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 Die Deklaration einer solchen Tabelle ist optional. Auth funktioniert in beiden Fällen: Ohne `defineAuthTable` werden die Benutzer in `rebase.users` gespeichert, und Konten sowie Rollen werden im Studio unter **Users & Roles** verwaltet. Das Admin-Panel zeigt Benutzer nur dann als Tabelle an, wenn das Projekt eine deklariert; das Weglassen der Datei hält sie also aus dem Admin-Panel heraus.
 

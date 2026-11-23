@@ -1,5 +1,5 @@
 ---
-sourceHash: 31645b4c27077651
+sourceHash: 20aec4c8317aa338
 title: Autorizzazione dello storage
 sidebar_label: Autorizzazione dello storage
 description: Decidi chi può leggere, scrivere, eliminare o elencare ciascun oggetto dello storage con storagePolicies e l'hook storageAuthorize, e quali scope di storage sono necessari per una chiave API.
@@ -50,8 +50,6 @@ fa fallire l'avvio anziché il primo caricamento.
 
 ### Sotto forma di dati: `STORAGE_POLICIES`
 
-<span class="since-badge" data-since="0.35">Da 0.35</span>
-
 Il runtime gestito non può leggere un predicato dal tuo codice, e un progetto sul
 backend predefinito di Rebase Cloud non ha codice da leggere. Pertanto le stesse regole possono essere impostate
 come JSON nella variabile di ambiente `STORAGE_POLICIES`, con i due predicati
@@ -79,8 +77,6 @@ valido impedisce l'avvio, segnalando ciascun problema; Rebase Cloud rifiuta di s
 e la sua console modifica l'elenco in **File storage → Access rules**.
 
 ## L'hook
-
-<span class="since-badge" data-since="0.35">Da 0.35</span>
 
 `requireAuth` e `publicRead` sono selettori *globali*: decidono se un chiamante deve aver effettuato l'accesso, non cosa tale chiamante possa toccare. Senza un hook di autorizzazione, **qualsiasi utente autenticato può leggere qualsiasi chiave di cui conosca il nome** — l'unica cosa che separa i file di due tenant è l'imprevedibilità della chiave, che non rappresenta un modello di controllo degli accessi. Peggio ancora, possono prima eseguire `GET /storage/list?prefix=`, quindi non è nemmeno necessario indovinare le chiavi.
 

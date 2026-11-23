@@ -4,8 +4,6 @@ sidebar_label: Redirects & Clean URLs
 description: "A static app in rebase.json can answer requests with redirects (Vercel-style :param matching, host, negated host and query conditions) and serve x.html at /x with cleanUrls."
 ---
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 A static app can answer some requests with a redirect instead of a file, and
 serve its HTML pages without the `.html`:
 
@@ -26,8 +24,6 @@ serve its HTML pages without the `.html`:
 ```
 
 ## `redirects`
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 - **`from`** is a path on the app's address, absolute and inside its `path`.
   `:name` matches one segment and `:name*`, as the last segment, matches the
@@ -60,8 +56,6 @@ the same requests, and when a redirect sends a request to a path its own
 
 ## One path, a different page per hostname
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 An app served on several hostnames can send the same path to a different page
 on each. Here `/` opens the app on `app.example.com` and the demo on every other
 hostname:
@@ -79,8 +73,6 @@ each redirect say on its own where it applies, as a `vercel.json` `missing`
 condition does, so the order no longer matters.
 
 ## Sending a domain to another
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 An app whose only job is a redirect sends the bare domain to `www`, path and
 query kept:
@@ -115,8 +107,6 @@ directory of the request's exact name is served first, so `/about` still serves
 site answers with a 404.
 
 ## Coming from Vercel
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 `vercel.json`:
 

@@ -63,7 +63,7 @@ A static app in `rebase.json` with no build step (no `build`, and `output` is
 its `root`, such as a plain HTML site) is served by the backend from that
 directory, at its `path`, as `rebase start` serves it from the bundle, and
 `FRONTEND_URL` is set to it (on the backend's port) so emailed links land there.
-<span class="since-badge" data-since="0.35">Since 0.35</span> Its [`redirects` and `cleanUrls`](/docs/architecture/redirects-and-clean-urls/) are served too, and an app that declares redirects needs no `index.html`.
+Its [`redirects` and `cleanUrls`](/docs/architecture/redirects-and-clean-urls/) are served too, and an app that declares redirects needs no `index.html`.
 An app with a build runs in Vite on its own port, and `FRONTEND_URL` is Vite's.
 
 An edit to `.env` restarts the backend, which reads the file again, as the admin panel does. What

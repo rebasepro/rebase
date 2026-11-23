@@ -1,5 +1,5 @@
 ---
-sourceHash: 14ada28ef46dc73c
+sourceHash: 9acb2b3f441697d7
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -168,8 +168,6 @@ authentifizierte Anfragen mit dessen Sitzung an den Dev-Server zu stellen und di
 | `CAPTCHA_ROUTES` | Kommagetrennte Liste der zu schützenden Auth-Routen (z. B. `register,login`). Wenn nicht gesetzt, wird der Standardsatz des Anbieters geschützt. | — |
 
 ### Storage
-
-<span class="since-badge" data-since="0.35">Seit 0.35</span>
 
 :::caution[Storage hat keine Row-Level Security, daher wird ein Zugriffsmodell benötigt]
 Tabellen werden durch Postgres-RLS geschützt. Für Object Storage gibt es kein Äquivalent –

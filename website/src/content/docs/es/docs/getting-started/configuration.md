@@ -1,5 +1,5 @@
 ---
-sourceHash: 14ada28ef46dc73c
+sourceHash: 9acb2b3f441697d7
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos de Rebase.
@@ -171,8 +171,6 @@ respuestas.
 | `CAPTCHA_ROUTES` | Rutas de autenticación separadas por comas que se protegerán (por ejemplo `register,login`). Si no se define, protege el conjunto de rutas predeterminado del proveedor. | — |
 
 ### Almacenamiento
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 :::caution[El almacenamiento no tiene seguridad a nivel de fila, por lo que necesita un modelo de acceso]
 Las tablas están protegidas por Postgres RLS. El almacenamiento de objetos no tiene un equivalente (las claves comparten un espacio de nombres plano), por lo que si hay un bucket configurado sin un modelo de acceso, el servidor **se negará a arrancar en producción**. Debe satisfacerse con exactamente uno de los siguientes:

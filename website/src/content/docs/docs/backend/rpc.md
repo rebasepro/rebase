@@ -4,8 +4,6 @@ sidebar_label: SQL functions (RPC)
 description: "Expose a Postgres function at POST /api/rpc/<name> with defineRpc: declared per function, arguments validated, run as the caller under row-level security, public ones rate-limited."
 ---
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 A SQL function you declare with `defineRpc` is served at `POST /api/rpc/<name>`,
 with its named arguments as the JSON body. It runs as the caller, the way
 `getSql(c)` does: an anonymous caller as the anonymous identity, a signed-in one
@@ -17,8 +15,6 @@ Only declared functions are callable. A function the database has and nobody
 declared answers `404 RPC_NOT_FOUND`.
 
 ## Declaring one
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 Declarations live beside the tables, in `backend/schema/`, and the schema index
 exports them:

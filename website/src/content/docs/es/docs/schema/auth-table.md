@@ -1,5 +1,5 @@
 ---
-sourceHash: e934bb43a5bf4916
+sourceHash: a7b5b5daa103ef94
 title: La tabla de usuarios
 sidebar_label: Tabla de usuarios
 description: "defineAuthTable declara la tabla en la que auth almacena los usuarios: las columnas que auth necesita, una política de autolectura, columnas de privilegios solo para administradores y el modelo de acceso: roles, scopes de la aplicación, claves personales y los hooks del ciclo de vida del usuario."
@@ -73,8 +73,6 @@ usuarios como de costumbre. Una regla en la propia tabla de usuarios también pu
 hacer referencia a cada columna de auth, esté declarada o no.
 
 ## Sin una tabla de usuarios
-
-<span class="since-badge" data-since="0.35">Desde 0.35</span>
 
 Declarar una es opcional. Auth funciona de cualquier manera: sin `defineAuthTable`,
 mantiene sus usuarios en `rebase.users`, y las cuentas y roles se gestionan en

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7cfed3fdc9ab52e4
+sourceHash: 320830830681a3a2
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Esegui Rebase ovunque con l'immagine di runtime ufficiale e il bundle del tuo progetto — Docker Compose, Fly, Railway o un semplice VPS.
@@ -81,7 +81,7 @@ Dato che sono già presenti, puoi montare il bundle in sola lettura — operazio
 Per un deployment reale, è preferibile includere entrambi in un'immagine, bloccando con precisione ciò che viene eseguito:
 
 ```dockerfile
-FROM rebasepro/server:0.34.2
+FROM rebasepro/server:0.35.0
 COPY dist-bundle /bundle
 ```
 
@@ -174,8 +174,6 @@ L'immagine crea `/storage` per l'utente non privilegiato `node` con cui viene es
 
 ### Lo storage richiede un modello di controllo degli accessi
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 Una volta che un bucket **è** configurato, il runtime **si rifiuta di avviarsi in produzione** finché il deployment non specifica come sono protetti gli oggetti. Lo storage non è coperto dalla row-level security e le sue chiavi condividono un unico namespace piatto; quindi, senza alcuna regola, l'unica cosa a separare i file di due utenti è l'imprevedibilità delle chiavi — che `GET /storage/list?prefix=` vanifica. Una qualsiasi delle seguenti opzioni è sufficiente:
 
 - un **hook `storageAuthorize`** (o `storagePolicies`) nella configurazione del tuo progetto, che è quanto fornito dallo scaffold in `backend/storage.ts`;
@@ -198,7 +196,7 @@ Il runtime è un normale container in ascolto su `$PORT`, quindi qualsiasi ambie
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.34.2 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.35.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -325,7 +323,7 @@ Tutto quanto descritto sopra prevede un unico container che serve l'intero proge
 ## Aggiornamento
 
 ```yaml
-image: rebasepro/server:0.34.2
+image: rebasepro/server:0.35.0
 ```
 
 Riavvia. Il tuo bundle rimane invariato. All'interno della stessa major version del contratto di runtime, un bundle validato continua a funzionare — consulta [Compatibility](/docs/architecture/runtime-and-bundles/#compatibility).

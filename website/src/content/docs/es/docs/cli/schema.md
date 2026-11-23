@@ -1,5 +1,5 @@
 ---
-sourceHash: be35acd402d34ec0
+sourceHash: a1e48da6a746fb71
 title: Generación de esquemas
 sidebar_label: Generación de esquemas
 description: Genera esquemas de Drizzle ORM a partir de las tablas en backend/schema, crea migraciones SQL, realiza introspección de una base de datos existente en archivos defineTable y mantén tu base de datos sincronizada con la CLI de Rebase.
@@ -213,7 +213,7 @@ rebase db push
   cambio de esquema y antes de cualquier paso que pueda fallar, de modo que un push que se detenga a mitad de camino deje una nueva tabla
   denegando todas las solicitudes en lugar de dejarla abierta a todas
 - Aplica las políticas RLS a las que compila el `rls` de tus tablas y **elimina las políticas que un push anterior haya reemplazado**
-- <span class="since-badge" data-since="0.35">Desde 0.35</span> Con `--prune-policies`, también elimina las políticas en las tablas declaradas que ninguna tabla declara —las que el dry run lista como "left in force", tales como las políticas propias de la base de datos después de que una tabla pasa a `rls: "admin-only"`— en la misma transacción que aplica las declaradas. El dry run lista cada una bajo "Planned row-level security changes", y el push las condiciona de la misma manera que una columna eliminada (pregunta en la terminal y, en otros entornos, requiere `--allow-destructive`): eliminar una política modifica quién puede leer y escribir las filas, y eliminar una política `RESTRICTIVE` amplía el acceso. Una tabla que `backend/schema` no declare y el esquema `rebase` nunca se tocan
+- Con `--prune-policies`, también elimina las políticas en las tablas declaradas que ninguna tabla declara —las que el dry run lista como "left in force", tales como las políticas propias de la base de datos después de que una tabla pasa a `rls: "admin-only"`— en la misma transacción que aplica las declaradas. El dry run lista cada una bajo "Planned row-level security changes", y el push las condiciona de la misma manera que una columna eliminada (pregunta en la terminal y, en otros entornos, requiere `--allow-destructive`): eliminar una política modifica quién puede leer y escribir las filas, y eliminar una política `RESTRICTIVE` amplía el acceso. Una tabla que `backend/schema` no declare y el esquema `rebase` nunca se tocan
 - Mantiene intacta
   cualquier restricción CHECK y EXCLUDE en una tabla declarada. Una tabla
   no puede declarar ninguna de las dos, por lo que son reglas propias de la base de datos, escritas a mano

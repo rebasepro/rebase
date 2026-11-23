@@ -1,5 +1,5 @@
 ---
-sourceHash: 8d5e791f9d3e039e
+sourceHash: 1f147c4f06a5601d
 title: Eine laufende App
 sidebar_label: Eine laufende App
 description: CLI-Befehle, die über ihre API auf eine laufende Rebase-App zugreifen – Zeilen, Benutzer, Cron, Protokolle, Funktionen, Dateien, der RLS-Simulator – auf rebase dev, einem benannten Server oder einem Rebase Cloud-Projekt.
@@ -98,7 +98,7 @@ rebase users guests prune --older-than 30d --yes
 
 ### Accounts importieren
 
-<span class="since-badge" data-since="0.35">Seit 0.35</span> `import` übernimmt Accounts aus einem anderen System und behält deren IDs bei, sodass Zeilen, die auf einen Benutzer verweisen, weiterhin auf denselben Benutzer zeigen. Akzeptiert CSV, ein JSON-Array oder NDJSON (`--format`, andernfalls nach Dateiendung) mit folgenden Spalten:
+`import` übernimmt Accounts aus einem anderen System und behält deren IDs bei, sodass Zeilen, die auf einen Benutzer verweisen, weiterhin auf denselben Benutzer zeigen. Akzeptiert CSV, ein JSON-Array oder NDJSON (`--format`, andernfalls nach Dateiendung) mit folgenden Spalten:
 
 | Spalte | |
 |---|---|

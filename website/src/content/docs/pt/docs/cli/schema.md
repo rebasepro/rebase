@@ -1,5 +1,5 @@
 ---
-sourceHash: be35acd402d34ec0
+sourceHash: a1e48da6a746fb71
 title: Geração de Schema
 sidebar_label: Geração de Schema
 description: Gere schemas Drizzle ORM a partir das tabelas em backend/schema, crie migrações SQL, faça introspecção de um banco de dados existente em arquivos defineTable e mantenha seu banco de dados sincronizado com a Rebase CLI.
@@ -210,7 +210,7 @@ rebase db push
   alteração de schema e antes de passos passíveis de falha. Dessa forma, caso o push seja interrompido na metade, novas tabelas
   bloquearão todas as requisições em vez de ficarem totalmente expostas
 - Aplica as políticas de RLS resultantes da compilação do `rls` das suas tabelas e **remove políticas substituídas por pushes anteriores**
-- <span class="since-badge" data-since="0.35">Desde 0.35</span> Com `--prune-policies`, também remove políticas em tabelas declaradas que nenhuma tabela mais define — aquelas que a simulação lista como "mantidas em vigor", como políticas nativas remanescentes após a tabela mudar para `rls: "admin-only"` — na mesma transação que aplica as políticas declaradas. A simulação lista cada uma em "Planned row-level security changes", e o push impõe o mesmo controle que adota para colunas removidas (solicita confirmação no terminal e exige `--allow-destructive` fora dele): remover políticas afeta as permissões de leitura e escrita, e remover uma política `RESTRICTIVE` amplia o acesso. Tabelas não declaradas em `backend/schema` e o schema `rebase` nunca são afetados
+- Com `--prune-policies`, também remove políticas em tabelas declaradas que nenhuma tabela mais define — aquelas que a simulação lista como "mantidas em vigor", como políticas nativas remanescentes após a tabela mudar para `rls: "admin-only"` — na mesma transação que aplica as políticas declaradas. A simulação lista cada uma em "Planned row-level security changes", e o push impõe o mesmo controle que adota para colunas removidas (solicita confirmação no terminal e exige `--allow-destructive` fora dele): remover políticas afeta as permissões de leitura e escrita, e remover uma política `RESTRICTIVE` amplia o acesso. Tabelas não declaradas em `backend/schema` e o schema `rebase` nunca são afetados
 - Mantém inalteradas
   todas as restrições CHECK e EXCLUDE em tabelas declaradas. Nenhuma tabela
   pode declarar essas restrições diretamente no código, portanto são consideradas regras próprias do banco, criadas manualmente

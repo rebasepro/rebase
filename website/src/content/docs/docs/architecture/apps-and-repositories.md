@@ -151,7 +151,7 @@ the static app `web`, where a scaffold names it `admin`, and it cannot know the
 app's `cms` route. The name does not change: Rebase Cloud registered `web` for
 every project that deployed without a `rebase.json`.
 `rebase apps init --force` keeps the names, `path`, `cms`, `routes`,
-`frameAncestors`, <span class="since-badge" data-since="0.35">Since 0.35</span> `redirects` and `cleanUrls` of the apps the file it replaces
+`frameAncestors`, `redirects` and `cleanUrls` of the apps the file it replaces
 declares, and names an app it no longer finds as removed.
 
 ## An app on its own hostname
@@ -363,16 +363,12 @@ routes against a build with `rebase start`.
 
 ## Redirects and clean URLs
 
-<span class="since-badge" data-since="0.35">Since 0.35</span>
-
 A static app takes `redirects` (`{ "from": "/blog/:slug", "to": "/posts/:slug" }`,
 including to another domain) and `cleanUrls: true` (`/x` serves `x.html`). See
 [Redirects and clean URLs](/docs/architecture/redirects-and-clean-urls/), which
 also maps a `vercel.json` onto `rebase.json`.
 
 ## App Links, Universal Links and other `/.well-known` files
-
-<span class="since-badge" data-since="0.35">Since 0.35</span>
 
 Android App Links and iOS Universal Links are verified by fetching a file from
 the site's origin: `https://<host>/.well-known/assetlinks.json` and
@@ -495,7 +491,7 @@ version stamp reveals nothing about the schema it stands for:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.34.2","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.35.0","contract":1}}
 ```
 
 Comparing the two in CI turns a silent mismatch into a failed check. The stamp

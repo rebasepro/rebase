@@ -1,5 +1,5 @@
 ---
-sourceHash: be35acd402d34ec0
+sourceHash: a1e48da6a746fb71
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus den Tabellen in backend/schema, erstellen Sie SQL-Migrationen, introspektieren Sie eine bestehende Datenbank in defineTable-Dateien und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -200,7 +200,7 @@ rebase db push
   Schemaänderung und vor jedem Schritt, der fehlschlagen kann, sodass ein unvollständiger Push eine neue Tabelle
   hinterlässt, die jede Anfrage verweigert, anstatt für alle offen zu sein
 - Wendet die RLS-Policies an, zu denen das `rls` Ihrer Tabellen kompiliert wird, und **entfernt Policies, die ein früherer Push abgelöst hat**
-- <span class="since-badge" data-since="0.35">Seit 0.35</span> Mit `--prune-policies` werden in der Transaktion, die die deklarierten Policies anwendet, auch die Policies auf deklarierten Tabellen gelöscht, die von keiner Tabelle deklariert werden — jene, die der Dry-Run als "in Kraft belassen" auflistet, wie z. B. datenbankeigene Policies, nachdem eine Tabelle auf `rls: "admin-only"` umgestellt wurde. Der Dry-Run listet jede davon unter "Planned row-level security changes" auf, und der Push sichert sie wie eine gelöschte Spalte ab (er fragt auf einem Terminal nach und erfordert andernfalls `--allow-destructive`): Das Löschen einer Policy ändert, wer die Zeilen lesen und schreiben kann, und eine gelöschte `RESTRICTIVE`-Policy erweitert den Zugriff. Eine Tabelle, die `backend/schema` nicht deklariert, sowie das `rebase`-Schema werden niemals angetastet
+- Mit `--prune-policies` werden in der Transaktion, die die deklarierten Policies anwendet, auch die Policies auf deklarierten Tabellen gelöscht, die von keiner Tabelle deklariert werden — jene, die der Dry-Run als "in Kraft belassen" auflistet, wie z. B. datenbankeigene Policies, nachdem eine Tabelle auf `rls: "admin-only"` umgestellt wurde. Der Dry-Run listet jede davon unter "Planned row-level security changes" auf, und der Push sichert sie wie eine gelöschte Spalte ab (er fragt auf einem Terminal nach und erfordert andernfalls `--allow-destructive`): Das Löschen einer Policy ändert, wer die Zeilen lesen und schreiben kann, und eine gelöschte `RESTRICTIVE`-Policy erweitert den Zugriff. Eine Tabelle, die `backend/schema` nicht deklariert, sowie das `rebase`-Schema werden niemals angetastet
 - Belässt jedes CHECK- und EXCLUDE-Constraint auf einer deklarierten Tabelle so, wie es ist. Eine Tabelle
   kann keines von beidem deklarieren, es handelt sich also um eigene Regeln der Datenbank, die manuell
   geschrieben oder von einer Datenbank übernommen wurden, die `schema introspect` übernommen hat; um ein Constraint
