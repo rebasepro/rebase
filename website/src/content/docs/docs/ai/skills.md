@@ -124,11 +124,20 @@ Commit them. They are part of the repo the same way a lint config is: every
 contributor's assistant then works from the same understanding of the codebase,
 including contributors who never ran the command.
 
+## Updating the skills
+
 **`rebase upgrade` updates them.** The skills ship inside `@rebasepro/cli`, so
 after it installs the new release, [`rebase upgrade`](/docs/cli/#rebase-upgrade)
-runs the new CLI's `rebase skills install` for every assistant the project has
-skills for. If you moved the pins some other way (a dependency bot, a hand edit),
-run `rebase upgrade` anyway, or the install yourself:
+runs the new CLI's `rebase skills install` for every assistant whose skills
+directory an install wrote, keeping files you edited. A project already on the
+release is refreshed too. A refresh that fails never fails the upgrade. Under
+`--json` the document's `skills` says what happened: `{ agents, refreshed }`, with
+a `reason` when it did not (`dry_run`, `not_installed` after `--no-install`,
+`no_project_cli` when the project does not install `@rebasepro/cli` itself,
+`failed`), or `null` with no skills installed.
+
+If you moved the pins some other way (a dependency bot, a hand edit), run
+`rebase upgrade` anyway, or the install yourself:
 
 ```bash
 rebase skills install

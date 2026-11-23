@@ -131,34 +131,13 @@ Overrides in `pnpm-workspace.yaml` and `package.json` move too, but a `link:` or
 `--drop-local-overrides` removes it. `--dry-run` writes nothing, `--no-install`
 skips the install, and `--json` prints one document.
 
-A project on a
-prerelease, such as a canary, stays on its channel unless `latest` is newer. A
-dist-tag that would move a pin backwards is refused (`downgrade_refused` under
-`--json`) unless you pass `--allow-downgrade`; an exact `--to` is applied, and
-flagged as a downgrade. A `--dry-run` of an upgrade the real run would refuse
-shows what would move and exits 0, and under `--json` its document carries the
-refusal as `wouldRefuse` (`{ code, message, hint }`).
-
-The agent skills a project has from [`rebase skills install`](#rebase-skills-install)
-ship inside `@rebasepro/cli`, so `rebase upgrade` refreshes them too, once it has
-installed: it runs the project's own, newly installed CLI's `rebase skills
-install` for every assistant whose skills directory an install wrote
-(`.claude/skills`, `.cursor/rules`, `.agents/skills`, …). Skill files you edited
-are kept, as they are by `rebase skills install`. A project already on the
-release gets the refresh too, so `rebase upgrade` after a dependency bot moved the
-pins brings the skills along. Under `--json` the document's `skills` says what
-happened: `{ agents, refreshed }`, with a `reason` when it did not (`dry_run`;
-`not_installed` after `--no-install`; `no_project_cli` when the project does not
-install `@rebasepro/cli` itself; `failed`), or `null` when the project has no
-skills installed. A refresh that fails never fails the upgrade.
-
-Every other command ends with one line on stderr while a newer release is out on
-the CLI's channel, such as "Rebase 0.35.0 is out; this CLI is 0.34.2", followed by
-the command that moves the project to it, `rebase upgrade`. Nothing waits on the
-network for it: the answer comes from `~/.rebase/release-check.json`, which a
-background process refreshes from the npm registry (or `npm_config_registry`)
-once a day, asking for `@rebasepro/cli`'s dist-tags and sending nothing else. It
-is off in CI and with `REBASE_NO_UPDATE_CHECK=1` or `NO_UPDATE_NOTIFIER`.
+A project on a prerelease, such as a canary, stays on its channel unless `latest`
+is newer. A dist-tag that would move a pin backwards is refused
+(`downgrade_refused` under `--json`) unless you pass `--allow-downgrade`; an exact
+`--to` is applied, and flagged as a downgrade. A `--dry-run` of an upgrade the
+real run would refuse shows what would move and exits 0, and under `--json` its
+document carries the refusal as `wouldRefuse` (`{ code, message, hint }`).
+Once installed, it also refreshes the project's [agent skills](/docs/ai/skills/#updating-the-skills) from the new CLI (`skills` in the `--json` document). Other commands end with a line on stderr when a newer release is out; [`REBASE_NO_UPDATE_CHECK=1`](/docs/getting-started/configuration/) hides it.
 
 ### `rebase start`
 
