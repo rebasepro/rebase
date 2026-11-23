@@ -231,7 +231,8 @@ export function ConsoleDemo() {
                 <div className="min-w-0 p-5 sm:p-7">
                     <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] gap-6">
                         <div className="min-w-0">
-                            <h3 className="font-headers text-2xl sm:text-3xl text-tone-max">bloom-shop</h3>
+                            {/* Not a heading: the demo sits between the hero h1 and the first h2. */}
+                            <p className="font-headers text-2xl sm:text-3xl text-tone-max">bloom-shop</p>
                             <p className="mt-2 flex items-center gap-2 text-[12.5px] text-tone-400">
                                 Admin panel <span className="font-mono text-tone-200">bloom-shop.rebase.website</span>
                             </p>
