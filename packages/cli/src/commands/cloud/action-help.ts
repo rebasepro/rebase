@@ -765,17 +765,176 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "storage create": {
         command: "cloud storage create",
-        usage: "cloud storage create",
+        usage: "cloud storage create [<bucket>]",
         summary:
-            "Provision platform-managed storage: a bucket and its credentials, written onto the "
-            + "project and injected into the tenant at deploy time. Takes no options of its own — "
-            + "region and naming come from the platform.",
+            "Create a Rebase Storage bucket: S3-compatible object storage on the platform, billed per GB-month over "
+            + "the included allowance. Prints the endpoint and the next step, a key to reach the bucket. "
+            + "Without a bucket name, the older platform-managed provisioning for the app runs instead, with a "
+            + "deprecation notice.",
         flags: [],
-        examples: ["rebase cloud storage create"],
+        examples: [
+            "rebase cloud storage create shop-assets",
+            "rebase cloud storage create shop-assets --json"
+        ],
         notes: [
-            "Creates billable infrastructure, and requires org admin rather than membership.",
-            "The secret key is never displayed: it goes to the project record and to the tenant's environment.",
-            "Redeploy afterwards — a running instance has no credentials for a bucket created after it started."
+            "Bucket names are global across Rebase Storage, like S3's: a name somebody else has answers `conflict`.",
+            "Then: `rebase cloud storage keys create --bucket <bucket>` for credentials.",
+            "Deprecated form: with no name it provisions platform-managed storage, writes its credentials onto the "
+                + "project and needs a redeploy. Create a bucket and a key instead."
+        ]
+    },
+
+    "storage delete": {
+        command: "cloud storage delete",
+        usage: "cloud storage delete <bucket> [--yes]",
+        summary:
+            "Delete a Rebase Storage bucket and every file in it. Confirms first; off a terminal it needs --yes.",
+        flags: [],
+        examples: ["rebase cloud storage delete old-assets --yes"],
+        notes: ["Its files are deleted within the hour; support can restore them for 30 days."]
+    },
+
+    "storage keys": {
+        command: "cloud storage keys",
+        usage: "cloud storage keys [list|create|rotate|revoke]",
+        summary:
+            "The project's Rebase Storage access keys: their access key id, permission, the bucket each is "
+            + "scoped to and when it was last used. Never the secrets, which are shown once, on create and rotate.",
+        flags: [],
+        examples: [
+            "rebase cloud storage keys",
+            "rebase cloud storage keys create --read-only --bucket shop-assets",
+            "rebase cloud storage keys rotate ci-uploader --yes",
+            "rebase cloud storage keys revoke ci-uploader --yes"
+        ]
+    },
+
+    "storage keys create": {
+        command: "cloud storage keys create",
+        usage: "cloud storage keys create [--name <name>] [--read-only] [--bucket <bucket>]",
+        summary:
+            "Issue an S3 access key for Rebase Storage. The secret is printed ONCE, with the lines to paste into "
+            + "a .env (S3_ENDPOINT, S3_REGION, S3_BUCKET when scoped, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, "
+            + "S3_FORCE_PATH_STYLE) and an aws-cli line to try it.",
+        flags: [
+            ["--name <name>", "What to call it. Default: key-<date>"],
+            ["--read-only", "Read, never write. Default: read-write"],
+            ["--bucket <bucket>", "Only this bucket. Default: every bucket in the project"]
+        ],
+        examples: [
+            "rebase cloud storage keys create --name app --bucket shop-assets",
+            "rebase cloud storage keys create --read-only --json"
+        ],
+        notes: [
+            "Requires org admin. The secret cannot be displayed again: lost, it is rotated.",
+            "In --json the secret is in `secretAccessKey`, and the .env lines in `env`."
+        ]
+    },
+
+    "storage keys rotate": {
+        command: "cloud storage keys rotate",
+        usage: "cloud storage keys rotate <key> [--yes]",
+        summary:
+            "Replace a key's secret. The old one stops working at once, so confirms first; the new one is printed "
+            + "once, with the .env lines.",
+        flags: [],
+        examples: ["rebase cloud storage keys rotate app --yes"],
+        notes: ["<key> is the key's name or id, as `rebase cloud storage keys` lists them."]
+    },
+
+    "storage keys revoke": {
+        command: "cloud storage keys revoke",
+        usage: "cloud storage keys revoke <key> [--yes]",
+        summary: "Revoke a key: anything using it loses access at once. Confirms first.",
+        flags: [],
+        examples: ["rebase cloud storage keys revoke ci-uploader --yes"]
+    },
+
+    "storage usage": {
+        command: "cloud storage usage",
+        usage: "cloud storage usage",
+        summary:
+            "What the project stores against its cap, as a percentage, when it was last measured, the included "
+            + "allowance, what a month costs at current usage and at the cap, and this month's egress, which is "
+            + "not billed within fair use.",
+        flags: [],
+        examples: ["rebase cloud storage usage", "rebase cloud storage usage --json"],
+        notes: [
+            "Between measurements the figure is an estimate from uploads and deletes.",
+            "Only current versions are billed; deleted files are kept for recovery and not charged."
+        ]
+    },
+
+    "storage limit": {
+        command: "cloud storage limit",
+        usage: "cloud storage limit [<GB>]",
+        summary:
+            "Show the storage cap, or set it. The cap bounds the bill: the most a month can cost is shown "
+            + "with it. Uploads past the cap are refused.",
+        flags: [],
+        examples: ["rebase cloud storage limit", "rebase cloud storage limit 50"],
+        notes: ["Requires org admin. A cap below what is already stored is accepted, with a warning."]
+    },
+
+    "storage cors": {
+        command: "cloud storage cors",
+        usage: "cloud storage cors <bucket> [--allow-origin <origin>]... [--allow-method <m>]... [--file <rules.json>] [--clear]",
+        summary:
+            "Show a bucket's CORS rules, or replace them: from flags (one rule), from a JSON file (any number), "
+            + "or with none. Browsers need a rule to upload to or read from a bucket directly.",
+        flags: [
+            ["--allow-origin <origin>", "An origin the rule allows. Repeatable"],
+            ["--allow-method <method>", "GET, HEAD, PUT, POST or DELETE. Repeatable. Default: GET and HEAD"],
+            ["--allow-header <header>", "A request header the rule allows. Repeatable"],
+            ["--file <rules.json>", "A list of rules, or { \"rules\": [...] }, in the wire's shape"],
+            ["--clear", "Remove every rule"]
+        ],
+        examples: [
+            "rebase cloud storage cors shop-assets",
+            "rebase cloud storage cors shop-assets --allow-origin https://shop.example --allow-method GET --allow-method PUT",
+            "rebase cloud storage cors shop-assets --file cors.json",
+            "rebase cloud storage cors shop-assets --clear"
+        ],
+        notes: [
+            "Each form replaces the bucket's whole rule set.",
+            "A rule in the file: { \"allowedOrigins\": [...], \"allowedMethods\": [...], \"allowedHeaders\"?: [...], "
+                + "\"exposeHeaders\"?: [...], \"maxAgeSeconds\"?: 3600 }."
+        ]
+    },
+
+    "storage import": {
+        command: "cloud storage import",
+        usage:
+            "cloud storage import --from s3://<bucket>[/<prefix>] --region <region> --access-key-id <id> --to <bucket> "
+            + "[--endpoint <url>] [--secret-access-key <secret|->] [--switch-app] [--wait]",
+        summary:
+            "Copy a bucket from another S3-compatible provider into a Rebase Storage bucket. The platform runs "
+            + "the copy, so the terminal can close; --wait follows it, and --status reads one already started. "
+            + "With --switch-app the app is pointed at the copy once it is verified.",
+        flags: [
+            ["--from s3://<bucket>[/<prefix>]", "The source bucket, and optionally a prefix in it"],
+            ["--to <bucket>", "The Rebase Storage bucket to copy into"],
+            ["--region <region>", "The source's region (`auto` for R2)"],
+            ["--endpoint <url>", "The source's S3 endpoint. Omit for AWS S3"],
+            ["--access-key-id <id>", "A key that can list and read the source"],
+            ["--secret-access-key <secret|->", "Its secret; `-` reads it from stdin. Default: REBASE_IMPORT_SECRET_ACCESS_KEY, or a prompt"],
+            ["--switch-app", "Point the app at the copy when it is verified"],
+            ["--from-app-storage", "Copy the app's current bucket with the key the platform already holds (no --from or credentials)"],
+            ["--from-import <importId>", "Copy again from an earlier import's source, with the key it was given: what reached the old bucket after a switch"],
+            ["--wait", "Follow the import to the end, printing progress"],
+            ["--status <importId>", "Read an import already started (with --wait, follow it)"]
+        ],
+        examples: [
+            "rebase cloud storage import --from s3://old-assets --region eu-west-1 --access-key-id AKIA… --to shop-assets --wait",
+            "rebase cloud storage import --from s3://media/uploads --endpoint https://<account>.r2.cloudflarestorage.com "
+                + "--region auto --access-key-id … --secret-access-key - --to shop-media --switch-app",
+            "rebase cloud storage import --status imp_123 --wait"
+        ],
+        notes: [
+            "The source secret is never printed, and a secret on the command line lands in shell history: prefer "
+                + "the variable or `-`.",
+            "Off a terminal with no secret given, it refuses rather than prompt.",
+            "A failed import exits 1 with code `import_failed`; nothing is switched over."
         ]
     },
 

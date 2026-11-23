@@ -362,6 +362,7 @@ export default defineConfig({
                         { label: "Cloud CI and Agents", slug: "docs/deployment/cloud-agents" },
                         { label: "Cloud Notifications", slug: "docs/deployment/cloud-notifications" },
                         { label: "Managed Runtime", slug: "docs/deployment/managed-runtime" },
+                        { label: "Rebase Storage", slug: "docs/deployment/rebase-storage" },
                         { label: "Self-Hosting", slug: "docs/deployment/self-hosting" },
                         { label: "Connection Pooling", slug: "docs/deployment/connection-pooling" },
                         { label: "Split Processes", slug: "docs/deployment/split-processes" },

@@ -84,6 +84,9 @@ export const CLOUD_VALUE_FLAGS = {
     "--actor": String,
     "--after": String,
     "--allow": String,
+    "--allow-header": String,
+    "--allow-method": String,
+    "--allow-origin": String,
     "--autoscale-cpu-target": String,
     "--autoscale-max": String,
     "--backup-access-key-id": String,
@@ -114,6 +117,8 @@ export const CLOUD_VALUE_FLAGS = {
     "--expires-in": String,
     "--file": String,
     "--format": String,
+    "--from": String,
+    "--from-import": String,
     "--function": String,
     "--grep": String,
     "--host": String,
@@ -157,6 +162,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--slug": String,
     "--source": String,
     "--spot": String,
+    "--status": String,
     "--storage": String,
     "--studio": String,
     "--subdomain": String,
@@ -165,6 +171,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--tables": String,
     "--target": String,
     "--timeout": String,
+    "--to": String,
     "--to-org": String,
     "--type": String,
     "--out": "--output",
@@ -322,8 +329,13 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         // database create --help` reached the group index while
         // `rebase cloud db create --help` printed the flags.
         const canonical = GROUP_ALIASES[group] ?? group;
+        // Most specific first: `storage keys create --help` has a page of its
+        // own, and falls back to `storage keys`'s when the third word is an
+        // argument rather than an action (`storage create my-bucket --help`).
+        const subAction = action ? pos.slice(1).filter(token => !token.startsWith("-"))[1] : undefined;
+        const forSubAction = subAction ? ACTION_HELP[`${canonical} ${action} ${subAction}`] : undefined;
         const forAction = action ? ACTION_HELP[`${canonical} ${action}`] : undefined;
-        const page = forAction ?? ACTION_HELP[canonical];
+        const page = forSubAction ?? forAction ?? ACTION_HELP[canonical];
         if (page) {
             printActionHelp(page);
             return;

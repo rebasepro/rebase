@@ -24,7 +24,7 @@ A Cloud **project** is three things the platform operates for you:
 |---|---|
 | **App** | Your bundle, running on the published runtime image. Deploys are a bundle upload, not a container build |
 | **Database** | A managed PostgreSQL, with automated backups and point-in-time recovery |
-| **Storage** | A bucket of your own, if your project uses file storage |
+| **Storage** | A bucket of your own on [Rebase Storage](/docs/deployment/rebase-storage/), if your project uses file storage |
 
 The app and the database are provisioned when you first deploy; a bucket only
 when you ask for one ([File storage](#file-storage)). Each is billed for what it
@@ -115,8 +115,9 @@ and where the month is heading at this pace. The overage is computed by the
 same code that reports it to Stripe, so it is what the invoice will carry; it
 appears on the invoice of the month after. `rebase cloud usage` prints the
 same, and `rebase cloud usage org` the whole organization. Any member can read
-it. The figures say what they cannot see yet: object storage is not measured,
-so no storage overage is billed; while a project runs two or more app pods,
+it. The figures say what they cannot see yet: object storage is measured but
+not billed yet ([Rebase Storage](/docs/deployment/rebase-storage/) gives its
+price); while a project runs two or more app pods,
 its requests are not counted; and a day with missed samples undercounts. An
 autoscaled project also shows the pods it ran above `--replicas`, in pod-hours,
 what they cost at its own rates and whether this platform charges them yet. A
@@ -558,7 +559,7 @@ fails, `rebase cloud compute apply` tries it again.
 | `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
 | `guests` | The guest users anonymous sign-in left behind: count them, delete one, prune the ones not seen for an age. See [Guests](/docs/cli/cloud/#guests). Owners and admins |
 | `extensions` | The Postgres extension allowlist |
-| `storage` | The project's bucket |
+| `storage` | The project's buckets and their keys, on [Rebase Storage](/docs/deployment/rebase-storage/) |
 | `resources` | Which databases and buckets the platform holds, against what the code declares |
 | `compute` | What this project reserves, what it costs, and how to change it |
 | `events` | What happened to the backend, newest first: the app scaling, database changes scheduled and applied, a standby taking over, the disk growing |

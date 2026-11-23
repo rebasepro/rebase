@@ -544,7 +544,9 @@ describe("every command the dispatch answers parses its flags strictly", () => {
             "access.ts:invite": "an action of `access`, whose `accessCommand` parses the line before dispatching",
             "access.ts:changeRole": "an action of `access`, whose `accessCommand` parses the line before dispatching",
             "access.ts:remove": "an action of `access`, whose `accessCommand` parses the line before dispatching",
-            "access.ts:invitesCommand": "an action of `access`, whose `accessCommand` parses the line before dispatching"
+            "access.ts:invitesCommand": "an action of `access`, whose `accessCommand` parses the line before dispatching",
+            "rebase-storage.ts:storageCreateBucket": "`storage create <bucket>`, called by resources.ts's `storageCreateCommand` once it has parsed the line",
+            "rebase-storage.ts:keysAction": "reads only which `storage keys` action to dispatch; each action then parses its own line"
         };
 
         /** `function name(params)` and its body, by brace matching. */
