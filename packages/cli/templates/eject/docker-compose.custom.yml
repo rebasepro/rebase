@@ -63,6 +63,12 @@ services:
       # served from.
       # {{/frontend}}
       CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the origin you browse to}
+      # Overrides the development value `env_file: .env` brings in
+      # (http://localhost:5173, the Vite dev server). In production the server
+      # refuses to boot on any variable that points at localhost, so that line
+      # alone stopped this stack from starting. Set your real address here — it
+      # is the base of every emailed link (password reset, verification).
+      FRONTEND_URL: ""
       # A durable named volume, which is the case this flag acknowledges. It is
       # mounted at /storage, one level above STORAGE_PATH, because every bucket
       # declared in backend/resources.ts gets a directory beside this one —

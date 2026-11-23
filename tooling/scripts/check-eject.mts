@@ -361,6 +361,25 @@ function checkCompose(projectRoot: string, flavour: "cms" | "baas"): void {
     const dockerfile = fs.readFileSync(path.join(projectRoot, "Dockerfile"), "utf8");
 
     check(!compose.includes("{{"), `${label}: an unrendered template marker survived`);
+
+    // The backend service loads the project's `.env` (`env_file: .env`) and runs
+    // with NODE_ENV=production, where the server refuses to boot on any variable
+    // pointing at localhost. `.env` is the DEVELOPMENT file — `init` writes it
+    // from `.env.example` — so every loopback value in it has to be restated
+    // under `environment:`, which wins over `env_file`. A FRONTEND_URL left at
+    // http://localhost:5173 stopped every ejected stack from starting.
+    if (/^\s*env_file:\s*\.env\s*$/m.test(compose)) {
+        const envExample = fs.readFileSync(path.join(templateRoot, ".env.example"), "utf8");
+        const loopback = [...envExample.matchAll(/^([A-Z][A-Z0-9_]*)=(.*)$/gm)]
+            .filter(([, , value]) => /\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(value))
+            .map(([, key]) => key);
+        for (const key of loopback) {
+            check(
+                new RegExp(`^\\s+${key}:`, "m").test(compose),
+                `${label}: .env sets ${key} to a localhost address and the backend loads it, but compose does not override it — the production server refuses to boot`
+            );
+        }
+    }
     check(
         new RegExp(`^name: ${PROJECT_NAME}$`, "m").test(compose),
         `${label}: the compose project name was not substituted from package.json`
