@@ -688,7 +688,7 @@ describe("a control plane without the route", () => {
 
 describe("compute set: a database restart is asked for and acknowledged", () => {
     const restartRefused = () => Object.assign(
-        new Error("Changing the database size restarts the database: it is unavailable for a few minutes (usually 3 to 8). Nothing was saved."),
+        new Error("Changing the database size restarts the database: it is unavailable for about a minute (3 minutes at worst). Nothing was saved."),
         { status: 409, code: "database_restart_unconfirmed" }
     );
 
@@ -700,7 +700,7 @@ describe("compute set: a database restart is asked for and acknowledged", () => 
         tables.projects = { findById: () => ({ id: PROJECT_ID, databaseCpu: "160m" }) };
         const refused = await stdoutOf(() => computeCommand("set", argv("compute", "set", "--db-cpu", "500m")));
         expect(errorOf(refused)).toMatchObject({ code: "confirmation_required", message: DATABASE_RESTART_REFUSAL });
-        expect(errorOf(refused).message).toContain("usually 3 to 8 minutes; the app answers with an error until it is back");
+        expect(errorOf(refused).message).toContain("about a minute, 3 minutes at worst; the app answers with an error until it is back");
         expect(updates).toEqual([]);
     });
 

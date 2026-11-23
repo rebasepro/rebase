@@ -648,7 +648,7 @@ describe("the compute pages", () => {
     it("says a database change applies now, restarts the database, and is billed at the current size until it runs", () => {
         const set = text("compute set");
         expect(set).toContain("A database change applies now; billed at the current size until it is running.");
-        expect(set).toContain("usually 3 to 8 minutes; the app answers with an error until it is back");
+        expect(set).toContain("about a minute, 3 minutes at worst; the app answers with an error until it is back");
         expect(set).toContain("acknowledgeDatabaseRestart");
         for (const key of ["compute", "compute set", "compute apply"]) {
             expect(text(key)).not.toMatch(/waits for the maintenance window|scheduled for the project's maintenance window|instead of in its maintenance window/);
