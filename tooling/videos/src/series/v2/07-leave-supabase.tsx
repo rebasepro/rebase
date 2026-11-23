@@ -67,23 +67,21 @@ const TerminalBar: React.FC<{ title: string; badge?: string; badgeColor?: string
             background: SURFACE.sheet,
         }}
     >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {["#F43F5E", "#FBBF24", "#34D399"].map((c) => (
-                <span key={c} style={{ width: 10, height: 10, borderRadius: 99, background: c, opacity: 0.6 }} />
-            ))}
-            <span style={{ marginLeft: 8, fontFamily: FONT.mono, fontSize: 15, color: INK.muted }}>{title}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 99, background: badgeColor, flexShrink: 0 }} />
+            <span style={{ fontFamily: FONT.mono, fontSize: 14, letterSpacing: "0.08em", color: INK.copy }}>{title}</span>
         </div>
         {badge && (
             <span
                 style={{
                     fontFamily: FONT.mono,
-                    fontSize: 13,
+                    fontSize: 12,
                     letterSpacing: "0.1em",
                     color: badgeColor,
                     padding: "3px 10px",
                     borderRadius: RADIUS.md,
-                    border: `1px solid ${badgeColor}55`,
-                    background: `${badgeColor}14`,
+                    border: `1px solid ${badgeColor}44`,
+                    background: `${badgeColor}12`,
                 }}
             >
                 {badge}
@@ -539,14 +537,14 @@ const Translate: React.FC = () => {
     );
 };
 
-/* ── scene 4: honest report + cloud db query ────────────────────────── */
+/* ── scene 4: honest report + Supabase migration tools ──────────────── */
 
 const H_HONEST = "Nothing silently skipped.";
 
 const LEFT_BEHIND = [
-    { kind: "triggers", detail: "CREATE TRIGGER on_project_insert …" },
-    { kind: "functions", detail: "CREATE FUNCTION get_public_proposal …" },
-    { kind: "CHECKs", detail: "ADD CONSTRAINT positive_total CHECK …" },
+    { kind: "triggers", detail: "CREATE TRIGGER on_project_insert …", short: "on_project_insert" },
+    { kind: "functions", detail: "CREATE FUNCTION get_public_proposal …", short: "get_public_proposal" },
+    { kind: "CHECKs", detail: "ADD CONSTRAINT positive_total CHECK …", short: "positive_total CHECK" },
 ] as const;
 
 const Honest: React.FC = () => {
@@ -564,11 +562,11 @@ const Honest: React.FC = () => {
 
     const cardO = ramp(frame, 0, 8, ENTER);
     const cliActive = ramp(frame, runAt, 12, ENTER);
-    const doneAt = runAt + 28;
+    const doneAt = runAt + 20;
+    const rpcO = ramp(frame, doneAt + 4, 12, ENTER);
+    const usersO = ramp(frame, doneAt + 16, 12, ENTER);
 
-    const cloudCmd = tall
-        ? "rebase cloud db query \\\n  --file backend/sql/introspected-left-behind.sql"
-        : "rebase cloud db query \\\n  --file backend/sql/introspected-left-behind.sql";
+    const cloudCmd = "rebase cloud db query --file backend/sql/introspected-left-behind.sql";
 
     return (
         <>
@@ -577,8 +575,8 @@ const Honest: React.FC = () => {
                 <div
                     style={{
                         display: "grid",
-                        gridTemplateColumns: tall ? "1fr" : "1fr 1fr",
-                        gap: tall ? 18 : 24,
+                        gridTemplateColumns: tall ? "1fr" : "0.78fr 1.22fr",
+                        gap: tall ? 14 : 22,
                         alignItems: "stretch",
                         opacity: cardO,
                         transform: cardO < 1 ? `translateY(${(1 - cardO) * 10}px)` : undefined,
@@ -589,7 +587,7 @@ const Honest: React.FC = () => {
                         style={{
                             borderRadius: RADIUS.xl,
                             border: `1px solid ${SURFACE.hairlineStrong}`,
-                            background: SURFACE.sheet,
+                            background: SURFACE.well,
                             overflow: "hidden",
                             display: "flex",
                             flexDirection: "column",
@@ -601,128 +599,275 @@ const Honest: React.FC = () => {
                                 alignItems: "center",
                                 justifyContent: "space-between",
                                 gap: 10,
-                                padding: tall ? "12px 18px" : "14px 20px",
+                                padding: tall ? "10px 16px" : "11px 18px",
                                 borderBottom: `1px solid ${SURFACE.hairline}`,
-                                background: SURFACE.well,
+                                background: SURFACE.sheet,
                             }}
                         >
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <FileGlyph color={AMBER} size={18} />
-                                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 16, color: AMBER, fontWeight: 600 }}>
+                                <FileGlyph color={AMBER} size={16} />
+                                <span style={{ fontFamily: FONT.mono, fontSize: 14, letterSpacing: "0.08em", color: AMBER, fontWeight: 600 }}>
                                     Not carried over
                                 </span>
                             </div>
-                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.muted }}>
+                            <span style={{ fontFamily: FONT.mono, fontSize: 12, letterSpacing: "0.1em", color: INK.muted }}>
                                 SAVED TO FILE
                             </span>
                         </div>
 
-                        <div style={{ padding: tall ? "14px 18px" : "18px 20px", display: "flex", flexDirection: "column", gap: tall ? 10 : 12, flex: 1 }}>
-                            <div
-                                style={{
-                                    fontFamily: FONT.mono,
-                                    fontSize: tall ? 16 : 18,
-                                    color: INK.high,
-                                    padding: "8px 12px",
-                                    borderRadius: RADIUS.md,
-                                    background: SURFACE.well,
-                                    border: `1px solid ${SURFACE.hairline}`,
-                                }}
-                            >
-                                backend/sql/introspected-left-behind.sql
+                        <div
+                            style={{
+                                padding: tall ? "12px 16px" : "16px 18px",
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "space-between",
+                                gap: tall ? 10 : 12,
+                                flex: 1,
+                            }}
+                        >
+                            <div style={{ display: "flex", flexDirection: "column", gap: tall ? 9 : 11 }}>
+                                <div
+                                    style={{
+                                        fontFamily: FONT.mono,
+                                        fontSize: tall ? 14 : 15,
+                                        color: INK.high,
+                                        padding: tall ? "7px 12px" : "8px 12px",
+                                        borderRadius: RADIUS.md,
+                                        background: SURFACE.sheet,
+                                        border: `1px solid ${SURFACE.hairline}`,
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                    }}
+                                >
+                                    backend/sql/introspected-left-behind.sql
+                                </div>
+
+                                <div
+                                    style={{
+                                        display: tall ? "grid" : "flex",
+                                        gridTemplateColumns: tall ? "repeat(3, 1fr)" : undefined,
+                                        flexDirection: tall ? undefined : "column",
+                                        gap: tall ? 8 : 10,
+                                    }}
+                                >
+                                    {LEFT_BEHIND.map((item, i) => {
+                                        const o = ramp(frame, itemAts[i], 10, ENTER);
+                                        return (
+                                            <div
+                                                key={item.kind}
+                                                style={{
+                                                    display: "flex",
+                                                    flexDirection: tall ? "column" : "row",
+                                                    alignItems: tall ? "flex-start" : "center",
+                                                    gap: tall ? 3 : 10,
+                                                    padding: tall ? "8px 11px" : "10px 13px",
+                                                    borderRadius: RADIUS.lg,
+                                                    background: SURFACE.sheet,
+                                                    border: `1px solid ${o > 0.5 ? `${AMBER}44` : SURFACE.hairline}`,
+                                                    opacity: 0.35 + 0.65 * o,
+                                                    minWidth: 0,
+                                                }}
+                                            >
+                                                <span
+                                                    style={{
+                                                        fontFamily: FONT.mono,
+                                                        fontSize: tall ? 14 : 15,
+                                                        fontWeight: 600,
+                                                        color: AMBER,
+                                                        minWidth: tall ? undefined : 86,
+                                                        flexShrink: 0,
+                                                    }}
+                                                >
+                                                    {item.kind}
+                                                </span>
+                                                <span
+                                                    style={{
+                                                        fontFamily: FONT.mono,
+                                                        fontSize: tall ? 13 : 14,
+                                                        color: INK.copy,
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                        width: tall ? "100%" : undefined,
+                                                    }}
+                                                >
+                                                    {tall ? item.short : item.detail}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
-                            {LEFT_BEHIND.map((item, i) => {
-                                const o = ramp(frame, itemAts[i], 10, ENTER);
-                                return (
-                                    <div
-                                        key={item.kind}
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 12,
-                                            padding: tall ? "9px 12px" : "11px 14px",
-                                            borderRadius: RADIUS.lg,
-                                            background: SURFACE.card,
-                                            border: `1px solid ${o > 0.5 ? `${AMBER}44` : SURFACE.hairline}`,
-                                            opacity: 0.35 + 0.65 * o,
-                                        }}
-                                    >
-                                        <span
-                                            style={{
-                                                fontFamily: FONT.mono,
-                                                fontSize: tall ? 15 : 16,
-                                                fontWeight: 600,
-                                                color: AMBER,
-                                                minWidth: tall ? 88 : 96,
-                                            }}
-                                        >
-                                            {item.kind}
-                                        </span>
-                                        <span
-                                            style={{
-                                                fontFamily: FONT.mono,
-                                                fontSize: tall ? 15 : 16,
-                                                color: INK.copy,
-                                                whiteSpace: "nowrap",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                            }}
-                                        >
-                                            {item.detail}
-                                        </span>
-                                    </div>
-                                );
-                            })}
+                            {!tall && (
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        paddingTop: 10,
+                                        borderTop: `1px solid ${SURFACE.hairline}`,
+                                        fontFamily: FONT.mono,
+                                        fontSize: 13,
+                                        color: INK.muted,
+                                    }}
+                                >
+                                    <span>3 objects extracted</span>
+                                    <span style={{ color: AMBER }}>0 silent drops</span>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    {/* Right / Bottom: Run straight on Rebase Cloud */}
+                    {/* Right / Bottom: Three Nov 23 Supabase migration tools */}
                     <div
                         style={{
                             borderRadius: RADIUS.xl,
-                            border: `1px solid ${cliActive > 0.3 ? `${ACCENT}66` : SURFACE.hairlineStrong}`,
+                            border: `1px solid ${cliActive > 0.3 ? `${ACCENT}55` : SURFACE.hairlineStrong}`,
                             background: SURFACE.well,
                             overflow: "hidden",
                             display: "flex",
                             flexDirection: "column",
                         }}
                     >
-                        <TerminalBar title="rebase cloud" badge="NO LOCAL PSQL" badgeColor={ACCENT} />
-                        <div style={{ padding: tall ? "16px 18px" : "20px 22px", display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1, gap: 14 }}>
-                            <div>
-                                <Prompt command={cloudCmd} at={Math.max(4, runAt)} size={tall ? 17 : 19} rate={0.28} />
+                        <TerminalBar title="supabase migration toolkit" badge="3 BUILT-IN TOOLS" badgeColor={ACCENT} />
+                        <div
+                            style={{
+                                padding: tall ? "12px 16px" : "16px 18px",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: tall ? 10 : 12,
+                                flex: 1,
+                            }}
+                        >
+                            {/* 1. Cloud DB query */}
+                            <div
+                                style={{
+                                    padding: tall ? "10px 14px" : "12px 16px",
+                                    borderRadius: RADIUS.lg,
+                                    background: SURFACE.sheet,
+                                    border: `1px solid ${cliActive > 0.3 ? `${ACCENT}44` : SURFACE.hairline}`,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 5,
+                                    opacity: 0.35 + 0.65 * cliActive,
+                                }}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                                    <span style={{ fontFamily: FONT.mono, fontSize: 12, letterSpacing: "0.12em", color: INK.muted }}>
+                                        01 · RUN LEFT-BEHIND SQL
+                                    </span>
+                                    <span
+                                        style={{
+                                            fontFamily: FONT.mono,
+                                            fontSize: 11,
+                                            letterSpacing: "0.08em",
+                                            color: ACCENT,
+                                            padding: "2px 8px",
+                                            borderRadius: RADIUS.md,
+                                            background: "rgba(52,211,153,0.12)",
+                                            border: "1px solid rgba(52,211,153,0.3)",
+                                        }}
+                                    >
+                                        NO LOCAL PSQL
+                                    </span>
+                                </div>
+                                <Prompt command={cloudCmd} at={Math.max(4, runAt)} size={tall ? 15 : 15} rate={0.2} />
                                 <div
                                     style={{
-                                        marginTop: 14,
                                         fontFamily: FONT.mono,
-                                        fontSize: tall ? 16 : 18,
-                                        lineHeight: 1.6,
+                                        fontSize: tall ? 13 : 14,
+                                        color: ACCENT,
                                         opacity: ramp(frame, doneAt, 10, ENTER),
                                     }}
                                 >
-                                    <div style={{ color: CYAN }}>→ Executing on Rebase Cloud Postgres</div>
-                                    <div style={{ color: ACCENT, fontWeight: 600 }}>✓ Applied triggers, functions &amp; CHECKs</div>
+                                    ✓ Applied triggers, functions &amp; CHECKs on Rebase Cloud
                                 </div>
                             </div>
 
+                            {/* 2. defineRpc */}
                             <div
                                 style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    padding: "10px 14px",
+                                    padding: tall ? "10px 14px" : "12px 16px",
                                     borderRadius: RADIUS.lg,
-                                    background: "rgba(52,211,153,0.10)",
-                                    border: `1px solid rgba(52,211,153,0.34)`,
-                                    fontFamily: FONT.mono,
-                                    fontSize: tall ? 15 : 16,
-                                    color: ACCENT,
-                                    opacity: 0.35 + 0.65 * ramp(frame, doneAt + 6, 10, ENTER),
+                                    background: SURFACE.sheet,
+                                    border: `1px solid ${rpcO > 0.3 ? `${CYAN}44` : SURFACE.hairline}`,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 5,
+                                    opacity: 0.35 + 0.65 * rpcO,
+                                    transform: rpcO < 1 ? `translateY(${(1 - rpcO) * 6}px)` : undefined,
                                 }}
                             >
-                                <span>✓ User IDs preserved</span>
-                                <span>0 local psql needed</span>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                                    <span style={{ fontFamily: FONT.mono, fontSize: 12, letterSpacing: "0.12em", color: INK.muted }}>
+                                        02 · EXPOSE SQL FUNCTIONS
+                                    </span>
+                                    <span
+                                        style={{
+                                            fontFamily: FONT.mono,
+                                            fontSize: 11,
+                                            letterSpacing: "0.08em",
+                                            color: CYAN,
+                                            padding: "2px 8px",
+                                            borderRadius: RADIUS.md,
+                                            background: "rgba(54,204,214,0.12)",
+                                            border: "1px solid rgba(54,204,214,0.3)",
+                                        }}
+                                    >
+                                        UNDER RLS
+                                    </span>
+                                </div>
+                                <div style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 16, color: INK.high, fontWeight: 600 }}>
+                                    defineRpc(&quot;get_public_proposal&quot;, …){" "}
+                                    <span style={{ color: CYAN }}>→ POST /api/rpc/…</span>
+                                </div>
+                                <div style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.copy }}>
+                                    Ports supabase.rpc() with zero handler boilerplate
+                                </div>
+                            </div>
+
+                            {/* 3. rebase users import */}
+                            <div
+                                style={{
+                                    padding: tall ? "10px 14px" : "12px 16px",
+                                    borderRadius: RADIUS.lg,
+                                    background: SURFACE.sheet,
+                                    border: `1px solid ${usersO > 0.3 ? `${ACCENT}44` : SURFACE.hairline}`,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 5,
+                                    opacity: 0.35 + 0.65 * usersO,
+                                    transform: usersO < 1 ? `translateY(${(1 - usersO) * 6}px)` : undefined,
+                                }}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                                    <span style={{ fontFamily: FONT.mono, fontSize: 12, letterSpacing: "0.12em", color: INK.muted }}>
+                                        03 · IMPORT USER ACCOUNTS
+                                    </span>
+                                    <span
+                                        style={{
+                                            fontFamily: FONT.mono,
+                                            fontSize: 11,
+                                            letterSpacing: "0.08em",
+                                            color: ACCENT,
+                                            padding: "2px 8px",
+                                            borderRadius: RADIUS.md,
+                                            background: "rgba(52,211,153,0.12)",
+                                            border: "1px solid rgba(52,211,153,0.3)",
+                                        }}
+                                    >
+                                        --dry-run · 0 EMAILS
+                                    </span>
+                                </div>
+                                <div style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 16, color: INK.high, fontWeight: 600 }}>
+                                    <span style={{ color: INK.muted, marginRight: 8 }}>$</span>
+                                    rebase users import users.csv
+                                </div>
+                                <div style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.copy }}>
+                                    Keeps every original Supabase user ID · zero email spam
+                                </div>
                             </div>
                         </div>
                     </div>

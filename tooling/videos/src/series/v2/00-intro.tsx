@@ -79,8 +79,8 @@ const Problem: React.FC = () => {
         <>
             <Headline text={H_PROBLEM} at={2} accent={CORAL} mark={["Wide-open", "tables."]} />
             <At x={x} y={y} w={w} style={{ opacity: termO }}>
-                <Window title="zsh · rls-check 0.18.1" at={0} pad={tall ? "16px 20px" : "20px 26px"}>
-                    <Prompt command="npx @rebasepro/rls-check $DATABASE_URL" at={2} size={tall ? 21 : 25} rate={0.45} />
+                <Window title="zsh · rls-check 0.18.1" at={0} accent={CORAL} pad={tall ? "16px 20px" : "20px 26px"}>
+                    <Prompt command="npx @rebasepro/rls-check" at={2} size={tall ? 21 : 25} rate={0.45} />
                     <div style={{ height: 10 }} />
                     <Log
                         size={tall ? 17 : 20}
@@ -669,24 +669,27 @@ const Cloud: React.FC = () => {
                         style={{
                             flex: 1,
                             borderRadius: RADIUS.xl,
-                            border: `1.5px solid ${TONE.deep.cardBorder}`,
-                            background: "rgba(9,10,12,0.72)",
+                            border: `1px solid ${SURFACE.hairlineStrong}`,
+                            background: "rgba(17,19,22,0.88)",
                             padding: tall ? "20px 22px" : "28px 30px",
                             opacity: ossO,
                         }}
                     >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 16 : 18, letterSpacing: "0.14em", color: CYAN }}>
-                                SELF-HOST · MIT
-                            </span>
-                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.muted }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 14, borderBottom: `1px solid ${SURFACE.hairline}` }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: 99, background: CYAN }} />
+                                <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 15 : 17, letterSpacing: "0.14em", color: INK.high }}>
+                                    SELF-HOST · MIT
+                                </span>
+                            </div>
+                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.muted }}>
                                 github.com/rebasepro
                             </span>
                         </div>
                         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: tall ? 10 : 14 }}>
-                            {bullet("Keep your Postgres (RDS, Neon, Hetzner, local)", CYAN)}
-                            {bullet("Zero Docker needed locally (built-in PGlite)", CYAN)}
-                            {bullet("Full backend, CMS, Studio & MCP — 100% MIT", CYAN)}
+                            {bullet("Keep your Postgres — or boot zero-code from DATABASE_URL", CYAN)}
+                            {bullet("Built-in PGlite locally & standalone Studio at /_studio", CYAN)}
+                            {bullet("Full backend, defineRpc, CMS, Studio & MCP — 100% MIT", CYAN)}
                         </div>
                     </div>
 
@@ -695,24 +698,27 @@ const Cloud: React.FC = () => {
                         style={{
                             flex: 1,
                             borderRadius: RADIUS.xl,
-                            border: `1.5px solid ${cloudO > 0.5 ? GREEN : TONE.deep.cardBorder}`,
-                            background: "rgba(9,10,12,0.82)",
+                            border: `1px solid ${cloudO > 0.5 ? "rgba(52,211,153,0.45)" : SURFACE.hairlineStrong}`,
+                            background: "rgba(17,19,22,0.92)",
                             padding: tall ? "20px 22px" : "28px 30px",
                             opacity: 0.35 + 0.65 * cloudO,
                             transform: `translateY(${(1 - cloudO) * 10}px)`,
                         }}
                     >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 16 : 18, letterSpacing: "0.14em", color: GREEN }}>
-                                REBASE CLOUD
-                            </span>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 14, borderBottom: `1px solid ${SURFACE.hairline}` }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: 99, background: GREEN }} />
+                                <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 15 : 17, letterSpacing: "0.14em", color: INK.high }}>
+                                    REBASE CLOUD
+                                </span>
+                            </div>
                             <span
                                 style={{
                                     fontFamily: FONT.mono,
                                     fontSize: tall ? 13 : 14,
                                     padding: "3px 10px",
                                     borderRadius: 99,
-                                    background: "rgba(52,211,153,0.16)",
+                                    background: "rgba(52,211,153,0.14)",
                                     color: GREEN,
                                 }}
                             >
@@ -733,8 +739,8 @@ const Cloud: React.FC = () => {
                         marginTop: tall ? 16 : 22,
                         padding: tall ? "14px 18px" : "16px 24px",
                         borderRadius: RADIUS.xl,
-                        border: `1px solid ${exitO > 0.5 ? GREEN : TONE.deep.cardBorder}`,
-                        background: "rgba(9,10,12,0.82)",
+                        border: `1px solid ${exitO > 0.5 ? "rgba(52,211,153,0.4)" : SURFACE.hairlineStrong}`,
+                        background: "rgba(17,19,22,0.92)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
@@ -768,7 +774,7 @@ export const INTRO_FILM: FilmSpec = checkFilm({
         { id: "schema", at: { line: "schema", plus: 0 }, render: Schema, roll: 0.52, ground: GROUND.claim, reveal: 0.65 },
         { id: "panel", at: { line: "panel", plus: 0 }, render: Panel, roll: 0.72 },
         { id: "agents", at: { line: "agents", plus: 0 }, render: Agents, roll: 0.36 },
-        { id: "cloud", at: { line: "cloud", plus: 0 }, render: Cloud, roll: 0.16, ground: GROUND.deep, reveal: 0.65, bright: true },
+        { id: "cloud", at: { line: "cloud", plus: 0 }, render: Cloud, roll: 0.16, bright: true },
         { id: "close", at: { line: "close", plus: 24 }, render: Close, roll: 0.48 },
     ],
 });

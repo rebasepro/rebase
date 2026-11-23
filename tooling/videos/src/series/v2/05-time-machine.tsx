@@ -1,7 +1,7 @@
 import React from "react";
 import { interpolate, useCurrentFrame } from "remotion";
 import { ENTER, ramp, SHIFT } from "../../components/motion";
-import { CHROMA, FONT, GROUND, INK, RADIUS, SURFACE, TONE } from "../../theme";
+import { CHROMA, FONT, GROUND, INK, RADIUS, SURFACE } from "../../theme";
 import {
     At,
     checkFilm,
@@ -416,14 +416,14 @@ const Privacy: React.FC = () => {
                         padding: tall ? "14px 18px" : "16px 24px",
                         borderRadius: RADIUS.xl,
                         background: SURFACE.well,
-                        border: "1.5px solid rgba(255,255,255,0.24)",
+                        border: `1px solid ${SURFACE.hairlineStrong}`,
                         marginBottom: tall ? 18 : 26,
                         opacity: topO,
                     }}
                 >
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <ShieldCheckIcon color={GREEN} size={22} />
-                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 16 : 19, color: TONE.claim.high }}>
+                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 16 : 19, color: INK.high }}>
                             GET /api/data/orders/ord_8841/history
                         </span>
                     </div>
@@ -555,7 +555,7 @@ const Privacy: React.FC = () => {
                         >
                             <BlockIcon color={CORAL} size={tall ? 20 : 24} />
                         </div>
-                        <span style={{ fontFamily: FONT.mono, fontSize: 13, letterSpacing: "0.14em", color: TONE.claim.high, fontWeight: 600 }}>
+                        <span style={{ fontFamily: FONT.mono, fontSize: 13, letterSpacing: "0.14em", color: INK.high, fontWeight: 600 }}>
                             NO JOIN
                         </span>
                     </div>
@@ -1046,7 +1046,7 @@ export const TIME_MACHINE: FilmSpec = checkFilm({
     close: { line: "close", plus: -2 },
     scenes: [
         { id: "on", at: { line: "on", plus: -16 }, render: On, roll: 0.34 },
-        { id: "privacy", at: { line: "privacy", plus: 0 }, render: Privacy, roll: 0.62, ground: GROUND.claim, reveal: 0.65 },
+        { id: "privacy", at: { line: "privacy", plus: 0 }, render: Privacy, roll: 0.62 },
         { id: "cli", at: { line: "cli", plus: 0 }, render: Cli, roll: 0.18 },
         { id: "revert", at: { line: "revert", plus: 0 }, render: Revert, roll: 0.78, bright: true },
         { id: "close", at: { line: "close", plus: 24 }, render: Close, roll: 0.48 },

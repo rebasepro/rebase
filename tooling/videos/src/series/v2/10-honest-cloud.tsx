@@ -1,7 +1,7 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { ENTER, ramp } from "../../components/motion";
-import { CHROMA, FONT, FRAME, GROUND, INK, PRIMARY, PRIMARY_LIGHT, RADIUS, SURFACE, TONE } from "../../theme";
+import { CHROMA, FONT, FRAME, GROUND, INK, PRIMARY, PRIMARY_LIGHT, RADIUS, SURFACE } from "../../theme";
 import { At, checkFilm, Headline, lines, useBodyFor, useCue, type FilmSpec } from "../kit";
 
 /**
@@ -645,7 +645,7 @@ const Dials: React.FC = () => {
     );
 };
 
-/* ── scene 3: signin — Open CMS one-click SSO (deep ground) ─────────── */
+/* ── scene 3: signin — Open CMS one-click SSO ───────────────────────── */
 
 const SignIn: React.FC = () => {
     const frame = useCurrentFrame();
@@ -668,13 +668,13 @@ const SignIn: React.FC = () => {
         <>
             <Headline text={headline} at={0} accent={CYAN} mark={["One", "click"]} />
             <At x={x} y={y} w={w}>
-                {/* 1. Rebase Cloud console project top bar */}
+                {/* 1. Rebase Cloud console project top bar (quiet monochrome chrome) */}
                 <div
                     style={{
                         borderRadius: FRAME.radius,
-                        background: "rgba(9, 10, 12, 0.9)",
-                        border: `1.5px solid ${TONE.deep.cardBorder}`,
-                        padding: tall ? "16px 20px" : "18px 26px",
+                        background: SURFACE.sheet,
+                        border: `1px solid ${SURFACE.hairlineStrong}`,
+                        padding: tall ? "14px 18px" : "16px 24px",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
@@ -682,37 +682,38 @@ const SignIn: React.FC = () => {
                         opacity: topIn,
                     }}
                 >
-                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <div
                             style={{
-                                width: 12,
-                                height: 12,
+                                width: 6,
+                                height: 6,
                                 borderRadius: 99,
                                 background: EMERALD,
+                                flexShrink: 0,
                             }}
                         />
                         <div>
-                            <div style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 20 : 22, color: INK.high }}>
+                            <div style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 19 : 21, color: INK.high }}>
                                 acme / shop
                             </div>
-                            <div style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: TONE.deep.muted, marginTop: 2 }}>
+                            <div style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.muted, marginTop: 2 }}>
                                 app.rebase.pro · owner@acme.dev
                             </div>
                         </div>
                     </div>
 
-                    {/* Open CMS button with animated click */}
+                    {/* Primary #0070F4 Open CMS button with animated click */}
                     <div style={{ position: "relative" }}>
                         <div
                             style={{
                                 fontFamily: FONT.body,
                                 fontWeight: 600,
-                                fontSize: tall ? 19 : 21,
+                                fontSize: tall ? 18 : 20,
                                 color: "#FFFFFF",
                                 background: PRIMARY,
-                                padding: tall ? "11px 22px" : "12px 26px",
+                                padding: tall ? "10px 20px" : "11px 24px",
                                 borderRadius: RADIUS.lg,
-                                border: `1.5px solid ${clickProg > 0.2 ? CYAN : PRIMARY_LIGHT}`,
+                                border: `1px solid ${clickProg > 0.2 ? PRIMARY_LIGHT : PRIMARY}`,
                                 transform: pressed ? "scale(0.95)" : undefined,
                                 whiteSpace: "nowrap",
                             }}
@@ -737,8 +738,8 @@ const SignIn: React.FC = () => {
                 {/* 2. Platform token exchange strip */}
                 <div
                     style={{
-                        marginTop: tall ? 14 : 16,
-                        marginBottom: tall ? 14 : 16,
+                        marginTop: tall ? 11 : 13,
+                        marginBottom: tall ? 11 : 13,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -754,28 +755,28 @@ const SignIn: React.FC = () => {
                             flexWrap: "wrap",
                             justifyContent: "center",
                             gap: tall ? 10 : 14,
-                            padding: tall ? "10px 16px" : "10px 22px",
+                            padding: tall ? "9px 16px" : "9px 20px",
                             borderRadius: 99,
-                            background: "rgba(9, 10, 12, 0.88)",
-                            border: `1.5px solid ${CYAN}88`,
+                            background: SURFACE.well,
+                            border: `1px solid ${SURFACE.hairlineStrong}`,
                         }}
                     >
                         <KeyTokenIcon color={CYAN} size={18} />
-                        <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 15 : 17, color: CYAN }}>
+                        <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 15 : 16, color: CYAN }}>
                             POST /api/auth/platform-signin
                         </span>
-                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: TONE.deep.copy }}>
+                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.copy }}>
                             • 1-min single-use token • auth:admin-signin
                         </span>
                     </div>
                 </div>
 
-                {/* 3. Rebase CMS window signed in as admin */}
+                {/* 3. Rebase CMS window signed in as admin (quiet monochrome chrome) */}
                 <div
                     style={{
                         borderRadius: FRAME.radius,
-                        background: "rgba(17, 19, 22, 0.96)",
-                        border: `1.5px solid ${cmsIn > 0.4 ? `${EMERALD}AA` : TONE.deep.cardBorder}`,
+                        background: SURFACE.sheet,
+                        border: `1px solid ${SURFACE.hairlineStrong}`,
                         overflow: "hidden",
                         opacity: 0.25 + 0.75 * cmsIn,
                         transform: cmsIn < 1 ? `translateY(${(1 - cmsIn) * 14}px)` : undefined,
@@ -787,16 +788,17 @@ const SignIn: React.FC = () => {
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
-                            padding: tall ? "12px 18px" : "13px 22px",
+                            padding: tall ? "11px 18px" : "12px 22px",
                             background: SURFACE.well,
                             borderBottom: `1px solid ${SURFACE.hairline}`,
                         }}
                     >
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: tall ? 18 : 19, color: INK.high }}>
+                            <span style={{ width: 6, height: 6, borderRadius: 99, background: EMERALD, flexShrink: 0 }} />
+                            <span style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: tall ? 17 : 18, color: INK.high }}>
                                 Rebase CMS
                             </span>
-                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.muted }}>
+                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.muted }}>
                                 shop.rebase.website/admin
                             </span>
                         </div>
@@ -805,13 +807,13 @@ const SignIn: React.FC = () => {
                                 display: "flex",
                                 alignItems: "center",
                                 gap: 8,
-                                padding: "5px 12px",
+                                padding: "4px 12px",
                                 borderRadius: 99,
-                                background: "rgba(52,211,153,0.16)",
-                                border: `1px solid ${EMERALD}`,
+                                background: SURFACE.sheet,
+                                border: `1px solid rgba(52,211,153,0.45)`,
                                 fontFamily: FONT.mono,
                                 fontWeight: 600,
-                                fontSize: tall ? 14 : 15,
+                                fontSize: tall ? 13 : 14,
                                 color: EMERALD,
                             }}
                         >
@@ -824,30 +826,31 @@ const SignIn: React.FC = () => {
                     <div
                         style={{
                             display: "grid",
-                            gridTemplateColumns: tall ? "170px 1fr" : "230px 1fr",
-                            minHeight: tall ? 200 : 195,
+                            gridTemplateColumns: tall ? "164px 1fr" : "220px 1fr",
+                            minHeight: tall ? 182 : 182,
                         }}
                     >
                         <div
                             style={{
-                                padding: tall ? "14px 14px" : "16px 18px",
+                                padding: tall ? "12px 12px" : "14px 16px",
                                 borderRight: `1px solid ${SURFACE.hairline}`,
                                 display: "flex",
                                 flexDirection: "column",
-                                gap: 8,
+                                gap: 6,
                             }}
                         >
                             {["Orders", "Customers", "Products", "Studio"].map((item, idx) => (
                                 <div
                                     key={item}
                                     style={{
-                                        padding: "8px 12px",
+                                        padding: "7px 12px",
                                         borderRadius: RADIUS.md,
-                                        background: idx === 0 ? "rgba(0,112,244,0.18)" : "transparent",
+                                        background: idx === 0 ? "rgba(255,255,255,0.07)" : "transparent",
+                                        border: idx === 0 ? `1px solid ${SURFACE.hairline}` : "1px solid transparent",
                                         color: idx === 0 ? INK.high : INK.copy,
                                         fontFamily: FONT.body,
                                         fontWeight: idx === 0 ? 600 : 400,
-                                        fontSize: tall ? 16 : 17,
+                                        fontSize: tall ? 15 : 16,
                                     }}
                                 >
                                     {item}
@@ -857,21 +860,21 @@ const SignIn: React.FC = () => {
 
                         <div
                             style={{
-                                padding: tall ? "16px 18px" : "18px 24px",
+                                padding: tall ? "14px 16px" : "16px 22px",
                                 display: "flex",
                                 flexDirection: "column",
                                 justifyContent: "space-between",
-                                gap: 14,
+                                gap: 12,
                             }}
                         >
                             <div>
-                                <div style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: tall ? 20 : 22, color: INK.high }}>
+                                <div style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: tall ? 19 : 21, color: INK.high }}>
                                     Orders · live production table
                                 </div>
-                                <div style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 16, color: INK.copy, marginTop: 8 }}>
+                                <div style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.copy, marginTop: 8 }}>
                                     ord_9412 · paid · €148.00 · Falkenstein CNPG
                                 </div>
-                                <div style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 16, color: INK.muted, marginTop: 4 }}>
+                                <div style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.muted, marginTop: 4 }}>
                                     ord_9411 · shipped · €64.00 · Falkenstein CNPG
                                 </div>
                             </div>
@@ -883,22 +886,52 @@ const SignIn: React.FC = () => {
                                     justifyContent: "space-between",
                                     flexWrap: "wrap",
                                     gap: 10,
-                                    padding: tall ? "10px 14px" : "11px 16px",
+                                    padding: tall ? "9px 14px" : "10px 16px",
                                     borderRadius: RADIUS.lg,
-                                    background: "rgba(52,211,153,0.12)",
-                                    border: `1.5px solid ${EMERALD}`,
+                                    background: SURFACE.well,
+                                    border: `1px solid rgba(52,211,153,0.42)`,
                                     opacity: 0.25 + 0.75 * zeroIn,
                                 }}
                             >
-                                <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 17 : 19, color: EMERALD }}>
+                                <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 16 : 18, color: EMERALD }}>
                                     0 bootstrap passwords
                                 </span>
-                                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.copy }}>
+                                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.copy }}>
                                     no REBASE_ADMIN_PASSWORD env var
                                 </span>
                             </div>
                         </div>
                     </div>
+                </div>
+
+                {/* 4. Auto-link deploy summary footer */}
+                <div
+                    style={{
+                        marginTop: tall ? 12 : 14,
+                        padding: tall ? "10px 16px" : "11px 20px",
+                        borderRadius: RADIUS.lg,
+                        background: SURFACE.well,
+                        border: `1px solid ${SURFACE.hairlineStrong}`,
+                        display: "flex",
+                        flexDirection: tall ? "column" : "row",
+                        alignItems: tall ? "flex-start" : "center",
+                        justifyContent: "space-between",
+                        gap: tall ? 4 : 14,
+                        opacity: 0.35 + 0.65 * zeroIn,
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 99, background: PRIMARY_LIGHT, flexShrink: 0 }} />
+                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.high }}>
+                            rebase cloud deploy
+                        </span>
+                        <span style={{ fontFamily: FONT.body, fontSize: tall ? 14 : 15, color: INK.muted }}>
+                            auto-links / creates project &amp; prints
+                        </span>
+                    </div>
+                    <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: PRIMARY_LIGHT }}>
+                        &lt;console&gt;/projects/&lt;id&gt;?open=admin
+                    </span>
                 </div>
             </At>
         </>
@@ -1150,7 +1183,7 @@ export const HONEST_CLOUD: FilmSpec = checkFilm({
     scenes: [
         { id: "physics", at: { line: "physics", plus: -16 }, render: Physics, roll: 0.22 },
         { id: "dials", at: { line: "dials", plus: 2 }, render: Dials, roll: 0.48 },
-        { id: "signin", at: { line: "signin", plus: 2 }, render: SignIn, roll: 0.72, ground: GROUND.deep, reveal: 0.65 },
+        { id: "signin", at: { line: "signin", plus: 2 }, render: SignIn, roll: 0.72 },
         { id: "region", at: { line: "region", plus: 2 }, render: Region, roll: 0.34, bright: true },
         { id: "close", at: { line: "close", plus: 24 }, render: Close, roll: 0.5 },
     ],

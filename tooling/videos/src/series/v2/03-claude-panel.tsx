@@ -1,7 +1,8 @@
 import React from "react";
 import { Img, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { ENTER, ramp, SHIFT } from "../../components/motion";
-import { CHROMA, FONT, FRAME, GROUND, INK, PRIMARY, PRIMARY_LIGHT, RADIUS, SURFACE, TONE, TRACKING } from "../../theme";
+import { Dot } from "../../components/Type";
+import { CHROMA, FONT, FRAME, GROUND, INK, PRIMARY, PRIMARY_LIGHT, RADIUS, SURFACE, TRACKING } from "../../theme";
 import { At, checkFilm, Headline, Label, lines, useBodyFor, useCue, type FilmSpec } from "../kit";
 
 /**
@@ -98,7 +99,7 @@ const Blind: React.FC = () => {
                     <div
                         style={{
                             ...cardStyle,
-                            border: `1.5px solid rgba(251,80,102,${0.48 + 0.22 * pulse})`,
+                            border: `1px solid rgba(251,80,102,${0.42 + 0.22 * pulse})`,
                             opacity: leftIn,
                             transform: leftIn < 1 ? `translateY(${(1 - leftIn) * 14}px)` : undefined,
                             padding: tall ? "20px 22px" : "26px 28px",
@@ -169,7 +170,7 @@ const Blind: React.FC = () => {
                     <div
                         style={{
                             ...cardStyle,
-                            border: `1.5px solid ${ACCENT}`,
+                            border: `1px solid ${SURFACE.hairlineStrong}`,
                             opacity: rightIn,
                             transform: rightIn < 1 ? `translateY(${(1 - rightIn) * 14}px)` : undefined,
                             padding: tall ? "20px 22px" : "26px 28px",
@@ -586,7 +587,7 @@ const AppScene: React.FC = () => {
                 <div
                     style={{
                         borderRadius: FRAME.radius,
-                        border: `1.5px solid rgba(54,204,214,0.45)`,
+                        border: `1px solid ${SURFACE.hairlineStrong}`,
                         background: SURFACE.sheet,
                         overflow: "hidden",
                         opacity: appIn,
@@ -601,13 +602,13 @@ const AppScene: React.FC = () => {
                             justifyContent: "space-between",
                             flexWrap: "wrap",
                             gap: 12,
-                            padding: tall ? "14px 18px" : "16px 24px",
+                            padding: tall ? "13px 18px" : "14px 24px",
                             borderBottom: `1px solid ${SURFACE.hairline}`,
-                            background: SURFACE.card,
+                            background: SURFACE.sheet,
                         }}
                     >
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ width: 9, height: 9, borderRadius: 99, background: GREEN }} />
+                            <Dot color={GREEN} size={6} />
                             <span style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: tall ? 20 : 22, color: INK.high }}>
                                 Fulfillment Triage
                             </span>
@@ -749,7 +750,7 @@ const Confirm: React.FC = () => {
         <div
             style={{
                 borderRadius: FRAME.radius,
-                border: `1.5px solid ${TONE.deep.cardBorder}`,
+                border: `1px solid ${SURFACE.hairlineStrong}`,
                 background: SURFACE.sheet,
                 overflow: "hidden",
                 opacity: frameIn,
@@ -762,12 +763,12 @@ const Confirm: React.FC = () => {
                     justifyContent: "space-between",
                     padding: tall ? "10px 16px" : "12px 18px",
                     borderBottom: `1px solid ${SURFACE.hairline}`,
-                    background: SURFACE.card,
+                    background: SURFACE.sheet,
                 }}
             >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ width: 9, height: 9, borderRadius: 99, background: AMBER }} />
-                    <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.high, letterSpacing: "0.08em" }}>
+                    <Dot color={AMBER} size={6} />
+                    <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.copy, letterSpacing: "0.08em" }}>
                         PLAN PREVIEW · 2-STEP WRITE
                     </span>
                 </div>
@@ -777,9 +778,9 @@ const Confirm: React.FC = () => {
                         fontSize: 13,
                         padding: "4px 10px",
                         borderRadius: RADIUS.md,
-                        background: "rgba(245,158,11,0.18)",
+                        background: "rgba(245,158,11,0.14)",
                         color: AMBER,
-                        border: "1px solid rgba(245,158,11,0.45)",
+                        border: "1px solid rgba(245,158,11,0.4)",
                     }}
                 >
                     Waiting on Confirm
@@ -844,7 +845,7 @@ const Confirm: React.FC = () => {
                 padding: tall ? "12px 16px" : "14px 20px",
                 borderRadius: FRAME.radius,
                 background: SURFACE.well,
-                border: `1px solid ${TONE.deep.cardBorder}`,
+                border: `1px solid ${SURFACE.hairlineStrong}`,
                 opacity: frameIn,
             }}
         >
@@ -870,7 +871,7 @@ const Confirm: React.FC = () => {
                         <div
                             style={{
                                 borderRadius: FRAME.radius,
-                                border: `1px solid ${TONE.deep.cardBorder}`,
+                                border: `1px solid ${SURFACE.hairlineStrong}`,
                                 background: SURFACE.sheet,
                                 padding: "12px 16px",
                                 opacity: frameIn,
@@ -922,7 +923,7 @@ const Confirm: React.FC = () => {
                             style={{
                                 flex: 1,
                                 borderRadius: FRAME.radius,
-                                border: `1.5px solid ${TONE.deep.cardBorder}`,
+                                border: `1px solid ${SURFACE.hairlineStrong}`,
                                 background: SURFACE.sheet,
                                 padding: "22px 24px",
                                 display: "flex",
@@ -949,7 +950,7 @@ const Confirm: React.FC = () => {
                                                     padding: "14px 16px",
                                                     borderRadius: RADIUS.lg,
                                                     background: lit > 0.4 ? "rgba(245,158,11,0.14)" : SURFACE.well,
-                                                    border: `1.5px solid ${lit > 0.4 ? AMBER : SURFACE.hairline}`,
+                                                    border: `1px solid ${lit > 0.4 ? AMBER : SURFACE.hairline}`,
                                                     transform: lit < 1 ? `translateY(${(1 - lit) * 6}px)` : undefined,
                                                 }}
                                             >
@@ -1007,7 +1008,7 @@ export const CLAUDE_PANEL: FilmSpec = checkFilm({
         { id: "blind", at: { line: "blind", plus: -16 }, render: Blind, roll: 0.24 },
         { id: "open", at: { line: "open", plus: 0 }, render: Open, roll: 0.56 },
         { id: "app", at: { line: "app", plus: 0 }, render: AppScene, roll: 0.78 },
-        { id: "confirm", at: { line: "confirm", plus: 0 }, render: Confirm, roll: 0.38, bright: true, ground: GROUND.deep },
+        { id: "confirm", at: { line: "confirm", plus: 0 }, render: Confirm, roll: 0.38, bright: true },
         { id: "close", at: { line: "close", plus: 24 }, render: Close, roll: 0.5 },
     ],
 });

@@ -1,7 +1,8 @@
 import React from "react";
 import { interpolate, useCurrentFrame } from "remotion";
 import { ENTER, ramp, SHIFT } from "../../components/motion";
-import { CHROMA, FONT, GROUND, INK, PRIMARY, RADIUS, SURFACE, TONE, TRACKING } from "../../theme";
+import { Dot } from "../../components/Type";
+import { CHROMA, FONT, GROUND, INK, PRIMARY, RADIUS, SURFACE, TRACKING } from "../../theme";
 import { At, checkFilm, Editor, Headline, lines, useBodyFor, useCue, type FilmSpec } from "../kit";
 
 /**
@@ -152,7 +153,7 @@ const Stage: React.FC = () => {
                             <div
                                 style={{
                                     borderRadius: RADIUS.lg,
-                                    border: `1.5px solid ${strike > 0.4 ? "rgba(251,80,102,0.65)" : SURFACE.hairline}`,
+                                    border: `1px solid ${strike > 0.4 ? "rgba(251,80,102,0.55)" : SURFACE.hairline}`,
                                     background: strike > 0.4 ? "rgba(251,80,102,0.08)" : SURFACE.well,
                                     padding: tall ? "14px 16px" : "18px 20px",
                                     display: "flex",
@@ -212,8 +213,8 @@ const Stage: React.FC = () => {
                             <div
                                 style={{
                                     borderRadius: RADIUS.lg,
-                                    border: `1.5px solid ${allow > 0.4 ? GREEN : SURFACE.hairline}`,
-                                    background: allow > 0.4 ? "rgba(52,211,153,0.10)" : SURFACE.well,
+                                    border: `1px solid ${allow > 0.4 ? "rgba(52,211,153,0.55)" : SURFACE.hairline}`,
+                                    background: allow > 0.4 ? "rgba(52,211,153,0.08)" : SURFACE.well,
                                     padding: tall ? "14px 16px" : "18px 20px",
                                     display: "flex",
                                     flexDirection: "column",
@@ -283,7 +284,7 @@ const Hold: React.FC = () => {
         <div
             style={{
                 borderRadius: RADIUS.xl,
-                border: `1.5px solid ${SURFACE.hairlineStrong}`,
+                border: `1px solid ${SURFACE.hairlineStrong}`,
                 background: SURFACE.sheet,
                 padding: tall ? "16px 20px" : "24px 24px",
                 display: "flex",
@@ -400,8 +401,8 @@ const Hold: React.FC = () => {
         <div
             style={{
                 borderRadius: RADIUS.xl,
-                border: `1.5px solid ${staged > 0.3 ? ACCENT : SURFACE.hairlineStrong}`,
-                background: staged > 0.3 ? "rgba(245,158,11,0.08)" : SURFACE.sheet,
+                border: `1px solid ${staged > 0.3 ? ACCENT : SURFACE.hairlineStrong}`,
+                background: SURFACE.sheet,
                 padding: tall ? "16px 20px" : "22px 26px",
                 display: "flex",
                 flexDirection: "column",
@@ -422,7 +423,7 @@ const Hold: React.FC = () => {
                         fontSize: 15,
                         padding: "5px 12px",
                         borderRadius: RADIUS.md,
-                        border: `1.5px solid ${ACCENT}`,
+                        border: `1px solid ${ACCENT}`,
                         background: staged > 0.3 ? ACCENT : "transparent",
                         color: staged > 0.3 ? GROUND.base : ACCENT,
                     }}
@@ -471,7 +472,7 @@ const Hold: React.FC = () => {
         <div
             style={{
                 borderRadius: RADIUS.xl,
-                border: `1.5px solid rgba(52,211,153,0.45)`,
+                border: `1px solid rgba(52,211,153,0.45)`,
                 background: SURFACE.sheet,
                 padding: tall ? "16px 20px" : "22px 26px",
                 display: "flex",
@@ -493,8 +494,8 @@ const Hold: React.FC = () => {
                         fontSize: 15,
                         padding: "5px 12px",
                         borderRadius: RADIUS.md,
-                        border: `1.5px solid ${GREEN}`,
-                        background: "rgba(52,211,153,0.14)",
+                        border: `1px solid ${GREEN}`,
+                        background: "rgba(52,211,153,0.12)",
                         color: GREEN,
                     }}
                 >
@@ -567,7 +568,6 @@ const Diff: React.FC = () => {
     const frame = useCurrentFrame();
     const { x, y, w, format } = useBodyFor(DIFF_HEADLINE);
     const tall = format === "tall";
-    const tone = TONE.claim;
     const diffAt = useCue({ line: "diff", word: "diff", plus: -4 }) ?? 9999;
     const approveAt = useCue({ line: "diff", word: "approve", plus: -4 }) ?? 9999;
 
@@ -585,7 +585,7 @@ const Diff: React.FC = () => {
                 <div
                     style={{
                         borderRadius: RADIUS.xl,
-                        border: `1.5px solid ${approved > 0.5 ? GREEN : tone.cardBorder}`,
+                        border: `1px solid ${approved > 0.5 ? "rgba(52,211,153,0.45)" : SURFACE.hairlineStrong}`,
                         background: SURFACE.sheet,
                         overflow: "hidden",
                         opacity: enterO,
@@ -593,34 +593,34 @@ const Diff: React.FC = () => {
                         position: "relative",
                     }}
                 >
-                    {/* CMS top bar */}
+                    {/* CMS drafted panel header */}
                     <div
                         style={{
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
-                            padding: tall ? "12px 20px" : "14px 26px",
-                            background: SURFACE.well,
+                            padding: tall ? "12px 20px" : "13px 26px",
+                            background: SURFACE.sheet,
                             borderBottom: `1px solid ${SURFACE.hairline}`,
                         }}
                     >
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                            <span style={{ width: 9, height: 9, borderRadius: 99, background: approved > 0.5 ? GREEN : ACCENT }} />
-                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 16 : 18, color: INK.copy }}>
-                                Rebase CMS <span style={{ color: INK.muted }}>/</span>{" "}
-                                <span style={{ color: INK.high, fontWeight: 600 }}>Review Queue</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <Dot color={approved > 0.5 ? GREEN : ACCENT} size={6} />
+                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 16, letterSpacing: "0.06em", color: INK.muted }}>
+                                REBASE CMS <span style={{ opacity: 0.55 }}>/</span>{" "}
+                                <span style={{ color: INK.high, fontWeight: 600 }}>REVIEW QUEUE</span>
                             </span>
                         </div>
                         <span
                             style={{
                                 fontFamily: FONT.mono,
                                 fontWeight: 600,
-                                fontSize: tall ? 15 : 16,
+                                fontSize: tall ? 14 : 15,
                                 padding: "5px 12px",
                                 borderRadius: RADIUS.md,
-                                border: `1px solid ${approved > 0.5 ? GREEN : ACCENT}`,
-                                background: approved > 0.5 ? "rgba(52,211,153,0.16)" : "rgba(245,158,11,0.14)",
-                                color: approved > 0.5 ? GREEN : ACCENT,
+                                border: `1px solid ${approved > 0.5 ? "rgba(52,211,153,0.5)" : SURFACE.hairlineStrong}`,
+                                background: approved > 0.5 ? "rgba(52,211,153,0.12)" : SURFACE.well,
+                                color: approved > 0.5 ? GREEN : INK.copy,
                             }}
                         >
                             {approved > 0.5 ? "✓ 0 PENDING" : "1 PENDING"}
@@ -630,7 +630,7 @@ const Diff: React.FC = () => {
                     {/* Proposal metadata strip */}
                     <div
                         style={{
-                            padding: tall ? "16px 20px" : "20px 26px",
+                            padding: tall ? "16px 20px" : "18px 26px",
                             borderBottom: `1px solid ${SURFACE.hairline}`,
                             display: "flex",
                             alignItems: "center",
@@ -644,10 +644,11 @@ const Diff: React.FC = () => {
                                 style={{
                                     fontFamily: FONT.mono,
                                     fontWeight: 600,
-                                    fontSize: tall ? 15 : 16,
+                                    fontSize: tall ? 14 : 15,
                                     padding: "5px 11px",
                                     borderRadius: RADIUS.md,
-                                    background: "rgba(245,158,11,0.18)",
+                                    border: `1px solid ${SURFACE.hairlineStrong}`,
+                                    background: SURFACE.well,
                                     color: ACCENT,
                                 }}
                             >
@@ -665,14 +666,14 @@ const Diff: React.FC = () => {
                                 gap: 10,
                                 padding: "6px 14px",
                                 borderRadius: RADIUS.lg,
-                                background: SURFACE.card,
-                                border: `1px solid ${SURFACE.hairlineStrong}`,
+                                background: SURFACE.well,
+                                border: `1px solid ${SURFACE.hairline}`,
                                 fontFamily: FONT.mono,
                                 fontSize: tall ? 16 : 17,
-                                color: INK.copy,
+                                color: INK.muted,
                             }}
                         >
-                            <KeyIcon size={17} color={CYAN} />
+                            <KeyIcon size={16} color={INK.muted} />
                             <span>
                                 <span style={{ color: INK.high }}>rk_live_7c2</span> · support-agent
                             </span>
@@ -684,7 +685,7 @@ const Diff: React.FC = () => {
                         <div
                             style={{
                                 borderRadius: RADIUS.lg,
-                                border: `1px solid ${diffLit > 0.5 ? "rgba(245,158,11,0.45)" : SURFACE.hairline}`,
+                                border: `1px solid ${diffLit > 0.5 ? SURFACE.hairlineStrong : SURFACE.hairline}`,
                                 background: SURFACE.well,
                                 overflow: "hidden",
                             }}
@@ -717,7 +718,7 @@ const Diff: React.FC = () => {
                                         alignItems: "center",
                                         padding: tall ? "14px 16px" : "18px 20px",
                                         borderBottom: idx === 0 ? `1px solid ${SURFACE.hairline}` : undefined,
-                                        background: diffLit > 0.4 ? `rgba(255,255,255,${0.025 * diffLit})` : undefined,
+                                        background: diffLit > 0.4 ? `rgba(255,255,255,${0.02 * diffLit})` : undefined,
                                         fontFamily: FONT.mono,
                                         fontSize: tall ? 20 : 23,
                                     }}
@@ -729,7 +730,7 @@ const Diff: React.FC = () => {
                                                 display: "inline-block",
                                                 padding: "4px 12px",
                                                 borderRadius: RADIUS.md,
-                                                background: "rgba(251,80,102,0.14)",
+                                                background: "rgba(251,80,102,0.12)",
                                                 color: CORAL,
                                                 textDecoration: "line-through",
                                             }}
@@ -744,8 +745,8 @@ const Diff: React.FC = () => {
                                                 display: "inline-block",
                                                 padding: "4px 12px",
                                                 borderRadius: RADIUS.md,
-                                                background: approved > 0.5 ? "rgba(52,211,153,0.18)" : "rgba(245,158,11,0.16)",
-                                                border: `1px solid ${approved > 0.5 ? GREEN : ACCENT}`,
+                                                background: approved > 0.5 ? "rgba(52,211,153,0.14)" : "rgba(245,158,11,0.12)",
+                                                border: `1px solid ${approved > 0.5 ? "rgba(52,211,153,0.55)" : "rgba(245,158,11,0.45)"}`,
                                                 color: approved > 0.5 ? GREEN : ACCENT,
                                                 fontWeight: 600,
                                             }}
@@ -763,6 +764,7 @@ const Diff: React.FC = () => {
                         style={{
                             padding: tall ? "14px 20px 18px" : "16px 26px 22px",
                             borderTop: `1px solid ${SURFACE.hairline}`,
+                            background: SURFACE.sheet,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
@@ -780,7 +782,7 @@ const Diff: React.FC = () => {
                                     padding: tall ? "11px 20px" : "12px 24px",
                                     borderRadius: RADIUS.lg,
                                     border: `1px solid ${SURFACE.hairlineStrong}`,
-                                    background: SURFACE.card,
+                                    background: SURFACE.well,
                                     fontFamily: FONT.body,
                                     fontWeight: 500,
                                     fontSize: tall ? 19 : 20,
@@ -877,7 +879,7 @@ const Apply: React.FC = () => {
                 <div
                     style={{
                         borderRadius: RADIUS.xl,
-                        border: `1.5px solid ${committed > 0.5 ? GREEN : SURFACE.hairlineStrong}`,
+                        border: `1px solid ${committed > 0.5 ? "rgba(52,211,153,0.5)" : SURFACE.hairlineStrong}`,
                         background: SURFACE.well,
                         overflow: "hidden",
                         opacity: enterO,
@@ -890,14 +892,14 @@ const Apply: React.FC = () => {
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
-                            padding: tall ? "12px 18px" : "14px 24px",
+                            padding: tall ? "12px 18px" : "13px 24px",
                             background: SURFACE.sheet,
                             borderBottom: `1px solid ${SURFACE.hairline}`,
                         }}
                     >
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <DatabaseIcon size={19} color={committed > 0.5 ? GREEN : CYAN} />
-                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 17, letterSpacing: TRACKING.eyebrow, color: INK.copy }}>
+                            <Dot color={committed > 0.5 ? GREEN : CYAN} size={6} />
+                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 16, letterSpacing: TRACKING.eyebrow, color: INK.copy }}>
                                 POSTGRES · SINGLE TRANSACTION
                             </span>
                         </div>
@@ -905,11 +907,11 @@ const Apply: React.FC = () => {
                             style={{
                                 fontFamily: FONT.mono,
                                 fontWeight: 600,
-                                fontSize: tall ? 14 : 16,
+                                fontSize: tall ? 14 : 15,
                                 padding: "4px 12px",
                                 borderRadius: RADIUS.md,
-                                border: `1.5px solid ${committed > 0.5 ? GREEN : ACCENT}`,
-                                background: committed > 0.5 ? GREEN : "rgba(245,158,11,0.14)",
+                                border: `1px solid ${committed > 0.5 ? GREEN : ACCENT}`,
+                                background: committed > 0.5 ? GREEN : "rgba(245,158,11,0.12)",
                                 color: committed > 0.5 ? GROUND.base : ACCENT,
                             }}
                         >
@@ -1025,7 +1027,7 @@ export const REVIEW_QUEUE: FilmSpec = checkFilm({
     scenes: [
         { id: "stage", at: { line: "stage", plus: -16 }, render: Stage, roll: 0.28 },
         { id: "hold", at: { line: "hold", plus: 0 }, render: Hold, roll: 0.52 },
-        { id: "diff", at: { line: "diff", plus: 0 }, render: Diff, roll: 0.72, ground: GROUND.claim, reveal: 0.6 },
+        { id: "diff", at: { line: "diff", plus: 0 }, render: Diff, roll: 0.72 },
         { id: "apply", at: { line: "apply", plus: 0 }, render: Apply, roll: 0.16, bright: true },
         { id: "close", at: { line: "close", plus: 24 }, render: Close, roll: 0.5 },
     ],

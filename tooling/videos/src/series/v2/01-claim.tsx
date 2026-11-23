@@ -1,7 +1,8 @@
 import React from "react";
 import { interpolate, useCurrentFrame } from "remotion";
 import { ENTER, ramp, SHIFT } from "../../components/motion";
-import { CHROMA, FONT, GROUND, INK, PRIMARY, PRIMARY_LIGHT, RADIUS, SURFACE, TONE, TRACKING } from "../../theme";
+import { Dot } from "../../components/Type";
+import { CHROMA, FONT, GROUND, INK, PRIMARY, PRIMARY_LIGHT, RADIUS, SURFACE, TRACKING } from "../../theme";
 import { At, checkFilm, Headline, lines, Log, Prompt, useBodyFor, useCue, Window, type FilmSpec } from "../kit";
 
 /**
@@ -126,7 +127,7 @@ const Run: React.FC = () => {
         <>
             <Headline text={RUN_HEADLINE} at={2} accent={ACCENT} mark={["zero", "account."]} />
             <At x={x} y={y} w={w}>
-                <Window title="zsh · ~/shop" at={0} pad={tall ? "20px 22px" : "24px 28px"}>
+                <Window title="zsh · ~/shop" at={0} accent={ACCENT} pad={tall ? "20px 22px" : "24px 28px"}>
                     <Prompt command="rebase cloud init --claim" at={2} size={tall ? 23 : 27} rate={0.45} />
                     <div style={{ height: 10 }} />
                     <Log
@@ -143,7 +144,7 @@ const Run: React.FC = () => {
                             padding: tall ? "14px 16px" : "16px 22px",
                             borderRadius: RADIUS.lg,
                             border: `1px solid ${SURFACE.hairlineStrong}`,
-                            borderLeft: `3px solid ${ACCENT}`,
+                            borderLeft: `2px solid ${ACCENT}`,
                             background: SURFACE.sheet,
                             opacity: urlsO,
                             transform: urlsO < 1 ? `translateY(${(1 - urlsO) * 10}px)` : undefined,
@@ -160,7 +161,7 @@ const Run: React.FC = () => {
                         </div>
                         <div style={{ display: "flex", gap: 16 }}>
                             <span style={{ color: INK.muted, width: tall ? 78 : 88, flexShrink: 0 }}>Admin</span>
-                            <span style={{ color: INK.copy }}>https://shop-4k9a.rebase.website/admin</span>
+                            <span style={{ color: INK.copy }}>https://app.rebase.pro/projects/shop-4k9a?open=admin</span>
                         </div>
                         <div style={{ display: "flex", gap: 16 }}>
                             <span style={{ color: INK.muted, width: tall ? 78 : 88, flexShrink: 0 }}>Claim</span>
@@ -185,7 +186,7 @@ const Run: React.FC = () => {
                     }}
                 >
                     <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: FONT.mono, fontSize: tall ? 17 : 19, color: INK.copy }}>
-                        <span style={{ width: 9, height: 9, borderRadius: 99, background: ACCENT, opacity: pulse }} />
+                        <span style={{ width: 6, height: 6, borderRadius: 99, background: ACCENT, opacity: pulse }} />
                         <span>.env linked · REBASE_API_TOKEN minted</span>
                     </div>
                     <div
@@ -195,8 +196,8 @@ const Run: React.FC = () => {
                             gap: 10,
                             padding: tall ? "7px 14px" : "8px 16px",
                             borderRadius: RADIUS.lg,
-                            border: `1.5px solid rgba(245,158,11,${0.45 + 0.35 * pulse})`,
-                            background: `rgba(245,158,11,${0.1 + 0.08 * pulse})`,
+                            border: `1px solid rgba(245,158,11,${0.42 + 0.32 * pulse})`,
+                            background: `rgba(245,158,11,${0.09 + 0.07 * pulse})`,
                             fontFamily: FONT.mono,
                             fontWeight: 600,
                             fontSize: tall ? 19 : 21,
@@ -255,7 +256,6 @@ const Locked: React.FC = () => {
     const frame = useCurrentFrame();
     const { x, y, w, format } = useBodyFor(LOCKED_HEADLINE);
     const tall = format === "tall";
-    const tone = TONE.deep;
     const mailAt = useCue({ line: "locked", word: "mail", plus: -4 }) ?? 9999;
     const secretsAt = useCue({ line: "locked", word: "secrets", plus: -4 }) ?? 9999;
     const ttlAt = useCue({ line: "locked", word: "seventy-two", plus: -6 }) ?? 9999;
@@ -277,17 +277,16 @@ const Locked: React.FC = () => {
                 >
                     {GUARD_CARDS.map((card, i) => {
                         const lit = ramp(frame, cues[i], 12, ENTER);
-                        const border = lit > 0.5 ? card.accent : tone.cardBorder;
-                        const fill = lit > 0.5 ? "rgba(8,9,10,0.42)" : tone.cardFill;
-                        const iconColor = lit > 0.5 ? card.accent : tone.high;
+                        const border = lit > 0.5 ? card.accent : SURFACE.hairlineStrong;
+                        const iconColor = lit > 0.5 ? card.accent : INK.high;
 
                         return (
                             <div
                                 key={card.title}
                                 style={{
                                     borderRadius: RADIUS.xl,
-                                    border: `1.5px solid ${border}`,
-                                    background: fill,
+                                    border: `1px solid ${border}`,
+                                    background: SURFACE.sheet,
                                     padding: tall ? "18px 22px" : "26px 24px",
                                     display: "flex",
                                     flexDirection: tall ? "row" : "column",
@@ -304,8 +303,8 @@ const Locked: React.FC = () => {
                                             width: tall ? 52 : 58,
                                             height: tall ? 52 : 58,
                                             borderRadius: RADIUS.lg,
-                                            border: `1px solid ${lit > 0.5 ? card.accent : tone.cardBorder}`,
-                                            background: "rgba(255,255,255,0.08)",
+                                            border: `1px solid ${lit > 0.5 ? card.accent : SURFACE.hairline}`,
+                                            background: SURFACE.well,
                                             display: "flex",
                                             alignItems: "center",
                                             justifyContent: "center",
@@ -325,7 +324,7 @@ const Locked: React.FC = () => {
                                                 letterSpacing: "0.1em",
                                                 padding: "6px 12px",
                                                 borderRadius: RADIUS.md,
-                                                border: `1.5px solid ${card.accent}`,
+                                                border: `1px solid ${card.accent}`,
                                                 color: lit > 0.5 ? GROUND.base : card.accent,
                                                 background: lit > 0.5 ? card.accent : "transparent",
                                             }}
@@ -341,7 +340,7 @@ const Locked: React.FC = () => {
                                             fontFamily: FONT.mono,
                                             fontSize: tall ? 14 : 15,
                                             letterSpacing: TRACKING.eyebrow,
-                                            color: tone.eyebrow,
+                                            color: INK.muted,
                                             marginBottom: 6,
                                         }}
                                     >
@@ -352,7 +351,7 @@ const Locked: React.FC = () => {
                                             fontFamily: FONT.mono,
                                             fontWeight: 600,
                                             fontSize: tall ? 24 : 25,
-                                            color: tone.high,
+                                            color: INK.high,
                                             lineHeight: 1.25,
                                         }}
                                     >
@@ -362,7 +361,7 @@ const Locked: React.FC = () => {
                                         style={{
                                             fontFamily: FONT.body,
                                             fontSize: tall ? 19 : 20,
-                                            color: tone.copy,
+                                            color: INK.copy,
                                             marginTop: tall ? 6 : 12,
                                             lineHeight: 1.4,
                                         }}
@@ -380,7 +379,7 @@ const Locked: React.FC = () => {
                                             letterSpacing: "0.08em",
                                             padding: "7px 14px",
                                             borderRadius: RADIUS.md,
-                                            border: `1.5px solid ${card.accent}`,
+                                            border: `1px solid ${card.accent}`,
                                             color: lit > 0.5 ? GROUND.base : card.accent,
                                             background: lit > 0.5 ? card.accent : "transparent",
                                             flexShrink: 0,
@@ -399,19 +398,19 @@ const Locked: React.FC = () => {
                         marginTop: tall ? 16 : 22,
                         padding: tall ? "12px 18px" : "14px 24px",
                         borderRadius: RADIUS.xl,
-                        border: `1px solid ${tone.cardBorder}`,
-                        background: tone.cardFill,
+                        border: `1px solid ${SURFACE.hairlineStrong}`,
+                        background: SURFACE.sheet,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
                         fontFamily: FONT.mono,
                         fontSize: tall ? 16 : 18,
-                        color: tone.copy,
+                        color: INK.copy,
                         opacity: shellO,
                     }}
                 >
                     <span>UNCLAIMED SANDBOX GUARDRAILS</span>
-                    <span style={{ color: tone.high }}>PRE-CLAIM USAGE · $0 BILLED</span>
+                    <span style={{ color: INK.high }}>PRE-CLAIM USAGE · $0 BILLED</span>
                 </div>
             </At>
         </>
@@ -452,40 +451,43 @@ const Handover: React.FC = () => {
                         position: "relative",
                     }}
                 >
-                    {/* Browser chrome */}
+                    {/* Drafted panel header */}
                     <div
                         style={{
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
-                            padding: tall ? "12px 18px" : "14px 22px",
+                            padding: tall ? "12px 18px" : "13px 22px",
                             borderBottom: `1px solid ${SURFACE.hairline}`,
-                            background: SURFACE.well,
+                            background: SURFACE.sheet,
                             gap: 14,
                         }}
                     >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            {["#F43F5E", "#FBBF24", "#34D399"].map((c) => (
-                                <span key={c} style={{ width: 10, height: 10, borderRadius: 99, background: c, opacity: 0.55 }} />
-                            ))}
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                            <Dot color={claimed > 0.5 ? GREEN : ACCENT} size={6} />
+                            <span style={{ fontFamily: FONT.mono, fontSize: 14, letterSpacing: "0.08em", color: INK.copy }}>
+                                REBASE CLOUD
+                            </span>
                         </div>
                         <div
                             style={{
                                 flex: 1,
-                                maxWidth: tall ? 560 : 680,
+                                maxWidth: tall ? 520 : 660,
                                 padding: "6px 14px",
                                 borderRadius: RADIUS.md,
-                                background: SURFACE.card,
+                                background: SURFACE.well,
                                 border: `1px solid ${SURFACE.hairline}`,
                                 fontFamily: FONT.mono,
-                                fontSize: tall ? 16 : 17,
-                                color: INK.copy,
+                                fontSize: tall ? 15 : 16,
+                                color: settled > 0.5 ? ACCENT : INK.copy,
                                 textAlign: "center",
                                 overflow: "hidden",
                                 whiteSpace: "nowrap",
                             }}
                         >
-                            https://app.rebase.pro/claim/c_9x82f1
+                            {settled > 0.5
+                                ? "https://app.rebase.pro/projects/shop-4k9a?open=admin"
+                                : "https://app.rebase.pro/claim/c_9x82f1"}
                         </div>
                         <span
                             style={{
@@ -493,6 +495,7 @@ const Handover: React.FC = () => {
                                 fontSize: 14,
                                 letterSpacing: "0.08em",
                                 color: claimed > 0.5 ? INK.muted : ACCENT,
+                                flexShrink: 0,
                             }}
                         >
                             {claimed > 0.5 ? "LINK CONSUMED" : "SINGLE-USE"}
@@ -526,8 +529,8 @@ const Handover: React.FC = () => {
                                         fontSize: tall ? 15 : 16,
                                         padding: "7px 14px",
                                         borderRadius: RADIUS.md,
-                                        border: `1.5px solid ${statusColor}`,
-                                        background: claimed > 0.5 ? "rgba(52,211,153,0.16)" : "rgba(245,158,11,0.14)",
+                                        border: `1px solid ${statusColor}`,
+                                        background: claimed > 0.5 ? "rgba(52,211,153,0.14)" : "rgba(245,158,11,0.12)",
                                         color: statusColor,
                                     }}
                                 >
@@ -540,8 +543,8 @@ const Handover: React.FC = () => {
                                 style={{
                                     padding: tall ? "14px 18px" : "16px 20px",
                                     borderRadius: RADIUS.lg,
-                                    border: `1.5px solid ${settled > 0.5 ? GREEN : SURFACE.hairlineStrong}`,
-                                    background: SURFACE.card,
+                                    border: `1px solid ${settled > 0.5 ? "rgba(52,211,153,0.55)" : SURFACE.hairlineStrong}`,
+                                    background: SURFACE.well,
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "space-between",
@@ -561,7 +564,7 @@ const Handover: React.FC = () => {
                             </div>
 
                             {/* Action button with animated cursor */}
-                            <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 16 }}>
+                            <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
                                 <div
                                     style={{
                                         padding: tall ? "14px 26px" : "16px 32px",
@@ -576,9 +579,26 @@ const Handover: React.FC = () => {
                                 >
                                     {claimed > 0.5 ? "✓ Claimed into Acme" : "Claim into Acme →"}
                                 </div>
-                                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 16 : 17, color: INK.muted }}>
-                                    {claimed > 0.5 ? "Mail ports 465 / 587 / 993 opened" : "Signed in as founder@acme.io"}
-                                </span>
+                                {claimed > 0.5 ? (
+                                    <div
+                                        style={{
+                                            padding: tall ? "12px 18px" : "14px 20px",
+                                            borderRadius: RADIUS.lg,
+                                            border: `1px solid ${SURFACE.hairlineStrong}`,
+                                            background: SURFACE.well,
+                                            fontFamily: FONT.mono,
+                                            fontWeight: 600,
+                                            fontSize: tall ? 16 : 17,
+                                            color: INK.high,
+                                        }}
+                                    >
+                                        Open CMS → <span style={{ color: INK.muted, fontWeight: 400 }}>1-click sign-in</span>
+                                    </div>
+                                ) : (
+                                    <span style={{ fontFamily: FONT.mono, fontSize: tall ? 16 : 17, color: INK.muted }}>
+                                        Signed in as founder@acme.io
+                                    </span>
+                                )}
 
                                 {cursorMove > 0 && cursorFade > 0 && (
                                     <div
@@ -656,8 +676,8 @@ const Handover: React.FC = () => {
 
                             <div style={{ fontFamily: FONT.body, fontSize: tall ? 16 : 18, color: INK.muted, lineHeight: 1.4 }}>
                                 {settled > 0.5
-                                    ? "Prior sandbox usage waived. Production billing starts now."
-                                    : "Your .env keeps working seamlessly once claimed."}
+                                    ? "Prior sandbox usage waived. Mail ports 465 / 587 / 993 open."
+                                    : "Your .env keeps working without changes once claimed."}
                             </div>
                         </div>
                     </div>
@@ -700,8 +720,8 @@ const Rotate: React.FC = () => {
                     <div
                         style={{
                             borderRadius: RADIUS.xl,
-                            border: `1.5px solid ${rev > 0.5 ? "rgba(251,80,102,0.65)" : SURFACE.hairlineStrong}`,
-                            background: rev > 0.5 ? "rgba(251,80,102,0.08)" : SURFACE.sheet,
+                            border: `1px solid ${rev > 0.5 ? "rgba(251,80,102,0.55)" : SURFACE.hairlineStrong}`,
+                            background: SURFACE.sheet,
                             padding: tall ? "20px 22px" : "24px 28px",
                             display: "flex",
                             flexDirection: "column",
@@ -719,7 +739,7 @@ const Rotate: React.FC = () => {
                                     fontSize: tall ? 16 : 18,
                                     padding: "6px 14px",
                                     borderRadius: RADIUS.md,
-                                    border: `1.5px solid ${rev > 0.5 ? CORAL : SURFACE.hairlineStrong}`,
+                                    border: `1px solid ${rev > 0.5 ? CORAL : SURFACE.hairlineStrong}`,
                                     background: rev > 0.5 ? CORAL : "transparent",
                                     color: rev > 0.5 ? GROUND.base : INK.muted,
                                 }}
@@ -762,8 +782,8 @@ const Rotate: React.FC = () => {
                     <div
                         style={{
                             borderRadius: RADIUS.xl,
-                            border: `1.5px solid ${rot > 0.5 ? "rgba(52,211,153,0.65)" : SURFACE.hairlineStrong}`,
-                            background: rot > 0.5 ? "rgba(52,211,153,0.07)" : SURFACE.sheet,
+                            border: `1px solid ${rot > 0.5 ? "rgba(52,211,153,0.55)" : SURFACE.hairlineStrong}`,
+                            background: SURFACE.sheet,
                             padding: tall ? "20px 22px" : "24px 28px",
                             display: "flex",
                             flexDirection: "column",
@@ -781,7 +801,7 @@ const Rotate: React.FC = () => {
                                     fontSize: tall ? 16 : 18,
                                     padding: "6px 14px",
                                     borderRadius: RADIUS.md,
-                                    border: `1.5px solid ${rot > 0.5 ? GREEN : ACCENT}`,
+                                    border: `1px solid ${rot > 0.5 ? GREEN : ACCENT}`,
                                     background: rot > 0.5 ? GREEN : "transparent",
                                     color: rot > 0.5 ? GROUND.base : ACCENT,
                                 }}
@@ -828,8 +848,8 @@ const Rotate: React.FC = () => {
                                         width: 46,
                                         height: 46,
                                         borderRadius: 99,
-                                        background: rot > 0.5 ? "rgba(52,211,153,0.16)" : SURFACE.card,
-                                        border: `1.5px solid ${rot > 0.5 ? GREEN : SURFACE.hairlineStrong}`,
+                                        background: rot > 0.5 ? "rgba(52,211,153,0.14)" : SURFACE.well,
+                                        border: `1px solid ${rot > 0.5 ? GREEN : SURFACE.hairlineStrong}`,
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
@@ -845,7 +865,7 @@ const Rotate: React.FC = () => {
                                     padding: tall ? "12px 16px" : "14px 20px",
                                     borderRadius: RADIUS.lg,
                                     background: SURFACE.well,
-                                    border: `1.5px solid ${rot > 0.5 ? GREEN : SURFACE.hairline}`,
+                                    border: `1px solid ${rot > 0.5 ? GREEN : SURFACE.hairline}`,
                                     fontFamily: FONT.mono,
                                     fontWeight: 600,
                                     fontSize: tall ? 20 : 23,
@@ -862,7 +882,7 @@ const Rotate: React.FC = () => {
                     <div
                         style={{
                             borderRadius: RADIUS.xl,
-                            border: `1.5px solid ${rest > 0.5 ? "rgba(52,211,153,0.45)" : SURFACE.hairlineStrong}`,
+                            border: `1px solid ${rest > 0.5 ? "rgba(52,211,153,0.45)" : SURFACE.hairlineStrong}`,
                             background: SURFACE.sheet,
                             padding: tall ? "14px 20px" : "16px 26px",
                             display: "flex",
@@ -884,7 +904,7 @@ const Rotate: React.FC = () => {
                                 fontSize: tall ? 16 : 17,
                                 padding: "6px 14px",
                                 borderRadius: RADIUS.md,
-                                border: `1.5px solid ${CORAL}`,
+                                border: `1px solid ${CORAL}`,
                                 background: `rgba(251,80,102,${0.08 + 0.12 * rest})`,
                                 color: CORAL,
                             }}
@@ -911,7 +931,7 @@ export const CLAIM: FilmSpec = checkFilm({
     close: { line: "close", plus: -2 },
     scenes: [
         { id: "run", at: { line: "run", plus: -16 }, render: Run, roll: 0.32 },
-        { id: "locked", at: { line: "locked", plus: 0 }, render: Locked, roll: 0.56, ground: GROUND.deep, reveal: 0.6 },
+        { id: "locked", at: { line: "locked", plus: 0 }, render: Locked, roll: 0.56 },
         { id: "handover", at: { line: "handover", plus: 0 }, render: Handover, roll: 0.72 },
         { id: "rotate", at: { line: "rotate", plus: 0 }, render: Rotate, roll: 0.16, bright: true },
         { id: "close", at: { line: "close", plus: 24 }, render: Close, roll: 0.5 },

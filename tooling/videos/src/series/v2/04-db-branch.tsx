@@ -1,7 +1,8 @@
 import React from "react";
 import { interpolate, useCurrentFrame } from "remotion";
 import { ENTER, ramp, SHIFT } from "../../components/motion";
-import { CHROMA, FONT, FRAME, GROUND, INK, RADIUS, SURFACE, TONE } from "../../theme";
+import { Dot } from "../../components/Type";
+import { CHROMA, FONT, FRAME, GROUND, INK, RADIUS, SURFACE } from "../../theme";
 import { At, checkFilm, Headline, lines, Log, Prompt, useBodyFor, useCue, useSeries, useStage, Window, type FilmSpec } from "../kit";
 
 /**
@@ -58,8 +59,8 @@ const BranchGraphLayer: React.FC = () => {
     const diffP = ramp(frame, mergeStart + 8, 16, ENTER);
     const mergeP = ramp(frame, mergeWordAt, 22, ENTER);
 
-    const barH = tall ? 96 : 100;
-    const barY = tall ? y + h - barH - 12 : y + h - barH; // wide: 810..910, tall: 912..1008
+    const barH = tall ? 92 : 96;
+    const barY = tall ? y + h - barH - 16 : y + h - barH - 8; // wide: 806..902 (clear of RailRule at 956), tall: 912..1004 (clear of RailRule at 1102)
 
     const phaseLabel =
         mergeP > 0.5 ? "MERGED ✓" : diffP > 0.3 ? "DIFFING" : wildP > 0.2 ? "AGENT ISOLATED" : templateP > 0.3 ? "TEMPLATE COPY" : "BRANCH FORKED";
@@ -96,7 +97,7 @@ const BranchGraphLayer: React.FC = () => {
                 height: barH,
                 borderRadius: FRAME.radius,
                 border: `1px solid ${SURFACE.hairlineStrong}`,
-                background: "rgba(17,19,22,0.94)",
+                background: SURFACE.sheet,
                 padding: tall ? "10px 16px" : "12px 24px",
                 display: "flex",
                 alignItems: "center",
@@ -107,13 +108,13 @@ const BranchGraphLayer: React.FC = () => {
             {/* Left legend */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6, width: tall ? 156 : 196, flexShrink: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 99, background: EMERALD, opacity: 0.35 + 0.65 * forkP }} />
+                    <span style={{ width: 6, height: 6, borderRadius: 99, background: EMERALD, opacity: 0.35 + 0.65 * forkP, flexShrink: 0 }} />
                     <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 15, color: forkP > 0.2 ? EMERALD : INK.muted, whiteSpace: "nowrap" }}>
                         rb_agent_backfill
                     </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 99, background: CYAN }} />
+                    <Dot color={CYAN} size={6} />
                     <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 15, color: INK.high, whiteSpace: "nowrap" }}>
                         main (rebase)
                     </span>
@@ -219,7 +220,7 @@ const Clone: React.FC = () => {
         <>
             <Headline text={H} at={0} accent={EMERALD} mark={["<1s."]} />
             <At x={x} y={y} w={w}>
-                <Window title="zsh" at={0} pad={tall ? "18px 20px" : "22px 28px"}>
+                <Window title="zsh" at={0} accent={EMERALD} pad={tall ? "18px 20px" : "22px 28px"}>
                     <Prompt command="rebase db branch create agent_backfill" at={2} size={tall ? 23 : 28} rate={0.42} />
                     <div style={{ height: 10 }} />
                     <Log
@@ -248,8 +249,8 @@ const Clone: React.FC = () => {
                                 key={b.label}
                                 style={{
                                     borderRadius: RADIUS.xl,
-                                    background: lit > 0.4 ? "rgba(52,211,153,0.10)" : SURFACE.sheet,
-                                    border: `1.5px solid ${lit > 0.4 ? EMERALD : SURFACE.hairline}`,
+                                    background: SURFACE.sheet,
+                                    border: `1px solid ${lit > 0.4 ? "rgba(52,211,153,0.55)" : SURFACE.hairlineStrong}`,
                                     padding: tall ? "14px 16px" : "18px 20px",
                                     opacity: appear,
                                     transform: appear < 1 ? `translateY(${(1 - appear) * 10}px)` : undefined,
@@ -270,7 +271,7 @@ const Clone: React.FC = () => {
     );
 };
 
-/** Native Postgres template copy + 3-step mechanism on GROUND.claim. */
+/** Native Postgres template copy + 3-step mechanism. */
 const How: React.FC = () => {
     const frame = useCurrentFrame();
     const H = "Native Postgres templates.";
@@ -316,22 +317,34 @@ const How: React.FC = () => {
                 <div
                     style={{
                         borderRadius: FRAME.radius,
-                        border: `1.5px solid ${TONE.claim.cardBorder}`,
+                        border: `1px solid ${SURFACE.hairlineStrong}`,
                         background: SURFACE.well,
-                        padding: tall ? "18px 20px" : "24px 30px",
+                        overflow: "hidden",
                         opacity: sqlIn,
                         transform: sqlIn < 1 ? `translateY(${(1 - sqlIn) * 12}px)` : undefined,
                     }}
                 >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                        <span style={{ fontFamily: FONT.mono, fontSize: 14, letterSpacing: "0.14em", color: INK.muted }}>
-                            BRANCHSERVICE · POSTGRESQL
-                        </span>
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: tall ? "11px 18px" : "12px 24px",
+                            background: SURFACE.sheet,
+                            borderBottom: `1px solid ${SURFACE.hairline}`,
+                        }}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <Dot color={EMERALD} size={6} />
+                            <span style={{ fontFamily: FONT.mono, fontSize: 14, letterSpacing: "0.14em", color: INK.copy }}>
+                                BRANCHSERVICE · POSTGRESQL
+                            </span>
+                        </div>
                         <span style={{ fontFamily: FONT.mono, fontSize: 14, color: EMERALD }}>
                             Zero SQL dump · Zero reload
                         </span>
                     </div>
-                    <div style={{ fontFamily: FONT.mono, fontSize: tall ? 22 : 30, lineHeight: 1.45, color: INK.high, wordBreak: "break-word" }}>
+                    <div style={{ padding: tall ? "16px 20px" : "22px 28px", fontFamily: FONT.mono, fontSize: tall ? 22 : 30, lineHeight: 1.45, color: INK.high, wordBreak: "break-word" }}>
                         <span style={{ color: CYAN }}>CREATE DATABASE</span>{" "}
                         <span style={{ color: EMERALD, fontWeight: 600 }}>&quot;rb_agent_backfill&quot;</span>{" "}
                         <span style={{ color: CYAN }}>TEMPLATE</span>{" "}
@@ -358,7 +371,7 @@ const How: React.FC = () => {
                                         flex: 1,
                                         borderRadius: RADIUS.xl,
                                         background: SURFACE.sheet,
-                                        border: `1.5px solid ${step.highlight ? EMERALD : TONE.claim.cardBorder}`,
+                                        border: `1px solid ${step.highlight ? EMERALD : SURFACE.hairlineStrong}`,
                                         padding: tall ? "14px 18px" : "20px 22px",
                                         opacity: o,
                                         transform: o < 1 ? `translateY(${(1 - o) * 10}px)` : undefined,
@@ -398,7 +411,7 @@ const How: React.FC = () => {
                                             alignItems: "center",
                                             fontFamily: FONT.mono,
                                             fontSize: 28,
-                                            color: TONE.claim.high,
+                                            color: INK.muted,
                                             opacity: o,
                                         }}
                                     >
@@ -452,7 +465,7 @@ const Wild: React.FC = () => {
                         style={{
                             flex: 1.15,
                             borderRadius: FRAME.radius,
-                            border: `1.5px solid rgba(245,158,11,0.6)`,
+                            border: `1px solid rgba(245,158,11,0.5)`,
                             background: SURFACE.sheet,
                             padding: tall ? "16px 18px" : "22px 24px",
                             opacity: leftIn,
@@ -466,8 +479,8 @@ const Wild: React.FC = () => {
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                     <span
                                         style={{
-                                            width: 9,
-                                            height: 9,
+                                            width: 6,
+                                            height: 6,
                                             borderRadius: 99,
                                             background: AMBER,
                                             opacity: 0.45 + 0.55 * Math.sin(frame / 3),
@@ -528,7 +541,7 @@ const Wild: React.FC = () => {
                         style={{
                             flex: 0.85,
                             borderRadius: FRAME.radius,
-                            border: `1.5px solid ${prodLit > 0.4 ? EMERALD : "rgba(52,211,153,0.45)"}`,
+                            border: `1px solid ${prodLit > 0.4 ? EMERALD : "rgba(52,211,153,0.4)"}`,
                             background: SURFACE.sheet,
                             padding: tall ? "16px 18px" : "22px 24px",
                             opacity: rightIn,
@@ -540,7 +553,7 @@ const Wild: React.FC = () => {
                         <div>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                    <span style={{ width: 9, height: 9, borderRadius: 99, background: EMERALD }} />
+                                    <Dot color={EMERALD} size={6} />
                                     <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 16 : 18, color: INK.high }}>
                                         production (rebase)
                                     </span>
@@ -617,7 +630,7 @@ const Merge: React.FC = () => {
         <>
             <Headline text={H} at={0} accent={EMERALD} mark={["Merge", "clean."]} />
             <At x={x} y={y} w={w}>
-                <Window title="zsh" at={0} pad={tall ? "16px 18px" : "22px 28px"}>
+                <Window title="zsh" at={0} accent={EMERALD} pad={tall ? "16px 18px" : "22px 28px"}>
                     <Prompt command="rebase db branch diff agent_backfill" at={2} size={cmdSize} rate={0.38} />
                     <div style={{ height: 8 }} />
                     <Log
@@ -687,7 +700,7 @@ export const DB_BRANCH: FilmSpec = checkFilm({
     layer: BranchGraphLayer,
     scenes: [
         { id: "clone", at: { line: "clone", plus: -16 }, render: Clone, roll: 0.28 },
-        { id: "how", at: { line: "how", plus: 0 }, render: How, roll: 0.54, ground: GROUND.claim },
+        { id: "how", at: { line: "how", plus: 0 }, render: How, roll: 0.54 },
         { id: "wild", at: { line: "wild", plus: 0 }, render: Wild, roll: 0.72 },
         { id: "merge", at: { line: "merge", plus: 0 }, render: Merge, roll: 0.36, bright: true },
         { id: "close", at: { line: "close", plus: 24 }, render: Close, roll: 0.5 },

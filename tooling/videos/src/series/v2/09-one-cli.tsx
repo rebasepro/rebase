@@ -1,7 +1,7 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { ENTER, ramp } from "../../components/motion";
-import { CHROMA, FONT, FRAME, GROUND, INK, PRIMARY_LIGHT, RADIUS, SURFACE, TONE, TRACKING } from "../../theme";
+import { CHROMA, FONT, FRAME, GROUND, INK, PRIMARY_LIGHT, RADIUS, SURFACE, TRACKING } from "../../theme";
 import { At, checkFilm, Headline, lines, useBodyFor, useCue, type FilmSpec } from "../kit";
 
 /**
@@ -141,22 +141,20 @@ const Reach: React.FC = () => {
                         transform: shellIn < 1 ? `translateY(${(1 - shellIn) * 12}px)` : undefined,
                     }}
                 >
-                    {/* Terminal chrome */}
+                    {/* Drafted panel header */}
                     <div
                         style={{
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
-                            padding: tall ? "12px 18px" : "13px 22px",
+                            padding: tall ? "11px 18px" : "12px 22px",
                             background: SURFACE.sheet,
                             borderBottom: `1px solid ${SURFACE.hairline}`,
                         }}
                     >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            {["#F43F5E", "#FBBF24", "#34D399"].map((c) => (
-                                <span key={c} style={{ width: 10, height: 10, borderRadius: 99, background: c, opacity: 0.6 }} />
-                            ))}
-                            <span style={{ marginLeft: 10, fontFamily: FONT.mono, fontSize: tall ? 15 : 16, color: INK.muted }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: 99, background: AMBER, flexShrink: 0 }} />
+                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, letterSpacing: "0.08em", color: INK.copy }}>
                                 zsh · rebase-cli
                             </span>
                         </div>
@@ -253,13 +251,40 @@ const Reach: React.FC = () => {
                             );
                         })}
                     </div>
+
+                    {/* Zero-code + admin scaffold footer strip */}
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            padding: tall ? "10px 18px" : "11px 24px",
+                            background: SURFACE.sheet,
+                            borderTop: `1px solid ${SURFACE.hairline}`,
+                            fontFamily: FONT.mono,
+                            fontSize: tall ? 14 : 15,
+                        }}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: 99, background: CYAN, flexShrink: 0 }} />
+                            <span style={{ color: INK.high }}>rebase dev --zero-code</span>
+                            <span style={{ color: INK.muted }}>·</span>
+                            <span style={{ color: INK.high }}>rebase apps add admin</span>
+                        </div>
+                        {!tall && (
+                            <span style={{ color: INK.muted, letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
+                                run from DATABASE_URL alone · add admin anytime
+                            </span>
+                        )}
+                    </div>
                 </div>
             </At>
         </>
     );
 };
 
-/* ── scene 2: proxy — Studio proxy security flow (claim ground) ─────── */
+/* ── scene 2: proxy — Studio proxy security flow ────────────────────── */
 
 interface ProxyNode {
     step: string;
@@ -318,7 +343,7 @@ const Proxy: React.FC = () => {
             <At x={x} y={y} w={w}>
                 {tall ? (
                     /* Vertical 3-step pipeline for 9:16 */
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {nodes.map((node, i) => {
                             const o = ramp(frame, nodeStarts[i], 12, ENTER);
                             const arrowProg = i === 0 ? arrow1 : arrow2;
@@ -330,22 +355,22 @@ const Proxy: React.FC = () => {
                                             alignItems: "center",
                                             justifyContent: "space-between",
                                             gap: 16,
-                                            padding: "18px 22px",
+                                            padding: "14px 20px",
                                             borderRadius: FRAME.radius,
-                                            background: i === 1 ? "rgba(9,10,12,0.92)" : "rgba(9,10,12,0.82)",
-                                            border: `1.5px solid ${i === 1 ? `${EMERALD}99` : TONE.claim.cardBorder}`,
+                                            background: SURFACE.sheet,
+                                            border: `1px solid ${i === 1 ? "rgba(52,211,153,0.52)" : SURFACE.hairlineStrong}`,
                                             opacity: 0.25 + 0.75 * o,
                                             transform: o < 1 ? `translateY(${(1 - o) * 10}px)` : undefined,
                                         }}
                                     >
-                                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                                             <div
                                                 style={{
-                                                    width: 46,
-                                                    height: 46,
+                                                    width: 42,
+                                                    height: 42,
                                                     borderRadius: RADIUS.lg,
-                                                    background: `${node.accent}1A`,
-                                                    border: `1px solid ${node.accent}55`,
+                                                    background: SURFACE.well,
+                                                    border: `1px solid ${node.accent}48`,
                                                     display: "flex",
                                                     alignItems: "center",
                                                     justifyContent: "center",
@@ -354,10 +379,10 @@ const Proxy: React.FC = () => {
                                                 {node.icon}
                                             </div>
                                             <div>
-                                                <div style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: 24, color: INK.high }}>
+                                                <div style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: 22, color: INK.high }}>
                                                     {node.title}
                                                 </div>
-                                                <div style={{ fontFamily: FONT.body, fontSize: 18, color: TONE.claim.copy, marginTop: 4 }}>
+                                                <div style={{ fontFamily: FONT.body, fontSize: 17, color: INK.copy, marginTop: 2 }}>
                                                     {node.detail}
                                                 </div>
                                             </div>
@@ -365,11 +390,11 @@ const Proxy: React.FC = () => {
                                         <div
                                             style={{
                                                 fontFamily: FONT.mono,
-                                                fontSize: 15,
+                                                fontSize: 14,
                                                 color: node.accent,
-                                                padding: "6px 12px",
+                                                padding: "5px 11px",
                                                 borderRadius: RADIUS.md,
-                                                background: `${node.accent}18`,
+                                                background: SURFACE.well,
                                                 border: `1px solid ${node.accent}44`,
                                                 whiteSpace: "nowrap",
                                             }}
@@ -384,12 +409,12 @@ const Proxy: React.FC = () => {
                                                 alignItems: "center",
                                                 justifyContent: "center",
                                                 gap: 10,
-                                                height: 28,
+                                                height: 24,
                                                 opacity: 0.25 + 0.75 * arrowProg,
                                             }}
                                         >
-                                            <span style={{ fontFamily: FONT.mono, fontSize: 18, color: EMERALD }}>↓</span>
-                                            <span style={{ fontFamily: FONT.mono, fontSize: 15, color: TONE.claim.copy, letterSpacing: "0.08em" }}>
+                                            <span style={{ fontFamily: FONT.mono, fontSize: 17, color: EMERALD }}>↓</span>
+                                            <span style={{ fontFamily: FONT.mono, fontSize: 14, color: INK.muted, letterSpacing: "0.08em" }}>
                                                 {i === 0 ? "HTTPS · project slug only" : "internal · key injected on control plane"}
                                             </span>
                                         </div>
@@ -409,27 +434,27 @@ const Proxy: React.FC = () => {
                                     <div
                                         style={{
                                             flex: 1,
-                                            padding: "24px 24px",
+                                            padding: "22px 24px",
                                             borderRadius: FRAME.radius,
-                                            background: i === 1 ? "rgba(9,10,12,0.92)" : "rgba(9,10,12,0.82)",
-                                            border: `1.5px solid ${i === 1 ? `${EMERALD}AA` : TONE.claim.cardBorder}`,
+                                            background: SURFACE.sheet,
+                                            border: `1px solid ${i === 1 ? "rgba(52,211,153,0.55)" : SURFACE.hairlineStrong}`,
                                             display: "flex",
                                             flexDirection: "column",
                                             justifyContent: "space-between",
-                                            minHeight: 248,
+                                            minHeight: 236,
                                             opacity: 0.25 + 0.75 * o,
                                             transform: o < 1 ? `translateY(${(1 - o) * 12}px)` : undefined,
                                         }}
                                     >
                                         <div>
-                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                                                 <div
                                                     style={{
                                                         width: 44,
                                                         height: 44,
                                                         borderRadius: RADIUS.lg,
-                                                        background: `${node.accent}1A`,
-                                                        border: `1px solid ${node.accent}55`,
+                                                        background: SURFACE.well,
+                                                        border: `1px solid ${node.accent}48`,
                                                         display: "flex",
                                                         alignItems: "center",
                                                         justifyContent: "center",
@@ -437,26 +462,26 @@ const Proxy: React.FC = () => {
                                                 >
                                                     {node.icon}
                                                 </div>
-                                                <span style={{ fontFamily: FONT.mono, fontSize: 14, color: TONE.claim.muted, letterSpacing: TRACKING.eyebrow }}>
+                                                <span style={{ fontFamily: FONT.mono, fontSize: 14, color: INK.muted, letterSpacing: TRACKING.eyebrow }}>
                                                     STEP {node.step}
                                                 </span>
                                             </div>
-                                            <div style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: 26, color: INK.high, lineHeight: 1.2 }}>
+                                            <div style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: 25, color: INK.high, lineHeight: 1.2 }}>
                                                 {node.title}
                                             </div>
-                                            <div style={{ fontFamily: FONT.body, fontSize: 19, color: TONE.claim.copy, marginTop: 10, lineHeight: 1.45 }}>
+                                            <div style={{ fontFamily: FONT.body, fontSize: 18, color: INK.copy, marginTop: 10, lineHeight: 1.45 }}>
                                                 {node.detail}
                                             </div>
                                         </div>
                                         <div
                                             style={{
-                                                marginTop: 18,
+                                                marginTop: 16,
                                                 fontFamily: FONT.mono,
                                                 fontSize: 15,
                                                 color: node.accent,
-                                                padding: "7px 12px",
+                                                padding: "6px 12px",
                                                 borderRadius: RADIUS.md,
-                                                background: `${node.accent}18`,
+                                                background: SURFACE.well,
                                                 border: `1px solid ${node.accent}44`,
                                                 alignSelf: "flex-start",
                                             }}
@@ -483,12 +508,12 @@ const Proxy: React.FC = () => {
                                                     x2="48"
                                                     y2="12"
                                                     stroke={EMERALD}
-                                                    strokeWidth="2"
+                                                    strokeWidth="1.6"
                                                     strokeDasharray="4 4"
                                                 />
-                                                <path d="M44 6l8 6-8 6" stroke={EMERALD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                <path d="M44 6l8 6-8 6" stroke={EMERALD} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                                             </svg>
-                                            <span style={{ fontFamily: FONT.mono, fontSize: 13, color: TONE.claim.copy }}>
+                                            <span style={{ fontFamily: FONT.mono, fontSize: 13, color: INK.muted }}>
                                                 {i === 0 ? "slug" : "key"}
                                             </span>
                                         </div>
@@ -499,61 +524,91 @@ const Proxy: React.FC = () => {
                     </div>
                 )}
 
-                {/* Bright emerald shield badge */}
+                {/* Drafted zero-secret shield card + hidden --prompt note */}
                 <div
                     style={{
-                        marginTop: tall ? 22 : 30,
-                        padding: tall ? "20px 22px" : "22px 28px",
+                        marginTop: tall ? 16 : 24,
                         borderRadius: FRAME.radius,
-                        background: "rgba(9, 26, 20, 0.92)",
-                        border: `2px solid ${EMERALD}`,
-                        display: "flex",
-                        flexDirection: tall ? "column" : "row",
-                        alignItems: tall ? "flex-start" : "center",
-                        justifyContent: "space-between",
-                        gap: tall ? 12 : 20,
+                        background: SURFACE.sheet,
+                        border: `1px solid rgba(52,211,153,0.48)`,
+                        overflow: "hidden",
                         opacity: shieldIn,
                         transform: shieldIn < 1 ? `translateY(${(1 - shieldIn) * 14}px)` : undefined,
                     }}
                 >
-                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                        <div
-                            style={{
-                                width: 46,
-                                height: 46,
-                                borderRadius: 99,
-                                background: "rgba(52,211,153,0.18)",
-                                border: `1.5px solid ${EMERALD}`,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                            }}
-                        >
-                            <ShieldCheckIcon color={EMERALD} size={24} />
-                        </div>
-                        <div>
-                            <div style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 21 : 25, color: INK.high }}>
-                                <span style={{ color: EMERALD }}>REBASE_SERVICE_KEY</span> never enters local memory
-                            </div>
-                            <div style={{ fontFamily: FONT.body, fontSize: tall ? 17 : 19, color: TONE.claim.copy, marginTop: 4 }}>
-                                Stays on the control plane · verified against your organization role on every call
-                            </div>
-                        </div>
-                    </div>
                     <div
                         style={{
-                            fontFamily: FONT.mono,
-                            fontWeight: 600,
-                            fontSize: tall ? 16 : 17,
-                            color: GROUND.base,
-                            background: EMERALD,
-                            padding: "8px 16px",
-                            borderRadius: 99,
-                            whiteSpace: "nowrap",
+                            padding: tall ? "16px 20px" : "20px 26px",
+                            display: "flex",
+                            flexDirection: tall ? "column" : "row",
+                            alignItems: tall ? "flex-start" : "center",
+                            justifyContent: "space-between",
+                            gap: tall ? 10 : 20,
                         }}
                     >
-                        0 secrets on disk
+                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                            <div
+                                style={{
+                                    width: 44,
+                                    height: 44,
+                                    borderRadius: 99,
+                                    background: SURFACE.well,
+                                    border: `1px solid rgba(52,211,153,0.55)`,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <ShieldCheckIcon color={EMERALD} size={22} />
+                            </div>
+                            <div>
+                                <div style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 20 : 24, color: INK.high }}>
+                                    <span style={{ color: EMERALD }}>REBASE_SERVICE_KEY</span> never enters local memory
+                                </div>
+                                <div style={{ fontFamily: FONT.body, fontSize: tall ? 16 : 18, color: INK.copy, marginTop: 3 }}>
+                                    Stays on the control plane · verified against your organization role on every call
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            style={{
+                                fontFamily: FONT.mono,
+                                fontWeight: 600,
+                                fontSize: tall ? 15 : 16,
+                                color: GROUND.base,
+                                background: EMERALD,
+                                padding: "7px 15px",
+                                borderRadius: 99,
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            0 secrets on disk
+                        </div>
+                    </div>
+
+                    {/* Hidden secret prompt note */}
+                    <div
+                        style={{
+                            padding: tall ? "10px 20px" : "12px 26px",
+                            background: SURFACE.well,
+                            borderTop: `1px solid ${SURFACE.hairline}`,
+                            display: "flex",
+                            flexDirection: tall ? "column" : "row",
+                            alignItems: tall ? "flex-start" : "center",
+                            justifyContent: "space-between",
+                            gap: tall ? 4 : 16,
+                        }}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: 99, background: CYAN, flexShrink: 0 }} />
+                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 16, fontWeight: 600, color: INK.high }}>
+                                rebase cloud env set KEY --prompt
+                            </span>
+                        </div>
+                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 15, color: INK.muted }}>
+                            hidden prompt — never enters agent chat or shell history
+                        </span>
                     </div>
                 </div>
             </At>
@@ -822,11 +877,9 @@ const Token: React.FC = () => {
                             borderBottom: `1px solid ${SURFACE.hairline}`,
                         }}
                     >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            {["#F43F5E", "#FBBF24", "#34D399"].map((c) => (
-                                <span key={c} style={{ width: 10, height: 10, borderRadius: 99, background: c, opacity: 0.6 }} />
-                            ))}
-                            <span style={{ marginLeft: 8, fontFamily: FONT.mono, fontSize: tall ? 15 : 16, color: INK.muted }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: 99, background: EMERALD, flexShrink: 0 }} />
+                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, letterSpacing: "0.08em", color: INK.copy }}>
                                 zsh · ci / bot token
                             </span>
                         </div>
@@ -987,7 +1040,7 @@ export const ONE_CLI: FilmSpec = checkFilm({
     close: { line: "close", plus: -2 },
     scenes: [
         { id: "reach", at: { line: "reach", plus: -16 }, render: Reach, roll: 0.24 },
-        { id: "proxy", at: { line: "proxy", plus: 2 }, render: Proxy, roll: 0.58, ground: GROUND.claim, reveal: 0.65 },
+        { id: "proxy", at: { line: "proxy", plus: 2 }, render: Proxy, roll: 0.58 },
         { id: "guard", at: { line: "guard", plus: 2 }, render: Guard, roll: 0.78 },
         { id: "token", at: { line: "token", plus: 2 }, render: Token, roll: 0.36, bright: true },
         { id: "close", at: { line: "close", plus: 24 }, render: Close, roll: 0.5 },

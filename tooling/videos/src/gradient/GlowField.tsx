@@ -26,8 +26,9 @@ import { GROUND } from "../theme";
 /** `.hero-glow`: solid to 30%, gone by 78%. The film frame is the hero. */
 export const GLOW_MASK = "linear-gradient(to bottom, #000 0%, #000 30%, transparent 78%)";
 
-/** `.hero-drafting`: solid to 45%, gone by 95%. */
-export const GRID_MASK = "linear-gradient(to bottom, #000 0%, #000 45%, transparent 95%)";
+/** `.hero-drafting`: visible cleanly through the upper and middle stage,
+ *  softening near the foot so the drafted grid stays subtle and never busy. */
+export const GRID_MASK = "linear-gradient(to bottom, #000 0%, #000 60%, rgba(0,0,0,0.32) 100%)";
 
 /**
  * A film's scene-to-scene turn, as a seat on the glow.
@@ -118,8 +119,8 @@ export const DraftingGrid: React.FC<{
     const { width } = useVideoConfig();
     const left = inset ?? railInset(width);
     const cell = (width - 2 * left) / columns;
-    const line = "rgba(255,255,255,0.045)";
-    const rail = chroma ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.07)";
+    const line = chroma ? "rgba(255,255,255,0.065)" : "rgba(255,255,255,0.042)";
+    const rail = chroma ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.085)";
     if (opacity <= 0) return null;
     return (
         <AbsoluteFill style={{ opacity, pointerEvents: "none" }}>
@@ -141,5 +142,44 @@ export const DraftingGrid: React.FC<{
                 </>
             )}
         </AbsoluteFill>
+    );
+};
+
+/** The 7px hollow outline diamond from `website/src/styles/global.css` (`--tick`),
+ *  placed strictly where a horizontal rule intersects a vertical rail. */
+export const RailTick: React.FC<{ x: number; y: number; chroma?: boolean; size?: number }> = ({ x, y, chroma = false, size = 9 }) => {
+    const half = size / 2;
+    return (
+        <svg
+            width={size}
+            height={size}
+            viewBox="0 0 7 7"
+            style={{
+                position: "absolute",
+                left: x - half + 0.5,
+                top: y - half + 0.5,
+                pointerEvents: "none",
+                overflow: "visible",
+            }}
+        >
+            <path d="M3.5 .6 6.4 3.5 3.5 6.4 .6 3.5Z" fill={GROUND.base} fillOpacity={chroma ? 0 : 0.9} stroke="#ffffff" strokeOpacity={chroma ? 0.48 : 0.34} strokeWidth="0.95" />
+        </svg>
+    );
+};
+
+/** A horizontal chapter hairline spanning rail-to-rail, with a hollow diamond
+ *  tick centred on each rail intersection — the site's `.chapter-rule`. */
+export const RailRule: React.FC<{ y: number; chroma?: boolean; opacity?: number; inset?: number }> = ({ y, chroma = false, opacity = 1, inset }) => {
+    const { width } = useVideoConfig();
+    if (opacity <= 0) return null;
+    const left = inset ?? railInset(width);
+    const right = width - left;
+    const line = chroma ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.085)";
+    return (
+        <div style={{ position: "absolute", inset: 0, opacity, pointerEvents: "none" }}>
+            <div style={{ position: "absolute", top: y, left, width: right - left, height: 1, background: line }} />
+            <RailTick x={left} y={y} chroma={chroma} />
+            <RailTick x={right} y={y} chroma={chroma} />
+        </div>
     );
 };

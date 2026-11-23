@@ -1,7 +1,7 @@
 import React from "react";
 import { interpolate, useCurrentFrame } from "remotion";
 import { ENTER, ramp } from "../../components/motion";
-import { CHROMA, FONT, GROUND, INK, RADIUS, SURFACE, TONE } from "../../theme";
+import { CHROMA, FONT, GROUND, INK, RADIUS, SURFACE } from "../../theme";
 import { At, checkFilm, Headline, lines, Prompt, useBodyFor, useCue, type FilmSpec } from "../kit";
 
 /**
@@ -55,6 +55,23 @@ const GlobeGlyph: React.FC<{ color: string; size?: number }> = ({ color, size = 
     </svg>
 );
 
+const DiamondTick: React.FC<{ color?: string; opacity?: number; size?: number }> = ({
+    color = "#FFFFFF",
+    opacity = 0.42,
+    size = 9,
+}) => (
+    <svg width={size} height={size} viewBox="0 0 7 7" fill="none" style={{ flexShrink: 0, overflow: "visible" }}>
+        <path
+            d="M3.5 .6 6.4 3.5 3.5 6.4 .6 3.5Z"
+            fill={GROUND.base}
+            fillOpacity={0.95}
+            stroke={color}
+            strokeOpacity={opacity}
+            strokeWidth="0.95"
+        />
+    </svg>
+);
+
 const TerminalBar: React.FC<{ title: string; badge?: string; badgeColor?: string }> = ({ title, badge, badgeColor = ACCENT }) => (
     <div
         style={{
@@ -66,11 +83,9 @@ const TerminalBar: React.FC<{ title: string; badge?: string; badgeColor?: string
             background: SURFACE.sheet,
         }}
     >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {["#F43F5E", "#FBBF24", "#34D399"].map((c) => (
-                <span key={c} style={{ width: 10, height: 10, borderRadius: 99, background: c, opacity: 0.6 }} />
-            ))}
-            <span style={{ marginLeft: 8, fontFamily: FONT.mono, fontSize: 15, color: INK.muted }}>{title}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 99, background: badgeColor, flexShrink: 0 }} />
+            <span style={{ fontFamily: FONT.mono, fontSize: 14, letterSpacing: "0.08em", color: INK.copy }}>{title}</span>
         </div>
         {badge && (
             <span
@@ -223,7 +238,7 @@ const Deploy: React.FC = () => {
     );
 };
 
-/* ── scene 2: architectural split diagram (ground: GROUND.deep) ─────── */
+/* ── scene 2: architectural split diagram ───────────────────────────── */
 
 const H_ISOLATED = "Isolated pod. Empty Postgres.";
 
@@ -244,9 +259,7 @@ const Isolated: React.FC = () => {
 
     const rootO = ramp(frame, 0, 8, ENTER);
     const barrierO = ramp(frame, 2, 12, ENTER);
-    const pulse = 0.55 + 0.45 * Math.sin(frame * 0.14);
-
-    const cardBg = "rgba(8,9,12,0.78)";
+    const pulse = 0.68 + 0.32 * Math.sin(frame * 0.12);
 
     return (
         <>
@@ -267,8 +280,8 @@ const Isolated: React.FC = () => {
                             width: tall ? w : 440,
                             flexShrink: 0,
                             borderRadius: RADIUS.xl,
-                            background: cardBg,
-                            border: `1.5px solid rgba(251,80,102,0.65)`,
+                            background: SURFACE.sheet,
+                            border: `1px solid rgba(251,80,102,0.48)`,
                             padding: tall ? "16px 20px" : "22px 24px",
                             display: "flex",
                             flexDirection: "column",
@@ -278,15 +291,15 @@ const Isolated: React.FC = () => {
                     >
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span style={{ width: 9, height: 9, borderRadius: 99, background: CORAL }} />
-                                <span style={{ fontFamily: FONT.mono, fontSize: 16, fontWeight: 600, letterSpacing: "0.14em", color: CORAL }}>
+                                <span style={{ width: 6, height: 6, borderRadius: 99, background: CORAL }} />
+                                <span style={{ fontFamily: FONT.mono, fontSize: 15, fontWeight: 600, letterSpacing: "0.14em", color: CORAL }}>
                                     PRODUCTION
                                 </span>
                             </div>
-                            <span style={{ fontFamily: FONT.mono, fontSize: 14, color: TONE.deep.muted }}>LOCKED</span>
+                            <span style={{ fontFamily: FONT.mono, fontSize: 13, letterSpacing: "0.12em", color: INK.muted }}>LOCKED</span>
                         </div>
 
-                        <div style={{ fontFamily: FONT.mono, fontSize: tall ? 19 : 21, fontWeight: 600, color: TONE.deep.high }}>
+                        <div style={{ fontFamily: FONT.mono, fontSize: tall ? 19 : 21, fontWeight: 600, color: INK.high }}>
                             songbuzz.rebase.website
                         </div>
 
@@ -307,18 +320,18 @@ const Isolated: React.FC = () => {
                                     style={{
                                         padding: tall ? "10px 12px" : "12px 14px",
                                         borderRadius: RADIUS.lg,
-                                        background: "rgba(255,255,255,0.06)",
-                                        border: `1px solid ${TONE.deep.cardBorder}`,
+                                        background: SURFACE.well,
+                                        border: `1px solid ${SURFACE.hairline}`,
                                     }}
                                 >
-                                    <div style={{ fontFamily: FONT.mono, fontSize: 12, letterSpacing: "0.12em", color: TONE.deep.muted }}>
+                                    <div style={{ fontFamily: FONT.mono, fontSize: 12, letterSpacing: "0.12em", color: INK.muted }}>
                                         {item.k}
                                     </div>
                                     <div
                                         style={{
                                             fontFamily: FONT.mono,
                                             fontSize: tall ? 14 : 17,
-                                            color: TONE.deep.high,
+                                            color: INK.high,
                                             marginTop: 3,
                                             whiteSpace: "nowrap",
                                             overflow: "hidden",
@@ -332,41 +345,42 @@ const Isolated: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Animated solid isolation barrier */}
+                    {/* Drafted architectural isolation barrier: 1px hairlines + hollow diamond ticks */}
                     <div
                         style={{
                             display: "flex",
                             flexDirection: tall ? "row" : "column",
                             alignItems: "center",
                             justifyContent: "center",
-                            gap: 10,
+                            gap: 0,
                             flexShrink: 0,
                             opacity: barrierO,
                         }}
                     >
+                        <DiamondTick color={CORAL} opacity={0.55 * pulse} size={9} />
                         <div
                             style={{
                                 flex: 1,
-                                width: tall ? undefined : 4,
-                                height: tall ? 4 : undefined,
-                                borderRadius: 99,
-                                background: `linear-gradient(${tall ? "90deg" : "180deg"}, rgba(251,80,102,0.35), ${CORAL}, rgba(251,80,102,0.35))`,
-                                opacity: pulse,
+                                width: tall ? undefined : 1,
+                                height: tall ? 1 : undefined,
+                                background: `rgba(251,80,102,${0.32 + 0.22 * pulse})`,
                             }}
                         />
+                        <DiamondTick color="#FFFFFF" opacity={0.36} size={8} />
                         <div
                             style={{
                                 display: "flex",
                                 alignItems: "center",
                                 gap: 6,
-                                padding: tall ? "6px 14px" : "10px 12px",
+                                margin: tall ? "0 8px" : "8px 0",
+                                padding: tall ? "6px 14px" : "9px 12px",
                                 borderRadius: 99,
-                                background: cardBg,
-                                border: `1.5px solid ${CORAL}`,
+                                background: SURFACE.well,
+                                border: `1px solid rgba(251,80,102,0.52)`,
                                 fontFamily: FONT.mono,
                                 fontSize: 13,
                                 fontWeight: 600,
-                                letterSpacing: "0.12em",
+                                letterSpacing: "0.14em",
                                 color: CORAL,
                                 whiteSpace: "nowrap",
                             }}
@@ -374,16 +388,16 @@ const Isolated: React.FC = () => {
                             <LockGlyph color={CORAL} size={14} />
                             <span>ISOLATED</span>
                         </div>
+                        <DiamondTick color="#FFFFFF" opacity={0.36} size={8} />
                         <div
                             style={{
                                 flex: 1,
-                                width: tall ? undefined : 4,
-                                height: tall ? 4 : undefined,
-                                borderRadius: 99,
-                                background: `linear-gradient(${tall ? "90deg" : "180deg"}, rgba(251,80,102,0.35), ${CORAL}, rgba(251,80,102,0.35))`,
-                                opacity: pulse,
+                                width: tall ? undefined : 1,
+                                height: tall ? 1 : undefined,
+                                background: `rgba(251,80,102,${0.32 + 0.22 * pulse})`,
                             }}
                         />
+                        <DiamondTick color={CORAL} opacity={0.55 * pulse} size={9} />
                     </div>
 
                     {/* Three stacked live preview lanes */}
@@ -395,8 +409,8 @@ const Isolated: React.FC = () => {
                                     key={lane.name}
                                     style={{
                                         borderRadius: RADIUS.xl,
-                                        background: cardBg,
-                                        border: `1.5px solid ${o > 0.4 ? "rgba(52,211,153,0.58)" : TONE.deep.cardBorder}`,
+                                        background: SURFACE.sheet,
+                                        border: `1px solid ${o > 0.4 ? "rgba(52,211,153,0.45)" : SURFACE.hairlineStrong}`,
                                         padding: tall ? "13px 18px" : "16px 22px",
                                         display: "flex",
                                         flexDirection: "column",
@@ -407,12 +421,12 @@ const Isolated: React.FC = () => {
                                 >
                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                            <span style={{ width: 9, height: 9, borderRadius: 99, background: GREEN }} />
+                                            <span style={{ width: 6, height: 6, borderRadius: 99, background: GREEN }} />
                                             <span style={{ fontFamily: FONT.mono, fontSize: tall ? 19 : 22, fontWeight: 600, color: GREEN }}>
                                                 {lane.name}
                                             </span>
                                         </div>
-                                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 16, color: TONE.deep.muted }}>
+                                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 16, color: INK.muted }}>
                                             {lane.host}
                                         </span>
                                     </div>
@@ -424,14 +438,14 @@ const Isolated: React.FC = () => {
                                                 style={{
                                                     fontFamily: FONT.mono,
                                                     fontSize: tall ? 14 : 16,
-                                                    color: TONE.deep.high,
-                                                    background: "rgba(54,204,214,0.14)",
-                                                    border: `1px solid rgba(54,204,214,0.42)`,
+                                                    color: INK.high,
+                                                    background: SURFACE.well,
+                                                    border: `1px solid ${SURFACE.hairlineStrong}`,
                                                     padding: tall ? "4px 10px" : "5px 12px",
                                                     borderRadius: RADIUS.md,
                                                 }}
                                             >
-                                                ✓ {chip}
+                                                <span style={{ color: ACCENT }}>✓</span> {chip}
                                             </span>
                                         ))}
                                     </div>
@@ -855,7 +869,7 @@ export const SAFE_PREVIEWS: FilmSpec = checkFilm({
     close: { line: "close", plus: -2 },
     scenes: [
         { id: "deploy", at: { line: "deploy", plus: -16 }, render: Deploy, roll: 0.24 },
-        { id: "isolated", at: { line: "isolated", plus: 0 }, render: Isolated, roll: 0.52, ground: GROUND.deep, reveal: 0.55 },
+        { id: "isolated", at: { line: "isolated", plus: 0 }, render: Isolated, roll: 0.52 },
         { id: "why", at: { line: "why", plus: 0 }, render: Why, roll: 0.16 },
         { id: "guard", at: { line: "guard", plus: 0 }, render: Guard, roll: 0.72, bright: true },
         { id: "close", at: { line: "close", plus: 24 }, render: Close, roll: 0.45 },

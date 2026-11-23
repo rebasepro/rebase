@@ -9,7 +9,7 @@ import {
     useCurrentFrame,
     useVideoConfig,
 } from "remotion";
-import { DraftingGrid, GLOW_MASK, GlowField, isChromaGround, seatForRoll } from "../gradient/GlowField";
+import { DraftingGrid, GLOW_MASK, GlowField, isChromaGround, railInset, RailRule, seatForRoll } from "../gradient/GlowField";
 import { Mark } from "../components/Mark";
 import { Code } from "../components/Code";
 import { Dot } from "../components/Type";
@@ -267,6 +267,7 @@ export function seriesFilm(spec: FilmSpec): React.FC<SeriesProps> {
                     <EndCard />
                     <Presenter take={take} clips={clips} live={live} />
                     <Captions />
+                    <OpenBadge />
                     <EpisodeMark />
                     {audit === "probe" && <AuditProbe />}
                 </AbsoluteFill>
@@ -289,12 +290,11 @@ const CLAMP = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const MASK_WIDE = GLOW_MASK;
 const MASK_TALL = "linear-gradient(to bottom, #000 0%, #000 16%, transparent 50%)";
 
-/** The field's strength under the scenes, as a share of the hero's. The open
- *  and a scene marked `bright` keep the full hero; the rest bank to this. The
- *  full hero is right for a page seen for seconds and too loud under a minute
- *  of code; chosen 2026-11-16 against a top band (the glow cut off above the
- *  panels) and a thin top edge (too little left to read as the site's). */
-const EMBER = 0.22;
+/** The field's strength under normal scenes, as a share of the hero's. Kept
+ *  whisper-quiet (0.13) so content scenes read on pure `#08090A` with the
+ *  drafted grid and rails leading — just like the site's chapters below the
+ *  hero. The open and `bright` payoff scenes bring the full hero glow back. */
+const EMBER = 0.13;
 
 /** The ground: the glow field under the whole film, flowing to each scene's
  *  seat over the scene's first second, steady in between; the drafting grid
@@ -495,76 +495,217 @@ const ClipVideo: React.FC<{ clip: Clip; fadeIn: boolean; fadeOut: boolean }> = (
 
 /* ── the marks ──────────────────────────────────────────────────────── */
 
-/** The episode, small, top left from the corner move on: which benefit this
- *  is, set as the site's chapter index — the dot in the film's hue, then
- *  "02 / TITLE" in the eyebrow's ink. A series is recognised by its
- *  constants. */
-const EpisodeMark: React.FC = () => {
+/** Whether the currently active scene sits on a chroma ground (`#0021C1`). */
+function useActiveScene(): { index: number; total: number; chroma: boolean } {
     const frame = useCurrentFrame();
     const series = useSeries();
+    const contentScenes = series.spec.scenes.filter((s) => s.id !== "close");
+    let active = 0;
+    let chroma = false;
+    contentScenes.forEach((s, idx) => {
+        const origIdx = series.spec.scenes.indexOf(s);
+        const start = series.starts[origIdx];
+        if (start !== null && frame >= start) {
+            active = idx;
+            chroma = isChromaGround(s.ground ?? GROUND.base);
+        }
+    });
+    return { index: active, total: Math.max(1, contentScenes.length), chroma };
+}
+
+/** The landing-page `.hero-badge` dark-glass pill shown over the hero glow
+ *  during the opening hook (before the presenter moves to the corner). */
+const OpenBadge: React.FC = () => {
+    const frame = useCurrentFrame();
+    const { width } = useVideoConfig();
+    const series = useSeries();
     const format = useFormat();
-    if (series.toCorner === null) return null;
-    const on = ramp(frame, series.toCorner + 10, 20);
-    const off = series.closeAt === null ? 0 : ramp(frame, series.closeAt, 14, SHIFT);
-    const o = Math.min(on, 1 - off);
+    const off = series.toCorner === null ? 0 : ramp(frame, series.toCorner - 4, 14, SHIFT);
+    const o = 1 - off;
     if (o <= 0) return null;
+    const tall = format === "tall";
+    const inset = railInset(width);
+    const padX = tall ? 72 : 120;
     const { number, title, accent } = series.spec;
+    const badgeLabel = number === 0 ? "POSTGRESQL — YOURS, OR ONE WE RUN FOR YOU" : `${String(number).padStart(2, "0")} · ${title}`;
+    const rightTag = number === 0 ? "00 / REBASE INTRODUCTION" : `SERIES · ${String(number).padStart(2, "0")} / 10`;
     return (
-        <div
-            data-audit="skip"
-            style={{
-                position: "absolute",
-                left: format === "tall" ? 72 : 120,
-                top: format === "tall" ? 150 : 64,
-                display: "flex",
-                alignItems: "center",
-                gap: EYEBROW.gap,
-                fontFamily: FONT.mono,
-                fontSize: format === "tall" ? 22 : 17,
-                letterSpacing: TRACKING.eyebrow,
-                textTransform: "uppercase",
-                color: TONE.base.eyebrow,
-                opacity: o,
-            }}
-        >
-            <Dot color={accent} size={format === "tall" ? 8 : 6} />
-            <span>
-                <span style={{ color: INK.high }}>{String(number).padStart(2, "0")}</span>
-                <span style={{ margin: "0 0.9em", opacity: 0.6 }}>/</span>
-                {title}
-            </span>
+        <div data-audit="skip" style={{ position: "absolute", inset: 0, opacity: o, pointerEvents: "none" }}>
+            <div
+                style={{
+                    position: "absolute",
+                    left: padX,
+                    right: padX,
+                    top: tall ? 136 : 56,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 16,
+                }}
+            >
+                <div
+                    style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: tall ? "10px 20px" : "8px 18px",
+                        borderRadius: 9999,
+                        border: "1px solid rgba(255,255,255,0.14)",
+                        background: "rgba(9,10,12,0.72)",
+                        fontFamily: FONT.mono,
+                        fontSize: tall ? 18 : 15,
+                        letterSpacing: "0.2em",
+                        textTransform: "uppercase",
+                        color: INK.high,
+                    }}
+                >
+                    <Dot color={accent} size={tall ? 8 : 6} />
+                    <span>{badgeLabel}</span>
+                </div>
+                {!tall && (
+                    <span
+                        style={{
+                            fontFamily: FONT.mono,
+                            fontSize: 15,
+                            letterSpacing: TRACKING.eyebrow,
+                            textTransform: "uppercase",
+                            color: TONE.base.eyebrow,
+                            fontVariantNumeric: "tabular-nums",
+                        }}
+                    >
+                        {rightTag}
+                    </span>
+                )}
+            </div>
+            <RailRule y={tall ? 212 : 114} inset={inset} opacity={0.85} />
         </div>
     );
 };
 
-/** The close: the mark, the address and the one command, beside (wide) or
- *  under (tall) the presenter. */
+/** The landing-page `.chapter-rule`: eyebrow + dot on the left, live tabular
+ *  scene counter ("01 / 05") on the right, and a 1px rail-to-rail hairline
+ *  with 7px hollow diamond ticks at both rail intersections. Also anchors the
+ *  foot of the drafted stage with a matching bottom rule. */
+const EpisodeMark: React.FC = () => {
+    const frame = useCurrentFrame();
+    const { width } = useVideoConfig();
+    const series = useSeries();
+    const format = useFormat();
+    const { index, total, chroma } = useActiveScene();
+    if (series.toCorner === null) return null;
+    const on = ramp(frame, series.toCorner + 8, 18);
+    const off = series.closeAt === null ? 0 : ramp(frame, series.closeAt, 14, SHIFT);
+    const o = Math.min(on, 1 - off);
+    if (o <= 0) return null;
+    const { number, title, accent } = series.spec;
+    const tall = format === "tall";
+    const inset = railInset(width);
+    const padX = tall ? 72 : 120;
+    const counter = `${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
+    return (
+        <div data-audit="skip" style={{ position: "absolute", inset: 0, opacity: o, pointerEvents: "none" }}>
+            <div
+                style={{
+                    position: "absolute",
+                    left: padX,
+                    right: padX,
+                    top: tall ? 136 : 56,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    fontFamily: FONT.mono,
+                    fontSize: tall ? 20 : 16,
+                    letterSpacing: TRACKING.eyebrow,
+                    textTransform: "uppercase",
+                    color: chroma ? TONE.claim.eyebrow : TONE.base.eyebrow,
+                }}
+            >
+                <div style={{ display: "flex", alignItems: "center", gap: EYEBROW.gap }}>
+                    <Dot color={accent} size={tall ? 8 : 6} />
+                    <span>
+                        {number > 0 && (
+                            <>
+                                <span style={{ color: INK.high }}>{String(number).padStart(2, "0")}</span>
+                                <span style={{ margin: "0 0.7em", opacity: 0.55 }}>/</span>
+                            </>
+                        )}
+                        {title}
+                    </span>
+                </div>
+                <span
+                    style={{
+                        color: chroma ? TONE.claim.muted : INK.muted,
+                        fontVariantNumeric: "tabular-nums",
+                        flexShrink: 0,
+                    }}
+                >
+                    {counter}
+                </span>
+            </div>
+            {/* Top chapter hairline + rail intersection diamonds */}
+            <RailRule y={tall ? 188 : 104} chroma={chroma} inset={inset} />
+            {/* Bottom drafted rail divider — separates stage from presenter card in tall, anchors footer in wide */}
+            <RailRule y={tall ? 1102 : 956} chroma={chroma} inset={inset} opacity={0.85} />
+        </div>
+    );
+};
+
+/** The close: the mark, the address and the one command, framed inside the
+ *  drafted rails with top/bottom chapter rules and the landing-page install bar. */
 const EndCard: React.FC = () => {
     const frame = useCurrentFrame();
+    const { width } = useVideoConfig();
     const series = useSeries();
     const format = useFormat();
     if (series.closeAt === null) return null;
     const at = series.closeAt + 24;
     if (frame < at) return null;
+    const fade = ramp(frame, at - 20, 36);
     const url = ramp(frame, at + 22, 24);
     const cmd = ramp(frame, at + 40, 22);
     const command = series.spec.endCommand === undefined ? "pnpm dlx @rebasepro/cli init" : series.spec.endCommand;
     const plan = { ...PRESENTER[format], ...(series.spec.presenter?.[format] ?? {}) };
     const tall = format === "tall";
+    const inset = railInset(width);
     const area: React.CSSProperties = tall
-        ? { left: 0, right: 0, top: plan.close.y + plan.close.h + 40, bottom: 260 }
+        ? { left: 0, right: 0, top: plan.close.y + plan.close.h + 34, bottom: 210 }
         : { left: plan.close.x + plan.close.w + 60, right: 120, top: 0, bottom: 0 };
     return (
         <AbsoluteFill data-audit="skip">
-            <AbsoluteFill style={{ background: GROUND.base, opacity: 0.82 * ramp(frame, at - 20, 40) }} />
+            <AbsoluteFill style={{ background: GROUND.base, opacity: 0.88 * fade }} />
+            <DraftingGrid opacity={0.9 * fade} />
+            <RailRule y={tall ? 188 : 104} inset={inset} opacity={fade} />
+            <RailRule y={tall ? 1720 : 956} inset={inset} opacity={fade} />
             <div style={{ position: "absolute", ...area, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                <Mark size={tall ? 96 : 110} delay={at} spread={18} />
-                <div style={{ overflow: "hidden", marginTop: 32, paddingBottom: "0.12em" }}>
+                <div
+                    style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: tall ? "8px 18px" : "7px 16px",
+                        borderRadius: 9999,
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        background: "rgba(17,19,22,0.85)",
+                        fontFamily: FONT.mono,
+                        fontSize: tall ? 16 : 14,
+                        letterSpacing: "0.2em",
+                        textTransform: "uppercase",
+                        color: INK.copy,
+                        marginBottom: tall ? 24 : 28,
+                        opacity: url,
+                    }}
+                >
+                    <Dot color={series.spec.accent} size={6} />
+                    <span>MIT OPEN SOURCE · REBASE CLOUD BETA</span>
+                </div>
+                <Mark size={tall ? 88 : 102} delay={at} spread={18} />
+                <div style={{ overflow: "hidden", marginTop: 26, paddingBottom: "0.12em" }}>
                     <div
                         style={{
                             fontFamily: FONT.display,
                             fontWeight: 600,
-                            fontSize: tall ? 92 : 100,
+                            fontSize: tall ? 88 : 96,
                             letterSpacing: "-0.034em",
                             lineHeight: 1,
                             color: INK.high,
@@ -577,19 +718,19 @@ const EndCard: React.FC = () => {
                 {command !== null && (
                     <div
                         style={{
-                            marginTop: 34,
-                            padding: "16px 30px",
+                            marginTop: 28,
+                            padding: "14px 28px",
                             borderRadius: 12,
-                            border: `1px solid ${INK.rule}`,
-                            background: FRAME.background,
+                            border: `1px solid ${SURFACE.hairlineStrong}`,
+                            background: SURFACE.sheet,
                             fontFamily: FONT.mono,
-                            fontSize: tall ? 30 : 26,
+                            fontSize: tall ? 28 : 24,
                             color: INK.high,
                             opacity: cmd,
                             transform: `translateY(${(1 - cmd) * 14}px)`,
                         }}
                     >
-                        <span style={{ color: INK.muted, marginRight: 14 }}>$</span>
+                        <span style={{ color: "#34D399", marginRight: 14 }}>$</span>
                         {command}
                     </div>
                 )}
@@ -872,23 +1013,23 @@ export const Window: React.FC<{
                     </Label>
                 </div>
             )}
-            <FrameBox title={title} at={at + 4} well={well} pad={pad}>
+            <FrameBox title={title} at={at + 4} well={well} pad={pad} accent={accent}>
                 {children}
             </FrameBox>
         </div>
     );
 };
 
-/** The kit's own frame: the brand window, without the spring (a short film
- *  cuts too fast for a settle to read). */
-const FrameBox: React.FC<{ title?: string; at: number; well: boolean; pad: string; children: React.ReactNode }> = ({ title, at, well, pad, children }) => {
+/** The kit's own frame: a drafted panel matching rebase.pro (no macOS traffic
+ *  lights — one 6px status dot, tracked mono title, 1px hairline). */
+const FrameBox: React.FC<{ title?: string; at: number; well: boolean; pad: string; accent?: string; children: React.ReactNode }> = ({ title, at, well, pad, accent, children }) => {
     const frame = useCurrentFrame();
     const o = ramp(frame, at, 12, ENTER);
     return (
         <div
             style={{
                 borderRadius: FRAME.radius,
-                border: FRAME.border,
+                border: `1px solid ${SURFACE.hairlineStrong}`,
                 background: well ? SURFACE.well : SURFACE.sheet,
                 overflow: "hidden",
                 opacity: o,
@@ -896,11 +1037,18 @@ const FrameBox: React.FC<{ title?: string; at: number; well: boolean; pad: strin
             }}
         >
             {title !== undefined && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 18px", borderBottom: `1px solid ${SURFACE.hairline}` }}>
-                    {["#F43F5E", "#FBBF24", "#34D399"].map((c) => (
-                        <span key={c} style={{ width: 10, height: 10, borderRadius: 99, background: c, opacity: 0.55 }} />
-                    ))}
-                    <span style={{ marginLeft: 8, fontFamily: FONT.mono, fontSize: 15, color: INK.muted }}>{title}</span>
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "11px 18px",
+                        background: SURFACE.sheet,
+                        borderBottom: `1px solid ${SURFACE.hairline}`,
+                    }}
+                >
+                    <Dot color={accent ?? EYEBROW.dotColor} size={6} />
+                    <span style={{ fontFamily: FONT.mono, fontSize: 14, letterSpacing: "0.08em", color: INK.copy }}>{title}</span>
                 </div>
             )}
             <div style={{ padding: pad }}>{children}</div>

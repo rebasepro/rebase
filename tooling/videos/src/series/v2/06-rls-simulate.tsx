@@ -1,7 +1,7 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { ENTER, ramp } from "../../components/motion";
-import { CHROMA, FONT, GROUND, INK, RADIUS, SURFACE, TONE } from "../../theme";
+import { CHROMA, FONT, GROUND, INK, RADIUS, SURFACE } from "../../theme";
 import {
     At,
     checkFilm,
@@ -250,9 +250,9 @@ const Sim: React.FC = () => {
                                 gap: 10,
                             }}
                         >
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span style={{ width: 9, height: 9, borderRadius: 99, background: ACCENT }} />
-                                <span style={{ fontFamily: FONT.body, fontSize: tall ? 14 : 16, color: INK.copy, fontWeight: 600 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: 99, background: ACCENT, flexShrink: 0 }} />
+                                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, letterSpacing: "0.08em", color: INK.copy }}>
                                     Rebase Studio
                                 </span>
                             </div>
@@ -341,7 +341,7 @@ const Sim: React.FC = () => {
     );
 };
 
-/* ── scene 3: matrix (ground: GROUND.deep) ──────────────────────────── */
+/* ── scene 3: matrix ────────────────────────────────────────────────── */
 
 interface MatrixCell {
     text: string;
@@ -427,7 +427,7 @@ const Matrix: React.FC = () => {
                     style={{
                         borderRadius: RADIUS.xl,
                         background: SURFACE.well,
-                        border: "1.5px solid rgba(255,255,255,0.24)",
+                        border: `1px solid ${SURFACE.hairlineStrong}`,
                         overflow: "hidden",
                         opacity: ramp(frame, 0, 10, ENTER),
                     }}
@@ -443,9 +443,12 @@ const Matrix: React.FC = () => {
                             justifyContent: "space-between",
                         }}
                     >
-                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 15, letterSpacing: "0.14em", color: TONE.deep.high, fontWeight: 600 }}>
-                            • LIVE PERMISSION MATRIX
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: 99, background: ACCENT, flexShrink: 0 }} />
+                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, letterSpacing: "0.14em", color: INK.high, fontWeight: 600 }}>
+                                LIVE PERMISSION MATRIX
+                            </span>
+                        </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                             <span style={{ fontFamily: FONT.mono, fontSize: tall ? 12 : 14, color: GREEN }}>
                                 ✓ rows served
@@ -610,6 +613,7 @@ const Loop: React.FC = () => {
     const diagO = ramp(frame, 0, 10, ENTER);
     const loopLit = ramp(frame, Math.max(4, atLoop - 6), 12, ENTER);
     const fixO = ramp(frame, Math.max(22, atStopping), 12, ENTER);
+    const pruneO = ramp(frame, Math.max(28, atStopping + 8), 12, ENTER);
     const dashOffset = -frame * 1.6;
 
     const cycleCard = (
@@ -714,8 +718,8 @@ const Loop: React.FC = () => {
     );
 
     const terminalAndFix = (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: tall ? 14 : 18 }}>
-            <Window title="zsh — rebase verify" at={-2} pad={tall ? "14px 18px" : "18px 24px"}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: tall ? 12 : 16 }}>
+            <Window title="zsh — rebase verify" at={-2} pad={tall ? "13px 18px" : "18px 24px"} accent={CORAL}>
                 <Prompt command="rebase verify" at={2} size={tall ? 19 : 23} rate={0.45} />
                 <Log
                     size={tall ? 15 : 18}
@@ -732,16 +736,16 @@ const Loop: React.FC = () => {
             {/* Fix banner */}
             <div
                 style={{
-                    padding: tall ? "14px 18px" : "18px 22px",
+                    padding: tall ? "12px 16px" : "16px 22px",
                     borderRadius: RADIUS.xl,
-                    background: "rgba(52,211,153,0.12)",
-                    border: `1.5px solid ${GREEN}`,
+                    background: "rgba(52,211,153,0.10)",
+                    border: `1px solid ${GREEN}`,
                     opacity: 0.35 + 0.65 * fixO,
                     transform: fixO < 1 ? `translateY(${(1 - fixO) * 10}px)` : undefined,
                 }}
             >
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                    <WrenchCheckIcon color={GREEN} size={19} />
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
+                    <WrenchCheckIcon color={GREEN} size={18} />
                     <span
                         style={{
                             fontFamily: FONT.mono,
@@ -755,13 +759,39 @@ const Loop: React.FC = () => {
                     >
                         REMEDY
                     </span>
-                    <span style={{ fontFamily: FONT.mono, fontSize: tall ? 16 : 19, color: INK.high, fontWeight: 600 }}>
+                    <span style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 18, color: INK.high, fontWeight: 600 }}>
                         Move lookup into SECURITY DEFINER function
                     </span>
                 </div>
                 <div style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 15, color: INK.copy }}>
                     CREATE FUNCTION public.can_access(…) LANGUAGE sql STABLE SECURITY DEFINER
                 </div>
+            </div>
+
+            {/* Secondary pill: --prune-policies */}
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: tall ? "9px 16px" : "11px 18px",
+                    borderRadius: RADIUS.lg,
+                    background: SURFACE.sheet,
+                    border: `1px solid ${SURFACE.hairlineStrong}`,
+                    opacity: 0.35 + 0.65 * pruneO,
+                    transform: pruneO < 1 ? `translateY(${(1 - pruneO) * 8}px)` : undefined,
+                }}
+            >
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 99, background: ACCENT, flexShrink: 0 }} />
+                    <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.high, fontWeight: 600 }}>
+                        rebase db push --prune-policies
+                    </span>
+                </div>
+                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 12 : 14, color: INK.muted, whiteSpace: "nowrap" }}>
+                    drops orphaned policies no table declares
+                </span>
             </div>
         </div>
     );
@@ -800,7 +830,7 @@ export const RLS_SIMULATE: FilmSpec = checkFilm({
     scenes: [
         { id: "guess", at: { line: "guess", plus: -26 }, render: Guess, roll: 0.34 },
         { id: "sim", at: { line: "sim", plus: 0 }, render: Sim, roll: 0.62 },
-        { id: "matrix", at: { line: "matrix", plus: 0 }, render: Matrix, roll: 0.2, ground: GROUND.deep, reveal: 0.65 },
+        { id: "matrix", at: { line: "matrix", plus: 0 }, render: Matrix, roll: 0.2 },
         { id: "loop", at: { line: "loop", plus: 0 }, render: Loop, roll: 0.78, bright: true },
         { id: "close", at: { line: "close", plus: 24 }, render: Close, roll: 0.48 },
     ],
