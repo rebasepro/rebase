@@ -1,6 +1,9 @@
+import { isBuiltin } from "node:module";
 import path from "path";
 
 import { defineConfig } from "vite";
+
+import { oneByteSource } from "../../tooling/scripts/one-byte-source";
 
 /**
  * The second build of this package: `@rebasepro/server/functions` and
@@ -32,11 +35,20 @@ import { defineConfig } from "vite";
  * `tooling/scripts/assert-portable-entry.mjs` checks the emitted file rather than
  * trusting this config, because the failure mode being guarded against is
  * exactly a build setting that quietly stops being true.
+ *
+ * A third entry, `@rebasepro/server/esm-resolve-cache`, is here for the other
+ * half of that property: it must load without the server, because the
+ * runtime's entrypoints install it before they import the server. It is
+ * Node-only, so Node built-ins are external rather than stubbed.
  */
 const EXTERNAL = ["hono"];
 
 const isExternal = (id: string) =>
-    EXTERNAL.some(ext => id === ext || id.startsWith(ext + "/"));
+    EXTERNAL.some(ext => id === ext || id.startsWith(ext + "/"))
+    // Only `esm-resolve-cache` imports built-ins. A portable entry that grew
+    // one would now import it for real instead of getting an empty stub, which
+    // `assert-portable-entry.mjs` refuses.
+    || id.startsWith("node:") || isBuiltin(id);
 
 export default defineConfig(() => ({
     esbuild: {
@@ -52,7 +64,8 @@ export default defineConfig(() => ({
                 // names, and the same shape `tsc --emitDeclarationOnly` uses
                 // for the matching `.d.ts`.
                 "functions/index": path.resolve(__dirname, "src/functions/index.ts"),
-                "schema/index": path.resolve(__dirname, "src/schema/index.ts")
+                "schema/index": path.resolve(__dirname, "src/schema/index.ts"),
+                "esm-resolve-cache": path.resolve(__dirname, "src/boot/esm-resolve-cache.ts")
             },
             formats: ["es"],
             fileName: (_format, entryName) => `${entryName}.js`
@@ -65,7 +78,8 @@ export default defineConfig(() => ({
             output: {
                 // Explicitly no banner. See the comment above; this is the
                 // single most important line in the file.
-                banner: ""
+                banner: "",
+                comments: { legal: true, annotation: true, jsdoc: false }
             }
         }
     },
@@ -81,5 +95,6 @@ export default defineConfig(() => ({
             "@rebasepro/types": path.resolve(__dirname, "../types/src")
         }
     },
-    plugins: []
+    // See `oneByteSource` and the same line in `vite.config.ts`.
+    plugins: [oneByteSource()]
 }));

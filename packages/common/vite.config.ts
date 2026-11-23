@@ -2,6 +2,8 @@ import path from "path";
 
 import { defineConfig } from "vite";
 
+import { oneByteSource } from "../../tooling/scripts/one-byte-source";
+
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
 
@@ -45,6 +47,7 @@ export default defineConfig(() => ({
                 warn(warning);
             },
             output: {
+                comments: { legal: true, annotation: true, jsdoc: false },
                 // A consumer's bundler drops a whole MODULE nobody imports from
                 // (package.json says `"sideEffects": false`), but inside one
                 // module it keeps every import that module makes. Shipped as a
@@ -66,7 +69,8 @@ export default defineConfig(() => ({
             "@rebasepro/types": path.resolve(__dirname, "../types/src")
         }
     },
-    // No plugins: this package has no JSX. The React plugin was here from when
-    // the type surface still had .tsx files in it.
-    plugins: []
+    // A runtime holds this package's source in memory for as long as it runs,
+    // so it is emitted without JSDoc (`comments` above) and with every literal
+    // stored one byte per character. See `oneByteSource`.
+    plugins: [oneByteSource()]
 }));

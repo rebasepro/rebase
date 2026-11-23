@@ -36,6 +36,7 @@ import { runtimeCors } from "./runtime-cors";
 import { numericEnvVar } from "../env";
 import { resolveRole, RoleConfigurationError } from "./role";
 import { resolveProvisionOnly } from "./provision-only";
+import { installEsmResolveCache } from "./esm-resolve-cache";
 
 // Where it has always been importable from. It has a module of its own now, so
 // `check:chart` can ask it about a rendered unit without loading the boot.
@@ -1071,6 +1072,9 @@ async function bootStaticApp(
  * bug and the trace is the point.
  */
 export async function runFromBundle(options: BootOptions = {}): Promise<BootedRuntime> {
+    // This process is the server, so the module loader is ours to configure.
+    // Before the boot imports the driver, the bundle and their dependencies.
+    installEsmResolveCache();
     try {
         const booted = await bootFromBundle(options);
         // Exit explicitly rather than letting the event loop drain. A bundle is

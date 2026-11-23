@@ -3,6 +3,8 @@ import path from "path";
 
 import { defaultServerConditions, defineConfig } from "vite";
 
+import { oneByteSource } from "../../tooling/scripts/one-byte-source";
+
 /**
  * Only externalize dependencies that the consumer app installs directly.
  * Everything else gets inlined so linked consumers work without installing them.
@@ -103,6 +105,7 @@ export default defineConfig(() => ({
                     ' import __rebaseProcess from "process";' +
                     ' globalThis.process ??= __rebaseProcess;' +
                     ' const require = __rebaseCreateRequire(import.meta.url);',
+                comments: { legal: true, annotation: true, jsdoc: false },
                 globals: {
                     "json-logic-js": "jsonLogic",
                     "fast-equals": "fastEquals",
@@ -120,7 +123,8 @@ export default defineConfig(() => ({
             "@rebasepro/types": path.resolve(__dirname, "../types/src")
         }
     },
-    // No plugins: this package has no JSX. The React plugin was here from when
-    // the type surface still had .tsx files in it.
-    plugins: []
+    // See `oneByteSource`: a runtime holds this package's source in memory for
+    // as long as it runs, so it is emitted without JSDoc (`comments` above) and
+    // with every literal stored one byte per character.
+    plugins: [oneByteSource()]
 }));

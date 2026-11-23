@@ -12,7 +12,7 @@
  * is what allows the engine to be upgraded — a security patch, a performance
  * fix — without rebuilding anyone's application.
  */
-import { runFromBundle } from "../dist/index.es.js";
+import { installEsmResolveCache } from "../dist/esm-resolve-cache.js";
 
 const args = process.argv.slice(2);
 
@@ -69,4 +69,10 @@ if (args[0] === "--version" || args[0] === "-v") {
     process.exit(0);
 }
 
+// Installed before the server is imported, so its own module graph resolves
+// through the cache too. `runFromBundle` installs it as well; this only starts
+// it earlier. The server is imported dynamically for that reason: a static
+// import would be loaded before this line runs.
+installEsmResolveCache();
+const { runFromBundle } = await import("../dist/index.es.js");
 await runFromBundle({ bundleDir: args[0] });

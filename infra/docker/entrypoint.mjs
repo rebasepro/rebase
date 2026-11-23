@@ -448,6 +448,12 @@ if (!["none", "ensure"].includes(migrateMode)) {
 }
 
 // ── 4. Run ───────────────────────────────────────────────────────────────────
+// The resolve cache goes in before the server is imported, so the server's own
+// module graph resolves through it as well as the bundle's. Without it, Node
+// re-parses drizzle-orm's 177 KB package.json for every file of drizzle it
+// loads, and the boot grows the heap to several times what it keeps.
+const { installEsmResolveCache } = await import("@rebasepro/server/esm-resolve-cache");
+installEsmResolveCache();
 // Imported rather than spawned so this process *is* the server: signals arrive
 // directly and graceful shutdown works without forwarding anything.
 const { runFromBundle } = await import("@rebasepro/server");

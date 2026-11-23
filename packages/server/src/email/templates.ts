@@ -245,7 +245,7 @@ export function getPasswordResetTemplate(
             </p>
             
             <div style="${styles.warning}">
-                ⏰ This link will expire in 1 hour for security reasons.
+                \u23F0 This link will expire in 1 hour for security reasons.
             </div>
             
             <div style="${styles.footer}">
@@ -414,7 +414,7 @@ export function getUserInvitationTemplate(
             </p>
             
             <div style="${styles.warning}">
-                ⏰ This link will expire in ${USER_INVITATION_LINK_TTL_HOURS} hours for security reasons.
+                \u23F0 This link will expire in ${USER_INVITATION_LINK_TTL_HOURS} hours for security reasons.
             </div>
             
             <div style="${styles.footer}">
@@ -567,7 +567,7 @@ export function getEmailOtpTemplate(
             </div>
 
             <div style="${styles.warning}">
-                ⏰ This code expires in 10 minutes and can only be used once.
+                \u23F0 This code expires in 10 minutes and can only be used once.
             </div>
 
             <div style="${styles.footer}">
@@ -647,7 +647,7 @@ export function getMagicLinkTemplate(
             </p>
             
             <div style="${styles.warning}">
-                ⏰ This link will expire in 15 minutes for security reasons and can only be used once.
+                \u23F0 This link will expire in 15 minutes for security reasons and can only be used once.
             </div>
             
             <div style="${styles.footer}">
@@ -735,7 +735,7 @@ export function getEmailChangeTemplate(
             </p>
 
             <div style="${styles.warning}">
-                ⏰ This link expires in 24 hours and can only be used once.
+                \u23F0 This link expires in 24 hours and can only be used once.
             </div>
 
             <div style="${styles.footer}">

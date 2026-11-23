@@ -3,6 +3,8 @@ import path from "path";
 
 import { defaultServerConditions, defineConfig } from "vite";
 
+import { oneByteSource } from "../../tooling/scripts/one-byte-source";
+
 /**
  * Only externalize dependencies that the consumer app installs directly.
  * Everything else gets inlined so linked consumers work without installing them.
@@ -131,6 +133,7 @@ export default defineConfig(() => ({
                 warn(warning);
             },
             output: {
+                comments: { legal: true, annotation: true, jsdoc: false },
                 /**
                  * `require` for the CJS dependencies rolled into this bundle.
                  *
@@ -160,7 +163,8 @@ export default defineConfig(() => ({
             "@rebasepro/utils": path.resolve(__dirname, "../utils/src")
         }
     },
-    // No plugins: this package has no JSX. The React plugin was here from when
-    // the type surface still had .tsx files in it.
-    plugins: []
+    // A runtime holds this package's source in memory for as long as it runs,
+    // so it is emitted without JSDoc (`comments` above) and with every literal
+    // stored one byte per character. See `oneByteSource`.
+    plugins: [oneByteSource()]
 }));

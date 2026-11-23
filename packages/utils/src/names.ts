@@ -106,7 +106,7 @@ export function truncateToBytes(name: string, maxBytes: number): string {
     if (bytes.byteLength <= maxBytes) return name;
     // Decoding a slice that ends mid-character yields U+FFFD; dropping it lands
     // on the last whole character that fits, which is what Postgres does.
-    return new TextDecoder("utf-8").decode(bytes.subarray(0, maxBytes)).replace(/�+$/, "");
+    return new TextDecoder("utf-8").decode(bytes.subarray(0, maxBytes)).replace(/\uFFFD+$/, "");
 }
 
 /**

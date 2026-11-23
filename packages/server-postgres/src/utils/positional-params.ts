@@ -23,8 +23,8 @@
  */
 import { sql, type SQL } from "drizzle-orm";
 
-const IDENT_CHAR = /[A-Za-z0-9_$\u0080-￿]/;
-const DOLLAR_TAG = /^\$([A-Za-z_\u0080-￿][A-Za-z0-9_\u0080-￿]*)?\$/;
+const IDENT_CHAR = /[A-Za-z0-9_$\u0080-\uFFFF]/;
+const DOLLAR_TAG = /^\$([A-Za-z_\u0080-\uFFFF][A-Za-z0-9_\u0080-\uFFFF]*)?\$/;
 
 /** One piece of the statement: SQL text, or a reference to parameter `n` (1-based). */
 export type SqlPiece = { text: string } | { param: number };

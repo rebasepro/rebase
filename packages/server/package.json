@@ -61,6 +61,12 @@
       "import": "./dist/schema/index.js",
       "default": "./dist/schema/index.js"
     },
+    "./esm-resolve-cache": {
+      "types": "./dist/boot/esm-resolve-cache.d.ts",
+      "development": "./dist/esm-resolve-cache.js",
+      "import": "./dist/esm-resolve-cache.js",
+      "default": "./dist/esm-resolve-cache.js"
+    },
     "./package.json": "./package.json"
   },
   "dependencies": {

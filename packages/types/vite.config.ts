@@ -2,6 +2,8 @@ import path from "path";
 
 import { defineConfig } from "vite";
 
+import { oneByteSource } from "../../tooling/scripts/one-byte-source";
+
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
 
@@ -32,6 +34,7 @@ export default defineConfig(() => ({
                 warn(warning);
             },
             output: {
+                comments: { legal: true, annotation: true, jsdoc: false },
                 globals: {
                     "json-logic-js": "jsonLogic",
                     "fast-equals": "fastEquals",
@@ -45,7 +48,8 @@ export default defineConfig(() => ({
 
         }
     },
-    // No plugins: this package has no JSX. The React plugin was here from when
-    // the type surface still had .tsx files in it.
-    plugins: []
+    // A runtime holds this package's source in memory for as long as it runs,
+    // so it is emitted without JSDoc (`comments` above) and with every literal
+    // stored one byte per character. See `oneByteSource`.
+    plugins: [oneByteSource()]
 }));

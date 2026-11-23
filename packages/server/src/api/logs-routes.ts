@@ -43,7 +43,7 @@ function normalizeFilter(options: LogFilterOptions): NormalizedFilter {
  * and the failure that produces is invisible — a tail that quietly shows a
  * different set of lines than the snapshot it started from.
  */
-function matchesFilter(entry: LogEntry, filter: NormalizedFilter): boolean {
+function matchesFilter(entry: Pick<LogEntry, "level" | "source" | "message" | "timestamp">, filter: NormalizedFilter): boolean {
     if (filter.level && entry.level !== filter.level) return false;
     if (filter.source && entry.source !== filter.source) return false;
     if (filter.search && !entry.message.toLowerCase().includes(filter.search)) return false;
@@ -54,8 +54,79 @@ function matchesFilter(entry: LogEntry, filter: NormalizedFilter): boolean {
 /** Notified for every entry pushed, in push order. */
 export type LogListener = (entry: LogEntry) => void;
 
+/** What `logMiddleware` records about a request; the entry's message and metadata are built from it. */
+interface RequestRecord {
+    method: string;
+    path: string;
+    status: number;
+    duration: number;
+    requestId: string | undefined;
+    collection: string | undefined;
+    failure: { code: string; message: string } | undefined;
+}
+
+/**
+ * An entry as the ring holds it.
+ *
+ * A full ring is 10,000 entries in every process that has served 10,000
+ * requests, so it keeps the facts and builds the strings when something reads
+ * them: the timestamp as a number, the id as its counter, and a request's
+ * message and metadata as the fields they are made of. Built up front, a
+ * request entry takes about 380 bytes besides its path and request id; kept
+ * like this, under half that, about 2 MB less heap for a full ring.
+ *
+ * `message` and `timestamp` are getters so `matchesFilter` reads a stored entry
+ * the same way it reads a built one, building only what a filter asks for.
+ */
+class StoredLogEntry {
+    constructor(
+        readonly seq: number,
+        readonly at: number,
+        readonly level: LogEntry["level"],
+        readonly source: LogEntry["source"],
+        private readonly text: string | RequestRecord,
+        private readonly extra: Record<string, unknown> | undefined
+    ) {}
+
+    get timestamp(): string {
+        return new Date(this.at).toISOString();
+    }
+
+    get message(): string {
+        const text = this.text;
+        if (typeof text === "string") return text;
+        return `${text.method} ${text.path} ${text.status} ${text.duration}ms`
+            + (text.failure ? ` — ${text.failure.code}: ${text.failure.message}` : "");
+    }
+
+    get metadata(): Record<string, unknown> | undefined {
+        const text = this.text;
+        if (typeof text === "string") return this.extra;
+        return {
+            method: text.method,
+            path: text.path,
+            status: text.status,
+            duration: text.duration,
+            ...(text.requestId && { requestId: text.requestId }),
+            ...(text.collection && { collection: text.collection }),
+            ...(text.failure && { errorCode: text.failure.code, errorMessage: text.failure.message })
+        };
+    }
+
+    toEntry(): LogEntry {
+        return {
+            timestamp: this.timestamp,
+            level: this.level,
+            source: this.source,
+            message: this.message,
+            metadata: this.metadata,
+            id: `log_${this.seq}`
+        };
+    }
+}
+
 class LogRingBuffer {
-    private buffer: LogEntry[] = [];
+    private buffer: StoredLogEntry[] = [];
     private maxSize: number;
     private idCounter = 0;
     private listeners = new Set<LogListener>();
@@ -64,20 +135,29 @@ class LogRingBuffer {
         this.maxSize = maxSize;
     }
 
-    push(entry: Omit<LogEntry, "id">): void {
-        const id = `log_${++this.idCounter}`;
-        const stored: LogEntry = { ...entry,
-            id };
+    /** A line with its own message: what `addLog` records. */
+    push(level: LogEntry["level"], source: LogEntry["source"], message: string, metadata?: Record<string, unknown>): void {
+        this.store(new StoredLogEntry(++this.idCounter, Date.now(), level, source, message, metadata));
+    }
+
+    /** A request, whose message and metadata are built from `request` when read. */
+    pushRequest(level: LogEntry["level"], source: LogEntry["source"], request: RequestRecord): void {
+        this.store(new StoredLogEntry(++this.idCounter, Date.now(), level, source, request, undefined));
+    }
+
+    private store(stored: StoredLogEntry): void {
         this.buffer.push(stored);
         if (this.buffer.length > this.maxSize) {
             this.buffer.shift();
         }
+        if (this.listeners.size === 0) return;
+        const entry = stored.toEntry();
         // This runs on the request hot path, so a listener must never be able to
         // take the request down with it: a tail that throws loses its own tail,
         // not the response the log line was describing.
         for (const listener of this.listeners) {
             try {
-                listener(stored);
+                listener(entry);
             } catch {
                 /* a broken tail is not the request's problem */
             }
@@ -113,13 +193,13 @@ class LogRingBuffer {
         const offset = options.offset || 0;
 
         return {
-            entries: sorted.slice(offset, offset + limit),
+            entries: sorted.slice(offset, offset + limit).map(e => e.toEntry()),
             total
         };
     }
 
     getLatest(count = 50): LogEntry[] {
-        return this.buffer.slice(-count).reverse();
+        return this.buffer.slice(-count).reverse().map(e => e.toEntry());
     }
 }
 
@@ -145,13 +225,7 @@ export function addLog(
     message: string,
     metadata?: Record<string, unknown>
 ): void {
-    logBuffer.push({
-        timestamp: new Date().toISOString(),
-        level,
-        source,
-        message,
-        metadata
-    });
+    logBuffer.push(level, source, message, metadata);
 }
 
 export interface LogMiddlewareOptions {
@@ -216,21 +290,15 @@ export function logMiddleware(options: LogMiddlewareOptions = {}): MiddlewareHan
         // rather than in a stdout line the panel cannot see. See
         // `HonoEnv.Variables.errorSummary`.
         const failure = c.get("errorSummary");
-        addLog(
-            level,
-            sourceForRequestPath(c.req.path, options.basePath),
-            `${c.req.method} ${c.req.path} ${status} ${duration}ms`
-                + (failure ? ` — ${failure.code}: ${failure.message}` : ""),
-            {
-                method: c.req.method,
-                path: c.req.path,
-                status,
-                duration,
-                ...(reqId && { requestId: reqId }),
-                ...(c.get("collection") && { collection: c.get("collection") }),
-                ...(failure && { errorCode: failure.code, errorMessage: failure.message })
-            }
-        );
+        logBuffer.pushRequest(level, sourceForRequestPath(c.req.path, options.basePath), {
+            method: c.req.method,
+            path: c.req.path,
+            status,
+            duration,
+            requestId: reqId,
+            collection: c.get("collection"),
+            failure: failure && { code: failure.code, message: failure.message }
+        });
     };
 }
 

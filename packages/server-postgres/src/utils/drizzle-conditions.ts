@@ -2454,7 +2454,7 @@ whereConditions };
                 SELECT jsonb_build_object(
                     'field', f.path,
                     'snippet', ts_headline(${config}::regconfig, f.txt, ${query},
-                        'StartSel=<mark>,StopSel=</mark>,MaxWords=14,MinWords=1,MaxFragments=1,FragmentDelimiter= … ')
+                        'StartSel=<mark>,StopSel=</mark>,MaxWords=14,MinWords=1,MaxFragments=1,FragmentDelimiter= \u2026 ')
                 ) AS m
                 WHERE ${matchedField}
             ) s
