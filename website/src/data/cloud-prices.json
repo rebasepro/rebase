@@ -18,6 +18,8 @@
   "regions": {
     "europe-west1": {
       "id": "europe-west1",
+      "publicRegion": "eu-west-1",
+      "place": "Belgium",
       "provider": "gcp",
       "app": [
         {
@@ -310,6 +312,8 @@
     },
     "fsn1": {
       "id": "fsn1",
+      "publicRegion": "eu-central-1",
+      "place": "Falkenstein, Germany",
       "provider": "hetzner",
       "app": [
         {
@@ -373,11 +377,6 @@
           "monthlyEur": 15.25
         },
         {
-          "cpu": "1",
-          "memory": "4Gi",
-          "monthlyEur": 17.4
-        },
-        {
           "cpu": "2",
           "memory": "2Gi",
           "monthlyEur": 21.9
@@ -386,11 +385,6 @@
           "cpu": "2",
           "memory": "3Gi",
           "monthlyEur": 24.05
-        },
-        {
-          "cpu": "2",
-          "memory": "4Gi",
-          "monthlyEur": 26.2
         }
       ],
       "database": [
@@ -498,41 +492,6 @@
           "cpu": "2",
           "memory": "2Gi",
           "monthlyEur": 98.3
-        },
-        {
-          "cpu": "50m",
-          "memory": "4Gi",
-          "monthlyEur": 27.94
-        },
-        {
-          "cpu": "100m",
-          "memory": "4Gi",
-          "monthlyEur": 30.07
-        },
-        {
-          "cpu": "160m",
-          "memory": "4Gi",
-          "monthlyEur": 32.63
-        },
-        {
-          "cpu": "250m",
-          "memory": "4Gi",
-          "monthlyEur": 36.48
-        },
-        {
-          "cpu": "500m",
-          "memory": "4Gi",
-          "monthlyEur": 47.15
-        },
-        {
-          "cpu": "1",
-          "memory": "4Gi",
-          "monthlyEur": 68.5
-        },
-        {
-          "cpu": "2",
-          "memory": "4Gi",
-          "monthlyEur": 111.2
         }
       ],
       "diskEurPerGib": 0.131,
@@ -607,6 +566,8 @@
     },
     "hel1": {
       "id": "hel1",
+      "publicRegion": "eu-north-1",
+      "place": "Helsinki, Finland",
       "provider": "hetzner",
       "app": [
         {
@@ -670,11 +631,6 @@
           "monthlyEur": 15.25
         },
         {
-          "cpu": "1",
-          "memory": "4Gi",
-          "monthlyEur": 17.4
-        },
-        {
           "cpu": "2",
           "memory": "2Gi",
           "monthlyEur": 21.9
@@ -683,11 +639,6 @@
           "cpu": "2",
           "memory": "3Gi",
           "monthlyEur": 24.05
-        },
-        {
-          "cpu": "2",
-          "memory": "4Gi",
-          "monthlyEur": 26.2
         }
       ],
       "database": [
@@ -795,41 +746,6 @@
           "cpu": "2",
           "memory": "2Gi",
           "monthlyEur": 98.3
-        },
-        {
-          "cpu": "50m",
-          "memory": "4Gi",
-          "monthlyEur": 27.94
-        },
-        {
-          "cpu": "100m",
-          "memory": "4Gi",
-          "monthlyEur": 30.07
-        },
-        {
-          "cpu": "160m",
-          "memory": "4Gi",
-          "monthlyEur": 32.63
-        },
-        {
-          "cpu": "250m",
-          "memory": "4Gi",
-          "monthlyEur": 36.48
-        },
-        {
-          "cpu": "500m",
-          "memory": "4Gi",
-          "monthlyEur": 47.15
-        },
-        {
-          "cpu": "1",
-          "memory": "4Gi",
-          "monthlyEur": 68.5
-        },
-        {
-          "cpu": "2",
-          "memory": "4Gi",
-          "monthlyEur": 111.2
         }
       ],
       "diskEurPerGib": 0.131,
@@ -903,5 +819,5 @@
       }
     }
   },
-  "contentHash": "4801c6694147532735f19847fd29e3e20cb67768880b53d5688207765d3cf938"
+  "contentHash": "98494b0294b17282324267ae7ae43709c37483ab94a231b9e6f11f5ba1b2c7b7"
 }

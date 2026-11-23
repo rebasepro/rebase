@@ -16,12 +16,15 @@ export const CLOUD_FLAGS = {
      */
     selfServe: false,
     /**
-     * Where a new project is created. `europe-west1` (Belgium, Google Cloud)
-     * today; `fsn1` (Falkenstein, Hetzner) the day that region is opened to
-     * customers in the control plane, its Stripe prices exist and the wildcard
-     * domain points at it.
+     * Where a new project is created. `fsn1` (Falkenstein, Hetzner) since the
+     * November 2026 move: the control plane runs there, the tenants were moved
+     * there (11-22/23) and its rates are the held card (saas
+     * `rate-card.ts` HELD_PRICES, default project €24.28). `europe-west1`
+     * (Belgium, Google Cloud) is still `sellable` in saas `substrate-rates.ts`
+     * and is still saas's `DEFAULT_REGION`; switch back only if new projects
+     * are sold there again.
      */
-    region: "europe-west1" as RegionId,
+    region: "fsn1" as RegionId,
     /** A project can sleep when idle and is billed the sleeping rate (needs the runtime release and REBASE_SLEEP_BILLING). */
     sleep: false,
     /** File storage keeps a second copy in Nuremberg and recovers deleted files for 30 days (the storage broker). */
@@ -41,6 +44,12 @@ export const REGION_FACTS: Record<RegionId, {
     outboundIp: string | null;
     /** Ports open for outbound mail. */
     mailPorts: string;
+    /**
+     * How far an app may use CPU beyond what it reserves, at no charge, or
+     * null where no burst is promised. `times` × the reservation, at most
+     * `capVcpu` per app.
+     */
+    cpuBurst: { times: number; capVcpu: number } | null;
 }> = {
     "europe-west1": {
         place: "Belgium",
@@ -48,7 +57,9 @@ export const REGION_FACTS: Record<RegionId, {
         provider: "Google Cloud",
         // docs/deployment/managed-runtime.md "Outbound traffic".
         outboundIp: "207.175.138.15",
-        mailPorts: "465, 587 and 993"
+        mailPorts: "465, 587 and 993",
+        // GKE Autopilot: no burst rule (saas provider-profile.ts GKE_AUTOPILOT).
+        cpuBurst: null
     },
     fsn1: {
         place: "Falkenstein, Germany",
@@ -58,7 +69,12 @@ export const REGION_FACTS: Record<RegionId, {
         // when it exists, and in docs/deployment/managed-runtime.md.
         outboundIp: null,
         // Hetzner blocks 465 (saas docs/hetzner-fleet-readiness.md item 10).
-        mailPorts: "587 and 993"
+        mailPorts: "587 and 993",
+        // saas provider-profile.ts `fixedNodeBurst`: CPU limit 10x the request,
+        // at most half a worker; tenant-topology.ts `burstLimitedResources`
+        // floors that to 100m. A CPX32 worker gives pods 3.55 vCPU
+        // (hetzner-fleet-cost.ts), so half is 1.775, floored to 1.7.
+        cpuBurst: { times: 10, capVcpu: 1.7 }
     }
 };
 
