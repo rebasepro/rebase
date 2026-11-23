@@ -1,5 +1,5 @@
 ---
-sourceHash: bf1f15a8efc11ed3
+sourceHash: 331b1a4bbf640cf3
 title: Desplegar Rebase en Hostman
 description: Despliega un proyecto rebase init en Hostman — App Platform con PostgreSQL administrado y almacenamiento S3, o un servidor en la nube con el propio archivo Compose de tu proyecto.
 sidebar_label: Hostman
@@ -64,7 +64,7 @@ COPY . .
 RUN npx -y pnpm@11 install --frozen-lockfile && npx -y pnpm@11 run build
 
 # The published runtime, with nothing added but the bundle
-FROM rebasepro/server:0.35.0
+FROM rebasepro/server:0.35.1
 COPY --from=build --chown=node:node /app/dist-bundle /bundle
 ```
 
