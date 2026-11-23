@@ -108,6 +108,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
         "--to": String,
         "--switch-app": Boolean,
         "--from-app-storage": Boolean,
+        "--from-import": String,
         "--wait": Boolean,
         "--status": String
     },

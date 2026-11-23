@@ -435,6 +435,21 @@ describe("storage import", () => {
         expect(jsonOut()).toMatchObject({ importId: "imp_1", status: "queued", follow: "rebase cloud storage import --status imp_1 --wait" });
     });
 
+    it("--from-app-storage and --from-import send no source and no secret: the platform holds the key", async () => {
+        await storage("import", "--from-app-storage", "--to", "shop-assets", "--switch-app", "--json");
+        expect(sent[0]).toMatchObject({ method: "POST", path: "/imports", body: { fromCurrentStorage: true, bucket: "shop-assets", switchApp: true } });
+        await storage("import", "--from-import", "imp_0", "--to", "shop-assets", "--json");
+        expect(sent[1]).toMatchObject({ method: "POST", path: "/imports", body: { fromImport: "imp_0", bucket: "shop-assets", switchApp: false } });
+        expect(sent[1].body).not.toHaveProperty("source");
+    });
+
+    it("refuses --from-import with a source of its own, or with --from-app-storage", async () => {
+        await storage("import", "--from-import", "imp_0", "--from", "s3://x", "--to", "b", "--json");
+        expect(jsonOut()).toMatchObject({ error: { code: "usage" } });
+        await storage("import", "--from-import", "imp_0", "--from-app-storage", "--to", "b", "--json");
+        expect(sent).toEqual([]);
+    });
+
     it("refuses with no secret and no terminal, before sending anything", async () => {
         await storage(...start, "--json");
         expect(jsonOut()).toMatchObject({ error: { code: "input_required" } });

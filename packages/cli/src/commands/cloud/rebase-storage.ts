@@ -921,7 +921,8 @@ export async function storageImportCommand(rawArgs: string[]): Promise<void> {
             "--switch-app": Boolean,
             "--wait": Boolean,
             "--status": String,
-            "--from-app-storage": Boolean
+            "--from-app-storage": Boolean,
+            "--from-import": String
         },
         rawArgs,
         commandWords: 3, // cloud storage import
@@ -933,7 +934,7 @@ export async function storageImportCommand(rawArgs: string[]): Promise<void> {
     // Following an import already started.
     const statusOfImport = flags["--status"];
     if (statusOfImport !== undefined) {
-        const startFlags = ["--from", "--endpoint", "--region", "--access-key-id", "--secret-access-key", "--to", "--switch-app", "--from-app-storage"] as const;
+        const startFlags = ["--from", "--endpoint", "--region", "--access-key-id", "--secret-access-key", "--to", "--switch-app", "--from-app-storage", "--from-import"] as const;
         const stray = startFlags.filter(f => flags[f] !== undefined);
         if (stray.length) fail(`--status reads an import; it does not take ${stray.join(", ")}.`, undefined, "usage");
         const { client } = await requireClient(rawArgs);
@@ -952,20 +953,25 @@ export async function storageImportCommand(rawArgs: string[]): Promise<void> {
         return;
     }
 
-    // The project's own current bucket, read with the key the platform already
-    // holds for it: nothing to type, nothing secret on the line.
-    if (flags["--from-app-storage"] === true) {
+    // The project's own current bucket, or the source of an earlier import (to
+    // copy what reached the old bucket after a switch), read with the key the
+    // platform already holds: nothing to type, nothing secret on the line.
+    const fromImport = flags["--from-import"];
+    if (flags["--from-app-storage"] === true || fromImport !== undefined) {
+        if (flags["--from-app-storage"] === true && fromImport !== undefined) fail("Pass --from-app-storage or --from-import, not both.", undefined, "usage");
+        const which = fromImport !== undefined ? "--from-import" : "--from-app-storage";
         const sourceFlags = ["--from", "--endpoint", "--region", "--access-key-id", "--secret-access-key"] as const;
         const stray = sourceFlags.filter(f => flags[f] !== undefined);
-        if (stray.length) fail(`--from-app-storage reads the app's current bucket; it does not take ${stray.join(", ")}.`, undefined, "usage");
+        if (stray.length) fail(`${which} names the source already; it does not take ${stray.join(", ")}.`, undefined, "usage");
         if (!flags["--to"]) fail("Missing --to.", "Run `rebase cloud storage import --help`.", "usage");
         const target = flags["--to"];
+        const label = fromImport !== undefined ? `import ${fromImport}'s source` : "the app's current bucket";
         const { client } = await requireClient(rawArgs);
         const projectId = await requireProject(rawArgs, client);
         let started: { importId: string; status: StorageImportStatus };
         try {
             started = await call<{ importId: string; status: StorageImportStatus }>(client, "POST", `${projectId}/imports`, {
-                fromCurrentStorage: true,
+                ...(fromImport !== undefined ? { fromImport } : { fromCurrentStorage: true }),
                 bucket: target,
                 switchApp: flags["--switch-app"] === true
             });
@@ -976,14 +982,14 @@ export async function storageImportCommand(rawArgs: string[]): Promise<void> {
             const follow = `rebase cloud storage import --status ${started.importId} --wait`;
             emit(
                 () => {
-                    success(`Import ${started.importId} started: the app's current bucket → ${target}.`);
+                    success(`Import ${started.importId} started: ${label} → ${target}.`);
                     note(chalk.gray("Follow it:  ") + chalk.bold(follow));
                 },
-                { success: true, projectId, importId: started.importId, status: started.status, source: "app-storage", bucket: target, switchApp: flags["--switch-app"] === true, follow }
+                { success: true, projectId, importId: started.importId, status: started.status, source: fromImport !== undefined ? `import:${fromImport}` : "app-storage", bucket: target, switchApp: flags["--switch-app"] === true, follow }
             );
             return;
         }
-        if (!isJsonMode()) success(`Import ${started.importId} started: the app's current bucket → ${target}.`);
+        if (!isJsonMode()) success(`Import ${started.importId} started: ${label} → ${target}.`);
         reportImportEnd(projectId, started.importId, await followImport(client, projectId, started.importId));
         return;
     }

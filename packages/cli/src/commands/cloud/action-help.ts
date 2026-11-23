@@ -920,6 +920,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--secret-access-key <secret|->", "Its secret; `-` reads it from stdin. Default: REBASE_IMPORT_SECRET_ACCESS_KEY, or a prompt"],
             ["--switch-app", "Point the app at the copy when it is verified"],
             ["--from-app-storage", "Copy the app's current bucket with the key the platform already holds (no --from or credentials)"],
+            ["--from-import <importId>", "Copy again from an earlier import's source, with the key it was given: what reached the old bucket after a switch"],
             ["--wait", "Follow the import to the end, printing progress"],
             ["--status <importId>", "Read an import already started (with --wait, follow it)"]
         ],

@@ -118,6 +118,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--file": String,
     "--format": String,
     "--from": String,
+    "--from-import": String,
     "--function": String,
     "--grep": String,
     "--host": String,

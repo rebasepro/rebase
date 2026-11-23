@@ -164,8 +164,24 @@ rebase cloud storage import --from s3://old-bucket --endpoint https://s3.example
 ```
 
 It copies every object, verifies the copy, and never modifies the source.
-With `--switch-app`, it then points your Rebase app at the new bucket and
-redeploys it.
+With `--switch-app`, it then points your Rebase app at the new bucket (its
+storage settings, and its own `S3_*` variables if it sets them). The app uses
+the new bucket from its next deploy; until then it keeps writing to the old one.
+
+For an app on Rebase Cloud, `--from-app-storage` takes the bucket the app uses
+now, with the key the platform already holds, so nothing secret goes on the
+command line. After the switch and the redeploy, copy what reached the old
+bucket in between with `--from-import <id>`, which reads the source of that
+earlier import again:
+
+```bash
+rebase cloud storage import --from-app-storage --to my-bucket --switch-app
+rebase cloud deploy
+rebase cloud storage import --from-import <importId> --to my-bucket
+```
+
+Objects already copied with the same size are skipped, so a second import only
+copies what is new.
 
 For Google Cloud Storage, use its S3 interoperability endpoint
 (`https://storage.googleapis.com`) with an HMAC key. `rebase cloud storage
