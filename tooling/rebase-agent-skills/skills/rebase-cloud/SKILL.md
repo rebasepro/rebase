@@ -706,7 +706,7 @@ out.
 | `rebase cloud settings show` / `set` | Name, branch, repo, subdomain, `--studio on\|off` (Studio access, which `--project` commands and `cloud guests` go through) |
 | `rebase cloud compute` / `compute set` | What it reserves, and what it costs |
 | `rebase cloud resources` / `resources prune database <key>` | What the platform holds against what the code declares |
-| `rebase cloud storage` / `storage create` / `storage attach` | Object storage |
+| `rebase cloud storage` / `storage create <bucket>` / `delete <bucket>` / `keys [create\|rotate\|revoke]` / `usage` / `limit [GB]` / `cors <bucket>` / `import` / `attach` | Rebase Storage (S3-compatible buckets and keys; a key's secret is printed once), and your own bucket with `attach` |
 | `rebase cloud notifications` / `add <url>` / `test <id>` / `remove <id>` | Deploy, backup, billing and usage events to Slack, Discord or any URL |
 | `rebase cloud orgs list` / `create` / `rename` / `delete` / `members` | Organizations |
 | `rebase cloud billing` / `billing setup` / `billing checkout` / `billing email <address>` | Card on file, and where invoices go |

@@ -85,6 +85,32 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "env set": ENV_SET_FLAGS,
     "env pull": { "--output": String, "--out": "--output" },
     "storage create": {},
+    "storage delete": {},
+    "storage keys": {},
+    "storage keys create": { "--name": String, "--read-only": Boolean, "--bucket": String },
+    "storage keys rotate": {},
+    "storage keys revoke": {},
+    "storage usage": {},
+    "storage limit": {},
+    "storage cors": {
+        "--allow-origin": [String],
+        "--allow-method": [String],
+        "--allow-header": [String],
+        "--clear": Boolean,
+        "--file": String
+    },
+    "storage import": {
+        "--from": String,
+        "--endpoint": String,
+        "--region": String,
+        "--access-key-id": String,
+        "--secret-access-key": String,
+        "--to": String,
+        "--switch-app": Boolean,
+        "--from-app-storage": Boolean,
+        "--wait": Boolean,
+        "--status": String
+    },
     "storage attach": {
         "--bucket": String,
         "--access-key-id": String,

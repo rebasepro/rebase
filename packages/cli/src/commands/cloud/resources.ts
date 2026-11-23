@@ -57,6 +57,21 @@ import { reportCallError, type Unserved } from "./not-served";
 import { NO_ORG_HINT, requireOrg } from "./org-scope";
 import { describeDomainStatus, projectDomainStates } from "./domains";
 import { driftSentence, frameworkDrift, localFrameworkVersion } from "./framework-drift";
+import { warnDeprecated } from "@rebasepro/common";
+import {
+    fetchStorageOverview,
+    formatEur,
+    monthlyCostEur,
+    storageCorsCommand,
+    storageCreateBucket,
+    storageDeleteBucket,
+    storageImportCommand,
+    storageKeysCommand,
+    storageLimitCommand,
+    storageUsageCommand,
+    type StorageOverview
+} from "./rebase-storage";
+import { formatBytes } from "../storage";
 
 /* ─── status: quick project dashboard ──────────────────────────── */
 
@@ -938,7 +953,7 @@ export async function webhooksCommand(_subcommand: string | undefined, _rawArgs:
 /* ─── storage ──────────────────────────────────────────────────── */
 
 /** The action words `rebase cloud storage` dispatches. No word means `list`. */
-export const STORAGE_ACTIONS = ["list", "create", "attach"] as const;
+export const STORAGE_ACTIONS = ["list", "create", "delete", "keys", "usage", "limit", "cors", "import", "attach"] as const;
 
 export async function storageCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     // `rebase cloud storage` used to only ever list. A tenant could therefore
@@ -953,6 +968,13 @@ export async function storageCommand(action: string | undefined, rawArgs: string
     // subcommand ever matched.
     if (action === "create") return storageCreateCommand(rawArgs);
     if (action === "attach") return storageAttachCommand(rawArgs);
+    // Rebase Storage: the platform's own S3-compatible buckets (rebase-storage.ts).
+    if (action === "delete") return storageDeleteBucket(rawArgs);
+    if (action === "keys") return storageKeysCommand(rawArgs);
+    if (action === "usage") return storageUsageCommand(rawArgs);
+    if (action === "limit") return storageLimitCommand(rawArgs);
+    if (action === "cors") return storageCorsCommand(rawArgs);
+    if (action === "import") return storageImportCommand(rawArgs);
     if (action === "help") return printStorageHelp();
     // Everything that is not one of those, and is not `list` or nothing, is a
     // typo — and used to LIST, exit 0, and read as a bucket that was created.
@@ -966,10 +988,19 @@ maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     try {
-        const stores = (await client.data.table("storages").find({
-            where: { project: ["==", projectId] },
-            limit: 50
-        })).data as Array<{
+        // Rebase Storage (buckets, keys, usage) and the project's `storages`
+        // rows — what the deployed app is pointed at, including a bucket of
+        // its own attached with `attach` — side by side. Neither replaces the
+        // other: a project can have both, and only the rows say which bucket
+        // the app reads.
+        const [found, storesResult] = await Promise.all([
+            fetchStorageOverview(client, projectId),
+            client.data.table("storages").find({
+                where: { project: ["==", projectId] },
+                limit: 50
+            })
+        ]);
+        const stores = storesResult.data as Array<{
             id: string | number;
             sourceKey?: string;
             type?: string;
@@ -978,17 +1009,27 @@ maxPositionals: 0 });
             s3Bucket?: string;
             status?: string;
         }>;
+        const overview = "overview" in found ? found.overview : undefined;
 
         emit(
             () => {
                 console.log("");
                 console.log(chalk.bold(`  🪣 Storage — project ${displayProjectRef(rawArgs)}`));
                 console.log("");
-                if (stores.length === 0) {
-                    console.log(chalk.gray("  No storage buckets attached."));
+                if (overview) {
+                    printRebaseStorageOverview(overview);
+                } else if ("unavailable" in found && found.unavailable === "error") {
+                    console.log(chalk.gray(`  Rebase Storage could not be read: ${found.message}`));
                     console.log("");
+                }
+                if (stores.length === 0) {
+                    if (!overview) {
+                        console.log(chalk.gray("  No storage buckets attached."));
+                        console.log("");
+                    }
                     return;
                 }
+                console.log(chalk.bold("  Attached to the app"));
                 for (const s of stores) {
                     // `bucketName` is written by managed provisioning only, so
                     // a bucket attached from the console or by `attach` listed
@@ -1003,6 +1044,10 @@ maxPositionals: 0 });
             },
             {
                 projectId,
+                // `null` when this platform has no Rebase Storage, or the
+                // control plane predates it; `rebaseStorageUnavailable` says which.
+                rebaseStorage: overview ?? null,
+                rebaseStorageUnavailable: "unavailable" in found ? found.unavailable : null,
                 stores: stores.map((s) => ({
                     id: String(s.id),
                     sourceKey: s.sourceKey || DEFAULT_STORAGE_SOURCE_KEY,
@@ -1018,15 +1063,86 @@ maxPositionals: 0 });
     }
 }
 
+/** The Rebase Storage half of `rebase cloud storage`: endpoint, buckets, keys, one usage line. */
+function printRebaseStorageOverview(o: StorageOverview): void {
+    console.log(chalk.bold("  Rebase Storage"));
+    keyValues([["Endpoint", o.endpoint], ["Region", o.region]]);
+    console.log("");
+    if (o.buckets.length === 0) {
+        console.log(chalk.gray("  No buckets yet:  ") + chalk.bold("rebase cloud storage create <bucket>"));
+    } else {
+        console.log(`  ${chalk.gray(`Buckets (${o.buckets.length})`)}`);
+        const width = Math.max(...o.buckets.map(b => b.name.length));
+        for (const b of o.buckets) {
+            const cors = b.cors?.length ? `CORS: ${b.cors.length} rule${b.cors.length === 1 ? "" : "s"}` : "no CORS";
+            console.log(`    ${chalk.bold(b.name.padEnd(width))}  ${chalk.gray(`created ${fmtDate(b.createdAt)} · ${cors}`)}`);
+        }
+    }
+    const readOnly = o.keys.filter(k => k.permission === "read").length;
+    console.log(`  ${chalk.gray("Keys:")} ${o.keys.length}${o.keys.length ? chalk.gray(` (${readOnly} read-only) · rebase cloud storage keys`) : chalk.gray(" · rebase cloud storage keys create")}`);
+    const u = o.usage;
+    const pct = u.capBytes > 0 ? Math.round((u.estimatedBytes / u.capBytes) * 100) : 0;
+    console.log(`  ${chalk.gray("Usage:")} ${formatBytes(u.estimatedBytes)} of ${formatBytes(u.capBytes)} cap (${pct}%) · `
+        + `${formatEur(monthlyCostEur(u.estimatedBytes, o.pricing))}/month`
+        + chalk.gray(" · rebase cloud storage usage"));
+    console.log("");
+}
+
 export function printStorageHelp(): void {
     printGroupHelp({
         command: "cloud storage",
         title: "The project's object storage",
         actions: [
             { action: "list",
-description: "The buckets this project has, and their state" },
+description: "Rebase Storage's endpoint, buckets, keys and usage, and what the app is attached to" },
             { action: "create",
-description: "Provision platform-managed storage. Takes no options" },
+args: "<bucket>",
+description: "Create a Rebase Storage bucket. Names are global" },
+            { action: "delete",
+args: "<bucket>",
+description: "Delete a bucket and its files. Confirms" },
+            {
+                action: "keys",
+                args: "[list|create|rotate|revoke]",
+                description: "S3 access keys. The secret is shown once, on create and rotate",
+                flags: [
+                    ["--name <name>", "create: what to call the key"],
+                    ["--read-only", "create: read, never write"],
+                    ["--bucket <name>", "create: one bucket only. Default: every bucket in the project"]
+                ]
+            },
+            { action: "usage",
+description: "Stored bytes against the cap, the month's cost, and egress" },
+            { action: "limit",
+args: "[<GB>]",
+description: "Show or set the storage cap, which bounds the bill" },
+            {
+                action: "cors",
+                args: "<bucket>",
+                description: "Show or replace a bucket's CORS rules",
+                flags: [
+                    ["--allow-origin <o>", "An origin browsers may call from. Repeatable"],
+                    ["--allow-method <m>", "GET, HEAD, PUT, POST, DELETE. Repeatable. Default: GET, HEAD"],
+                    ["--allow-header <h>", "A request header to allow. Repeatable"],
+                    ["--file <rules.json>", "The rules as JSON instead"],
+                    ["--clear", "Remove every rule"]
+                ]
+            },
+            {
+                action: "import",
+                description: "Copy another S3 bucket into Rebase Storage, run by the platform",
+                flags: [
+                    ["--from s3://<bucket>[/<prefix>]", "The source. Required"],
+                    ["--to <bucket>", "The Rebase Storage bucket to fill. Required"],
+                    ["--region <region>", "Source region. Required"],
+                    ["--access-key-id <id>", "Source key. Required"],
+                    ["--secret-access-key <s|->", "Source secret, `-` for stdin, or REBASE_IMPORT_SECRET_ACCESS_KEY"],
+                    ["--endpoint <url>", "Source endpoint. Omit for AWS S3"],
+                    ["--switch-app", "Point the app at the copy once it is verified"],
+                    ["--wait", "Follow it to the end"],
+                    ["--status <importId>", "Read an import already started"]
+                ]
+            },
             {
                 action: "attach",
                 description: "Attach your own S3-compatible bucket",
@@ -1042,9 +1158,11 @@ description: "Provision platform-managed storage. Takes no options" },
             }
         ],
         notes: [
-            "Without either, file storage stays off: uploads are refused with 501",
-            "STORAGE_NOT_CONFIGURED rather than written to a container filesystem that is",
-            "erased on the next restart.",
+            "Each action has its own page: `rebase cloud storage keys create --help`.",
+            "`storage create` with no bucket name still provisions platform-managed storage for the",
+            "app, and is deprecated: create a bucket and a key instead.",
+            "Without storage, uploads are refused with 501 STORAGE_NOT_CONFIGURED rather than",
+            "written to a container filesystem that is erased on the next restart.",
             "Redeploy after `attach` for the tenant to pick the credentials up."
         ]
     });
@@ -1056,13 +1174,21 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
     // Takes no options of its own, and provisions billable infrastructure: an
     // unrecognised flag here (`storage create --region eu`, borrowed from
     // `attach`) provisioned in the default region and said nothing.
-    parseCloudArgs({
+    const { positionals } = parseCloudArgs({
         spec: {},
         rawArgs,
         commandWords: 3, // cloud storage create
         command: "cloud storage create",
-        maxPositionals: 0
+        maxPositionals: 1
     });
+    // `storage create <bucket>` is Rebase Storage. Without a name it is the
+    // older platform-managed provisioning, kept working and deprecated.
+    if (positionals[0]) return storageCreateBucket(rawArgs, positionals[0]);
+    warnDeprecated(
+        "cli.cloud-storage-create-managed",
+        "`rebase cloud storage create` with no bucket name is deprecated. Create a Rebase Storage bucket and a key "
+        + "instead: `rebase cloud storage create <bucket>`, then `rebase cloud storage keys create --bucket <bucket>`."
+    );
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
 

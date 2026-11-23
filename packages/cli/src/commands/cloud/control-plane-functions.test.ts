@@ -53,6 +53,9 @@ const CONTROL_PLANE_FUNCTIONS: Record<string, Status> = {
     "platform-config": "served",
     previews: "served",
     pricing: "served",
+    // Rebase Storage. Lands with saas feat/rebase-storage; its commands answer
+    // `not_served` on a control plane without it (rebase-storage.ts).
+    "rebase-storage": "served",
     resources: "served",
     "runtime-logs": "served",
     "runtime-token": "served",
