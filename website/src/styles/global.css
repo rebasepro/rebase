@@ -499,20 +499,20 @@ html[data-theme="light"]:not([data-scrolled], [data-menu-open]):has(.hero-under-
    that without producing a horizontal scrollbar — but it clips rather than
    reflows, so anything bled must be decorative-safe at its outer edge. A demo
    frame is; a control or a line of text would not be. */
-/* Capped at 8rem, the same step as `bleed-x` (2026-11-23), so every bled
+/* Capped at 12rem, the same step as `bleed-x` (2026-11-23), so every bled
    frame on a page ends on one right edge. Uncapped, a 2000px screen pulled the
    frame ~400px past the shell and it read as a slab escaping the page, not as
-   a wider product. Up to ~1500px wide the cap changes nothing. */
+   a wider product. Up to ~1570px wide the cap changes nothing. */
 @utility bleed-right {
-    margin-right: calc(-1 * min(8rem, max(0px, (100vw - 72rem) / 2 - 1.5rem)));
+    margin-right: calc(-1 * min(12rem, max(0px, (100vw - 72rem) / 2 - 1.5rem)));
 }
 
-/* The capped symmetric step. `min(…, 8rem)` is the cap from test 1: the frame
+/* The capped symmetric step. `min(…, 12rem)` (8rem until 2026-11-23) is the cap from test 1: the frame
    moves far enough past the shell to read as the product rather than as a
    figure in the column, and not so far that it loses its heading. Below 72rem
    the gutter is negative, `max(0px, …)` returns 0 and this is a no-op. */
 @utility bleed-x {
-    margin-inline: calc(-1 * min(8rem, max(0px, (100vw - 72rem) / 2 - 1.5rem)));
+    margin-inline: calc(-1 * min(12rem, max(0px, (100vw - 72rem) / 2 - 1.5rem)));
 }
 
 /* A raised ground eats the muted tier's headroom, so the muted tier lifts with
