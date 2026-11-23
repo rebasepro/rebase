@@ -1,5 +1,5 @@
 ---
-sourceHash: ae48e0b641989cf2
+sourceHash: ce7831be934cb96a
 title: "Recette : Publication éditoriale"
 sidebar_label: Publication éditoriale
 description: "Gérez un blog ou une salle de rédaction sur Rebase : rédacteurs et éditeurs, révision, publication planifiée, brouillons d'articles en ligne, prévisualisations, traductions, médiathèque, blocs de contenu, flux, notes éditoriales et import WordPress."
@@ -9,28 +9,28 @@ description: "Gérez un blog ou une salle de rédaction sur Rebase : rédacteurs
 
 Cette recette met en place le volet éditorial d'une publication sur Rebase. Chaque partie est un point d'extension documenté, ce qui vous permet de ne conserver que les fonctionnalités dont vous avez besoin :
 
-| Ce que vous obtenez | Conçu avec |
+| Vous obtenez | Conçu avec |
 |---|---|
-| Les rédacteurs rédigent, les éditeurs planifient et publient, imposé par Postgres | [Sécurité au niveau des lignes (RLS)](/docs/collections/security-rules/) |
+| Les rédacteurs rédigent, les éditeurs planifient et publient, appliqué par Postgres | [Sécurité au niveau des lignes (RLS)](/docs/collections/security-rules/) |
 | Un tableau par statut, avec des boutons Soumettre et Publier | [Vue Kanban](/docs/frontend/view-modes/), [actions d'entité](/docs/frontend/entity-actions/) |
-| Publication et dépublication planifiées | Une [tâche cron](/docs/backend/cron-jobs/) |
-| Modifier un article en ligne sans le changer jusqu'à sa publication | Une table de brouillons et deux actions d'entité |
+| Publication et dépublication planifiées | Un [cron job](/docs/backend/cron-jobs/) |
+| Modifier un article en ligne sans altérer la version publiée avant publication | Une table de brouillons et deux actions d'entité |
 | Un aperçu des modifications non enregistrées | Une [vue d'entité](/docs/frontend/entity-views/) |
-| Traductions, champs SEO, blocs de contenu | Colonnes JSON avec un schéma ([Documents JSON](/docs/schema/json/)) |
+| Traductions, champs SEO, blocs de contenu | Colonnes JSON structurées ([Documents JSON](/docs/schema/json/)) |
 | Une médiathèque avec texte alternatif et crédits | Une table `media` et une relation |
-| RSS, un sitemap et une API de lecture publique | Une [fonction personnalisée](/docs/backend/custom-functions/) |
-| Notes entre le rédacteur et l'éditeur | Une table de notes et une vue d'entité |
-| Révisions avec retour arrière (rollback) | [Historique](/docs/backend/history/) |
+| RSS, sitemap et une API publique en lecture | Une [fonction personnalisée](/docs/backend/custom-functions/) |
+| Notes entre rédacteur et éditeur | Une table de notes et une vue d'entité |
+| Révisions avec retour en arrière | [Historique](/docs/backend/history/) |
 | Un import WordPress | Un [script](/docs/recipes/import-from-wordpress/) |
-| Deux publications dans une seule installation | [Multi-entité (Tenancy)](/docs/collections/tenancy/) |
+| Deux publications dans une seule instance | [Multi-tenance (Tenancy)](/docs/collections/tenancy/) |
 
-Elle étend le modèle de rôles de la [recette CMS de blog](/docs/recipes/blog-cms/) : `writer` et `editor` sont des entrées dans les `roles` d'un utilisateur. Si vous avez commencé à partir du scaffold, ajoutez `writer` aux options de rôles dans `backend/schema/users.ts`.
+Elle étend le modèle de rôles de la [recette CMS de blog](/docs/recipes/blog-cms/) : `writer` et `editor` sont des entrées dans le tableau `roles` d'un utilisateur. Si vous êtes parti du scaffold de base, ajoutez `writer` aux options de rôle dans `backend/schema/users.ts`.
 
-Chaque table est un fichier dans `backend/schema/`, exporté depuis son `index.ts` ; la manière dont le panneau d'administration la présente — le tableau, les boutons, les aperçus — est une configuration `customizeTable` dans `frontend/src/cms/`, transmise à `<RebaseCMS tableCustomizations>`.
+Chaque table est un fichier dans `backend/schema/`, exporté depuis son fichier `index.ts` ; la façon dont le panneau d'administration la présente — le tableau, les boutons, les prévisualisations — est définie par un `customizeTable` dans `frontend/src/cms/`, transmis à `<RebaseCMS tableCustomizations>`.
 
 ## Médias
 
-Une ligne par image, de sorte qu'une image est téléversée une seule fois et réutilisée, avec son texte alternatif et ses crédits à côté :
+Une ligne par image, de sorte qu'une image est téléversée une seule fois et réutilisée, avec son texte alternatif et ses crédits associés :
 
 ```ts
 // backend/schema/media.ts
@@ -51,7 +51,7 @@ export const media = defineTable("media", {
 });
 ```
 
-Un article pointe vers une ligne de média grâce à une relation, et le sélecteur de relation liste les images déjà présentes dans la bibliothèque. Les utilisateurs autorisés à téléverser les fichiers eux-mêmes sont définis par votre [autorisation de stockage](/docs/backend/storage-authorization/).
+Un article pointe vers une ligne de média via une relation, et le sélecteur de relation liste les images déjà présentes dans la bibliothèque. Les autorisations de téléversement des fichiers eux-mêmes sont définies par votre [autorisation de stockage](/docs/backend/storage-authorization/).
 
 ## Articles
 
@@ -117,7 +117,7 @@ export const posts = defineTable("posts", {
 });
 ```
 
-Et la manière dont le panneau les affiche — un tableau par statut, deux boutons et deux onglets :
+Et voici comment le panneau d'administration les affiche — un tableau par statut, deux boutons et deux onglets :
 
 ```tsx
 // frontend/src/cms/posts.tsx
@@ -133,7 +133,6 @@ export const postsCms = customizeTable<typeof posts>("posts", {
     fields: {
         summary: { multiline: true },
         createdBy: { readOnly: true },
-        __order: { hidden: true, disabled: true },
         status: {
             enumLabels: {
                 draft:     { label: "Draft", color: "gray" },
@@ -179,17 +178,17 @@ export const postsCms = customizeTable<typeof posts>("posts", {
 });
 ```
 
-Rôle de chaque composant :
+Le rôle de chaque élément :
 
-- **Le flux de travail (workflow).** Les rédacteurs déplacent leurs propres articles entre `draft` et `review`. Les éditeurs planifient, publient et archivent. Postgres applique ces restrictions, de sorte que les règles s'appliquent de manière identique au panneau d'administration, à l'API REST et au SDK. Un rédacteur qui tente d'enregistrer avec le statut `published` est rejeté par la base de données, quel que soit l'état affiché par les boutons.
-- **Le tableau.** Les articles s'ouvrent sous la forme d'un tableau Kanban avec une colonne par statut, et glisser-déposer une carte entre deux colonnes correspond au même enregistrement, soumis aux mêmes règles.
-- **Révisions.** `history: true` conserve un instantané de chaque enregistrement, avec un bouton de rétablissement dans l'onglet Historique de l'élément.
-- **Traductions.** Une colonne JSON dotée d'un schéma génère un groupe de champs par langue dans le formulaire. Pour afficher plutôt les langues sous forme d'onglets, attribuez à `translations` un [champ personnalisé](/docs/frontend/custom-fields/).
-- **Blocs.** `json.oneOf` au sein des éléments d'un `json.array` fournit des blocs typés et réorganisables stockés au format JSON. Pour un éditeur intégré tel que BlockNote ou TipTap, placez-le derrière un champ personnalisé sur un `col.jsonb()` sans schéma ; le JSON de l'éditeur est stocké tel quel.
+- **Le flux de travail.** Les rédacteurs déplacent leurs propres articles entre `draft` (brouillon) et `review` (en relecture). Les éditeurs planifient, publient et archivent. Postgres applique ces règles, de sorte qu'elles s'imposent de la même manière au panneau d'administration, à l'API REST et au SDK. Un rédacteur qui tente d'enregistrer avec le statut `published` sera rejeté par la base de données, quel que soit l'état affiché par les boutons.
+- **Le tableau.** Les articles s'ouvrent sous forme de tableau Kanban avec une colonne par statut, et glisser-déposer une carte d'une colonne à l'autre déclenche la même opération d'enregistrement, soumise aux mêmes règles.
+- **Révisions.** `history: true` conserve un instantané de chaque enregistrement, avec un bouton de restauration dans l'onglet Historique de l'enregistrement.
+- **Traductions.** Une colonne JSON avec un schéma structure les champs par langue dans le formulaire. Pour afficher les langues sous forme d'onglets plutôt que de groupes de champs, attribuez à `translations` un [champ personnalisé](/docs/frontend/custom-fields/).
+- **Blocs.** `json.oneOf` au sein d'un `json.array` permet d'obtenir des blocs typés et réorganisables stockés en JSON. Pour un éditeur intégré tel que BlockNote ou TipTap, placez-le derrière un champ personnalisé sur une colonne `col.jsonb()` sans schéma imposé ; le JSON généré par l'éditeur est stocké tel quel.
 
 ## Publication planifiée
 
-Une tâche cron publie les articles planifiés lorsque leur heure arrive, et archive ceux dont la date `unpublishAt` est dépassée :
+Un cron job publie les articles planifiés lorsque leur date est atteinte, et archive ceux dont la date `unpublishAt` est dépassée :
 
 ```typescript
 // backend/crons/publish-scheduled.ts
@@ -220,11 +219,11 @@ export default defineCron({
 });
 ```
 
-`dataAsAdmin` s'exécute avec le rôle `admin`, la règle restrictive le laisse donc passer, et les hooks ainsi que l'historique de la table s'exécutent toujours lors de ces enregistrements.
+`dataAsAdmin` s'exécute avec le rôle `admin`, la règle restrictive autorise donc l'opération, et les hooks ainsi que l'historique de la table continuent de fonctionner lors de ces sauvegardes.
 
 ## Modifier un article en ligne
 
-Modifier un article publié le modifie directement en production, et les règles ci-dessus empêchent un rédacteur de le modifier. Pour préparer des modifications et les publier en une seule étape, conservez-les dans une seconde table dotée des mêmes colonnes :
+Modifier un article publié le modifie directement en production, et les règles définies précédemment empêchent complètement un rédacteur de le modifier. Pour préparer des modifications et les publier en une seule fois, conservez-les dans une seconde table ayant les mêmes colonnes :
 
 ```ts
 // backend/schema/post_drafts.ts
@@ -269,7 +268,7 @@ export const postDraftsCms = customizeTable<typeof postDrafts>("post_drafts", {
 });
 ```
 
-Donnez ensuite à `posts` une action qui crée un brouillon à partir d'un article publié, puis ajoutez `draftChanges` aux `entityActions` de `postsCms` :
+Ajoutez ensuite à `posts` une action qui initialise un brouillon à partir d'un article publié, et insérez `draftChanges` dans les `entityActions` de `postsCms` :
 
 ```typescript
 import type { TableEntityAction } from "@rebasepro/cms-types";
@@ -288,11 +287,11 @@ export const draftChanges: TableEntityAction = {
 };
 ```
 
-N'importe quel membre de l'équipe peut préparer un brouillon. Seul un éditeur peut le publier, car sa publication constitue une mise à jour d'un article publié, ce que la règle restrictive sur `posts` interdit à tous les autres.
+N'importe quel membre de l'équipe peut préparer un brouillon. Seul un éditeur peut le publier, car le publier équivaut à mettre à jour un article publié, ce que la règle restrictive sur `posts` interdit à tous les autres utilisateurs.
 
-## Aperçus
+## Prévisualisations
 
-Un onglet de vue d'entité reçoit les valeurs du formulaire, y compris les modifications non enregistrées, ce qui lui permet d'afficher l'article tel qu'il apparaîtra avant que quiconque ne l'enregistre :
+Un onglet de vue d'entité reçoit les valeurs du formulaire, modifications non enregistrées incluses, ce qui permet de prévisualiser l'article tel qu'il apparaîtra avant tout enregistrement :
 
 ```tsx
 // frontend/src/editorial/PostPreview.tsx
@@ -323,11 +322,11 @@ export default function PostPreview({ modifiedValues }: EntityCustomViewParams) 
 }
 ```
 
-Pour prévisualiser avec le design réel du site, effectuez le rendu du composant d'article du site dans cet onglet, ou intégrez la page d'aperçu du site dans un iframe et envoyez-lui `modifiedValues` à l'aide de `postMessage`. Un site statique hébergé par Rebase ne peut être intégré dans une frame que depuis sa propre origine.
+Pour prévisualiser avec le design réel de votre site, affichez le composant d'article de votre site dans cet onglet, ou intégrez la page de prévisualisation du site dans une iframe et transmettez-lui `modifiedValues` via `postMessage`. Un site statique hébergé par Rebase ne peut être intégré dans une frame que depuis sa propre origine.
 
 ## Notes éditoriales
 
-Les notes entre rédacteur et éditeur sont des lignes distinctes, affichées sur l'article :
+Les notes échangées entre le rédacteur et l'éditeur sont des lignes indépendantes, affichées sur la fiche de l'article :
 
 ```ts
 // backend/schema/post_notes.ts
@@ -347,7 +346,7 @@ export const postNotes = defineTable("post_notes", {
 });
 ```
 
-Masquez cette table du panneau latéral grâce à `hideFromNavigation: true` dans sa configuration `customizeTable`.
+Masquez cette table du panneau latéral de navigation avec `hideFromNavigation: true` dans son `customizeTable`.
 
 ```tsx
 // frontend/src/editorial/EditorialNotes.tsx
@@ -383,11 +382,11 @@ export default function EditorialNotes({ id }: EntityCustomViewParams) {
 }
 ```
 
-Pour notifier l'autre intervenant, envoyez un e-mail à partir du [hook](/docs/collections/callbacks/) `afterSave` de la table des notes avec `rebase.email`.
+Pour avertir l'autre interlocuteur, envoyez un e-mail à partir du [hook](/docs/collections/callbacks/) `afterSave` de la table des notes à l'aide de `rebase.email`.
 
-## Flux, sitemap et API de lecture publique
+## Flux, sitemap et API publique en lecture
 
-Une fonction personnalisée répond avec le type de contenu de votre choix. Celle-ci est publique (elle ne comporte pas de `requireAuth`), elle lit donc les données avec `dataAsAdmin` et filtre elle-même les articles publiés :
+Une fonction personnalisée répond avec le type de contenu de votre choix. Celle-ci est publique (elle n'utilise pas `requireAuth`), elle lit donc les données avec `dataAsAdmin` et filtre elle-même les articles publiés :
 
 ```typescript
 // backend/functions/site.ts
@@ -451,19 +450,19 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-Référencez le sitemap dans le fichier `robots.txt` de votre site (`Sitemap: https://example.com/api/functions/site/sitemap.xml`), ce qui permet aux moteurs de recherche de trouver un sitemap situé en dehors de la racine du site. Les pages qui lisent directement les articles peuvent utiliser le SDK à la place, avec une règle de lecture qui gère le filtrage : voir [Accès public](/docs/collections/security-rules/#public-access).
+Indiquez le sitemap dans le fichier `robots.txt` de votre site (`Sitemap: https://example.com/api/functions/site/sitemap.xml`), ce qui permet de repérer un sitemap situé en dehors de la racine du site. Les pages accédant directement aux articles peuvent plutôt utiliser le SDK, en laissant une règle de lecture effectuer le filtrage : voir [Accès public](/docs/collections/security-rules/#public-access).
 
 ## Importer depuis WordPress
 
-Un script lit l'API REST de WordPress et effectue un upsert de chaque article en fonction de son slug, ce qui permet de le relancer sans rien dupliquer : voir [Importer depuis WordPress](/docs/recipes/import-from-wordpress/).
+Un script lit l'API REST de WordPress et effectue un upsert de chaque article en fonction de son slug, ce qui permet de le réexécuter sans créer de doublons : voir [Importer depuis WordPress](/docs/recipes/import-from-wordpress/).
 
-## Deux publications dans une seule installation
+## Deux publications dans une seule instance
 
-Pour faire cohabiter un blog et un site d'actualités sur une même instance Rebase, ajoutez une colonne `site` aux tables `posts`, `post_drafts`, `post_notes` et `media`, puis déclarez [`tenant`](/docs/collections/tenancy/) sur chacune d'elles à l'aide d'une table d'adhésion. Un éditeur travaillant sur les deux sites verra alors les deux, tandis qu'un rédacteur affecté à un seul site n'aura accès qu'à celui-ci, le tout contrôlé directement par Postgres.
+Pour faire cohabiter un blog et un site d'actualités sur une même instance Rebase, ajoutez une colonne `site` à `posts`, `post_drafts`, `post_notes` et `media`, puis déclarez [`tenant`](/docs/collections/tenancy/) sur chacune d'elles à l'aide d'une table d'adhésion. Un éditeur travaillant sur les deux sites verra alors les deux, tandis qu'un rédacteur affecté à un seul site ne verra que le sien, le tout étant appliqué au niveau de Postgres.
 
-## Voir aussi
+## Ressources associées
 
 - [Recette CMS de blog](/docs/recipes/blog-cms/) : la version simplifiée du flux de travail
-- [Sécurité au niveau des lignes (RLS)](/docs/collections/security-rules/) : ce en quoi ces règles sont compilées
+- [Sécurité au niveau des lignes (RLS)](/docs/collections/security-rules/) : la structure sous-jacente des règles
 - [Actions d'entité](/docs/frontend/entity-actions/) et [vues d'entité](/docs/frontend/entity-views/)
-- [Tâches cron](/docs/backend/cron-jobs/) et [fonctions personnalisées](/docs/backend/custom-functions/)
+- [Cron jobs](/docs/backend/cron-jobs/) et [fonctions personnalisées](/docs/backend/custom-functions/)

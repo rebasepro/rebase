@@ -1,12 +1,12 @@
 ---
-sourceHash: 435a9c498c9da3cc
+sourceHash: b2705ba2e3901257
 title: Colunas
 sidebar_label: Colunas
-description: "Cada construtor e modificador col.*: o tipo Postgres que cada um cria, o tipo que um cliente lê e grava, e o que a API impõe — nulabilidade, padrões, marcações (stamps), validação, conjuntos fechados de valores, acesso e armazenamento."
+description: "Cada construtor e modificador col.*: o tipo do Postgres que cada um cria, o tipo que um cliente lê e grava, e o que a API impõe — nulidade, padrões, carimbos, validação, conjuntos fechados de valores, acesso e armazenamento."
 ---
 
-Uma coluna é um construtor `col.*`, refinado por modificadores. O construtor decide o
-tipo Postgres; os modificadores definem todo o resto: se a coluna pode ser
+Uma coluna é um construtor `col.*`, refinado por modificadores. O construtor define o
+tipo do Postgres; os modificadores definem todo o resto: se a coluna pode ser
 nula, seu valor padrão, sua validação, quem pode lê-la e gravá-la.
 
 ```ts
@@ -29,106 +29,106 @@ export const products = defineTable("products", {
 });
 ```
 
-Os construtores são imutáveis: cada modificador retorna um novo construtor, de forma que uma coluna pode ser
-declarada uma vez e compartilhada entre tabelas.
+Os construtores são imutáveis: cada modificador retorna um novo construtor, de modo que uma coluna pode ser
+declarada uma única vez e compartilhada entre tabelas.
 
-Após o ponto, uma coluna é lida como o `pg-core` do [Drizzle](https://orm.drizzle.team/docs/column-types/pg):
-os mesmos nomes de construtores, um nome de coluna SQL opcional primeiro, depois
-o objeto de configuração do Drizzle, e então o encadeamento — `col.varchar({ length: 32 })`,
+Após o ponto, a sintaxe de uma coluna se assemelha ao `pg-core` do [Drizzle](https://orm.drizzle.team/docs/column-types/pg):
+os mesmos nomes de construtores, um nome opcional de coluna SQL primeiro, depois
+o objeto de configuração do Drizzle e, em seguida, a cadeia — `col.varchar({ length: 32 })`,
 `col.timestamp({ withTimezone: true })`, `col.text().array()`,
-`` .default(sql`now()`) ``. Uma grafia do Drizzle que significaria outra coisa aqui
-não compila, e o erro informa o que escrever em seu lugar. Duas diferenças para
-manter em mente:
+`` .default(sql`now()`) ``. Uma sintaxe do Drizzle que significaria outra coisa aqui
+não compila, e o erro informa o que deve ser escrito em seu lugar. Duas diferenças a
+ter em mente:
 
 - **Uma chave estrangeira é uma relação.** Declare-a sob `relations`:
   `author: rel.belongsTo(() => users, { localKey: "author_id" })`. A
-  chave da relação é o que o `include` nomeia. `.references()` não existe, e
-  informa isso. Consulte [Relações](/docs/collections/relations/).
-- **`.defaultNow()` é apenas um padrão de banco de dados**: `DEFAULT now()`, o qual um cliente
-  ainda pode substituir. `.onCreateNow()` é uma [marcação (stamp)](#marcações-stamps) do servidor: o servidor
-  grava o horário na criação, independentemente do que o cliente enviou.
+  chave da relação é o que o `include` referencia. `.references()` não existe, e
+  informa isso explicitamente. Consulte [Relações](/docs/collections/relations/).
+- **`.defaultNow()` é apenas um valor padrão de banco de dados**: `DEFAULT now()`, que um cliente
+  ainda pode sobrescrever. `.onCreateNow()` é um [carimbo](#carimbos) do servidor: o servidor
+  grava a hora na criação, independentemente do que o cliente enviou.
 
 ## Construtores
 
-Um construtor por tipo Postgres. O tipo transmitido (wire type) é o que um cliente lê em uma linha e
+Um construtor por tipo do Postgres. O tipo transmitido (wire type) é o que um cliente lê em uma linha e
 envia em uma gravação, e como o SDK e o [`InferRow`](/docs/schema/types/) tipam
-a coluna. Cada construtor aceita um nome de coluna SQL opcional como seu primeiro
-argumento (`col.text("legacy_title")`); sem ele, o nome SQL é o
-snake_case da chave.
+a coluna. Cada construtor aceita um nome opcional de coluna SQL como seu primeiro
+argumento (`col.text("legacy_title")`); sem ele, o nome SQL será a conversão da chave para snake_case.
 
-| Construtor | Tipo Postgres | Tipo transmitido | Notas |
+| Construtor | Tipo do Postgres | Tipo transmitido (Wire type) | Notas |
 |---|---|---|---|
 | `col.uuid()` | `UUID` | `string` | `.defaultRandom()` para `gen_random_uuid()` |
 | `col.text()` | `TEXT` | `string` | `col.text({ enum: [...] })` aceita apenas esses valores; consulte [Conjuntos fechados de valores](#conjuntos-fechados-de-valores) |
-| `col.varchar({ length })` | `VARCHAR(n)` | `string` | o comprimento é obrigatório; também aceita `enum` |
-| `col.char({ length })` | `CHAR(n)` | `string` | o comprimento é obrigatório; também aceita `enum` |
+| `col.varchar({ length })` | `VARCHAR(n)` | `string` | o tamanho é obrigatório; também aceita `enum` |
+| `col.char({ length })` | `CHAR(n)` | `string` | o tamanho é obrigatório; também aceita `enum` |
 | `col.enum(values)` | um tipo enum do Postgres, `<table>_<column>` | a união de `values` | consulte [Conjuntos fechados de valores](#conjuntos-fechados-de-valores) |
-| `pgEnum(name, values)`, depois `status()` | um tipo enum nomeado do Postgres | a união de `values` | cada coluna dele compartilha o mesmo tipo |
+| `pgEnum(name, values)`, depois `status()` | um tipo enum nomeado do Postgres | a união de `values` | cada coluna que o utiliza compartilha o mesmo tipo |
 | `col.smallint()` | `SMALLINT` | `number` | |
 | `col.integer()` | `INTEGER` | `number` | |
 | `col.bigint({ mode: "number" })` | `BIGINT` | `number` | lido e gravado como um número JavaScript |
-| `col.smallserial()` | `SMALLSERIAL` | `number` | possui um padrão; prefira `col.smallint().generatedByDefaultAsIdentity()` em um novo esquema |
-| `col.serial()` | `SERIAL` | `number` | possui um padrão; prefira `col.integer().generatedByDefaultAsIdentity()` |
-| `col.bigserial({ mode: "number" })` | `BIGSERIAL` | `number` | possui um padrão; prefira `col.bigint({ mode: "number" }).generatedByDefaultAsIdentity()` |
+| `col.smallserial()` | `SMALLSERIAL` | `number` | possui um valor padrão; prefira `col.smallint().generatedByDefaultAsIdentity()` em um novo schema |
+| `col.serial()` | `SERIAL` | `number` | possui um valor padrão; prefira `col.integer().generatedByDefaultAsIdentity()` |
+| `col.bigserial({ mode: "number" })` | `BIGSERIAL` | `number` | possui um valor padrão; prefira `col.bigint({ mode: "number" }).generatedByDefaultAsIdentity()` |
 | `col.real()` | `REAL` | `number` | |
 | `col.doublePrecision()` | `DOUBLE PRECISION` | `number` | |
-| `col.numeric({ precision?, scale? })` | `NUMERIC`, `NUMERIC(p)`, `NUMERIC(p, s)` | `number` | uma escala precisa de uma precisão; `col.decimal()` é o mesmo construtor |
+| `col.numeric({ precision?, scale? })` | `NUMERIC`, `NUMERIC(p)`, `NUMERIC(p, s)` | `number` | uma escala requer uma precisão; `col.decimal()` é o mesmo construtor |
 | `col.boolean()` | `BOOLEAN` | `boolean` | |
 | `col.timestamp({ withTimezone: true })` | `TIMESTAMPTZ` | `string` (ISO 8601) | uma gravação também aceita um `Date`; um timestamp sem fuso horário é `col.custom({ dataType: "timestamp" })` |
 | `col.date()` | `DATE` | `string` (`YYYY-MM-DD`) | uma gravação também aceita um `Date` |
 | `col.time()` | `TIME` | `string` (`HH:MM:SS`) | uma gravação também aceita um `Date` |
-| `col.jsonb()` / `col.jsonb(shape)` | `JSONB` | `unknown` (`.$type<T>()` o tipa), ou o tipo do formato (shape) | consulte [Documentos JSON](/docs/schema/json/) |
-| `col.json()` / `col.json(shape)` | `JSON` | como `jsonb` | mantém o texto fornecido; prefira `jsonb` |
+| `col.jsonb()` / `col.jsonb(shape)` | `JSONB` | `unknown` (`.$type<T>()` o tipa), ou o tipo do shape | consulte [Documentos JSON](/docs/schema/json/) |
+| `col.json()` / `col.json(shape)` | `JSON` | igual a `jsonb` | mantém o texto exatamente como recebido; prefira `jsonb` |
 | `<builder>.array()` | `<inner>[]` | um array do tipo transmitido interno | `col.text().array()`; sem arrays de arrays; consulte [Arrays](#arrays) |
-| `col.vector({ dimensions, index? })` | `vector(dimensions)` (pgvector) | `number[]` | um índice cosseno HNSW, a menos que `index` determine o contrário; consulte [Busca vetorial](/docs/backend/vector-search/) |
+| `col.vector({ dimensions, index? })` | `vector(dimensions)` (pgvector) | `number[]` | um índice cosseno HNSW, a menos que `index` especifique o contrário; consulte [Busca vetorial](/docs/backend/vector-search/) |
 | `col.bytea()` | `BYTEA` | `string` (base64) | |
 | `col.geopoint()` | `JSONB` | `{ latitude: number; longitude: number }` | |
-| `col.storage(options)` | `TEXT` | `string` (o caminho do arquivo) | `.multiple()` o torna `TEXT[]`; consulte [Colunas de armazenamento](#colunas-de-armazenamento) |
-| `col.custom({ dataType })` | qualquer outro tipo Postgres, literal (`"inet"`, `"citext"`) | `string` (`.$type<T>()` o tipa) | O Rebase nomeia o tipo no DDL e repassa os valores |
+| `col.storage(options)` | `TEXT` | `string` (o caminho do arquivo) | `.multiple()` o transforma em `TEXT[]`; consulte [Colunas de armazenamento](#colunas-de-armazenamento) |
+| `col.custom({ dataType })` | qualquer outro tipo do Postgres, verbatim (`"inet"`, `"citext"`) | `string` (`.$type<T>()` o tipa) | O Rebase nomeia o tipo no DDL e repassa os valores |
 
 ## Modificadores
 
-Todo construtor tem o primeiro grupo. O restante existe apenas nos construtores onde fazem
-sentido; chamar um deles em outro lugar gera um erro de tipo.
+Todos os construtores contam com o primeiro grupo. Os demais existem apenas nos construtores onde
+fazem sentido; chamar um modificador incompatível gera um erro de tipo.
 
-| Modificador | Em | Banco de dados | API e tipos |
+| Modificador | Em | Banco de Dados | API e tipos |
 |---|---|---|---|
-| `.notNull()` | qualquer coluna | `NOT NULL` | nunca `null` em uma linha; obrigatório na criação, a menos que possua um padrão |
+| `.notNull()` | qualquer coluna | `NOT NULL` | nunca `null` em uma linha; obrigatório na criação a menos que tenha um padrão |
 | `.primaryKey()` | qualquer coluna | parte da chave primária, `NOT NULL` | ausente do tipo `Update` |
-| `.unique()` | qualquer coluna | `UNIQUE` de coluna única | um duplicado resulta em `409` |
-| `.default(value)` | qualquer coluna | `DEFAULT <value>` | aplicado pelo driver na criação também; opcional na criação |
+| `.unique()` | qualquer coluna | `UNIQUE` em coluna única | uma duplicata resulta em `409` |
+| `.default(value)` | qualquer coluna | `DEFAULT <value>` | aplicado também pelo driver na criação; opcional na criação |
 | `` .default(sql`expr`) `` | qualquer coluna | `DEFAULT <expr>` | opcional na criação; `sql` é importado junto com `col` |
-| `.dbDefault()` | qualquer coluna | mantém o padrão existente do banco de dados intacto | opcional na criação |
+| `.dbDefault()` | qualquer coluna | mantém o padrão existente no banco de dados inalterado | opcional na criação |
+| `.serverDefault()` | qualquer coluna | nenhum | preenchido por um hook; opcional na criação, e o formulário do painel não o exige |
 | `` .generatedAlwaysAs(sql`expr`) `` | qualquer coluna | `GENERATED ALWAYS AS (<expr>) STORED` | nunca gravável, por ninguém |
-| `.$type<T>()` | qualquer coluna | nenhum | tipa o valor apenas para o TypeScript, como no Drizzle |
+| `.$type<T>()` | qualquer coluna | nenhum | apenas tipa o valor para o TypeScript, como no Drizzle |
 | `.array()` | qualquer coluna | `<type>[]` | consulte [Arrays](#arrays) |
 | `.readOnly()` | qualquer coluna | nenhum | gravações de clientes recusadas; ausente de `Insert` e `Update` |
-| `.private()` | qualquer coluna | nenhum | nunca trafegado, nem no SDK ou no OpenAPI |
-| `.access({ read?, write? })` | qualquer coluna | nenhum | leitura e gravação por perfil (role); consulte [Acesso a campos](/docs/collections/field-access/) |
-| `.describe(text)` | qualquer coluna | nenhum | a descrição no OpenAPI e MCP |
-| `.validate(rules)` | qualquer coluna | nenhum | verificado antes de cada gravação; as regras dependem do tipo, consulte [Validação](#validação) |
+| `.private()` | qualquer coluna | nenhum | nunca exposto via rede, no SDK ou no OpenAPI |
+| `.access({ read?, write? })` | qualquer coluna | nenhum | leitura e gravação por papel (role); consulte [Acesso a campos](/docs/collections/field-access/) |
+| `.describe(text)` | qualquer coluna | nenhum | a descrição no OpenAPI e no MCP |
+| `.validate(rules)` | qualquer coluna | nenhum | validado antes de cada gravação; as regras dependem do tipo, consulte [Validação](#validação) |
 | `.transform({ beforeSave?, afterRead? })` | qualquer coluna | nenhum | hooks a nível de campo; `value` é `T \| null` a menos que `.notNull()` venha primeiro; consulte [Hooks de tabela](/docs/collections/callbacks/#field-hooks-transform) |
-| `.oneOf(values)` | colunas numéricas | nenhum | apenas estes valores são aceitos; tipado como a união deles (uma coluna de texto aceita `{ enum: [...] }`) |
+| `.oneOf(values)` | colunas numéricas | nenhum | somente esses valores são aceitos; tipado como a união deles (uma coluna de texto aceita `{ enum: [...] }`) |
 | `.defaultRandom()` | `col.uuid()` | `DEFAULT gen_random_uuid()` | opcional na criação |
 | `.generatedByDefaultAsIdentity()` | `col.smallint()`, `col.integer()`, `col.bigint({ mode: "number" })` | `GENERATED BY DEFAULT AS IDENTITY` | opcional na criação |
 | `.defaultNow()` | `timestamptz`, `date`, `time` | `DEFAULT now()` | opcional na criação; um cliente ainda pode enviar um valor |
-| `.onCreateNow()` | `timestamptz`, `date`, `time` | `DEFAULT now()` | o servidor marca o horário na criação |
-| `.onUpdateNow()` | `timestamptz`, `date`, `time` | `DEFAULT now()` e um trigger `BEFORE UPDATE` | o servidor marca o horário na criação e a cada atualização |
+| `.onCreateNow()` | `timestamptz`, `date`, `time` | `DEFAULT now()` | o servidor carimba a hora na criação |
+| `.onUpdateNow()` | `timestamptz`, `date`, `time` | `DEFAULT now()` e um gatilho `BEFORE UPDATE` | o servidor carimba a hora na criação e em cada atualização |
 | `.onCreateUser()` | colunas de texto, `col.uuid()` | nenhum | o servidor grava o id do chamador na criação |
 | `.onUpdateUser()` | colunas de texto, `col.uuid()` | nenhum | o servidor grava o id do chamador a cada gravação |
 | `.userId()` | colunas de texto, `col.uuid()` | nenhum | a coluna armazena o id de um usuário; o painel oferece um seletor de usuários; consulte [Colunas de usuário](#colunas-de-usuário) |
-| `.multiple()` | `col.storage()` | `TEXT[]` | a coluna armazena vários caminhos de arquivo |
+| `.multiple()` | `col.storage()` | `TEXT[]` | a coluna armazena múltiplos caminhos de arquivo |
 
 ## Nulo, obrigatório e padrões
 
-As colunas são anuláveis por padrão. `.notNull()` e `.primaryKey()` tornam uma coluna
-`NOT NULL`, e a API passa a exigi-la na criação, a menos que tenha um valor padrão. Uma
-coluna `NOT NULL` é `T` em uma linha; qualquer outra coluna é `T | null`.
+As colunas aceitam valores nulos por padrão. `.notNull()` e `.primaryKey()` tornam uma coluna
+`NOT NULL`, e a API passa a exigi-la na criação, a menos que possua um valor padrão. Uma
+coluna `NOT NULL` é tipada como `T` em uma linha; qualquer outra coluna é `T | null`.
 
-Um valor padrão pode ser qualquer um de `.default()`, `` .default(sql`…`) ``, `.defaultNow()`,
-`.dbDefault()`, `.defaultRandom()`, `.generatedByDefaultAsIdentity()`, uma marcação (stamp)
-ou um construtor serial. Uma coluna com um valor
-padrão pode ser omitida na criação:
+Um valor padrão pode ser definido por `.default()`, `` .default(sql`…`) ``, `.defaultNow()`,
+`.dbDefault()`, `.serverDefault()`, `.defaultRandom()`,
+`.generatedByDefaultAsIdentity()`, um carimbo, ou um construtor serial. Uma coluna com um
+valor padrão pode ser omitida na criação:
 
 ```ts
 import { defineTable, col, sql } from "@rebasepro/server/schema";
@@ -145,44 +145,50 @@ export const tickets = defineTable("tickets", {
 ```
 
 - **`.default(value)`** é gravado como o `DEFAULT` da coluna e também aplicado
-  pelo driver na criação, para que uma linha seja retornada da mesma forma, independentemente de quem a insira. Uma
+  pelo driver na criação, garantindo que o resultado da linha seja o mesmo, independentemente de quem a insira. Uma
   coluna temporal também aceita um `Date`, armazenado como sua string ISO. O padrão de uma
-  coluna enum deve ser um dos seus valores.
+  coluna enum deve ser um de seus valores.
 - **`` .default(sql`expression`) ``** é avaliado pelo Postgres. A expressão é
-  gravada no DDL como está, portanto a tag `sql` não aceita `${…}`.
+  escrita no DDL como está, portanto a tag `sql` não aceita `${…}`.
   `.defaultNow()` equivale a `` .default(sql`now()`) ``.
-- **`.dbDefault()`** indica que o banco de dados já possui um padrão que o esquema
-  não declara. Uma criação pode omitir a coluna, e um push de esquema não remove
+- **`.dbDefault()`** indica que o banco de dados já possui um padrão que o schema
+  não declara. Uma criação pode omitir a coluna, e um schema push não remove
   o padrão.
+- **`.serverDefault()`** indica que o próprio código de servidor da tabela preenche a coluna quando
+  uma criação a omite: um `hooks.beforeSave` que deriva um slug a partir do
+  título, ou o `.transform()` da própria coluna. Como um hook é um código que clientes externos não podem inspecionar, a
+  coluna explicita o que faz. Nenhum default de DDL é gravado; uma criação pode omitir a
+  coluna, o OpenAPI não a lista como obrigatória, e o formulário do painel permite que um
+  registro seja criado sem ela (nenhum `filledByServer` na customização).
 
-`.generatedAlwaysAs()` não pode ter um valor padrão nem uma marcação (stamp): o Postgres computa a coluna
+`.generatedAlwaysAs()` não pode ter um padrão nem um carimbo: o Postgres calcula a coluna
 a cada gravação. Uma coluna de chave primária não pode ser `.private()`.
 
-## Marcações (Stamps)
+## Carimbos
 
-Uma marcação (stamp) é um valor que o servidor grava em uma coluna por conta própria. Ela substitui
-o que quer que o cliente envie para essa coluna.
+Um carimbo (stamp) é um valor que o servidor grava em uma coluna por conta própria. Ele sobrescreve
+qualquer valor que um cliente envie para essa coluna.
 
-| Marcação | Grava | Quando |
+| Carimbo | Gravações | Quando |
 |---|---|---|
 | `.onCreateNow()` | a hora atual | na criação |
 | `.onUpdateNow()` | a hora atual | na criação e a cada atualização |
 | `.onCreateUser()` | o id de usuário do chamador | na criação |
 | `.onUpdateUser()` | o id de usuário do chamador | na criação e a cada atualização |
 
-Uma coluna aceita apenas uma marcação. Chamar uma segunda marcação diferente lança um erro quando o
-módulo carrega; `.onUpdateNow()` por si só já preenche a linha quando ela é criada.
-Colunas com marcação permanecem anuláveis a menos que você adicione `.notNull()`.
+Uma coluna comporta apenas um carimbo. Chamar um segundo carimbo diferente lança um erro quando o
+módulo carrega; `.onUpdateNow()` por si só já carimba a linha no momento em que ela é criada.
+Colunas de carimbo permanecem anuláveis a menos que você defina `.notNull()`.
 
-`.onCreateUser()` é a forma como uma coluna que uma regra de segurança a nível de linha compara com
-o chamador (`ownerField`) obtém seu valor. Uma coluna preenchida pelo chamador é uma coluna
-sobre a qual o chamador pode mentir.
+`.onCreateUser()` é a forma como uma coluna comparada com o chamador por uma regra de segurança a nível de linha
+(`ownerField`) obtém seu valor. Uma coluna preenchida pelo próprio chamador é uma coluna
+sobre a qual ele pode mentir.
 
 ## Colunas de usuário
 
-`.userId()` indica que uma coluna armazena o id de um usuário. É um significado semântico, não um
+`.userId()` declara que uma coluna armazena o id de um usuário. Trata-se de um significado semântico, não de um
 tipo: a coluna continua sendo `text` (ou `varchar`, `char`, `uuid`), e o
-descritor fornecido pelo servidor passa a conter `semantic: "user"`.
+descritor que o servidor fornece inclui `semantic: "user"`.
 
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";
@@ -200,42 +206,43 @@ export const tickets = defineTable("tickets", {
 
 Duas coisas decorrem disso:
 
-- O painel administrativo renderiza um seletor de usuários para a coluna em vez de um campo
-  de texto, e exibe o usuário em vez do id puro.
-- Um chamador com permissão para gravar na tabela pode consultar usuários para preenchê-la. A leitura
-  do seletor responde a eles mesmo quando a segurança a nível de linha oculta linhas de outros usuários.
+- O painel administrativo renderiza um seletor de usuários para a coluna em vez de um
+  campo de texto simples, e exibe o usuário em vez do id bruto.
+- Um chamador com permissão para gravar na tabela pode buscar usuários para preenchê-la. A leitura
+  do seletor responde a essa busca mesmo quando a segurança a nível de linha oculta as linhas de outros usuários
+  para ele.
 
-Funciona em `col.text()`, `col.varchar()`, `col.char()` e `col.uuid()`,
-nos itens de um array (`col.text().userId().array()`) e em
+Funciona com `col.text()`, `col.varchar()`, `col.char()` e `col.uuid()`,
+nos itens de um array (`col.text().userId().array()`), e em
 `json.string()` dentro de um [documento JSON](/docs/schema/json/). Em qualquer outro lugar,
-lança um erro quando o módulo carrega. Ele não declara chave estrangeira: use
-`rel.belongsTo(() => users)` caso o banco de dados deva impor uma restrição. Para fazer com que o
-servidor preencha a coluna com o id do chamador, use uma [marcação (stamp)](#marcações-stamps) em vez disso.
+uma exceção é lançada quando o módulo carrega. Ele não declara chave estrangeira: use
+`rel.belongsTo(() => users)` quando o banco de dados precisar impor essa restrição. Para fazer com que o
+servidor preencha a coluna com o id do chamador, use um [carimbo](#carimbos) em seu lugar.
 
 ## Validação
 
-`.validate(rules)` aceita as regras para o tipo da coluna. A API as verifica
-antes de uma criação ou atualização e recusa a gravação com um status `400` indicando a
-coluna. Chamar `.validate()` duas vezes mescla as regras.
+`.validate(rules)` recebe as regras correspondentes ao tipo da coluna. A API as verifica
+antes de uma criação ou atualização e recusa a gravação com um código `400` indicando
+a coluna. Chamar `.validate()` duas vezes mescla as regras.
 
 | Regra | Colunas de texto e `col.storage()` | Colunas numéricas | `timestamptz`, `date`, `time` | Arrays |
 |---|---|---|---|---|
-| `min`, `max` | comprimento | limites inclusivos | valor mais antigo e mais recente (string ISO ou `Date`) | |
-| `length` | comprimento exato | | | |
-| `matches`, `matchesFlags`, `matchesMessage` | um padrão (string ou `RegExp`) e o erro | | | |
-| `email`, `url` | o valor é um e-mail ou uma URL | | | |
+| `min`, `max` | tamanho | limites inclusivos | valor mínimo e máximo (string ISO ou `Date`) | |
+| `length` | tamanho exato | | | |
+| `matches`, `matchesFlags`, `matchesMessage` | um padrão (string ou `RegExp`) e a mensagem de erro | | | |
+| `email`, `url` | o valor deve ser um endereço de e-mail ou uma URL | | | |
 | `trim`, `lowercase`, `uppercase` | o valor é normalizado antes de ser armazenado | | | |
 | `lessThan`, `moreThan` | | limites exclusivos | | |
 | `positive`, `negative`, `integer` | | sinal, número inteiro | | |
-| `minItems`, `maxItems`, `uniqueItems` | | | | quantidade de itens, sem duplicatas |
+| `minItems`, `maxItems`, `uniqueItems` | | | | contagem de itens, sem duplicatas |
 | `requiredMessage` | ✓ | ✓ | ✓ | ✓ |
 
 `requiredMessage` é o erro que uma criação recebe ao omitir uma coluna `.notNull()`
-sem valor padrão. Todos os outros tipos de coluna (`uuid`, `enum`, `boolean`,
+sem um padrão. Todos os outros tipos de coluna (`uuid`, `enum`, `boolean`,
 JSON, `vector`, `bytea`, `geopoint`) aceitam apenas `requiredMessage`.
 
-Um `RegExp` é armazenado como seu código-fonte e flags, e um limite `Date` como sua
-string ISO, de modo que as regras expostas na conexão são exatamente as que o servidor verifica.
+Um `RegExp` é armazenado como sua expressão de origem e sinalizadores (flags), e um limite de `Date` como sua
+string ISO, garantindo que as regras servidas pela rede correspondam exatamente às regras validadas pelo servidor.
 
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";
@@ -252,26 +259,26 @@ export const signups = defineTable("signups", {
 });
 ```
 
-Em `col.varchar({ length })` e `col.char({ length })`, o comprimento é imposto
-pelo Postgres e pela API. Um `max` diferente entra em contradição com ele; declare
-o comprimento apenas uma vez.
+Em `col.varchar({ length })` e `col.char({ length })`, o tamanho é imposto
+pelo Postgres e pela API. Um `max` que divirja dele cria uma contradição; declare
+o tamanho apenas uma vez.
 
 ## Conjuntos fechados de valores
 
-Duas formas de aceitar apenas determinados valores:
+Existem duas formas de restringir a aceitação a valores específicos:
 
-- **Um tipo enum do Postgres**, para que o banco de dados também imponha o conjunto.
-  `col.enum(values)` cria um tipo nomeado como `<table>_<column>`. Um tipo com um nome
-  de sua escolha, compartilhado por várias colunas, é declarado uma única vez com
-  `pgEnum(name, values)` — como no Drizzle — e chamado em cada coluna:
-  `postStatus()`. Duas declarações com o mesmo nome devem listar os mesmos valores
+- **Um tipo enum do Postgres**, para que o banco de dados também aplique a restrição.
+  `col.enum(values)` cria um tipo com o nome `<table>_<column>`. Um tipo com um nome
+  à sua escolha, compartilhado por várias colunas, é declarado uma única vez com
+  `pgEnum(name, values)` — como no Drizzle — e invocado em cada coluna:
+  `postStatus()`. Duas declarações com o mesmo nome devem listar exatamente os mesmos valores
   na mesma ordem.
 - **Um conjunto validado pela API**, sem um tipo no Postgres: `{ enum: [...] }` em
   `col.text()`, `col.varchar()` ou `col.char()`, e `.oneOf(values)` em uma
-  coluna numérica. Também é o formato para um array de strings conhecidas:
+  coluna numérica. Essa é também a sintaxe para um array de strings conhecidas:
   `col.text({ enum: ["a", "b"] }).array()`.
 
-Todas essas abordagens tipam a coluna como a união dos seus valores: `status` abaixo é
+Todas essas opções tipam a coluna como a união de seus valores: `status` abaixo é
 `"draft" | "published"` na linha, `kind` é `"news" | "guide"`, e `rating`
 é `1 | 2 | 3 | 4 | 5`.
 
@@ -292,69 +299,69 @@ export const reviews = defineTable("reviews", {
 });
 ```
 
-Rótulos e cores para os valores são questões de apresentação. Eles pertencem ao CMS, não
+Rótulos e cores para os valores dizem respeito à apresentação. Pertencem ao CMS, não
 à tabela.
 
 ## Arrays
 
-`.array()` cria um array Postgres do tipo da coluna, como no Drizzle:
-`col.text().array()` é `TEXT[]`, `col.integer().array()` é `INTEGER[]`. O que
-for encadeado antes de `.array()` descreve cada item: seu `{ enum }`, `.validate()`,
-`.oneOf()`, opções de armazenamento e `.transform()`. O que vem depois dele descreve
-a coluna de array em si: seu próprio `.validate()` aceita `minItems`, `maxItems` e
+`.array()` gera um array do Postgres com o tipo correspondente da coluna, como no Drizzle:
+`col.text().array()` resulta em `TEXT[]`, `col.integer().array()` em `INTEGER[]`. O que
+for encadeado antes de `.array()` descreve cada item individual: seu `{ enum }`, `.validate()`,
+`.oneOf()`, opções de armazenamento e `.transform()`. O que vem depois descreve
+a coluna do array em si: seu próprio `.validate()` aceita `minItems`, `maxItems` e
 `uniqueItems`.
 
-Modificadores que descrevem a coluna (`.notNull()`, um padrão, `.unique()`,
-`.access()`) vão após `.array()` — `col.text().array().notNull().default([])`;
-antes dele, não compilam. Um array de arrays é recusado; use
-`col.jsonb()` para listas aninhadas. Um array contém escalares — texto, `uuid`, números,
+Modificadores que descrevem uma coluna (`.notNull()`, um padrão, `.unique()`,
+`.access()`) devem vir após `.array()` — `col.text().array().notNull().default([])`;
+antes dele, eles não compilam. Arrays de arrays não são permitidos; use
+`col.jsonb()` para listas aninhadas. Um array armazena escalares — texto, `uuid`, números,
 booleanos, datas, enums: um `.array()` de `jsonb`, `json`, `vector`, `bytea`,
 geopoints ou `col.custom()` é recusado, e uma lista de documentos, pontos ou
-vetores deve ser `col.jsonb(json.array(…))`. Um tipo de lista customizado é declarado com seu próprio nome:
+vetores deve ser definida como `col.jsonb(json.array(…))`. Um tipo de lista customizado é declarado pelo seu próprio nome:
 `col.custom({ dataType: "inet[]" })`.
 
-Cada item é retornado da mesma forma que seu tipo é retornado em uma coluna escalar: um
+Cada item é servido conforme o seu tipo é servido em uma coluna escalar: um
 item de `timestamptz[]` como uma string RFC 3339, um item de `numeric[]` como um número, e
 um item nulo como `null`.
 
-## Chaves, identidade e seriais
+## Chaves, identidade e serials
 
-`.generatedByDefaultAsIdentity()` torna uma coluna de inteiros `GENERATED BY DEFAULT
-AS IDENTITY`. É o formato recomendado para chaves inteiras em um novo esquema
+`.generatedByDefaultAsIdentity()` define uma coluna de inteiros como `GENERATED BY DEFAULT
+AS IDENTITY`. Essa é a forma recomendada para chaves primárias inteiras em novos schemas
 (`.generatedAlwaysAsIdentity()` não compila: o Rebase cria identidades apenas por
 padrão). Os construtores seriais (`col.smallserial()`, `col.serial()`,
-`col.bigserial({ mode: "number" })`) existem para esquemas que
-já os utilizam; uma coluna apontando para uma chave serial deve ser o inteiro comum
-de mesma largura. Consulte [Chaves primárias](/docs/schema/#primary-keys) para chaves compostas.
+`col.bigserial({ mode: "number" })`) existem para schemas que
+já os utilizam; uma coluna que referencia uma chave serial deve ser o inteiro simples da
+mesma largura. Consulte [Chaves primárias](/docs/schema/#primary-keys) para chaves compostas.
 
 `col.bigint({ mode: "number" })` é lido e gravado como um `number` do JavaScript
-(o `mode: "bigint"` do Drizzle não compila), sendo exato até
+(a opção `mode: "bigint"` do Drizzle não compila), sendo exato até
 2⁵³ − 1. `col.numeric()` também é um `number`, portanto carrega a precisão de um
-double na conexão, independentemente da precisão armazenada pelo Postgres.
+double pela rede, independentemente da precisão armazenada pelo Postgres.
 
 ## Quem pode ler e gravar uma coluna
 
 A segurança a nível de linha decide quais linhas um chamador pode acessar. Três modificadores restringem
-o que ele pode visualizar de uma linha e o que pode alterar:
+o que ele pode visualizar de uma linha e o que pode definir:
 
-- **`.readOnly()`** recusa qualquer gravação de cliente na coluna, tanto na criação quanto na
-  atualização, independentemente do perfil do chamador. O banco de dados (um padrão, um trigger) e
-  o código do servidor ainda a preenchem. A coluna fica ausente dos tipos `Insert` e `Update`.
-- **`.private()`** mantém a coluna restrita ao servidor: ausente de cada linha transmitida,
-  do SDK e do OpenAPI, além de ser rejeitada em filtros e ordenações. Hooks e
-  o código do servidor ainda têm acesso a ela. Uma coluna privada não pode declarar `.access()`.
-- **`.access({ read, write })`** lista os perfis que recebem a coluna e os
-  perfis que podem gravá-la. Omitir uma lista delega essa direção à linha; uma
-  lista vazia a bloqueia para todos os chamadores.
+- **`.readOnly()`** recusa qualquer gravação feita pelo cliente na coluna, tanto na criação quanto na
+  atualização, independentemente do papel do chamador. O banco de dados (um default, um gatilho) e
+  o código do servidor ainda podem preenchê-la. A coluna não estará presente nos tipos `Insert` e `Update`.
+- **`.private()`** mantém a coluna restrita ao servidor: oculta de todas as linhas expostas via
+  rede, do SDK e do OpenAPI, e proibida em filtros e ordenações. Hooks e o
+  código do servidor ainda podem acessá-la. Uma coluna privada não pode declarar `.access()`.
+- **`.access({ read, write })`** especifica os papéis que podem receber a coluna e os
+  papéis que podem gravá-la. Omitir uma lista deixa essa operação condicionada à linha; fornecer
+  uma lista vazia bloqueia o acesso para qualquer chamador.
 
-O artigo [Acesso a campos](/docs/collections/field-access/) detalha o que um chamador visualiza quando
-uma coluna é ocultada, bem como todas as portas de entrada às quais a regra se aplica.
+O artigo [Acesso a campos](/docs/collections/field-access/) detalha o que o chamador recebe quando
+uma coluna é ocultada e todas as interfaces às quais essa regra se aplica.
 
 ## Colunas de armazenamento
 
 `col.storage(options)` armazena o caminho de um arquivo em um bucket de armazenamento. A rota
-de upload impõe `accept` e `maxBytes`, e a varredura de órfãos considera o arquivo como
-referenciado enquanto uma linha contiver seu caminho. `.multiple()` faz com que a coluna armazene
+de upload impõe `accept` e `maxBytes`, e a limpeza de arquivos órfãos considera o arquivo como
+referenciado enquanto uma linha contiver o seu caminho. `.multiple()` permite que a coluna contenha
 múltiplos caminhos (`TEXT[]`).
 
 ```ts
@@ -374,73 +381,72 @@ export const listings = defineTable("listings", {
 
 | Opção | O que faz |
 |---|---|
-| `path` | **Obrigatório.** O destino dos arquivos, como um modelo de caminho (path template): `"posts/heroes/"`, `"users/{id}/"`. |
+| `path` | **Obrigatório.** Destino dos arquivos, em forma de template de caminho: `"posts/heroes/"`, `"users/{id}/"`. |
 | `source` | O bucket, declarado em `backend/resources.ts`. O bucket padrão quando omitido. |
 | `accept` | Tipos MIME aceitos, com caracteres curinga: `["image/*", "application/pdf"]`. |
-| `maxBytes` | O maior arquivo aceito: um número de bytes ou um tamanho legível como `"10MB"`, `"512 kb"`, `"1.5GB"`. Múltiplos binários: 1 MB são 1.048.576 bytes. Um tamanho ilegível lança um erro. |
+| `maxBytes` | O tamanho máximo de arquivo aceito: um número em bytes ou uma string de tamanho como `"10MB"`, `"512 kb"`, `"1.5GB"`. Múltiplos binários: 1 MB equivale a 1.048.576 bytes. Um tamanho ilegível lança erro. |
 | `imageResize` | Redimensiona imagens antes de armazená-las: `maxWidth`, `maxHeight`, `mode` (`"contain"` ou `"cover"`), `format` (`"original"`, `"jpeg"`, `"png"`, `"webp"`), `quality`. |
-| `public` | Os arquivos são legíveis sem uma URL assinada. |
-| `fileName` | O nome do arquivo armazenado, como um modelo. O nome original do upload quando omitido. |
-| `metadata` | Metadados armazenados com cada arquivo. |
-| `includeBucketUrl` | Armazena a URL do bucket antes do caminho. |
+| `public` | Os arquivos podem ser lidos sem a necessidade de uma URL assinada. |
+| `fileName` | O nome do arquivo armazenado, em forma de template. Usa o nome original enviado quando omitido. |
+| `metadata` | Metadados armazenados junto com cada arquivo. |
+| `includeBucketUrl` | Armazena a URL do bucket como prefixo do caminho. |
 | `storeUrl` | Armazena a URL de download em vez do caminho. |
 
-Uma coluna de armazenamento aceita as regras de validação de colunas de texto. Um arquivo dentro de um
-documento JSON é `json.storage()`, com as mesmas opções; consulte
-[Documentos JSON](/docs/schema/json/). Quem pode fazer upload e download de determinados caminhos é definido em
-[Autorização de armazenamento](/docs/backend/storage-authorization/); a entrega e
-o cache de arquivos são abordados em [Armazenamento](/docs/backend/storage/).
+Uma coluna de armazenamento aceita as mesmas regras de validação de colunas de texto. Um arquivo dentro de um documento
+JSON é definido como `json.storage()`, com as mesmas opções; consulte
+[Documentos JSON](/docs/schema/json/). Para configurar quem pode fazer upload e download em determinados caminhos, consulte
+[Autorização de armazenamento](/docs/backend/storage-authorization/); para o envio e
+cache dos arquivos, consulte [Armazenamento](/docs/backend/storage/).
 
 ## O que é recusado
 
-Ao carregar o módulo, um construtor lança um erro para:
+Ao carregar o módulo, um construtor lança um erro nos seguintes casos:
 
-- `col.varchar()` ou `col.char()` sem um comprimento definido; um `length` ou `dimensions`
+- `col.varchar()` ou `col.char()` sem definição de tamanho; um `length` ou `dimensions`
   que não seja um número inteiro positivo, e `col.numeric({ scale })` sem precisão;
-- `col.enum([])`, `pgEnum(name, { … })` e `.array()` de um array;
-- um valor padrão ou expressão gerada `sql` que contenha interpolação;
-- uma segunda marcação (stamp) diferente na mesma coluna, e `.oneOf()` com um valor que
-  não seja string ou número;
-- `.access()` cujo `read` ou `write` não seja uma lista de nomes de perfis não vazios;
-- `col.storage()` sem um `path`, ou com um `maxBytes` que não corresponda a um tamanho válido.
+- `col.enum([])`, `pgEnum(name, { … })`, e `.array()` de um array;
+- um padrão `sql` ou expressão gerada contendo interpolação;
+- um segundo carimbo diferente na mesma coluna, e `.oneOf()` com um valor que
+  não seja uma string ou um número;
+- `.access()` cujo `read` ou `write` não seja uma lista de nomes de papéis não vazios;
+- `col.storage()` sem a propriedade `path`, ou com um `maxBytes` que não corresponda a um tamanho válido.
 
-Ao compilar o esquema, a tabela é recusada por:
+Ao compilar o schema, a tabela é recusada se contiver:
 
-- um valor padrão em conjunto com `.generatedAlwaysAs()`, ou uma marcação (stamp) combinada a ele;
+- um padrão em conjunto com `.generatedAlwaysAs()`, ou um carimbo junto a ele;
 - `.generatedByDefaultAsIdentity()` em uma coluna não inteira, `.defaultRandom()` em uma coluna que
-  não seja `uuid`, uma marcação de tempo em uma coluna não temporal, uma marcação de usuário em uma coluna
-  que não seja texto nem `uuid`;
-- uma chave primária `.private()`, ou uma chave primária de tipo `timestamptz` ou `time`;
+  não seja `uuid`, um carimbo de tempo em uma coluna não temporal, ou um carimbo de usuário em uma coluna que
+  não seja texto nem `uuid`;
+- uma chave primária `.private()`, ou uma chave primária dos tipos `timestamptz` ou `time`;
 - uma chave primária em uma coluna `jsonb`, `json`, geopoint, `vector`, `bytea`, array ou
-  lista customizada: uma chave deve ser um escalar (texto, `varchar`, `char`, `uuid`, um
-  enum, um número, um booleano ou uma data). O `schema introspect` ignora tabelas que tenham
-  chaves desse tipo e relata o motivo;
+  lista customizada: uma chave deve ser um escalar (texto, `varchar`, `char`, `uuid`,
+  enum, número, booleano ou data). O comando `schema introspect` ignora tabelas com chaves
+  desse formato e explica o motivo;
 - um `.array()` de `jsonb`, `json`, `vector`, `bytea`, geopoints ou
   `col.custom()` (consulte [Arrays](#arrays));
-- uma regra de `.validate()` não suportada pelo tipo da coluna, por seus itens ou por um nó JSON
-  (`integer` em uma coluna de texto, `trim` em um número, `minItems` em um escalar);
-- uma coluna que seja ao mesmo tempo `.private()` e declare `.access()`;
-- um `.transform()` na coluna e outro em sua estrutura JSON;
+- uma regra de `.validate()` que o tipo de coluna, seus itens ou um nó JSON não
+  suportem (`integer` em coluna de texto, `trim` em número, `minItems` em um escalar);
+- uma coluna que possua tanto `.private()` quanto `.access()`;
+- um `.transform()` aplicado na coluna e outro no seu formato (shape) JSON;
 - um `col.custom({ dataType })` cujo nome de tipo não siga a estrutura de um
-  nome de tipo Postgres;
-- `.oneOf([])` e `.oneOf()` em uma coluna que não seja texto nem número;
-- um enum com valor em branco ou repetido, ou um padrão que não esteja entre os seus
-  valores;
-- duas chaves que resolvam para a mesma coluna SQL, inclusive após o Postgres
-  truncar os nomes para 63 bytes;
-- um tipo enum nomeado que receba duas listas de valores diferentes.
+  nome de tipo válido do Postgres;
+- `.oneOf([])`, e `.oneOf()` em uma coluna que não seja de texto nem numérica;
+- um enum com valor em branco ou repetido, ou com um padrão que não pertença aos seus valores válidos;
+- duas chaves que resultem no mesmo nome de coluna SQL, inclusive após o truncamento
+  do Postgres para 63 bytes;
+- um tipo enum nomeado que receba duas listas de valores divergentes.
 
-Cada recusa informa a tabela, a coluna e o que escrever para corrigir.
+Cada recusa especifica a tabela, a coluna e a sintaxe correta a ser utilizada.
 
-Grafias do Drizzle que teriam outro significado aqui não compilam, e o
+Sintaxes do Drizzle que teriam outro significado aqui não compilam, e o
 compilador exibe o que escrever: `col.timestamp()` sem `withTimezone: true`,
 `.references()`, `.$defaultFn()`, `.$onUpdate()`, `.generatedAlwaysAsIdentity()`,
-`.unique("name")`, `mode: "string"` de `numeric`, além de `col.inet()`, `col.interval()`
-e outros tipos que o Rebase referencia apenas por meio de `col.custom({ dataType })`.
+`.unique("name")`, `mode: "string"` do `numeric`, além de `col.inet()`, `col.interval()`
+e demais tipos que o Rebase expõe exclusivamente via `col.custom({ dataType })`.
 
 ## Próximos passos
 
 - [Documentos JSON](/docs/schema/json/): a estrutura de uma coluna `jsonb`
-- [Relações](/docs/collections/relations/): chaves estrangeiras vêm de `rel.*`, não de colunas
-- [Acesso a campos](/docs/collections/field-access/): detalhes sobre `.access()`, `.private()` e `.readOnly()`
-- [Inferência de tipos](/docs/schema/types/): o impacto de cada modificador em `InferRow` e `InferInsert`
+- [Relações](/docs/collections/relations/): chaves estrangeiras são definidas via `rel.*`, não nas colunas
+- [Acesso a campos](/docs/collections/field-access/): `.access()`, `.private()` e `.readOnly()` em detalhes
+- [Inferência de tipos](/docs/schema/types/): o impacto de cada modificador no `InferRow` e `InferInsert`

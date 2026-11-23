@@ -1,8 +1,8 @@
 ---
-sourceHash: 7f745fbf9e5bda12
+sourceHash: 6319f76bf1a110cd
 title: Champs
 sidebar_label: Champs
-description: "Le champ généré par le CMS pour chaque type de colonne — texte, markdown, e-mail, URL, sélection, sélection multiple, nombre, interrupteur, date, téléversement de fichier, JSON, géopoint, vecteur, binaire — et les options customizeTable qui modifient chacun d'eux."
+description: "Le champ que le CMS affiche pour chaque type de colonne — texte, markdown, e-mail, URL, sélection, sélection multiple, nombre, interrupteur, date, téléversement de fichier, JSON, géopoint, vecteur, binaire — et les options customizeTable qui modifient chacun d'eux."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
@@ -10,7 +10,7 @@ import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPr
 Chaque colonne d'une table est un champ dans le CMS. La nature du champ découle
 de la colonne : son type, sa validation et ses règles de stockage, tous déclarés
 dans [`backend/schema`](/docs/schema/columns/). L'apparence du champ peut être
-modifiée par vos soins, champ par champ, dans [`customizeTable`](/docs/frontend/customize-table/).
+personnalisée, champ par champ, dans [`customizeTable`](/docs/frontend/customize-table/).
 
 Cette table est utilisée dans les exemples ci-dessous :
 
@@ -41,7 +41,7 @@ export const products = defineTable("products", {
 });
 ```
 
-Sans aucun fichier frontend, chaque colonne possède déjà un champ. Cette
+Sans fichier frontend, chaque colonne dispose déjà d'un champ. Cette
 personnalisation en modifie certains :
 
 ```tsx
@@ -74,7 +74,7 @@ export const productsCms = customizeTable<typeof products>("products", {
 ## Texte
 
 Une colonne `col.text()`, `col.varchar({ length })`, `col.char({ length })` ou `col.uuid()` est un champ
-de saisie de texte. `varchar(n)` et `char(n)` limitent sa longueur à `n`, et `.validate({ min,
+de saisie textuelle. `varchar(n)` et `char(n)` limitent sa longueur à `n`, et `.validate({ min,
 max, length, matches })` ajoute les règles que le formulaire vérifie avant l'enregistrement.
 
 <FieldWidgetPreview client:only="react" variant="text" />
@@ -83,69 +83,67 @@ max, length, matches })` ajoute les règles que le formulaire vérifie avant l'e
 
 <FieldWidgetPreview client:only="react" variant="multiline" />
 
-`markdown: true` en fait un éditeur markdown doté d'une barre d'outils et d'un aperçu.
+`markdown: true` en fait un éditeur markdown avec une barre d'outils et un aperçu.
 
 <FieldWidgetPreview client:only="react" variant="markdown" />
 
-`.validate({ email: true })` sur la colonne donne un champ e-mail, validé comme
-tel. Il s'agit d'une caractéristique intrinsèque de la donnée, elle est donc
-déclarée sur la colonne, où le serveur la vérifie également.
+`.validate({ email: true })` sur la colonne produit un champ e-mail, validé comme
+une adresse e-mail. C'est une caractéristique des données, elle est donc déclarée
+sur la colonne, où le serveur la vérifie également.
 
 <FieldWidgetPreview client:only="react" variant="email" />
 
-`.validate({ url: true })` donne un champ URL, validé comme une URL, avec un aperçu
+`.validate({ url: true })` produit un champ URL, validé comme une URL, avec un aperçu
 du lien. `urlPreview` modifie uniquement l'aperçu : `true` pour un lien, ou `"image"`,
 `"video"`, `"audio"` ou `"file"` pour afficher le média directement dans la page.
 
 <FieldWidgetPreview client:only="react" variant="url" />
 
-Une colonne text ou uuid marquée avec `.userId()` contient l'identifiant d'un utilisateur
-et se présente sous forme de sélecteur des utilisateurs du projet : leurs noms, e-mails
-et avatars, proposés à toute personne autorisée à écrire dans la table. `ownerId`
-ci-dessus en est un exemple. Il en va de même pour chaque élément d'un
-`col.text().userId().array()`.
+Une colonne texte ou uuid marquée `.userId()` contient l'identifiant d'un utilisateur,
+et se présente sous forme de sélecteur d'utilisateurs du projet : leurs noms, e-mails et avatars,
+proposés à quiconque a les droits d'écriture sur la table. `ownerId` ci-dessus en est un exemple.
+C'est également le cas de chaque élément d'un `col.text().userId().array()`.
 
 `previewAsTag: true` affiche la valeur sous forme de badge en dehors du formulaire. `clearable:
-true` ajoute une commande permettant de la définir sur `null`. `referenceTo: "<slug>"` traite la
-valeur comme la clé d'un enregistrement dans une autre collection, quelle que soit la source de données,
-et affiche un sélecteur de référence ; voir [Firestore](/docs/frontend/firebase/#from-a-table-to-firestore).
+true` ajoute un contrôle permettant de la définir sur `null`. `referenceTo: "<slug>"` traite la
+valeur comme la clé d'un enregistrement dans une autre collection, sur n'importe quelle source de
+données, et affiche un sélecteur de référence ; voir [Firestore](/docs/frontend/firebase/#from-a-table-to-firestore).
 
-## Ensembles fermés de valeurs
+## Ensembles de valeurs fermés
 
-Un `col.enum([...])` est une liste déroulante (select), affichée ailleurs sous forme de badge coloré. Il
-en va de même pour une colonne text ou number avec `.oneOf([...])`. Chaque valeur reçoit un libellé
-dérivé de son identifiant (`needs_review` devient « Needs Review ») ainsi qu'une couleur générée à partir
-de la valeur, identique à chaque chargement.
+Un `col.enum([...])` est un menu déroulant (select), affiché ailleurs sous la forme d'un
+badge coloré. Il en va de même pour une colonne de texte ou de nombre avec `.oneOf([...])`.
+Chaque valeur est étiquetée à partir de son identifiant (`needs_review` devient « Needs Review »)
+et reçoit une couleur dérivée de la valeur, identique à chaque chargement.
 
 <FieldWidgetPreview client:only="react" variant="select" />
 
 `enumLabels` définit les libellés et les couleurs de certaines valeurs ; une valeur non spécifiée
-conserve son libellé et sa couleur dérivés. Chaque entrée est une chaîne ou
+conserve son libellé et sa couleur dérivés. Chaque entrée est une chaîne de caractères ou
 `{ label, color?, disabled? }` : `color` est une clé de couleur de badge telle que `"green"`
-ou `"orangeDark"`, et `disabled` maintient la valeur visible tout en empêchant sa sélection.
-`enumOrder` définit l'ordre dans lequel les valeurs sont proposées, ainsi que l'ordre des
-colonnes kanban. Les deux sont vérifiés par rapport à la colonne : une valeur que la colonne
-ne peut pas contenir génère une erreur de type.
+ou `"orangeDark"`, et `disabled` maintient la valeur visible mais empêche sa sélection. `enumOrder`
+définit l'ordre dans lequel les valeurs sont proposées, ainsi que l'ordre des colonnes kanban.
+Les deux sont vérifiés par rapport à la colonne : une valeur que la colonne ne peut pas contenir
+génère une erreur de type.
 
-Un tableau d'un ensemble fermé, `col.text({ enum: [...] }).array()`, est une
-sélection multiple sur une seule colonne `text[]`. Les `enumLabels` définis sur
-le tableau s'appliquent à ses éléments.
+Un tableau d'un ensemble fermé, `col.text({ enum: [...] }).array()`, est une sélection multiple
+sur une seule colonne `text[]`. Les `enumLabels` définis sur le tableau s'appliquent à ses éléments.
 
 <FieldWidgetPreview client:only="react" variant="multi_select" />
 
 ## Nombres
 
-Chaque colonne integer, serial, `real`, `doublePrecision` et `numeric` est un
-champ de saisie de nombre. Les colonnes integer et serial acceptent uniquement des nombres entiers,
-et `.validate({ min, max, moreThan, lessThan, positive, negative })` ajoute des limites.
+Toute colonne integer, serial, `real`, `doublePrecision` et `numeric` est un champ
+de saisie numérique. Les colonnes integer et serial n'acceptent que des nombres entiers,
+et `.validate({ min, max, moreThan, lessThan, positive, negative })` permet d'ajouter des limites.
 
 <FieldWidgetPreview client:only="react" variant="number" />
 
-`format` formate l'affichage du nombre sans modifier ce qui est stocké : `style`
+`format` formate l'affichage du nombre sans modifier la valeur stockée : `style`
 (`"decimal"`, `"currency"`, `"percent"`), `currency` (avec `"currency"`),
 `locale`, `minimumFractionDigits`, `maximumFractionDigits`, et `notation:
-"compact"`, qui affiche `12000` sous la forme `12K` dans une colonne étroite. `clearable` ajoute
-une commande permettant de définir la valeur sur `null`.
+"compact"`, qui affiche `12000` sous la forme `12K` dans une colonne étroite. `clearable` ajoute un
+contrôle permettant de définir la valeur sur `null`.
 
 ## Booléens
 
@@ -155,93 +153,93 @@ Un `col.boolean()` est un interrupteur.
 
 ## Dates et heures
 
-Un `col.timestamp({ withTimezone: true })` est un sélecteur de date et d'heure, un `col.date()` un sélecteur
-de date et un `col.time()` une heure de la journée. `mode` permet de basculer entre `"date"` et
-`"date_time"`, et `timezone` affiche et sélectionne la valeur dans un fuseau IANA fixe
+Un `col.timestamp({ withTimezone: true })` est un sélecteur de date et heure, un `col.date()` un sélecteur de date et
+un `col.time()` une heure de la journée. `mode` permet de basculer entre `"date"` et
+`"date_time"`, et `timezone` affiche et sélectionne la valeur dans un fuseau horaire IANA fixe
 (`"Europe/Madrid"`) plutôt que celui de l'utilisateur.
 
 <FieldWidgetPreview client:only="react" variant="date" />
 
 <FieldWidgetPreview client:only="react" variant="date_time" />
 
-Une colonne horodatée par le serveur, avec `.onCreateNow()` ou `.onUpdateNow()`, est
-en lecture seule, affichée dans le bloc de métadonnées de l'enregistrement et exclue des colonnes
-par défaut de la table. Les colonnes `.onCreateUser()` et `.onUpdateUser()` sont en lecture seule :
-le serveur y inscrit l'identifiant de l'utilisateur effectuant l'action, quel que soit le contenu de la requête.
+Une colonne horodatée par le serveur, `.onCreateNow()` ou `.onUpdateNow()`, est en
+lecture seule, affichée dans le bloc de métadonnées de l'enregistrement et exclue des colonnes de table
+par défaut. Les colonnes `.onCreateUser()` et `.onUpdateUser()` sont en lecture seule :
+le serveur écrit l'identifiant de l'utilisateur effectuant l'action, quel que soit le contenu de la requête.
 
 ## Fichiers
 
 Une colonne `col.storage({ … })` est un champ de téléversement avec aperçu, et
-`.multiple()` en fait un champ multifichier. Le bucket, le chemin, les types
-acceptés et la limite de taille sont déclarés sur la colonne ; les fonctions qui
-s'exécutent dans le navigateur sont ajoutées avec `storage` dans `customizeTable`.
-Voir [Téléversements de fichiers](/docs/collections/file-uploads/).
+`.multiple()` en fait un champ multifichier. Le bucket, le chemin, les types acceptés
+et la limite de taille sont déclarés sur la colonne ; les fonctions qui s'exécutent dans
+le navigateur sont ajoutées avec `storage` dans `customizeTable`. Voir
+[Téléversements de fichiers](/docs/collections/file-uploads/).
 
 <FieldWidgetPreview client:only="react" variant="file_upload" />
 
 ## Tableaux et JSON
 
-Une colonne de tableau (`<item>.array()`) est une liste répétable du champ de l'élément. Une colonne `jsonb`
-dotée d'une structure [`json.*`](/docs/schema/json/) est un groupe de champs typés, de listes et
+Une colonne tableau (`<item>.array()`) est une liste répétable du champ correspondant à l'élément. Une colonne `jsonb`
+dotée d'une [structure `json.*`](/docs/schema/json/) est un groupe de champs typés, de listes et
 de blocs ; une colonne sans structure est un éditeur clé/valeur. Voir
 [Tableaux et JSON](/docs/collections/arrays-and-maps/).
 
 ## Relations et références
 
 Un `belongsTo` est un sélecteur de la ligne associée, affiché à la place de sa colonne de clé
-étrangère ; une relation to-many correspond à un onglet de l'enregistrement. Une colonne texte
-avec `referenceTo` est également un sélecteur.
+étrangère ; une relation to-many (un-à-plusieurs) est un onglet de l'enregistrement. Une colonne texte avec
+`referenceTo` est également un sélecteur.
 
 <FieldWidgetPreview client:only="react" variant="reference" />
 
 Voir [Relations dans le panneau](/docs/collections/relations-in-the-admin-panel/).
 
-## Géopoints, vecteurs et données binaires
+## Géopoints, vecteurs et binaire
 
 Un `col.geopoint()` est un champ de latitude et longitude. Un `col.vector({ dimensions })` est un
-champ de vecteur ; `clearable` est sa seule option. Un `col.bytea()` est un champ binaire,
-lu et écrit en base64. Aucun d'entre eux ne possède d'options spécifiques au type au-delà de
-celles acceptées par chaque champ.
+champ de saisie de vecteur ; `clearable` est sa seule option. Un `col.bytea()` est un champ binaire,
+lu et écrit en base64. Aucun d'entre eux ne possède d'options spécifiques au type au-delà
+de celles communes à tous les champs.
 
 ## Options communes à tous les champs
 
 Quel que soit le type de colonne :
 
 - `name` et `description` remplacent le libellé dérivé et ajoutent un texte d'aide.
-- `hidden` masque le champ dans les vues en tableau et en cartes, et `hiddenInForm`
-  le masque dans le formulaire. Aucun des deux ne modifie ce que l'API lit ou écrit ; pour
-  restreindre l'accès à une valeur pour un appelant, utilisez [l'accès aux champs](/docs/collections/field-access/).
-- `readOnly` affiche la valeur sous forme de texte simple ; `disabled` grise le composant, et sous
+- `hidden` masque le champ dans les vues en table et en cartes, et `hiddenInForm`
+  le masque dans le formulaire. Aucun des deux ne modifie ce que l'API lit ou écrit ; pour restreindre
+  l'accès à une valeur pour un appelant, utilisez [l'accès aux champs](/docs/collections/field-access/).
+- `readOnly` affiche la valeur sous forme de texte ; `disabled` grise le contrôle, et sous
   la forme `{ disabledMessage, clearOnDisabled }`, en explique la raison et efface la valeur.
 - `columnWidth` définit la largeur de la colonne du tableau ; `span` définit le nombre de colonnes
-  de la grille du formulaire occupées par le champ parmi les quatre disponibles (voir [Mise en page du formulaire](/docs/frontend/form-layout/)).
-- `filterOperators` restreint les opérateurs de filtre proposés pour le champ, et
-  `[]` désactive son filtrage. Les opérateurs proposés correspondent à l'intersection de ceux que la source
-  de données peut exécuter, des valeurs par défaut du type et de cette liste : vous ne pouvez que
+  de la grille du formulaire (sur quatre) que le champ occupe (voir [Mise en page du formulaire](/docs/frontend/form-layout/)).
+- `filterOperators` restreint les opérateurs de filtrage proposés pour le champ, et
+  `[]` désactive son filtrage. Les opérateurs proposés correspondent à l'intersection entre ceux que la source
+  de données peut exécuter, les valeurs par défaut du type et cette liste : vous ne pouvez que
   restreindre.
-- `filledByServer` permet de laisser le champ vide lors d'une création, afin qu'un hook côté
-  serveur le remplisse.
-- `Field`, `Preview` et `Filter` remplacent respectivement le composant de formulaire, l'affichage hors
-  formulaire et le composant de filtre par vos propres composants ; `customProps` leur est
-  transmis tel quel. Voir [Champs personnalisés](/docs/frontend/custom-fields/).
+- `filledByServer` permet à une création de laisser le champ vide, afin qu'un hook serveur le
+  remplisse. Une colonne marquée `.serverDefault()` l'est déjà ; cette option prévaut sur la table.
+- `Field`, `Preview` et `Filter` remplacent le contrôle de formulaire, le rendu hors
+  formulaire et le contrôle de filtre par vos propres composants ; `customProps` leur est
+  transmis sans modification. Voir [Champs personnalisés](/docs/frontend/custom-fields/).
 - `propertyConfig` désigne un type de champ enregistré sur `<Rebase propertyConfigs>`.
-- `conditions` et `dynamicProps` modifient le champ en fonction des valeurs propres à
-  l'enregistrement ; voir [champs conditionnels](/docs/collections/validation-and-conditions/#conditional-fields).
+- `conditions` et `dynamicProps` modifient le champ en fonction des valeurs de l'enregistrement
+  lui-même ; voir [champs conditionnels](/docs/collections/validation-and-conditions/#conditional-fields).
 - `metadata` est à votre disposition.
 
 Chaque option, avec son type, est détaillée dans la
 [référence customizeTable](/docs/frontend/customize-table/#field-options).
 
 :::note[Présentation uniquement]
-Les options de champ déterminent ce que le CMS affiche. L'API accepte une écriture qui
-les ignore, et aucune contrainte ne les applique côté base. Ce qui doit être respecté pour
-chaque appelant relève de la colonne (`.notNull()`, `.validate()`, `.access()`) ou de la
-[sécurité au niveau des lignes](/docs/collections/security-rules/) de la table.
+Les options de champ déterminent ce que le CMS affiche. L'API accepte une écriture qui les
+ignore, et aucune contrainte ne les applique en arrière-plan. Ce qui doit être respecté pour chaque appelant
+doit être défini sur la colonne (`.notNull()`, `.validate()`, `.access()`) ou dans la
+[sécurité au niveau des lignes (RLS)](/docs/collections/security-rules/) de la table.
 :::
 
 ## Prochaines étapes
 
 - [customizeTable](/docs/frontend/customize-table/) : chaque option, avec son type
-- [Validation et conditions](/docs/collections/validation-and-conditions/) : ce que le formulaire vérifie et les champs réagissant aux valeurs
-- [Téléversements de fichiers](/docs/collections/file-uploads/) : colonnes de stockage dans le CMS
+- [Validation et conditions](/docs/collections/validation-and-conditions/) : ce que le formulaire vérifie, et champs qui réagissent aux valeurs
+- [Téléversements de fichiers](/docs/collections/file-uploads/) : les colonnes de stockage dans le CMS
 - [Colonnes](/docs/schema/columns/) : les types de colonnes dont sont issus ces champs

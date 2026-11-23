@@ -1,24 +1,24 @@
 ---
-sourceHash: 94cc15a104ed93ec
+sourceHash: 68aa6b76fbe1dd6b
 title: Modos de visualización
 sidebar_label: Modos de visualización
-description: "Muestra las filas de una tabla como una lista, una hoja de cálculo, tarjetas o un tablero kanban; elige qué rellena el título, la imagen, el estado y la fecha de cada registro; y define el orden predeterminado, los filtros y los ajustes preestablecidos de filtro con un solo clic."
+description: "Muestra las filas de una tabla como una lista, una hoja de cálculo, tarjetas o un tablero kanban; elige qué rellena el título, la imagen, el estado y la fecha de cada registro; y define la ordenación predeterminada, los filtros y los ajustes preestablecidos de filtro con un solo clic."
 ---
 
-Cada colección se puede mostrar de cuatro formas, desde el selector de su barra de herramientas:
+Cada colección se puede mostrar de cuatro formas, desde el selector en su barra de herramientas:
 
-- **Tabla**: una hoja de cálculo virtualizada con edición en línea, ordenación, filtrado
+- **Table**: una hoja de cálculo virtualizada con edición en línea, ordenación, filtrado
   y selección múltiple. Donde se abre una colección a menos que se indique lo contrario.
-- **Lista**: una línea por registro, con su imagen, título, subtítulo, estado y
+- **List**: una línea por registro, con su imagen, título, subtítulo, estado y
   fecha.
-- **Tarjetas**: una cuadrícula de tarjetas, para contenido con abundantes imágenes.
+- **Cards**: una cuadrícula de tarjetas, para contenido con muchas imágenes.
 - **Kanban**: un tablero agrupado por una columna con un conjunto cerrado de valores.
 
-Una colección también puede ofrecer modos de visualización que tú mismo escribas (un calendario, un mapa,
-una galería) en el mismo selector, controlados por la misma barra de herramientas: consulta
+Una colección también puede ofrecer modos de visualización creados por ti (un calendario, un mapa, una
+galería) en el mismo selector, controlados por la misma barra de herramientas: consulta
 [Modos de visualización personalizados](/docs/frontend/extending#custom-view-modes).
 
-## Elección de las vistas
+## Elegir las vistas
 
 ```ts
 // backend/schema/tasks.ts
@@ -55,17 +55,16 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
                 done:        { label: "Done", color: "green" },
             },
         },
-        __order: { hidden: true },
     },
 });
 ```
 
 | Opción | Efecto |
 |---|---|
-| `defaultViewMode` | Dónde aterriza el visitante: `"table"`, `"list"`, `"cards"`, `"kanban"` o la clave de una vista personalizada. |
+| `defaultViewMode` | Dónde aterriza un visitante: `"table"`, `"list"`, `"cards"`, `"kanban"` o la clave de una vista personalizada. |
 | `enabledViews` | Las vistas que ofrece el selector. |
 | `kanban` | `{ columnField, orderField }`: el tablero. |
-| `defaultSize` | La altura de la fila, indicada más abajo. |
+| `defaultSize` | La altura de la fila, descrita a continuación. |
 | `customViews` | Vistas propias, por valor o por clave. |
 
 ### Altura de fila
@@ -80,35 +79,36 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 
 ## Kanban
 
-`kanban.columnField` indica la columna por la que se agrupa el tablero. Debe contener un
-conjunto cerrado de cadenas de texto, un `col.enum([...])` o una columna de texto con
-`.oneOf([...])`; cualquier otra cosa generará un error de tipo. Las columnas se representan en el
+`kanban.columnField` indica la columna por la que se agrupa el tablero. Debe contener
+un conjunto cerrado de cadenas de texto, un `col.enum([...])` o una columna de texto con
+`.oneOf([...])`; cualquier otra cosa es un error de tipo. Las columnas se representan en el
 propio orden de la columna, o en `enumOrder`, con las etiquetas y colores de
-`enumLabels`. Arrastrar una tarjeta a otra columna actualiza `columnField`.
+`enumLabels`. Arrastrar una tarjeta a otra columna escribe en `columnField`.
 
 `kanban.orderField` indica dónde se almacena la posición de una tarjeta **dentro** de una columna.
-Decláralo siempre que ese orden importe: cometer cualquiera de estos tres errores producirá un tablero
+Decláralo siempre que ese orden importe: cometer tres errores comunes aquí puede dar lugar a un tablero
 que parece configurado pero no lo está.
 
 **Sin `orderField`, solo se conserva la columna.** Una tarjeta aún se puede arrastrar entre
-columnas, ya que eso actualiza `columnField`, que es todo lo que necesita un tablero de estados.
+columnas, ya que eso escribe en `columnField`, que es todo lo que necesita un tablero de estados.
 Su posición dentro de una columna no tiene dónde almacenarse, por lo que se restablece en la siguiente
-lectura. El tablero advierte esto la primera vez que se suelta una tarjeta en una nueva posición dentro de
-su propia columna, mediante una barra que se puede descartar; un tablero cuyas tarjetas solo se mueven
+lectura. El tablero lo advierte la primera vez que se suelta una tarjeta en un lugar nuevo dentro de su
+propia columna, en una barra que se puede descartar; un tablero cuyas tarjetas solo se mueven
 entre columnas no muestra nada.
 
 **La columna debe ser de texto.** La reordenación escribe una clave de
 [fractional-indexing](https://github.com/rocicorp/fractional-indexing)
-(`"i0"`, `"i1"`, `"i0i"`), no un índice. Una columna numérica nunca puede almacenar esto, por lo que
-`orderField` solo acepta una columna de texto. Es un mecanismo interno, no contenido: escóndelo,
-como se muestra arriba.
+(`"i0"`, `"i1"`, `"i0i"`), no un índice. Una columna numérica nunca puede almacenar una, por lo
+que `orderField` solo acepta una columna de texto. Es parte de la infraestructura interna, no contenido, por lo que
+nombrarla en `orderField` la oculta de la tabla y la deshabilita en el formulario.
+Una entrada en `fields.__order` aún puede anular cualquiera de las dos cosas: `hidden: false` la muestra.
 
-**Las filas creadas fuera del CMS llegan sin clave.** Nada asigna una al insertar.
-Una fila escrita por un cron, un script de inicialización (seed), una migración o la API REST
-llega con `__order` en null, y el tablero muestra *"Some items don't have order
-values"* con un botón **Initialize**. Un solo clic completa retrospectivamente la primera página, y
-la siguiente ejecución del cron volverá a mostrar la barra. Si un backend crea filas para
-un tablero, debe adjuntar la clave él mismo, utilizando el alfabeto que usa el CMS:
+**Las filas creadas fuera del CMS llegan sin clave.** Nada asigna una al
+insertar. Una fila escrita por un cron, un script de seed, una migración o la API REST
+llega con `__order` nulo, y el tablero muestra *"Some items don't have order
+values"* con un botón **Initialize**. Un solo clic completa la primera página, y
+la siguiente ejecución del cron vuelve a mostrar la barra de inmediato. Si un backend crea filas para
+un tablero, debe añadir la clave él mismo, utilizando el alfabeto que usa el CMS:
 
 ```typescript
 import { generateKeyBetween } from "fractional-indexing";
@@ -139,20 +139,20 @@ await client.data.tasks.create({
 });
 ```
 
-Las filas creadas a través del formulario también llegan sin clave; la única diferencia es que
-verás la barra en el momento en que agregues una. **Initialize** es la solución en ese caso; en un
-tablero alimentado por un backend, es una solución que se deshace en cada ejecución.
+Las filas creadas a través del formulario también llegan sin clave; la única diferencia es
+que ves la barra en el momento en que añades una. **Initialize** es la solución en ese caso;
+en un tablero alimentado por un backend, es una solución que se deshace en cada ejecución.
 
 ## Slots de visualización
 
-Cada superficie que representa un registro utiliza algunos de estos seis slots: **title**,
-**subtitle**, **image**, **status**, **date** y **tags**. Una fila de lista es image +
-title + subtitle + status + date, una tarjeta es lo mismo con la imagen en la parte superior, un
-selector de referencias es title + subtitle, y el encabezado de una página es únicamente el title.
+Cada superficie que renderiza un registro utiliza algunos de seis slots: **title**,
+**subtitle**, **image**, **status**, **date** y **tags**. Una fila de lista es imagen +
+título + subtítulo + estado + fecha, una tarjeta es lo mismo con la imagen arriba, un
+selector de referencias es título + subtítulo, y un encabezado de página es solo el título.
 
 El CMS rellena algunos slots a partir de las columnas de la tabla (consulta
-[slots de visualización predeterminados](/docs/collections/#display-slots)). `display` define cualquiera
-de ellos, ya sea como una ruta de campo o como una función:
+[slots de visualización predeterminados](/docs/collections/#display-slots)). `display` define
+cualquiera de ellos, como una ruta de campo o como una función:
 
 ```tsx
 import { customizeTable } from "@rebasepro/cms";
@@ -168,40 +168,40 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 });
 ```
 
-Un slot que se omita conservará su valor derivado.
+Cualquier slot que omitas conserva su valor derivado.
 
-Un resolvedor (resolver) recibe `{ row, id, context }`. `row` es el registro tal como lo envía el servidor,
-tipado como la fila de la tabla: fechas como cadenas ISO, un belongsTo como su columna de
-clave foránea. `id` es su clave primaria como cadena de texto, con las partes de una clave compuesta
-unidas por `:::`. Una relación cargada por el CMS llega anidada bajo su nombre, tal como la
-devuelve el `include` de REST, de modo que un resolver puede leer el campo de un registro relacionado
-sin realizar una petición propia.
+A un resolver se le pasa `{ row, id, context }`. `row` es el registro tal como lo
+envía el servidor, tipado como la fila de la tabla: fechas como cadenas ISO, un belongsTo como su
+columna de clave foránea. `id` es su clave primaria como una cadena de texto, con las partes de una clave compuesta
+unidas por `:::`. Una relación cargada por el CMS llega anidada bajo su nombre, como lo
+devuelve el `include` de REST, por lo que un resolver puede leer el campo de un registro relacionado
+sin realizar ninguna petición propia.
 
-Un resolver puede ser `async`, para leer algo que el registro no contenga. Mientras
+Un resolver puede ser `async`, para leer datos que el registro no incluye. Mientras
 la promesa está en curso, la superficie muestra el valor derivado y lo sustituye por el
-resuelto cuando llega: un título nunca muestra un indicador de carga (spinner). Los resultados se almacenan en caché por
-registro y slot, y las solicitudes concurrentes comparten una sola llamada.
+resuelto cuando finaliza: un título nunca es un spinner de carga. Los resultados se guardan en caché por
+registro y slot, y las peticiones concurrentes comparten una sola llamada.
 
-Devuelve `undefined` cuando un registro no tenga nada para el slot; la superficie recurrirá
-a lo que conoce (un encabezado utiliza el nombre de la colección en singular, un enlace utiliza
-el id). Un resolver que lance una excepción se tratará como `undefined` y se registrará en los logs una sola vez.
+Devuelve `undefined` cuando un registro no tenga nada para el slot; la superficie recurre
+a lo que conoce (un encabezado usa el nombre singular de la colección, un enlace usa
+el id). Si un resolver lanza un error, se trata como `undefined` y se registra en el log una sola vez.
 
-Prefiere una ruta siempre que el valor esté en el registro: una ruta conserva la renderización propia
-del campo, por lo que un estado de tipo enum se mantiene como una etiqueta coloreada y una fecha conserva su formato,
-algo que un resolver que devuelve una cadena no puede hacer.
+Prefiere una ruta siempre que el valor esté en el registro: una ruta conserva la
+renderización propia del campo, por lo que un estado enum se mantiene como una etiqueta de color y una fecha se mantiene formateada,
+algo que un resolver que devuelve una cadena de texto no puede hacer.
 
-Cuando ningún slot define el título, el CMS elige uno del propio texto de la tabla.
+Cuando ningún slot define el título, el CMS elige uno a partir del propio texto de la tabla.
 Con `fieldOrder`, se toma el primer campo en ese orden que pueda ser un título.
-De lo contrario, los candidatos se clasifican: primero el texto cuya clave designa una etiqueta (`name`,
+De lo contrario, los candidatos se priorizan: primero el texto cuya clave denote una etiqueta (`name`,
 `title`, `label`…), luego texto corto, un correo electrónico, un enum, texto largo y un
-selector de usuarios. Las claves, columnas uuid, claves foráneas, relaciones, referencias, documentos
-JSON, campos de archivo y campos ocultos nunca califican: una relación nombra a
-otro registro, por lo que un cliente que pertenece a una agencia nunca tendrá como título el nombre de la
-agencia. Una tabla que no tenga ninguno de estos se titula por su id. Un nombre que reside
-dentro de una columna JSON, o una relación que realmente identifica a la fila (una
-fila de unión), se especifica con `display.title`: `title: "data.name"`,
-`title: "agency"`. Todo lo que contenga el título se dibuja como texto: una fecha con formato,
-un array unido y una relación como el título de su fila relacionada, recurriendo a
+selector de usuarios. Las claves, columnas uuid, claves foráneas, relaciones, referencias,
+documentos JSON, campos de archivo y campos ocultos nunca califican: una relación nombra a
+otro registro, por lo que un cliente que pertenece a una agencia nunca tendrá como título la
+agencia. Una tabla que no contenga ninguno de estos elementos se titulará por su id. Un nombre que reside
+dentro de una columna JSON, o una relación que realmente es como se llama una fila (una
+fila de unión), se define con `display.title`: `title: "data.name"`,
+`title: "agency"`. Cualquier valor que contenga el título se dibuja como texto: una fecha formateada,
+un array unido, y una relación como el título de su fila relacionada, recurriendo a
 su id si no está disponible.
 
 ## Filtros, ajustes preestablecidos y ordenación
@@ -223,21 +223,21 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 | Opción | Efecto |
 |---|---|
 | `sort` | La ordenación predeterminada: una clave y dirección, o varias en orden. |
-| `defaultFilter` | El filtro con el que comienza el visitante y que puede modificar. |
-| `fixedFilter` | Un filtro que el visitante no puede cambiar. Los filtros que aplique en otros campos se combinarán con este. |
-| `filterPresets` | Filtros de un solo clic en la barra de herramientas: `{ label?, filterValues, sort? }`. Sin una etiqueta, se genera una a partir del filtro. |
-| `pagination` | Cargar por páginas (`true`, o el tamaño de página), o todo a la vez (`false`). |
+| `defaultFilter` | El filtro con el que comienza un visitante, y que puede modificar. |
+| `fixedFilter` | Un filtro que el visitante no puede modificar. Los filtros que aplique en otros campos se combinan con este. |
+| `filterPresets` | Filtros de un solo clic en la barra de herramientas: `{ label?, filterValues, sort? }`. Si no se indica una etiqueta, se genera una a partir del filtro. |
+| `pagination` | Cargar en páginas (`true`, o el tamaño de página), o todo a la vez (`false`). |
 
-Cada clave se comprueba contra los campos de la tabla. La propiedad `filterOperators` propia de un campo
-restringe lo que se puede filtrar en él, y `[]` desactiva el filtrado en ese campo.
+Cada clave se comprueba con los campos de la tabla. El `filterOperators` propio de un campo
+restringe lo que se puede filtrar en él, y `[]` desactiva el filtrado en dicho campo.
 
-Un `fixedFilter` restringe lo que el CMS *solicita*. No es un límite de seguridad: lo que
-un usuario o cliente puede leer lo determina la
-[seguridad a nivel de fila](/docs/collections/security-rules/) de la tabla, para cada solicitante.
+Un `fixedFilter` restringe lo que el CMS *solicita*. No es un límite de seguridad: lo que un
+cliente puede leer lo decide la [seguridad a nivel de fila](/docs/collections/security-rules/)
+de la tabla, para cada usuario.
 
-## Siguientes pasos
+## Próximos pasos
 
 - [customizeTable](/docs/frontend/customize-table/): todas las opciones
-- [Personalizar la administración](/docs/frontend/customizing/): tus propios modos de visualización, páginas y acciones
+- [Personalizar el admin](/docs/frontend/customizing/): tus propios modos de visualización, páginas y acciones
 - [Vistas de entidad](/docs/frontend/entity-views/): pestañas en un registro
 - [Acciones de entidad](/docs/frontend/entity-actions/): botones en un registro

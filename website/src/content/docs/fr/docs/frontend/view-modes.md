@@ -1,20 +1,20 @@
 ---
-sourceHash: 94cc15a104ed93ec
+sourceHash: 68aa6b76fbe1dd6b
 title: Modes d'affichage
 sidebar_label: Modes d'affichage
-description: "Affichez les lignes d'une table sous forme de liste, de feuille de calcul, de cartes ou de tableau kanban ; choisissez ce qui remplit le titre, l'image, le statut et la date de chaque enregistrement ; et définissez le tri par défaut, les filtres et les préconfigurations de filtres en un clic."
+description: "Affichez les lignes d'une table sous forme de liste, de feuille de calcul, de cartes ou de tableau kanban ; choisissez ce qui remplit le titre, l'image, le statut et la date de chaque enregistrement ; et définissez le tri par défaut, les filtres et les préréglages de filtres en un clic."
 ---
 
 Chaque collection peut être affichée de quatre manières, depuis le sélecteur dans sa barre d'outils :
 
 - **Table** : une feuille de calcul virtualisée avec édition en ligne, tri, filtrage
-  et sélection multiple. Là où une collection s'ouvre sauf indication contraire.
-- **Liste** : une ligne par enregistrement, avec son image, son titre, son sous-titre, son statut et sa
-  date.
-- **Cartes** : une grille de cartes, pour les contenus riches en images.
-- **Kanban** : un tableau regroupé selon une colonne avec un ensemble fermé de valeurs.
+  et sélection multiple. C'est le mode d'ouverture par défaut d'une collection, sauf indication contraire.
+- **List** : une ligne par enregistrement, avec son image, son titre, son sous-titre, son statut et
+  sa date.
+- **Cards** : une grille de cartes, pour les contenus riches en images.
+- **Kanban** : un tableau regroupé par une colonne ayant un ensemble fermé de valeurs.
 
-Une collection peut également proposer des modes d'affichage que vous écrivez (un calendrier, une carte, une
+Une collection peut également proposer des modes d'affichage que vous écrivez vous-même (un calendrier, une carte, une
 galerie) dans le même sélecteur, pilotés par la même barre d'outils : voir
 [Modes d'affichage personnalisés](/docs/frontend/extending#custom-view-modes).
 
@@ -55,7 +55,6 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
                 done:        { label: "Done", color: "green" },
             },
         },
-        __order: { hidden: true },
     },
 });
 ```
@@ -75,40 +74,41 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 | `"xs"` | 36 | Tables de données denses |
 | `"s"` | 42 | Lignes de texte compactes |
 | `"m"` | 48 | Par défaut |
-| `"l"` | 96 | Vignettes d'images moyennes |
-| `"xl"` | 160 | Grandes vignettes d'images |
+| `"l"` | 96 | Miniatures d'images moyennes |
+| `"xl"` | 160 | Grandes miniatures d'images |
 
 ## Kanban
 
-`kanban.columnField` désigne la colonne selon laquelle le tableau effectue le regroupement. Elle doit contenir un
-ensemble fermé de chaînes de caractères, un `col.enum([...])` ou une colonne texte avec
-`.oneOf([...])` ; toute autre valeur génère une erreur de type. Les colonnes sont affichées dans l'ordre propre de
-la colonne, ou selon `enumOrder`, avec les libellés et les couleurs de
-`enumLabels`. Glisser une carte vers une autre colonne met à jour `columnField`.
+`kanban.columnField` nomme la colonne utilisée pour regrouper le tableau. Elle doit contenir un
+ensemble fermé de chaînes, un `col.enum([...])` ou une colonne texte avec
+`.oneOf([...])` ; tout autre élément génère une erreur de type. Les colonnes sont affichées dans
+l'ordre propre de la colonne, ou selon `enumOrder`, avec les libellés et les couleurs de
+`enumLabels`. Glisser une carte vers une autre colonne écrit dans `columnField`.
 
-`kanban.orderField` désigne l'endroit où la position d'une carte **au sein** d'une colonne est stockée.
-Déclarez-le dès que cet ordre a de l'importance : trois erreurs ici produisent toutes un tableau
+`kanban.orderField` indique l'endroit où la position d'une carte **au sein** d'une colonne est stockée.
+Déclarez-le dès que cet ordre a de l'importance : trois erreurs courantes ici produisent toutes un tableau
 qui semble configuré mais ne l'est pas.
 
-**Sans `orderField`, seule la colonne est conservée.** Une carte peut toujours être glissée entre les
-colonnes, car cela écrit dans `columnField`, ce qui suffit amplement pour un tableau d'états.
-Sa position au sein d'une colonne n'a aucun endroit où être stockée, elle est donc réinitialisée à la prochaine
-lecture. Le tableau l'indique la première fois qu'une carte est déposée à un nouvel endroit dans sa
-propre colonne, dans une barre qui peut être fermée ; un tableau dont les cartes ne se déplacent qu'entre
-les colonnes n'affiche rien.
+**Sans `orderField`, seule la colonne est conservée.** Une carte peut toujours être glissée entre
+les colonnes, car cela écrit dans `columnField`, ce qui suffit à un tableau de statuts.
+Sa position au sein d'une colonne ne pouvant être stockée nulle part, elle se réinitialise à la prochaine
+lecture. Le tableau l'indique la première fois qu'une carte est déposée à un nouvel emplacement dans sa
+propre colonne, via un bandeau qui peut être fermé ; un tableau dont les cartes ne se déplacent
+qu'entre colonnes n'affiche rien.
 
-**La colonne doit être de type texte.** La réorganisation écrit une clé de
+**La colonne doit être de type texte.** La réorganisation écrit une clé
 [fractional-indexing](https://github.com/rocicorp/fractional-indexing)
-(`"i0"`, `"i1"`, `"i0i"`), et non un indice numérique. Une colonne de nombres ne peut jamais en contenir une,
-c'est pourquoi `orderField` n'accepte qu'une colonne texte. Il s'agit de tuyauterie technique, pas de contenu : masquez-la,
-comme ci-dessus.
+(`"i0"`, `"i1"`, `"i0i"`), pas un index. Une colonne numérique ne peut jamais en contenir, donc
+`orderField` n'accepte qu'une colonne texte. Il s'agit d'un mécanisme interne et non de contenu, donc
+le renseigner dans `orderField` le masque de la table et le désactive dans le formulaire.
+Une entrée `fields.__order` surcharge néanmoins l'un ou l'autre : `hidden: false` l'affiche.
 
-**Les lignes créées en dehors du CMS arrivent sans clé.** Rien n'en attribue une lors de
-l'insertion. Une ligne écrite par une tâche cron, un script de seed, une migration ou l'API REST
-arrive avec un `__order` null, et le tableau affiche *« Some items don't have order
-values »* avec un bouton **Initialize**. Un simple clic permet de remplir rétroactivement la première page, et
-la prochaine exécution de la tâche cron fera réapparaître la barre aussitôt. Si un backend crée des lignes pour un
-tableau, il doit lui-même ajouter la clé, en utilisant l'alphabet utilisé par le CMS :
+**Les lignes créées en dehors du CMS arrivent sans clé.** Rien n'en assigne une à
+l'insertion. Une ligne écrite par un cron, un script de seed, une migration ou l'API REST
+arrive avec `__order` à null, et le tableau affiche *"Some items don't have order
+values"* avec un bouton **Initialize**. Un clic remplit la première page, et
+la prochaine exécution du cron fait réapparaître le bandeau immédiatement. Si un backend crée des lignes pour un
+tableau, il doit ajouter la clé lui-même, avec l'alphabet qu'utilise le CMS :
 
 ```typescript
 import { generateKeyBetween } from "fractional-indexing";
@@ -139,20 +139,20 @@ await client.data.tasks.create({
 });
 ```
 
-Les lignes créées via le formulaire arrivent également sans clé ; la seule différence est que
-vous voyez la barre dès que vous en ajoutez une. **Initialize** est la solution dans ce cas ;
-sur un tableau alimenté par un backend, c'est une solution qui s'annule à chaque exécution.
+Les lignes créées via le formulaire arrivent également sans clé ; la seule différence est
+que vous voyez le bandeau dès que vous en ajoutez une. **Initialize** est la solution dans ce cas ; sur un
+tableau alimenté par un backend, c'est une solution qui s'annule à chaque exécution.
 
-## Emplacements d'affichage
+## Emplacements d'affichage (Display slots)
 
-Chaque surface qui restitue un enregistrement utilise certains des six emplacements : **title**,
-**subtitle**, **image**, **status**, **date** et **tags**. Une ligne de liste est image +
-titre + sous-titre + statut + date, une carte est identique avec l'image au-dessus, un
-sélecteur de référence est titre + sous-titre, et un en-tête de page est le titre seul.
+Toute surface affichant un enregistrement utilise certains de ces six emplacements : **title**,
+**subtitle**, **image**, **status**, **date** et **tags**. Une ligne de liste est composée de image +
+title + subtitle + status + date, une carte est identique avec l'image au-dessus, un
+sélecteur de référence correspond à title + subtitle, et un en-tête de page correspond au title seul.
 
-Le CMS remplit certains emplacements à partir des colonnes de la table (voir les
-[emplacements d'affichage par défaut](/docs/collections/#display-slots)). `display` définit n'importe
-lequel d'entre eux, sous forme de chemin de champ ou de fonction :
+Le CMS remplit certains emplacements à partir des colonnes de la table (voir
+[emplacements d'affichage par défaut](/docs/collections/#display-slots)). `display` permet de définir
+n'importe lequel d'entre eux, sous forme de chemin de champ ou de fonction :
 
 ```tsx
 import { customizeTable } from "@rebasepro/cms";
@@ -168,43 +168,43 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 });
 ```
 
-Un emplacement omis conserve sa valeur dérivée.
+Un emplacement que vous omettez conserve sa valeur dérivée.
 
-Un résolveur reçoit `{ row, id, context }`. `row` est l'enregistrement tel que le serveur
-l'envoie, typé selon la ligne de la table : les dates sous forme de chaînes ISO, une relation belongsTo sous forme de sa
-colonne de clé étrangère. `id` est sa clé primaire sous forme de chaîne, les parties d'une clé composite
-étant jointes par `:::`. Une relation chargée par le CMS arrive imbriquée sous son nom, de la même manière que
-le paramètre `include` de REST la renvoie, permettant ainsi à un résolveur de lire le champ d'un enregistrement lié sans
-aucune requête supplémentaire.
+Un resolver reçoit `{ row, id, context }`. `row` est l'enregistrement tel que le serveur
+l'envoie, typé selon la ligne de la table : les dates sous forme de chaînes ISO, une relation belongsTo sous la forme
+de sa colonne de clé étrangère. `id` est sa clé primaire sous forme de chaîne de caractères, les parties d'une clé composite
+étant jointes par `:::`. Une relation chargée par le CMS arrive imbriquée sous son nom, telle que
+`include` de l'API REST la renvoie, permettant à un resolver de lire le champ d'un enregistrement lié
+sans effectuer de requête supplémentaire.
 
-Un résolveur peut être `async`, pour lire des données que l'enregistrement ne contient pas. Pendant que
-la promesse est en cours, la surface affiche la valeur dérivée et la remplace par la
-valeur résolue dès qu'elle arrive : un titre n'est jamais un indicateur de chargement. Les résultats sont mis en cache par
+Un resolver peut être `async`, pour aller lire un élément que l'enregistrement ne contient pas. Pendant que
+la promesse est en attente, la surface affiche la valeur dérivée puis la remplace par la valeur
+résolue dès qu'elle arrive : un titre n'est jamais un indicateur de chargement. Les résultats sont mis en cache par
 enregistrement et par emplacement, et les requêtes simultanées partagent un seul appel.
 
-Renvoyez `undefined` lorsqu'un enregistrement ne possède rien pour l'emplacement ; la surface bascule
-alors sur ce qu'elle connaît (un en-tête utilise le nom de la collection au singulier, un lien utilise
-l'id). Un résolveur qui lève une exception est traité comme `undefined` et consigné une seule fois dans les logs.
+Renvoyez `undefined` lorsqu'un enregistrement ne contient rien pour l'emplacement ; la surface se rabat
+sur ce qu'elle connaît (un en-tête utilise le nom de la collection au singulier, un lien utilise
+l'identifiant). Un resolver qui lève une exception est traité comme renvoyant `undefined` et est consigné dans les logs une seule fois.
 
-Privilégiez un chemin dès que la valeur se trouve sur l'enregistrement : un chemin préserve le rendu
-propre au champ, ainsi un statut d'enum reste une pastille colorée et une date reste formatée,
-ce qu'un résolveur renvoyant une chaîne ne peut pas faire.
+Privilégiez un chemin dès que la valeur se trouve sur l'enregistrement : un chemin conserve le
+rendu propre au champ, ainsi un statut enum reste un badge coloré et une date reste formatée,
+ce qu'un resolver renvoyant une chaîne ne peut pas faire.
 
-Lorsqu'aucun emplacement ne spécifie le titre, le CMS en choisit un parmi les champs texte de la table.
-Avec `fieldOrder`, il prend le premier champ dans cet ordre pouvant servir de titre.
+Lorsqu'aucun emplacement ne spécifie le titre, le CMS en choisit un à partir du texte de la table elle-même.
+Avec `fieldOrder`, il choisit le premier champ dans cet ordre pouvant faire office de titre.
 Sinon, les candidats sont classés : le texte dont la clé correspond à un libellé (`name`,
-`title`, `label`…) en premier, puis le texte court, un e-mail, un enum, le texte long et un
-sélecteur d'utilisateur. Les clés, les colonnes uuid, les clés étrangères, les relations, les références, les
-documents JSON, les champs de fichiers et les champs masqués ne sont jamais éligibles : une relation désigne
-un autre enregistrement, ainsi un client qui appartient à une agence n'aura jamais l'agence pour titre.
-Une table ne disposant d'aucun de ces éléments a pour titre son id. Un nom qui réside
-dans une colonne JSON, ou une relation qui correspond véritablement au nom d'une ligne (une ligne de jonction),
-est désigné avec `display.title` : `title: "data.name"`,
+`title`, `label`…) en premier, puis un texte court, une adresse e-mail, un enum, un texte long et un
+sélecteur d'utilisateur. Les clés, colonnes uuid, clés étrangères, relations, références, documents
+JSON, champs de fichiers et champs masqués ne sont jamais retenus : une relation nomme
+un autre enregistrement, ainsi un client appartenant à une agence n'a jamais pour titre
+l'agence. Une table ne possédant aucun de ces éléments est intitulée par son identifiant. Un nom qui réside
+dans une colonne JSON, ou une relation qui correspond réellement au nom d'une ligne (une
+ligne de jonction), est désigné avec `display.title` : `title: "data.name"`,
 `title: "agency"`. Quel que soit le contenu du titre, il est affiché sous forme de texte : une date formatée,
-un tableau joint, et une relation prend le titre de sa ligne liée, avec repli sur
-son id.
+un tableau concaténé, et une relation sous forme du titre de sa ligne liée, avec un repli
+sur son identifiant.
 
-## Filtres, préconfigurations et tri
+## Filtres, préréglages et tri
 
 ```tsx
 import { customizeTable } from "@rebasepro/cms";
@@ -223,21 +223,21 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 | Option | Effet |
 |---|---|
 | `sort` | Le tri par défaut : une clé et une direction, ou plusieurs dans l'ordre. |
-| `defaultFilter` | Le filtre initial d'un visiteur, qu'il peut modifier. |
-| `fixedFilter` | Un filtre que le visiteur ne peut pas modifier. Les filtres qu'il applique sur d'autres champs se combinent avec celui-ci. |
-| `filterPresets` | Filtres en un clic dans la barre d'outils : `{ label?, filterValues, sort? }`. Sans libellé, un libellé est généré à partir du filtre. |
-| `pagination` | Chargement par pages (`true`, ou la taille de la page), ou tout d'un coup (`false`). |
+| `defaultFilter` | Le filtre à partir duquel un visiteur commence, et qu'il peut modifier. |
+| `fixedFilter` | Un filtre que le visiteur ne peut pas modifier. Les filtres qu'il applique sur d'autres champs y sont combinés. |
+| `filterPresets` | Filtres en un clic dans la barre d'outils : `{ label?, filterValues, sort? }`. Sans libellé, un nom est généré à partir du filtre. |
+| `pagination` | Charger par pages (`true`, ou la taille de page), ou tout en une seule fois (`false`). |
 
-Chaque clé est vérifiée par rapport aux champs de la table. La propriété `filterOperators` propre à un champ
-restreint ce qui peut être filtré dessus, et `[]` désactive le filtrage pour celui-ci.
+Chaque clé est validée par rapport aux champs de la table. La propriété `filterOperators` d'un champ
+restreint ce qui peut être filtré sur celui-ci, et `[]` en désactive le filtrage.
 
-Un `fixedFilter` restreint ce que le CMS *demande*. Il ne constitue pas une barrière : ce qu'un
-appelant peut lire est déterminé par la
-[sécurité au niveau des lignes](/docs/collections/security-rules/) de la table, pour chaque appelant.
+Un `fixedFilter` restreint ce que le CMS *demande*. Il ne s'agit pas d'une limite de sécurité : ce qu'un
+appelant a le droit de lire est déterminé par la
+[sécurité au niveau des lignes (RLS)](/docs/collections/security-rules/) de la table, pour chaque appelant.
 
 ## Prochaines étapes
 
 - [customizeTable](/docs/frontend/customize-table/) : toutes les options
-- [Personnaliser l'administration](/docs/frontend/customizing/) : vos propres modes d'affichage, pages et actions
-- [Vues d'entités](/docs/frontend/entity-views/) : onglets sur un enregistrement
-- [Actions d'entités](/docs/frontend/entity-actions/) : boutons sur un enregistrement
+- [Personnalisation de l'administration](/docs/frontend/customizing/) : vos propres modes d'affichage, pages et actions
+- [Entity views](/docs/frontend/entity-views/) : onglets sur un enregistrement
+- [Entity actions](/docs/frontend/entity-actions/) : boutons sur un enregistrement

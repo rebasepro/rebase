@@ -1,43 +1,43 @@
 ---
-sourceHash: ae48e0b641989cf2
+sourceHash: ce7831be934cb96a
 title: "Receita: Publicação editorial"
 sidebar_label: Publicação editorial
 description: "Execute um blog ou redação no Rebase: redatores e editores, revisão, publicação agendada, rascunhos de posts ativos, pré-visualizações, traduções, biblioteca de mídia, blocos de conteúdo, feeds, notas editoriais e importação do WordPress."
 ---
 
-## Visão geral
+## Visão Geral
 
 Esta receita desenvolve o lado editorial de uma publicação no Rebase. Cada parte é
-um ponto de extensão documentado, permitindo que você aproveite apenas as partes necessárias:
+um ponto de extensão documentado, permitindo que você use apenas o que precisa:
 
-| Você obtém | Construído com |
+| O que você obtém | Desenvolvido com |
 |---|---|
-| Redatores criam rascunhos, editores agendam e publicam, aplicado pelo Postgres | [Segurança a nível de linha](/docs/collections/security-rules/) |
+| Redatores criam rascunhos, editores agendam e publicam, aplicado pelo Postgres | [Segurança em nível de linha](/docs/collections/security-rules/) |
 | Um quadro por status, com botões Enviar e Publicar | [Visualização Kanban](/docs/frontend/view-modes/), [ações de entidade](/docs/frontend/entity-actions/) |
-| Publicação e despublicação agendadas | Um [cron job](/docs/backend/cron-jobs/) |
-| Edite um post ativo sem alterá-lo até publicar | Uma tabela de rascunhos e duas ações de entidade |
+| Publicação e despublicação agendadas | Uma [tarefa cron](/docs/backend/cron-jobs/) |
+| Edição de post publicado sem alterá-lo até a publicação | Uma tabela de rascunhos e duas ações de entidade |
 | Uma pré-visualização de alterações não salvas | Uma [visualização de entidade](/docs/frontend/entity-views/) |
-| Traduções, campos de SEO, blocos de conteúdo | Colunas JSON com um formato ([Documentos JSON](/docs/schema/json/)) |
+| Traduções, campos de SEO, blocos de conteúdo | Colunas JSON tipadas ([documentos JSON](/docs/schema/json/)) |
 | Uma biblioteca de mídia com texto alternativo e créditos | Uma tabela `media` e uma relação |
-| RSS, um sitemap e uma API pública de leitura | Uma [função customizada](/docs/backend/custom-functions/) |
+| RSS, sitemap e uma API pública de leitura | Uma [função personalizada](/docs/backend/custom-functions/) |
 | Notas entre redator e editor | Uma tabela de notas e uma visualização de entidade |
-| Revisões com reversão | [Histórico](/docs/backend/history/) |
-| Uma importação do WordPress | Um [script](/docs/recipes/import-from-wordpress/) |
-| Duas publicações em uma única instalação | [Tenancy](/docs/collections/tenancy/) |
+| Revisões com reversão (rollback) | [Histórico](/docs/backend/history/) |
+| Importação do WordPress | Um [script](/docs/recipes/import-from-wordpress/) |
+| Duas publicações em uma única instalação | [Multi-inquilino (Tenancy)](/docs/collections/tenancy/) |
 
-Ela estende o modelo de funções (roles) da [receita de CMS de Blog](/docs/recipes/blog-cms/):
+Ela estende o modelo de papéis da [receita de Blog CMS](/docs/recipes/blog-cms/):
 `writer` e `editor` são entradas nas `roles` de um usuário. Se você começou a partir do
-scaffold, adicione `writer` às opções de role em `backend/schema/users.ts`.
+scaffold, adicione `writer` às opções de papéis em `backend/schema/users.ts`.
 
-Cada tabela é um arquivo em `backend/schema/`, exportado de seu `index.ts`; a forma
-como o painel administrativo a apresenta — o quadro, os botões, as pré-visualizações — é um
+Cada tabela é um arquivo em `backend/schema/`, exportado a partir de seu `index.ts`; a
+forma como o painel administrativo a apresenta — o quadro, os botões, as pré-visualizações — é um
 `customizeTable` em `frontend/src/cms/`, passado para
 `<RebaseCMS tableCustomizations>`.
 
 ## Mídia
 
-Uma linha por imagem, para que uma imagem seja carregada uma única vez e reutilizada, com seu texto alternativo
-e crédito ao lado dela:
+Uma linha por imagem, para que uma foto seja enviada uma única vez e reutilizada, com seu texto alternativo
+e créditos associados:
 
 ```ts
 // backend/schema/media.ts
@@ -58,9 +58,9 @@ export const media = defineTable("media", {
 });
 ```
 
-Um post aponta para uma linha de mídia com uma relação, e o seletor de relações lista as
-imagens que já estão na biblioteca. Quem pode fazer upload dos arquivos em si é definido
-pela sua [autorização de armazenamento](/docs/backend/storage-authorization/).
+Um post aponta para uma linha de mídia com uma relação, e o seletor de relação lista as
+imagens já presentes na biblioteca. Quem pode fazer upload dos próprios arquivos é definido pela
+sua [autorização de armazenamento](/docs/backend/storage-authorization/).
 
 ## Posts
 
@@ -126,7 +126,7 @@ export const posts = defineTable("posts", {
 });
 ```
 
-E como o painel os apresenta — um quadro por status, dois botões e duas abas:
+E como o painel os exibe — um quadro por status, dois botões e duas abas:
 
 ```tsx
 // frontend/src/cms/posts.tsx
@@ -142,7 +142,6 @@ export const postsCms = customizeTable<typeof posts>("posts", {
     fields: {
         summary: { multiline: true },
         createdBy: { readOnly: true },
-        __order: { hidden: true, disabled: true },
         status: {
             enumLabels: {
                 draft:     { label: "Draft", color: "gray" },
@@ -191,26 +190,26 @@ export const postsCms = customizeTable<typeof posts>("posts", {
 O que cada parte faz:
 
 - **O fluxo de trabalho.** Redatores movem seus próprios posts entre `draft` e
-  `review`. Editores agendam, publicam e arquivam. O Postgres aplica isso, de modo
-  que as regras se mantêm válidas tanto para o painel administrativo quanto para a API REST e o SDK. Um redator que
-  tentar salvar como `published` é recusado pelo banco de dados, independentemente do que os botões
-  exibam.
-- **O quadro.** Os posts abrem como um quadro Kanban com uma coluna por status, e
-  arrastar um card entre colunas é o mesmo salvamento, sob as mesmas regras.
-- **Revisões.** `history: true` mantém um snapshot de cada salvamento, com um
+  `review`. Editores agendam, publicam e arquivam. O Postgres impõe isso, garantindo
+  que as regras sejam válidas para o painel de administração, a API REST e o SDK
+  igualmente. Um redator que tentar salvar como `published` será recusado pelo banco
+  de dados, independentemente do que os botões exibam.
+- **O quadro.** Os posts são abertos como um quadro Kanban com uma coluna por status, e
+  arrastar um cartão entre as colunas realiza o mesmo salvamento, sob as mesmas regras.
+- **Revisões.** `history: true` mantém um instantâneo (snapshot) de cada salvamento, com um
   botão de reversão na aba Histórico do registro.
-- **Traduções.** Uma coluna JSON com um formato recebe um grupo de campos por
+- **Traduções.** Uma coluna JSON tipada gera um grupo de campos por
   idioma no formulário. Para exibir os idiomas como abas, configure
-  `translations` com um [campo customizado](/docs/frontend/custom-fields/).
+  um [campo personalizado](/docs/frontend/custom-fields/) para `translations`.
 - **Blocos.** `json.oneOf` como itens de um `json.array` fornece blocos tipados e
   reordenáveis armazenados como JSON. Para um editor inline como BlockNote ou
-  TipTap, coloque-o atrás de um campo customizado em uma `col.jsonb()` sem formato definido; o
-  JSON do editor é armazenado como está.
+  TipTap, coloque-o em um campo personalizado em um `col.jsonb()` sem definição de formato;
+  o JSON do editor será armazenado exatamente como está.
 
 ## Publicação agendada
 
-Um cron job publica posts agendados quando chega a hora e arquiva
-aqueles cujo `unpublishAt` já passou:
+Uma tarefa cron publica posts agendados no momento determinado e arquiva
+aqueles cujo `unpublishAt` já expirou:
 
 ```typescript
 // backend/crons/publish-scheduled.ts
@@ -241,14 +240,14 @@ export default defineCron({
 });
 ```
 
-`dataAsAdmin` executa com a role `admin`, portanto a regra restritiva permite
-a operação, e os hooks e o histórico da tabela ainda continuam sendo executados nesses salvamentos.
+`dataAsAdmin` é executado com a role `admin`, logo a regra restritiva permite sua
+execução, e os hooks e histórico da tabela ainda são acionados nesses salvamentos.
 
-## Editando um post ativo
+## Editando um post publicado
 
-Editar um post publicado altera-o ao vivo, e as regras acima impedem que um redator
-o edite. Para preparar alterações e publicá-las em uma única etapa, mantenha-as
-em uma segunda tabela com as mesmas colunas:
+Editar um post publicado altera seu conteúdo no ar (em produção), e as regras acima
+impedem totalmente que um redator o edite. Para preparar alterações e publicá-las em
+uma única etapa, mantenha-as em uma segunda tabela com as mesmas colunas:
 
 ```ts
 // backend/schema/post_drafts.ts
@@ -293,8 +292,8 @@ export const postDraftsCms = customizeTable<typeof postDrafts>("post_drafts", {
 });
 ```
 
-Em seguida, adicione a `posts` uma ação que inicia um rascunho a partir de um post publicado e adicione
-`draftChanges` aos `entityActions` de `postsCms`:
+Em seguida, crie uma ação em `posts` que inicia um rascunho a partir de um post publicado e
+adicione `draftChanges` aos `entityActions` de `postsCms`:
 
 ```typescript
 import type { TableEntityAction } from "@rebasepro/cms-types";
@@ -314,13 +313,13 @@ export const draftChanges: TableEntityAction = {
 ```
 
 Qualquer membro da equipe pode preparar um rascunho. Apenas um editor pode publicá-lo,
-pois publicá-lo é uma atualização de um post publicado, o que a regra restritiva em
-`posts` recusa para qualquer outra pessoa.
+pois a publicação consiste na atualização de um post publicado, o que a regra restritiva
+em `posts` recusa para qualquer outro usuário.
 
 ## Pré-visualizações
 
-Uma aba de visualização de entidade recebe os valores do formulário, incluindo edições não salvas,
-mostrando assim o post como ele será lido antes de alguém salvá-lo:
+Uma aba de visualização de entidade recebe os valores do formulário, incluindo edições não
+salvas, exibindo o post exatamente como ele será lido antes de qualquer salvamento:
 
 ```tsx
 // frontend/src/editorial/PostPreview.tsx
@@ -351,14 +350,14 @@ export default function PostPreview({ modifiedValues }: EntityCustomViewParams) 
 }
 ```
 
-Para pré-visualizar no design do próprio site, renderize o componente de artigo do site
-nesta aba ou incorpore em um iframe a página de pré-visualização do site e envie-lhe `modifiedValues`
-com `postMessage`. Um site estático servido pelo Rebase só pode ser incorporado em iframes a partir de
-sua própria origem.
+Para pré-visualizar com o design real do site, renderize o componente de artigo do próprio
+site nesta aba, ou carregue em um iframe a página de pré-visualização do site e envie
+`modifiedValues` via `postMessage`. Um site estático hospedado pelo Rebase só pode ser
+incorporado em iframes a partir de sua própria origem.
 
 ## Notas editoriais
 
-Notas entre redator e editor são linhas próprias, exibidas no post:
+Notas entre o redator e o editor são linhas próprias, exibidas no post:
 
 ```ts
 // backend/schema/post_notes.ts
@@ -416,12 +415,12 @@ export default function EditorialNotes({ id }: EntityCustomViewParams) {
 ```
 
 Para notificar a outra pessoa, envie um e-mail a partir do [hook](/docs/collections/callbacks/)
-`afterSave` da tabela de notas com `rebase.email`.
+`afterSave` da tabela de notas utilizando `rebase.email`.
 
 ## Feeds, sitemap e uma API pública de leitura
 
-Uma função customizada responde com qualquer tipo de conteúdo que você fornecer a ela. Esta
-é pública (não possui `requireAuth`), portanto ela faz a leitura com `dataAsAdmin` e filtra
+Uma função personalizada responde com qualquer content type definido. Esta é
+pública (não possui `requireAuth`), portanto realiza a leitura com `dataAsAdmin` e filtra
 os posts publicados por conta própria:
 
 ```typescript
@@ -486,29 +485,29 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-Anuncie o sitemap a partir do `robots.txt` do seu site
-(`Sitemap: https://example.com/api/functions/site/sitemap.xml`), que é como um
+Declare o sitemap no arquivo `robots.txt` do seu site
+(`Sitemap: https://example.com/api/functions/site/sitemap.xml`), que é a forma como um
 sitemap fora da raiz do site é encontrado. Páginas que leem os posts diretamente podem
-usar o SDK em vez disso, com uma regra de leitura fazendo a filtragem: consulte
-[Acesso público](/docs/collections/security-rules/#public-access).
+usar o SDK, com uma regra de leitura fazendo o filtro: consulte
+[Acesso Público](/docs/collections/security-rules/#public-access).
 
 ## Importando do WordPress
 
-Um script lê a API REST do WordPress e faz upsert de cada post pelo seu slug,
-permitindo ser executado novamente sem duplicar nada: consulte
+Um script lê a API REST do WordPress e faz o upsert de cada post pelo seu slug,
+permitindo que seja executado novamente sem duplicar nada: consulte
 [Importando do WordPress](/docs/recipes/import-from-wordpress/).
 
 ## Duas publicações em uma única instalação
 
-Para um blog e um site de notícias compartilhando uma única instância do Rebase, adicione uma coluna `site` a
+Para um blog e um site de notícias compartilhando o mesmo Rebase, adicione uma coluna `site` em
 `posts`, `post_drafts`, `post_notes` e `media`, e declare
-[`tenant`](/docs/collections/tenancy/) em cada um com uma tabela de associação. Um
-editor que trabalha em ambos os sites verá ambos, um redator em um deles verá apenas
-aquele, e o Postgres aplicará essa regra.
+[`tenant`](/docs/collections/tenancy/) em cada uma com uma tabela de associação (membership). Um
+editor que trabalha em ambos os sites verá os dois, enquanto um redator verá apenas
+o seu, com o Postgres garantindo o controle.
 
 ## Relacionados
 
-- [Receita de CMS de Blog](/docs/recipes/blog-cms/): a versão mais enxuta do fluxo de trabalho
-- [Segurança a nível de linha](/docs/collections/security-rules/): para o que as regras são compiladas
+- [Receita de CMS de Blog](/docs/recipes/blog-cms/): a versão simplificada do fluxo de trabalho
+- [Segurança em nível de linha (RLS)](/docs/collections/security-rules/): para o que as regras são compiladas
 - [Ações de entidade](/docs/frontend/entity-actions/) e [visualizações de entidade](/docs/frontend/entity-views/)
-- [Cron jobs](/docs/backend/cron-jobs/) e [funções customizadas](/docs/backend/custom-functions/)
+- [Tarefas cron](/docs/backend/cron-jobs/) e [funções personalizadas](/docs/backend/custom-functions/)

@@ -1,43 +1,43 @@
 ---
-sourceHash: ae48e0b641989cf2
+sourceHash: ce7831be934cb96a
 title: "Rezept: Redaktionelles Publizieren"
 sidebar_label: Redaktionelles Publizieren
-description: "Betreiben Sie ein Blog oder einen Newsroom auf Rebase: Autoren und Redakteure, Review-Prozesse, geplante Veröffentlichungen, Entwürfe von Live-Beiträgen, Vorschauen, Übersetzungen, eine Medienbibliothek, Inhaltsblöcke, Feeds, redaktionelle Notizen und ein WordPress-Import."
+description: "Betreiben Sie einen Blog oder Newsroom auf Rebase: Autoren und Redakteure, Review-Prozesse, geplante Veröffentlichungen, Entwürfe von Live-Beiträgen, Vorschauen, Übersetzungen, eine Medienbibliothek, Inhaltsblöcke, Feeds, redaktionelle Notizen und ein WordPress-Import."
 ---
 
 ## Übersicht
 
-Dieses Rezept baut den redaktionellen Teil einer Publikation auf Rebase auf. Jeder Teil
-ist ein dokumentierter Erweiterungspunkt, sodass Sie nur die Komponenten übernehmen können, die Sie benötigen:
+Dieses Rezept baut den redaktionellen Teil einer Publikation auf Rebase auf. Jeder Teil ist
+ein dokumentierter Erweiterungspunkt, sodass Sie nur die Komponenten verwenden können, die Sie tatsächlich benötigen:
 
-| Was Sie erhalten | Umgesetzt mit |
+| Sie erhalten | Erstellt mit |
 |---|---|
-| Autoren schreiben Entwürfe, Redakteure planen und veröffentlichen, durchgesetzt von Postgres | [Row-Level Security](/docs/collections/security-rules/) |
-| Ein Board nach Status mit Buttons zum Einreichen und Veröffentlichen | [Kanban-Ansicht](/docs/frontend/view-modes/), [Entity-Aktionen](/docs/frontend/entity-actions/) |
-| Geplantes Veröffentlichen und Depublizieren | Ein [Cron-Job](/docs/backend/cron-jobs/) |
-| Einen Live-Beitrag bearbeiten, ohne ihn vor der Veröffentlichung zu verändern | Eine Drafts-Tabelle und zwei Entity-Aktionen |
-| Eine Vorschau ungespeicherter Änderungen | Eine [Entity-Ansicht](/docs/frontend/entity-views/) |
+| Autoren entwerfen, Redakteure planen und veröffentlichen, erzwungen durch Postgres | [Row-Level Security](/docs/collections/security-rules/) |
+| Ein Board nach Status mit Submit- und Publish-Buttons | [Kanban-Ansicht](/docs/frontend/view-modes/), [Entity Actions](/docs/frontend/entity-actions/) |
+| Geplante Veröffentlichung und Depublikation | Einem [Cron-Job](/docs/backend/cron-jobs/) |
+| Bearbeiten eines Live-Beitrags, ohne ihn vor der Veröffentlichung zu verändern | Einer Entwurfstabelle und zwei Entity Actions |
+| Eine Vorschau ungespeicherter Änderungen | Einer [Entity View](/docs/frontend/entity-views/) |
 | Übersetzungen, SEO-Felder, Inhaltsblöcke | JSON-Spalten mit definierter Struktur ([JSON-Dokumente](/docs/schema/json/)) |
-| Eine Medienbibliothek mit Alt-Text und Bildnachweisen | Eine `media`-Tabelle und eine Relation |
-| RSS, eine Sitemap und eine öffentliche Lese-API | Eine [benutzerdefinierte Funktion](/docs/backend/custom-functions/) |
-| Notizen zwischen Autor und Redakteur | Eine Notizen-Tabelle und eine Entity-Ansicht |
-| Revisionen mit Rollback | [Verlauf (History)](/docs/backend/history/) |
-| Ein WordPress-Import | Ein [Skript](/docs/recipes/import-from-wordpress/) |
+| Eine Medienbibliothek mit Alt-Text und Quellenangabe | Einer `media`-Tabelle und einer Relation |
+| RSS, eine Sitemap und eine öffentliche Lese-API | Einer [Custom Function](/docs/backend/custom-functions/) |
+| Notizen zwischen Autor und Redakteur | Einer Notiztabelle und einer Entity View |
+| Revisionen mit Rollback | [History](/docs/backend/history/) |
+| Ein WordPress-Import | Einem [Skript](/docs/recipes/import-from-wordpress/) |
 | Zwei Publikationen in einer Installation | [Tenancy](/docs/collections/tenancy/) |
 
 Es erweitert das Rollenmodell aus dem [Blog-CMS-Rezept](/docs/recipes/blog-cms/):
-`writer` und `editor` sind Einträge in den `roles` eines Benutzers. Wenn Sie mit dem
-Scaffold begonnen haben, fügen Sie `writer` zu den Rollenoptionen in `backend/schema/users.ts` hinzu.
+`writer` und `editor` sind Einträge in den `roles` eines Benutzers. Wenn Sie vom
+Scaffold-Projekt ausgegangen sind, fügen Sie `writer` zu den Rollenoptionen in `backend/schema/users.ts` hinzu.
 
 Jede Tabelle ist eine Datei in `backend/schema/`, die aus ihrer `index.ts` exportiert wird; wie
-das Admin-Panel sie darstellt – das Board, die Buttons, die Vorschauen – ist eine
-`customizeTable` in `frontend/src/cms/`, die an
+das Admin-Panel sie darstellt – das Board, die Buttons, die Vorschauen – ist ein
+`customizeTable` in `frontend/src/cms/`, das an
 `<RebaseCMS tableCustomizations>` übergeben wird.
 
 ## Medien
 
-Eine Zeile pro Bild, sodass ein Bild einmal hochgeladen und wiederverwendet wird, zusammen
-mit Alt-Text und Bildnachweis:
+Eine Zeile pro Bild, sodass eine Datei einmal hochgeladen und wiederverwendet werden kann, mit
+ihrem Alt-Text und der Quellenangabe direkt daneben:
 
 ```ts
 // backend/schema/media.ts
@@ -58,10 +58,9 @@ export const media = defineTable("media", {
 });
 ```
 
-Ein Beitrag verweist über eine Relation auf eine Zeile in der Media-Tabelle, und die
-Relationsauswahl listet die bereits in der Bibliothek vorhandenen Bilder auf. Wer
-die Dateien selbst hochladen darf, wird über Ihre
-[Speicherautorisierung](/docs/backend/storage-authorization/) festgelegt.
+Ein Beitrag verweist über eine Relation auf eine Medienzeile, und die Relationsauswahl listet
+die Bilder auf, die sich bereits in der Bibliothek befinden. Wer die Dateien selbst hochladen darf,
+wird über Ihre [Speicherautorisierung](/docs/backend/storage-authorization/) geregelt.
 
 ## Beiträge
 
@@ -143,7 +142,6 @@ export const postsCms = customizeTable<typeof posts>("posts", {
     fields: {
         summary: { multiline: true },
         createdBy: { readOnly: true },
-        __order: { hidden: true, disabled: true },
         status: {
             enumLabels: {
                 draft:     { label: "Draft", color: "gray" },
@@ -189,29 +187,29 @@ export const postsCms = customizeTable<typeof posts>("posts", {
 });
 ```
 
-Was die einzelnen Teile bewirken:
+Was die einzelnen Komponenten bewirken:
 
 - **Der Workflow.** Autoren verschieben ihre eigenen Beiträge zwischen `draft` und
   `review`. Redakteure planen, veröffentlichen und archivieren. Postgres erzwingt dies, sodass
   die Regeln für das Admin-Panel, die REST-API und das SDK gleichermaßen gelten. Ein Autor,
   der versucht, `published` zu speichern, wird von der Datenbank abgewiesen – unabhängig davon,
   was die Buttons anzeigen.
-- **Das Board.** Die Beiträge werden als Kanban-Board mit einer Spalte pro Status
-  geöffnet, und das Ziehen einer Karte zwischen den Spalten ist derselbe Speichervorgang unter denselben Regeln.
-- **Revisionen.** `history: true` behält einen Snapshot jedes Speichervorgangs bei,
-  inklusive eines Revert-Buttons im History-Tab des Eintrags.
-- **Übersetzungen.** Eine JSON-Spalte mit definierter Struktur erhält im Formular
-  eine Feldgruppe pro Sprache. Um die Sprachen stattdessen als Tabs darzustellen, weisen Sie
-  `translations` ein [benutzerdefiniertes Feld](/docs/frontend/custom-fields/) zu.
+- **Das Board.** Die Beiträge öffnen sich als Kanban-Board mit einer Spalte pro Status, und
+  das Ziehen einer Karte zwischen den Spalten entspricht demselben Speichervorgang unter denselben Regeln.
+- **Revisionen.** `history: true` behält einen Snapshot jedes Speichervorgangs bei, inklusive
+  eines Wiederherstellen-Buttons im History-Tab des Datensatzes.
+- **Übersetzungen.** Eine JSON-Spalte mit Schema erhält im Formular eine Feldgruppe pro
+  Sprache. Um die Sprachen stattdessen als Tabs anzuzeigen, weisen Sie
+  `translations` ein [Custom Field](/docs/frontend/custom-fields/) zu.
 - **Blöcke.** `json.oneOf` als Elemente eines `json.array` ermöglicht typisierte,
-  neu anordenbare Blöcke, die als JSON gespeichert werden. Für einen Inline-Editor wie BlockNote oder
-  TipTap binden Sie diesen über ein benutzerdefiniertes Feld an ein `col.jsonb()` ohne feste Struktur; das
-  JSON des Editors wird dann unverändert gespeichert.
+  umsortierbare Blöcke, die als JSON gespeichert werden. Für einen Inline-Editor wie BlockNote oder
+  TipTap binden Sie diesen über ein Custom Field an ein `col.jsonb()` ohne Schema an; das
+  JSON des Editors wird exakt so gespeichert, wie es ist.
 
 ## Geplantes Veröffentlichen
 
-Ein Cron-Job veröffentlicht geplante Beiträge, sobald deren Zeitpunkt erreicht ist, und
-archiviert diejenigen, deren `unpublishAt` überschritten wurde:
+Ein Cron-Job veröffentlicht geplante Beiträge, sobald deren Zeit gekommen ist, und archiviert
+jene, deren `unpublishAt`-Zeitpunkt überschritten wurde:
 
 ```typescript
 // backend/crons/publish-scheduled.ts
@@ -242,14 +240,14 @@ export default defineCron({
 });
 ```
 
-`dataAsAdmin` wird mit der Rolle `admin` ausgeführt, sodass die restriktive Regel den
-Zugriff gewährt; die Hooks und die History der Tabelle werden bei diesen Speichervorgängen weiterhin ausgeführt.
+`dataAsAdmin` wird mit der Rolle `admin` ausgeführt, sodass die restriktive Regel den Zugriff
+erlaubt. Die Hooks und der Änderungsverlauf der Tabelle greifen bei diesen Speichervorgängen weiterhin.
 
-## Einen Live-Beitrag bearbeiten
+## Bearbeiten eines Live-Beitrags
 
-Das Bearbeiten eines veröffentlichten Beitrags ändert diesen direkt live, und die obigen Regeln
-hindern Autoren daran, ihn überhaupt zu bearbeiten. Um Änderungen vorzubereiten und in einem
-Schritt zu veröffentlichen, verwalten Sie diese in einer zweiten Tabelle mit denselben Spalten:
+Das Bearbeiten eines veröffentlichten Beitrags ändert diesen direkt live, und die oben definierten Regeln
+hindern Autoren daran, ihn überhaupt zu bearbeiten. Um Änderungen vorzubereiten und in einem Schritt zu
+veröffentlichen, speichern Sie diese in einer zweiten Tabelle mit denselben Spalten:
 
 ```ts
 // backend/schema/post_drafts.ts
@@ -294,8 +292,8 @@ export const postDraftsCms = customizeTable<typeof postDrafts>("post_drafts", {
 });
 ```
 
-Fügen Sie `posts` anschließend eine Aktion hinzu, die einen Entwurf aus einem veröffentlichten Beitrag
-erstellt, und ergänzen Sie `draftChanges` in den `entityActions` von `postsCms`:
+Fügen Sie `posts` dann eine Aktion hinzu, die einen Entwurf aus einem veröffentlichten Beitrag erstellt,
+und ergänzen Sie `draftChanges` in den `entityActions` von `postsCms`:
 
 ```typescript
 import type { TableEntityAction } from "@rebasepro/cms-types";
@@ -314,14 +312,14 @@ export const draftChanges: TableEntityAction = {
 };
 ```
 
-Jedes Redaktionsmitglied kann einen Entwurf vorbereiten. Nur ein Redakteur kann ihn
-veröffentlichen, da die Veröffentlichung ein Update eines bereits publizierten Beitrags darstellt –
-was die restriktive Regel auf `posts` allen anderen verweigert.
+Jedes Redaktionsmitglied kann einen Entwurf vorbereiten. Nur ein Redakteur kann ihn veröffentlichen,
+da die Veröffentlichung einer Aktualisierung eines bereits publizierten Beitrags entspricht – was die
+restriktive Regel auf `posts` für alle anderen Personen verweigert.
 
 ## Vorschauen
 
-Ein Tab für Entity-Ansichten empfängt die Werte des Formulars einschließlich ungespeicherter
-Änderungen. So wird der Beitrag genau so dargestellt, wie er aussehen wird, noch bevor jemand speichert:
+Ein Tab für eine Entity View empfängt die Werte des Formulars, einschließlich ungespeicherter Änderungen,
+sodass der Beitrag so angezeigt werden kann, wie er nach dem Speichern aussehen wird:
 
 ```tsx
 // frontend/src/editorial/PostPreview.tsx
@@ -352,14 +350,14 @@ export default function PostPreview({ modifiedValues }: EntityCustomViewParams) 
 }
 ```
 
-Um die Vorschau im Design der eigentlichen Website anzuzeigen, rendern Sie die
-Artikelkomponente der Website in diesem Tab oder binden Sie die Vorschauseite der Website
-über einen Frame ein und übergeben Sie ihr `modifiedValues` via `postMessage`. Eine von Rebase
-ausgelieferte statische Website kann nur von ihrem eigenen Origin aus in einen Frame eingebunden werden.
+Um die Vorschau im tatsächlichen Design der Website darzustellen, können Sie die Artikelkomponente der
+Website in diesem Tab rendern oder die Vorschauseite der Website in einem Frame einbinden und ihr
+`modifiedValues` über `postMessage` übermitteln. Eine statische Website, die über Rebase bereitgestellt
+wird, kann nur von ihrem eigenen Origin aus in einem Frame geladen werden.
 
 ## Redaktionelle Notizen
 
-Notizen zwischen Autor und Redakteur sind eigene Tabellenzeilen, die direkt am Beitrag angezeigt werden:
+Notizen zwischen Autor und Redakteur sind eigenständige Datensätze, die am Beitrag angezeigt werden:
 
 ```ts
 // backend/schema/post_notes.ts
@@ -379,8 +377,8 @@ export const postNotes = defineTable("post_notes", {
 });
 ```
 
-Halten Sie sie mit `hideFromNavigation: true` in der entsprechenden `customizeTable`
-aus dem Navigationsmenü (Drawer) heraus.
+Mit `hideFromNavigation: true` in der `customizeTable`-Konfiguration verhindern Sie,
+dass die Tabelle in der Seitenleiste angezeigt wird.
 
 ```tsx
 // frontend/src/editorial/EditorialNotes.tsx
@@ -416,14 +414,14 @@ export default function EditorialNotes({ id }: EntityCustomViewParams) {
 }
 ```
 
-Um die andere Person zu benachrichtigen, können Sie aus dem `afterSave`-
-[Hook](/docs/collections/callbacks/) der Notizen-Tabelle heraus eine E-Mail mit `rebase.email` senden.
+Um die andere Person zu benachrichtigen, können Sie aus dem `afterSave`-[Hook](/docs/collections/callbacks/)
+der Notiztabelle heraus eine E-Mail mit `rebase.email` versenden.
 
 ## Feeds, Sitemap und eine öffentliche Lese-API
 
-Eine benutzerdefinierte Funktion antwortet mit dem Content-Type, den Sie angeben. Diese Funktion ist
-öffentlich (sie hat kein `requireAuth`), daher liest sie mit `dataAsAdmin` und filtert die
-veröffentlichten Beiträge selbst:
+Eine Custom Function antwortet mit jedem beliebigen Content-Type, den Sie angeben. Diese Funktion ist
+öffentlich (sie hat kein `requireAuth`), liest Daten daher mit `dataAsAdmin` und filtert
+selbstständig auf veröffentlichte Beiträge:
 
 ```typescript
 // backend/functions/site.ts
@@ -489,27 +487,27 @@ export default defineFunction((app, { rebase }) => {
 
 Geben Sie die Sitemap in der `robots.txt` Ihrer Website an
 (`Sitemap: https://example.com/api/functions/site/sitemap.xml`), damit eine Sitemap
-außerhalb des Web-Roots gefunden werden kann. Seiten, die Beiträge direkt abrufen, können
-stattdessen das SDK verwenden, wobei eine Leseregel das Filtern übernimmt: siehe
-[Öffentlicher Zugriff](/docs/collections/security-rules/#public-access).
+außerhalb des Site-Roots gefunden werden kann. Seiten, die Beiträge direkt abfragen, können
+stattdessen das SDK nutzen, wobei eine Leseregel die Filterung übernimmt: siehe
+[Public Access](/docs/collections/security-rules/#public-access).
 
 ## Importieren aus WordPress
 
-Ein Skript liest die WordPress-REST-API aus und führt ein Upsert für jeden Beitrag
-anhand seines Slugs durch, sodass es ohne Duplikate mehrfach ausgeführt werden kann: siehe
-[Aus WordPress importieren](/docs/recipes/import-from-wordpress/).
+Ein Skript liest die WordPress-REST-API aus und führt ein Upsert für jeden Beitrag anhand seines Slugs durch,
+sodass es erneut ausgeführt werden kann, ohne Duplikate zu erzeugen: siehe
+[Importieren aus WordPress](/docs/recipes/import-from-wordpress/).
 
 ## Zwei Publikationen in einer Installation
 
-Für ein Blog und ein Nachrichtenportal, die sich dieselbe Rebase-Instanz teilen, fügen Sie
-`posts`, `post_drafts`, `post_notes` und `media` eine `site`-Spalte hinzu und deklarieren
-[`tenant`](/docs/collections/tenancy/) auf jeder Tabelle zusammen mit einer Membership-Tabelle.
-Ein Redakteur, der auf beiden Websites arbeitet, sieht dann beide; ein Autor auf einer Website
-sieht nur diese eine – und Postgres setzt dies strikt durch.
+Für einen Blog und eine Nachrichtenseite, die sich dieselbe Rebase-Instanz teilen, fügen Sie eine `site`-Spalte zu
+`posts`, `post_drafts`, `post_notes` und `media` hinzu und deklarieren
+[`tenant`](/docs/collections/tenancy/) auf jeder dieser Tabellen über eine Membership-Tabelle. Ein
+Redakteur, der an beiden Seiten arbeitet, sieht dann beide; ein Autor auf einer Seite sieht nur diese
+eine – durchgesetzt von Postgres.
 
-## Verwandte Themen
+## Siehe auch
 
-- [Blog-CMS-Rezept](/docs/recipes/blog-cms/): die kompaktere Version des Workflows
-- [Row-Level Security](/docs/collections/security-rules/): worin die Regeln übersetzt werden
-- [Entity-Aktionen](/docs/frontend/entity-actions/) und [Entity-Ansichten](/docs/frontend/entity-views/)
-- [Cron-Jobs](/docs/backend/cron-jobs/) und [benutzerdefinierte Funktionen](/docs/backend/custom-functions/)
+- [Blog-CMS-Rezept](/docs/recipes/blog-cms/): Die kompaktere Version des Workflows
+- [Row-Level Security](/docs/collections/security-rules/): Worin die Regeln kompiliert werden
+- [Entity Actions](/docs/frontend/entity-actions/) und [Entity Views](/docs/frontend/entity-views/)
+- [Cron-Jobs](/docs/backend/cron-jobs/) und [Custom Functions](/docs/backend/custom-functions/)

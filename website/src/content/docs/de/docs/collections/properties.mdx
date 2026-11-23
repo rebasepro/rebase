@@ -1,16 +1,16 @@
 ---
-sourceHash: 7f745fbf9e5bda12
+sourceHash: 6319f76bf1a110cd
 title: Felder
 sidebar_label: Felder
-description: "Das Feld, das das CMS für jeden Spaltentyp darstellt – Text, Markdown, E-Mail, URL, Select, Multi-Select, Zahl, Schalter, Datum, Datei-Upload, JSON, Geopoint, Vektor, Binär – und die customizeTable-Optionen zur jeweiligen Anpassung."
+description: "Das Feld, das das CMS für jeden Spaltentyp darstellt – Text, Markdown, E-Mail, URL, Select, Multi-Select, Zahl, Switch, Datum, Datei-Upload, JSON, Geopoint, Vektor, Binär – und die customizeTable-Optionen, die jedes davon anpassen."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
 
-Jede Spalte einer Tabelle ist ein Feld im CMS. Welche Art von Feld es ist, ergibt sich
-aus der Spalte: ihr Typ, ihre Validierung und ihre Speicherregeln, die alle in
-[`backend/schema`](/docs/schema/columns/) deklariert werden. Wie das Feld aussieht,
-können Sie feldweise in [`customizeTable`](/docs/frontend/customize-table/) anpassen.
+Jede Spalte einer Tabelle ist ein Feld im CMS. Was das Feld ist, ergibt sich aus
+der Spalte: ihr Typ, ihre Validierung und ihre Speicherregeln, die alle in
+[`backend/schema`](/docs/schema/columns/) deklariert werden. Wie das Feld aussieht, können Sie
+pro Feld in [`customizeTable`](/docs/frontend/customize-table/) anpassen.
 
 Diese Tabelle wird in den folgenden Beispielen verwendet:
 
@@ -41,7 +41,7 @@ export const products = defineTable("products", {
 });
 ```
 
-Ohne eine Frontend-Datei besitzt jede Spalte bereits ein Feld. Diese Anpassung
+Ohne Frontend-Datei verfügt jede Spalte bereits über ein Feld. Diese Anpassung
 ändert einige davon:
 
 ```tsx
@@ -73,7 +73,7 @@ export const productsCms = customizeTable<typeof products>("products", {
 
 ## Text
 
-Eine `col.text()`-, `col.varchar({ length })`-, `col.char({ length })`- oder `col.uuid()`-Spalte ist ein
+Eine Spalte vom Typ `col.text()`, `col.varchar({ length })`, `col.char({ length })` oder `col.uuid()` ist ein
 Texteingabefeld. `varchar(n)` und `char(n)` begrenzen die Länge auf `n`, und `.validate({ min,
 max, length, matches })` fügt Regeln hinzu, die das Formular vor dem Speichern prüft.
 
@@ -83,58 +83,58 @@ max, length, matches })` fügt Regeln hinzu, die das Formular vor dem Speichern 
 
 <FieldWidgetPreview client:only="react" variant="multiline" />
 
-`markdown: true` macht daraus einen Markdown-Editor mit Werkzeugleiste und Vorschau.
+`markdown: true` macht daraus einen Markdown-Editor mit Toolbar und Vorschau.
 
 <FieldWidgetPreview client:only="react" variant="markdown" />
 
 `.validate({ email: true })` an der Spalte erzeugt ein E-Mail-Eingabefeld, das als
-E-Mail validiert wird. Da es sich um eine Eigenschaft der Daten handelt, wird dies an der Spalte
-deklariert, wo auch der Server dies prüft.
+E-Mail validiert wird. Da es sich um eine Eigenschaft der Daten handelt, wird dies an der Spalte deklariert,
+wo der Server es ebenfalls prüft.
 
 <FieldWidgetPreview client:only="react" variant="email" />
 
-`.validate({ url: true })` erzeugt ein URL-Eingabefeld, das als URL validiert wird, mit einer
+`.validate({ url: true })` erzeugt ein URL-Eingabefeld, das als URL validiert wird, inklusive
 Linkvorschau. `urlPreview` ändert lediglich die Vorschau: `true` für einen Link oder `"image"`,
-`"video"`, `"audio"` oder `"file"`, um das Medium direkt inline anzuzeigen.
+`"video"`, `"audio"` bzw. `"file"`, um das Medium inline anzuzeigen.
 
 <FieldWidgetPreview client:only="react" variant="url" />
 
 Eine mit `.userId()` gekennzeichnete Text- oder UUID-Spalte enthält die ID eines Benutzers und dient als
-Auswahl für die Benutzer des Projekts: deren Namen, E-Mails und Avatare werden jedem angeboten,
-der Schreibrechte auf die Tabelle hat. `ownerId` oben ist ein solches Feld. Ebenso jedes Element eines
+Auswahlfeld (Picker) für die Benutzer des Projekts: deren Namen, E-Mails und Avatare werden jedem
+angeboten, der Schreibrechte für die Tabelle hat. `ownerId` oben ist ein solches Feld. Ebenso jedes Element eines
 `col.text().userId().array()`.
 
 `previewAsTag: true` stellt den Wert außerhalb des Formulars als Chip dar. `clearable:
-true` fügt ein Steuerelement hinzu, das ihn auf `null` setzt. `referenceTo: "<slug>"` behandelt den
+true` fügt ein Steuerelement hinzu, um ihn auf `null` zu setzen. `referenceTo: "<slug>"` behandelt den
 Wert als Schlüssel eines Datensatzes in einer anderen Collection (auf einer beliebigen Datenquelle) und
-stellt eine Referenzauswahl dar; siehe [Firestore](/docs/frontend/firebase/#from-a-table-to-firestore).
+stellt einen Referenz-Picker dar; siehe [Firestore](/docs/frontend/firebase/#from-a-table-to-firestore).
 
-## Feste Wertemengen (Enums)
+## Feste Wertemengen
 
-Ein `col.enum([...])` ist ein Select-Feld, das an anderer Stelle als farbiger Chip dargestellt wird. Dasselbe gilt für eine
-Text- oder Zahlenspalte mit `.oneOf([...])`. Jeder Wert erhält eine Beschriftung anhand seines
-Bezeichners (`needs_review` wird zu „Needs Review“) und eine vom Wert abgeleitete Farbe,
-die bei jedem Laden identisch bleibt.
+Ein `col.enum([...])` ist ein Select-Feld, das an anderer Stelle als farbiger Chip dargestellt wird. Dasselbe gilt für eine Text-
+oder Zahlenspalte mit `.oneOf([...])`. Jeder Wert erhält eine Beschriftung, die von seinem
+Bezeichner abgeleitet wird (`needs_review` wird zu „Needs Review“), sowie eine aus dem
+Wert deterministisch generierte Farbe, die bei jedem Laden identisch bleibt.
 
 <FieldWidgetPreview client:only="react" variant="select" />
 
-`enumLabels` definiert Beschriftungen und Farben für ausgewählte Werte; ein nicht aufgeführter Wert
+`enumLabels` definiert Beschriftungen und Farben für bestimmte Werte; ein nicht aufgeführter Wert
 behält seine abgeleitete Beschriftung und Farbe. Jeder Eintrag ist ein String oder
-`{ label, color?, disabled? }`: `color` ist ein Schlüssel für eine Chip-Farbe wie `"green"`
+`{ label, color?, disabled? }`: `color` ist ein Farb-Schlüssel für Chips wie `"green"`
 oder `"orangeDark"`, und `disabled` lässt den Wert sichtbar, verhindert jedoch dessen
-Auswahl. `enumOrder` bestimmt die Reihenfolge, in der Werte angeboten werden, sowie die Reihenfolge von
-Kanban-Spalten. Beides wird anhand der Spalte überprüft: Ein Wert, den die Spalte nicht
+Auswahl. `enumOrder` legt die Reihenfolge fest, in der Werte angeboten werden, sowie die Reihenfolge von
+Kanban-Spalten. Beide werden gegen die Spalte geprüft: Ein Wert, den die Spalte nicht
 aufnehmen kann, führt zu einem Typfehler.
 
 Ein Array einer festen Wertemenge, `col.text({ enum: [...] }).array()`, ist ein
-Multi-Select über eine einzelne `text[]`-Spalte. Für das Array definierte `enumLabels` gelten
-auch für dessen Elemente.
+Multi-Select-Feld über eine einzelne `text[]`-Spalte. Für das Array definierte `enumLabels` gelten
+für dessen Elemente.
 
 <FieldWidgetPreview client:only="react" variant="multi_select" />
 
 ## Zahlen
 
-Jede Integer-, Serial-, `real`-, `doublePrecision`- und `numeric`-Spalte ist ein
+Jede Spalte vom Typ `integer`, `serial`, `real`, `doublePrecision` und `numeric` ist ein
 Zahleneingabefeld. Integer- und Serial-Spalten akzeptieren nur ganze Zahlen, und
 `.validate({ min, max, moreThan, lessThan, positive, negative })` fügt Begrenzungen hinzu.
 
@@ -144,11 +144,11 @@ Zahleneingabefeld. Integer- und Serial-Spalten akzeptieren nur ganze Zahlen, und
 (`"decimal"`, `"currency"`, `"percent"`), `currency` (zusammen mit `"currency"`),
 `locale`, `minimumFractionDigits`, `maximumFractionDigits` und `notation:
 "compact"`, wodurch `12000` in einer schmalen Spalte als `12K` dargestellt wird. `clearable` fügt ein
-Steuerelement hinzu, das den Wert auf `null` setzt.
+Steuerelement hinzu, um den Wert auf `null` zu setzen.
 
-## Boolscher Wert
+## Boolesche Werte
 
-Ein `col.boolean()` ist ein Schalter (Switch).
+Ein `col.boolean()` ist ein Switch.
 
 <FieldWidgetPreview client:only="react" variant="boolean" />
 
@@ -157,22 +157,22 @@ Ein `col.boolean()` ist ein Schalter (Switch).
 Ein `col.timestamp({ withTimezone: true })` ist eine Datums- und Uhrzeitauswahl, ein `col.date()` eine Datumsauswahl und
 ein `col.time()` eine Uhrzeitauswahl. `mode` wechselt zwischen `"date"` und
 `"date_time"`, und `timezone` zeigt und wählt den Wert in einer festen IANA-Zeitzone
-(`"Europe/Madrid"`) statt in der des Betrachters.
+(`"Europe/Madrid"`) statt in der Zeitzone des Betrachters.
 
 <FieldWidgetPreview client:only="react" variant="date" />
 
 <FieldWidgetPreview client:only="react" variant="date_time" />
 
-Eine vom Server gesetzte Spalte mit `.onCreateNow()` oder `.onUpdateNow()` ist
+Eine vom Server mit einem Zeitstempel versehene Spalte, `.onCreateNow()` oder `.onUpdateNow()`, ist
 schreibgeschützt, wird im Metadatenblock des Datensatzes angezeigt und in den Standard-Tabellenspalten
-ausgelassen. Spalten mit `.onCreateUser()` und `.onUpdateUser()` sind schreibgeschützt:
-Der Server schreibt die ID des ausführenden Benutzers, unabhängig vom Inhalt der Anfrage.
+ausgelassen. `.onCreateUser()`- und `.onUpdateUser()`-Spalten sind schreibgeschützt:
+Der Server schreibt die ID des ausführenden Benutzers, unabhängig vom Inhalt des Requests.
 
 ## Dateien
 
 Eine `col.storage({ … })`-Spalte ist ein Upload-Feld mit Vorschau, und
-`.multiple()` macht daraus ein Mehrfachdatei-Feld. Der Bucket, der Pfad, die akzeptierten
-Dateitypen und das Größenlimit werden an der Spalte deklariert; die Funktionen, die im
+`.multiple()` macht daraus ein Feld für mehrere Dateien. Der Bucket, der Pfad, die akzeptierten
+Dateitypen und das Größenlimit werden an der Spalte deklariert; die Funktionen, die in
 Browser ausgeführt werden, werden mit `storage` in `customizeTable` hinzugefügt. Siehe
 [Datei-Uploads](/docs/collections/file-uploads/).
 
@@ -180,67 +180,63 @@ Browser ausgeführt werden, werden mit `storage` in `customizeTable` hinzugefüg
 
 ## Arrays und JSON
 
-Eine Array-Spalte (`<item>.array()`) ist eine wiederholbare Liste des Element-Felds. Eine `jsonb`-Spalte
-mit einer [`json.*`-Struktur](/docs/schema/json/) ist eine Gruppe aus typisierten Feldern, Listen und
-Blöcken; eine ohne Struktur ist ein Schlüssel-Wert-Editor. Siehe
+Eine Array-Spalte (`<item>.array()`) ist eine wiederholbare Liste des Felds des jeweiligen Elements. Eine `jsonb`-Spalte
+mit einer [`json.*`-Shape](/docs/schema/json/) ist eine Gruppe typisierter Felder, Listen und
+Blöcke; eine Spalte ohne Shape ist ein Schlüssel/Wert-Editor. Siehe
 [Arrays und JSON](/docs/collections/arrays-and-maps/).
 
 ## Relationen und Referenzen
 
-Ein `belongsTo` ist eine Auswahl für die verknüpfte Zeile, die anstelle der Foreign-Key-Spalte
-angezeigt wird; eine To-Many-Relation wird als Reiter (Tab) des Datensatzes dargestellt. Eine Textspalte mit
-`referenceTo` ist ebenfalls ein Auswahlelement.
+Ein `belongsTo` ist ein Auswahlfeld für die zugehörige Zeile, das anstelle seiner Fremdschlüssel-Spalte
+angezeigt wird; eine To-Many-Relation wird als Tab des Datensatzes dargestellt. Eine Textspalte mit
+`referenceTo` ist ebenfalls ein Auswahlfeld.
 
 <FieldWidgetPreview client:only="react" variant="reference" />
 
-Siehe [Relationen im Panel](/docs/collections/relations-in-the-admin-panel/).
+Siehe [Relationen im Admin-Panel](/docs/collections/relations-in-the-admin-panel/).
 
 ## Geopoints, Vektoren und Binärdaten
 
-Ein `col.geopoint()` ist ein Feld für Breiten- und Längengrad. Ein `col.vector({ dimensions })` ist eine
-Vektoreingabe; `clearable` ist dessen einzige Option. Ein `col.bytea()` ist ein Binärfeld,
-das als Base64 gelesen und geschrieben wird. Keines dieser Felder hat typspezifische Optionen über
-diejenigen hinaus, die jedes Feld unterstützt.
+Ein `col.geopoint()` ist ein Feld für Breiten- und Längengrade. Ein `col.vector({ dimensions })` ist ein
+Vektor-Eingabefeld; `clearable` ist seine einzige Option. Ein `col.bytea()` ist ein Binärfeld,
+das als Base64 gelesen und geschrieben wird. Keines davon verfügt über typspezifische Optionen abgesehen
+von jenen, die jedes Feld unterstützt.
 
 ## Optionen, die jedes Feld unterstützt
 
 Unabhängig vom Spaltentyp:
 
-- `name` und `description` ersetzen die abgeleitete Beschriftung und ergänzen Hilfetext.
+- `name` und `description` ersetzen die abgeleitete Beschriftung und fügen Hilfetext hinzu.
 - `hidden` blendet das Feld in Tabellen- und Kartenansichten aus, und `hiddenInForm`
-  blendet es im Formular aus. Beides ändert nichts daran, was die API liest oder schreibt; um
+  entfernt es aus dem Formular. Beides ändert nichts daran, was die API liest oder schreibt; um
   einen Wert vor einem Aufrufer zu verbergen, verwenden Sie [Feldzugriff](/docs/collections/field-access/).
 - `readOnly` stellt den Wert als Text dar; `disabled` graut das Steuerelement aus, und als
-  `{ disabledMessage, clearOnDisabled }` erklärt es den Grund und leert den Wert.
+  `{ disabledMessage, clearOnDisabled }` begründet es dies und leert den Wert.
 - `columnWidth` legt die Breite der Tabellenspalte fest; `span` bestimmt, wie viele der
   vier Rasterspalten des Formulars das Feld einnimmt (siehe [Formular-Layout](/docs/frontend/form-layout/)).
 - `filterOperators` schränkt die für das Feld angebotenen Filteroperatoren ein, und
   `[]` deaktiviert das Filtern dafür vollständig. Die angebotenen Operatoren ergeben sich aus der
-  Schnittmenge der Operatoren, die die Datenquelle ausführen kann, den Standardwerten des Typs und dieser Liste:
-  Sie können nur einschränken.
-- `filledByServer` erlaubt es, das Feld beim Erstellen leer zu lassen, damit ein Server-Hook
-  es befüllen kann.
+  Schnittmenge der von der Datenquelle unterstützten Operatoren, den Standardwerten des Typs und dieser Liste: Sie können die Auswahl nur einschränken.
+- `filledByServer` erlaubt es, das Feld beim Erstellen leer zu lassen, damit ein Server-Hook es
+  füllen kann. Eine mit `.serverDefault()` markierte Spalte verhält sich bereits so; die Option überschreibt die Tabelleneinstellung.
 - `Field`, `Preview` und `Filter` ersetzen das Formular-Steuerelement, die Darstellung außerhalb
-  des Formulars und das Filter-Steuerelement durch Ihre eigenen Komponenten; `customProps` wird
-  unverändert an sie übergeben. Siehe [Benutzerdefinierte Felder](/docs/frontend/custom-fields/).
-- `propertyConfig` gibt einen Feldtyp an, der unter `<Rebase propertyConfigs>` registriert ist.
+  des Formulars und das Filter-Steuerelement durch eigene Komponenten; `customProps` wird
+  unverändert an sie übergeben. Siehe [Eigene Felder](/docs/frontend/custom-fields/).
+- `propertyConfig` benennt einen Feldtyp, der unter `<Rebase propertyConfigs>` registriert ist.
 - `conditions` und `dynamicProps` verändern das Feld basierend auf den Werten des
-  Datensatzes selbst; siehe [Bedingte Felder](/docs/collections/validation-and-conditions/#conditional-fields).
+  Datensatzes; siehe [Bedingte Felder](/docs/collections/validation-and-conditions/#conditional-fields).
 - `metadata` steht Ihnen frei zur Verfügung.
 
-Alle Optionen mitsamt Typangaben finden Sie in der
+Jede Option samt Typ finden Sie in der
 [customizeTable-Referenz](/docs/frontend/customize-table/#field-options).
 
 :::note[Nur Darstellung]
-Feldoptionen bestimmen lediglich, was das CMS darstellt. Die API akzeptiert Schreibvorgänge, die
-diese ignorieren, und es steht kein Constraint dahinter. Was für jeden Aufrufer gelten
-muss, gehört an die Spalte (`.notNull()`, `.validate()`, `.access()`) oder in die
-[Row-Level-Security](/docs/collections/security-rules/) der Tabelle.
+Feldoptionen bestimmen lediglich, was das CMS darstellt. Die API akzeptiert Schreibvorgänge, die diese Optionen ignorieren, und es steht kein Constraint dahinter. Was für jeden Aufrufer zwingend gelten muss, gehört an die Spalte (`.notNull()`, `.validate()`, `.access()`) oder in die [Row-Level Security](/docs/collections/security-rules/) der Tabelle.
 :::
 
 ## Nächste Schritte
 
 - [customizeTable](/docs/frontend/customize-table/): jede Option mit ihrem Typ
-- [Validierung und Bedingungen](/docs/collections/validation-and-conditions/): was das Formular prüft und Felder, die auf Werte reagieren
+- [Validierung und Bedingungen](/docs/collections/validation-and-conditions/): Was das Formular prüft, und Felder, die auf Werte reagieren
 - [Datei-Uploads](/docs/collections/file-uploads/): Storage-Spalten im CMS
-- [Spalten](/docs/schema/columns/): die Spaltentypen, auf denen diese Felder basieren
+- [Spalten](/docs/schema/columns/): Die Spaltentypen, auf denen diese Felder basieren
