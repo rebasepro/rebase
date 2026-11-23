@@ -222,10 +222,10 @@ import { CASE_STUDIES as cases } from "../data/case-studies";
                 </button>
             </div>
 
-            <p class="text-sm font-mono text-tone-500 tabular-nums">
-                <span id="case-current" class="text-tone-max">01</span>
-                <span class="mx-1 text-tone-700">/</span>
-                <span>{String(cases.length).padStart(2, "0")}</span>
+            {/* A slide counter, not a chapter index: plain "1 of 7" in the body
+                face, so it can't be read as the page's own 01 / 05 numbering. */}
+            <p class="text-sm text-tone-500 tabular-nums">
+                <span id="case-current" class="text-tone-max">1</span>{" "}{t("showcase.counter.of")}{" "}<span>{cases.length}</span>
             </p>
         </div>
 
@@ -381,7 +381,7 @@ import { CASE_STUDIES as cases } from "../data/case-studies";
         let index = 0;
 
         const render = () => {
-            current.textContent = String(index + 1).padStart(2, "0");
+            current.textContent = String(index + 1);
             live.textContent = `Slide ${index + 1} of ${slides.length}`;
             prevBtn.disabled = index === 0;
             nextBtn.disabled = index === slides.length - 1;

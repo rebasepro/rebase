@@ -1,6 +1,5 @@
 export const fr = {
   "hero.badge": "PostgreSQL — le vôtre, ou un que nous gérons pour vous",
-  "hero.spec.license.value": "Open source MIT",
   "hero.index": "Le backend et le panneau",
   "hero.subtitle": "Pointez Rebase vers votre base de données. Chaque table se compile en <strong>sécurité au niveau des lignes de Postgres</strong>, un <strong>SDK typé, REST et temps réel</strong>, et un <strong>panneau d’administration piloté par le schéma</strong> qui tourne comme un client ordinaire.",
   "hero.consumers.title": "Une définition · trois usages",
@@ -10,11 +9,6 @@ export const fr = {
   "hero.pillar.team.desc": "Panneau d’admin · 0 écran écrit",
   "hero.pillar.agents": "Postgres RLS et MCP",
   "hero.pillar.agents.desc": "Appliqué en base · rebase_user",
-  "hero.spec.data": "Plan de données",
-  "hero.spec.heritage": "Héritage",
-  "hero.spec.heritage.value": "Plus de 10 000 projets FireCMS",
-  "hero.spec.audit": "Audit",
-  "hero.spec.license": "Licence",
   "hero.title.part1": "Le backend pour votre Postgres.",
   "hero.title.part2": "Conçu pour votre équipe. Sûr pour vos agents.",
   "hero.cta.demo": "Tester la démo",
@@ -36,8 +30,9 @@ export const fr = {
   "recognition.oneNote": "une règle, dans Postgres, sur chaque chemin",
   // Beat 04 — the panel that ships with the backend (carousel + the three products).
   "panel.badge": "Là où votre équipe travaille",
-  "panel.title": "Les agents n'ont pas besoin d'interface. Votre équipe, si.",
-  "engine.badge": "Ce que vous obtenez",
+  "panel.title": "Votre équipe a un panneau d'administration. Personne n'a à le construire.",
+  "showcase.counter.of": "sur",
+  "engine.badge": "Les API",
   "engine.title":
     "Des API opérationnelles sur votre base de données, dès la première minute.",
   "engine.subtitle":
@@ -120,7 +115,7 @@ export const fr = {
   "cta.title": "Pointez-le vers votre base de données.",
   "cta.lane.local.title": "Lancez-le en local",
   "cta.lane.local.desc":
-    "Une seule commande sur votre Postgres existant. Pas de compte, pas de conteneur à pull, aucune inscription.",
+    "Une seule commande, et ça tourne. Pas de compte, pas de conteneur à pull, aucune inscription.",
   "cta.lane.local.link": "Démarrage rapide",
   "cta.lane.selfhost.title": "Auto-hébergez-le",
   "cta.lane.selfhost.desc":
@@ -723,7 +718,7 @@ export const fr = {
   "cli.02": "Échafaudez un projet, introspectez une base de données que vous avez déjà, déplacez le schéma, régénérez les types, lancez les deux moitiés en dev, et installez les skills dont votre agent de code a besoin.",
   "cli.03": "Les cinq premières minutes",
   "cli.04": "Trois commandes, et ça tourne",
-  "cli.05": "Échafaudez sur une base de données que vous avez déjà, poussez-y le schéma, et démarrez les deux moitiés. Rien entre ces étapes ne vous est caché — chacune affiche ce qu'elle a fait.",
+  "cli.05": "Échafaudez un projet, poussez le schéma vers sa base, et démarrez les deux moitiés. Rien entre ces étapes ne vous est caché — chacune affiche ce qu'elle a fait.",
   "cli.06": "Installer les skills de l'agent",
   "cli.07": "Écrit les fichiers de skills Rebase dans les répertoires d'agent de votre projet, pour qu'un agent de code connaisse le format des tables et la forme de l'API sans qu'on le lui répète.",
   "cli.08": "Sauvegardez, et restaurez",
@@ -1153,7 +1148,7 @@ export const fr = {
 
   // ── startupspage ────────────────────────────────────────────────
   "startupspage.00": "Le backend d'abord.<br/>Le back-office quand il le faut.",
-  "startupspage.01": "Pointez Rebase vers le Postgres que vous exploitez déjà et vous avez REST, un SDK typé, l'auth, le stockage et le temps réel dans l'après-midi — avec des règles d'accès appliquées par la base plutôt que par un middleware que personne n'a encore le temps de relire. Ajoutez le panneau le jour où quelqu'un qui n'est pas ingénieur doit toucher aux données. <b>Des minutes, pas des mois</b>, et pas de second modèle de données dans un cas comme dans l'autre.",
+  "startupspage.01": "Lancez Rebase et vous avez REST, un SDK typé, l'auth, le stockage et le temps réel dans l'après-midi — avec des règles d'accès appliquées par la base plutôt que par un middleware que personne n'a encore le temps de relire. Ajoutez le panneau le jour où quelqu'un qui n'est pas ingénieur doit toucher aux données. <b>Des minutes, pas des mois</b>, et pas de second modèle de données dans un cas comme dans l'autre.",
   "startupspage.02": "La couche que vous alliez construire deux fois",
   "startupspage.03":
     "Chaque produit a besoin de la même plomberie avant d'avoir besoin de quoi que ce soit d'intéressant : des endpoints CRUD, un client, des sessions, des uploads, des permissions. Rebase lit votre Postgres existant et la génère — l'API d'abord, et le panneau d'administration à partir de la même définition quand un humain en a besoin.",
@@ -1296,7 +1291,7 @@ export const fr = {
 
   // ── vsstrapi ────────────────────────────────────────────────────
   "vsstrapi.00": "Rebase face à Strapi",
-  "vsstrapi.01": "Strapi possède le schéma : les types de contenu sont créés dans Strapi, dans les tables de Strapi, et la base de données est un détail d'implémentation. Rebase pointe vers un Postgres que vous avez déjà et travaille avec les tables qu'il y trouve. C'est une différence de nature, et elle décide lequel vous convient avant toute fonctionnalité.",
+  "vsstrapi.01": "Strapi possède le schéma : les types de contenu sont créés dans Strapi, dans les tables de Strapi, et la base de données est un détail d'implémentation. Avec Rebase les tables sont les vôtres, dans votre Postgres, et il travaille avec les tables qu'il y trouve. C'est une différence de nature, et elle décide lequel vous convient avant toute fonctionnalité.",
   "vsstrapi.02": "Ses tables, ou les vôtres",
   "vsstrapi.04": "Strapi modélise les zones dynamiques et les relations via des tables de jointure générées et ses propres métadonnées (<code class=\"font-mono text-tone-300\">components_*</code>). C'est une conception raisonnable pour un CMS qui possède son schéma — mais cela signifie qu'un outil de BI ou une requête SQL brute lit la forme de Strapi et non la vôtre, et que sortir le contenu passe par l'API plutôt que par les tables.",
   "vsstrapi.06": "Rebase utilise des définitions natives Postgres, portées par Drizzle ORM.",
@@ -1393,13 +1388,13 @@ export const fr = {
 
   // ── close ───────────────────────────────────────────────────────
   "close.vs.title": "Ne nous croyez pas sur parole.",
-  "close.vs.blurb": "La comparaison qui compte est celle que vous faites. Pointez Rebase vers une base Postgres que vous avez déjà et voyez comment il tient face à %s.",
+  "close.vs.blurb": "La comparaison qui compte est celle que vous faites. Lancez Rebase vous-même et voyez comment il tient face à %s.",
   "close.pricing.title": "Rien à acheter pour commencer.",
   "close.pricing.blurb": "Sous licence MIT et gratuit à exploiter vous-même. Échafaudez un projet et voyez exactement ce que vous obtenez avant de parler à qui que ce soit.",
   "close.compare.title": "Comparez-le sur votre propre base de données.",
-  "close.compare.blurb": "La seule comparaison honnête est celle que vous faites vous-même. Pointez Rebase vers une base Postgres que vous avez déjà.",
+  "close.compare.blurb": "La seule comparaison honnête est celle que vous faites vous-même. Une commande lance Rebase.",
   "close.manifesto.title": "Possédez votre pile.",
-  "close.manifesto.blurb": "Un argument ne vaut que ce que vaut le logiciel qui le porte. Pointez Rebase vers une base que vous exploitez déjà.",
+  "close.manifesto.blurb": "Un argument ne vaut que ce que vaut le logiciel qui le porte. Une commande lance Rebase.",
   "close.ui.title": "Construisez vos propres champs dessus.",
   "close.ui.blurb": "Échafaudez un projet et déposez vos composants React dans le panneau là où le champ par défaut ne suffit pas.",
   "close.agencies.title": "Commencez ici le prochain projet client.",
@@ -1407,17 +1402,17 @@ export const fr = {
   "close.security.title": "Lisez les politiques qu'il écrit.",
   "close.security.blurb": "Échafaudez un projet et inspectez la sécurité au niveau des lignes de Postgres générée depuis vos définitions de table — avant de lui confier quoi que ce soit.",
   "close.startups.title": "Livrez le back-office dans ce sprint.",
-  "close.startups.blurb": "Échafaudez sur le Postgres que vous exploitez déjà et confiez le panneau à votre équipe — sans construire un seul écran d'administration.",
+  "close.startups.blurb": "Échafaudez un projet et confiez le panneau à votre équipe — sans construire un seul écran d'administration.",
   "close.sdk.title": "Typé depuis votre propre schéma.",
   "close.sdk.blurb": "Échafaudez un projet et le client est généré depuis les tables que vous définissez. Aucun type écrit à la main qui dérive.",
   "close.product.title": "Les deux couches, une commande.",
   "close.product.blurb": "Échafaudez un projet sur votre propre Postgres et voyez exactement quelles parties vous gardez.",
   "close.backend.title": "Pointez-le vers votre base de données.",
-  "close.backend.blurb": "Échafaudez sur une base Postgres que vous exploitez déjà et lisez les routes REST, le document OpenAPI et les politiques générées.",
+  "close.backend.blurb": "Échafaudez un projet et lisez les routes REST, le document OpenAPI et les politiques générées.",
   "close.cli.title": "Tout le cycle de vie, un terminal.",
   "close.cli.blurb": "Échafaudez un projet, poussez un schéma, lancez-le, sauvegardez-le — chaque étape est une commande que vous pouvez mettre en CI.",
   "close.about.title": "Construisez quelque chose dessus.",
-  "close.about.blurb": "Rebase est sous licence MIT et auto-hébergé. Pointez-le vers une base Postgres que vous exploitez déjà.",
+  "close.about.blurb": "Rebase est sous licence MIT. Faites-le tourner sur vos serveurs ou sur Rebase Cloud.",
   "close.admin.title": "Ajoutez le panneau quand vous en avez besoin.",
   "close.admin.blurb": "Échafaudez un projet, définissez une table, et le panneau d'administration est déjà là, lisant la même API que votre application.",
   "close.developers.title": "Lancez la boucle.",
@@ -1425,7 +1420,7 @@ export const fr = {
   "close.studio.title": "Pilotez votre base de données depuis le panneau.",
   "close.studio.blurb": "Échafaudez un projet et Studio vient avec : console SQL, visualiseur de schéma, éditeur de politiques RLS, branches, cron, stockage et logs — sur votre propre Postgres.",
   "close.contact.title": "Ou essayez-le avant d'écrire.",
-  "close.contact.blurb": "La plupart des questions trouvent leur réponse après une commande sur une base que vous avez déjà.",
+  "close.contact.blurb": "La plupart des questions trouvent leur réponse après une seule commande.",
   "close.europe.title": "Faites-le tourner où vous voulez.",
   "close.europe.blurb": "Sous licence MIT et auto-hébergé sur votre propre infrastructure — ou sur Rebase Cloud, avec le sous-traitant et le sous-traitant ultérieur nommés.",
 

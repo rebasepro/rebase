@@ -1,6 +1,5 @@
 export const de = {
   "hero.badge": "PostgreSQL — deins, oder eins, das wir betreiben",
-  "hero.spec.license.value": "MIT Open Source",
   "hero.index": "Das Backend & das Panel",
   "hero.subtitle": "Richte Rebase auf deine Datenbank. Jede Tabelle wird zu <strong>Row-Level-Security in Postgres</strong>, einem <strong>typisierten SDK, REST &amp; Realtime</strong> und einem <strong>schemagetriebenen Admin-Panel</strong>, das als ganz normaler Client läuft.",
   "hero.consumers.title": "Eine Definition · drei Nutzer",
@@ -10,11 +9,6 @@ export const de = {
   "hero.pillar.team.desc": "Admin-Panel · 0 Screens geschrieben",
   "hero.pillar.agents": "Postgres RLS & MCP",
   "hero.pillar.agents.desc": "In der DB erzwungen · rebase_user",
-  "hero.spec.data": "Datenebene",
-  "hero.spec.heritage": "Herkunft",
-  "hero.spec.heritage.value": "10.000+ FireCMS-Projekte",
-  "hero.spec.audit": "Audit",
-  "hero.spec.license": "Lizenz",
   "hero.title.part1": "Das Backend für dein Postgres.",
   "hero.title.part2": "Gebaut für dein Team. Sicher für deine Agenten.",
   "hero.cta.demo": "Demo testen",
@@ -36,8 +30,9 @@ export const de = {
   "recognition.oneNote": "eine Regel, in Postgres, auf jedem Weg",
   // Beat 04 — the panel that ships with the backend (carousel + the three products).
   "panel.badge": "Wo dein Team arbeitet",
-  "panel.title": "Agenten brauchen keine Oberfläche. Dein Team schon.",
-  "engine.badge": "Was du bekommst",
+  "panel.title": "Dein Team bekommt ein Admin-Panel. Niemand muss es bauen.",
+  "showcase.counter.of": "von",
+  "engine.badge": "Die APIs",
   "engine.title": "Einsatzbereite APIs für deine Datenbank, ab Minute eins.",
   "engine.subtitle":
     "Ein typisiertes SDK für deine Tabellen, REST für jede Tabelle und Realtime über WebSocket, ab Minute eins auf deiner Datenbank.",
@@ -119,7 +114,7 @@ export const de = {
   "cta.title": "Verbinde es mit deiner Datenbank.",
   "cta.lane.local.title": "Lokal ausführen",
   "cta.lane.local.desc":
-    "Ein Befehl gegen dein bestehendes Postgres. Kein Account, kein Container-Pull, keine Registrierung.",
+    "Ein Befehl, und es läuft. Kein Account, kein Container-Pull, keine Registrierung.",
   "cta.lane.local.link": "Quickstart",
   "cta.lane.selfhost.title": "Selbst hosten",
   "cta.lane.selfhost.desc":
@@ -722,7 +717,7 @@ export const de = {
   "cli.02": "Scaffolde ein Projekt, introspiziere eine Datenbank, die du schon hast, bewege das Schema, generiere die Typen neu, starte beide Hälften im Dev-Modus und installiere die Skills, die dein Coding-Agent braucht.",
   "cli.03": "Die ersten fünf Minuten",
   "cli.04": "Drei Befehle, dann läuft es",
-  "cli.05": "Scaffolde gegen eine Datenbank, die du schon hast, bring das Schema darauf und starte beide Hälften. Zwischen diesen Schritten bleibt dir nichts verborgen — jeder druckt, was er getan hat.",
+  "cli.05": "Scaffolde ein Projekt, bring das Schema in seine Datenbank und starte beide Hälften. Zwischen diesen Schritten bleibt dir nichts verborgen — jeder druckt, was er getan hat.",
   "cli.06": "Die Agent-Skills installieren",
   "cli.07": "Schreibt die Rebase-Skill-Dateien in die Agent-Verzeichnisse deines Projekts, damit ein Coding-Agent das Tabellenformat und die API-Form kennt, ohne dass man es ihm jedes Mal sagt.",
   "cli.08": "Sichern, und zurückspielen",
@@ -1153,7 +1148,7 @@ export const de = {
 
   // ── startupspage ────────────────────────────────────────────────
   "startupspage.00": "Erst das Backend.<br/>Das Back-Office, wenn du es brauchst.",
-  "startupspage.01": "Richte Rebase auf das Postgres, das du schon betreibst, und du hast REST, ein typisiertes SDK, Auth, Storage und Realtime noch am selben Nachmittag — mit Zugriffsregeln, die die Datenbank durchsetzt statt Middleware, die noch niemand zu reviewen Zeit hatte. Nimm das Panel an dem Tag dazu, an dem jemand ohne Engineering-Rolle die Daten anfassen muss. <b>Minuten, keine Monate</b>, und in beiden Fällen kein zweites Datenmodell.",
+  "startupspage.01": "Starte Rebase, und du hast REST, ein typisiertes SDK, Auth, Storage und Realtime noch am selben Nachmittag — mit Zugriffsregeln, die die Datenbank durchsetzt statt Middleware, die noch niemand zu reviewen Zeit hatte. Nimm das Panel an dem Tag dazu, an dem jemand ohne Engineering-Rolle die Daten anfassen muss. <b>Minuten, keine Monate</b>, und in beiden Fällen kein zweites Datenmodell.",
   "startupspage.02": "Die Schicht, die du zweimal gebaut hättest",
   "startupspage.03":
     "Jedes Produkt braucht dasselbe Grundgerüst, bevor es irgendetwas Interessantes braucht: CRUD-Endpunkte, einen Client, Sessions, Uploads, Berechtigungen. Rebase liest dein vorhandenes Postgres und generiert es — API zuerst, und das Admin-Panel aus derselben Definition, wenn ein Mensch eines braucht.",
@@ -1298,7 +1293,7 @@ export const de = {
 
   // ── vsstrapi ────────────────────────────────────────────────────
   "vsstrapi.00": "Rebase gegen Strapi",
-  "vsstrapi.01": "Strapi besitzt das Schema: Content-Typen entstehen in Strapi, in Strapis Tabellen, und die Datenbank ist ein Implementierungsdetail. Rebase richtet sich auf ein Postgres, das du schon hast, und arbeitet mit den Tabellen, die es vorfindet. Das ist ein Unterschied in der Art, und er entscheidet vor jedem Feature, welches das richtige für dich ist.",
+  "vsstrapi.01": "Strapi besitzt das Schema: Content-Typen entstehen in Strapi, in Strapis Tabellen, und die Datenbank ist ein Implementierungsdetail. Bei Rebase sind die Tabellen deine, in deinem Postgres, und es arbeitet mit den Tabellen, die es vorfindet. Das ist ein Unterschied in der Art, und er entscheidet vor jedem Feature, welches das richtige für dich ist.",
   "vsstrapi.02": "Seine Tabellen, oder deine",
   "vsstrapi.04": "Strapi modelliert Dynamic Zones und Relationen über generierte Join-Tabellen und eigene Metadaten (<code class=\"font-mono text-tone-300\">components_*</code>). Das ist ein vernünftiger Entwurf für ein CMS, dem sein Schema gehört — aber es heißt, dass ein BI-Werkzeug oder eine rohe SQL-Query Strapis Form liest statt deiner, und dass Inhalte über die API herauswandern, nicht über die Tabellen.",
   "vsstrapi.06": "Rebase nutzt Postgres-native Definitionen auf Basis von Drizzle ORM.",
@@ -1397,13 +1392,13 @@ export const de = {
 
   // ── close ───────────────────────────────────────────────────────
   "close.vs.title": "Glaub uns nicht einfach.",
-  "close.vs.blurb": "Der Vergleich, der zählt, ist der, den du selbst machst. Richte Rebase auf ein Postgres, das du schon hast, und sieh, wie es sich neben %s hält.",
+  "close.vs.blurb": "Der Vergleich, der zählt, ist der, den du selbst machst. Starte Rebase selbst und sieh, wie es sich neben %s hält.",
   "close.pricing.title": "Zum Anfangen gibt es nichts zu kaufen.",
   "close.pricing.blurb": "MIT-lizenziert und kostenlos selbst zu betreiben. Scaffolde ein Projekt und sieh genau, was du bekommst, bevor du mit jemandem sprichst.",
   "close.compare.title": "Vergleich es an deiner eigenen Datenbank.",
-  "close.compare.blurb": "Der einzige ehrliche Vergleich ist der, den du selbst machst. Richte Rebase auf ein Postgres, das du schon hast.",
+  "close.compare.blurb": "Der einzige ehrliche Vergleich ist der, den du selbst machst. Ein Befehl startet Rebase.",
   "close.manifesto.title": "Besitz deinen Stack.",
-  "close.manifesto.blurb": "Ein Argument ist nur so viel wert wie die Software darunter. Richte Rebase auf eine Datenbank, die du schon betreibst.",
+  "close.manifesto.blurb": "Ein Argument ist nur so viel wert wie die Software darunter. Ein Befehl startet Rebase.",
   "close.ui.title": "Bau deine eigenen Felder darauf.",
   "close.ui.blurb": "Scaffolde ein Projekt und setz deine React-Komponenten dort ins Panel, wo das Standardfeld nicht reicht.",
   "close.agencies.title": "Fang das nächste Kundenprojekt hier an.",
@@ -1411,17 +1406,17 @@ export const de = {
   "close.security.title": "Lies die Policies, die es schreibt.",
   "close.security.blurb": "Scaffolde ein Projekt und sieh dir die aus deinen Tabellendefinitionen erzeugte Postgres-Row-Level-Security an — bevor du ihr irgendetwas anvertraust.",
   "close.startups.title": "Liefer das Back-Office in diesem Sprint.",
-  "close.startups.blurb": "Scaffolde gegen das Postgres, das du schon betreibst, und gib deinem Team das Panel — ohne einen einzigen Admin-Screen zu bauen.",
+  "close.startups.blurb": "Scaffolde ein Projekt und gib deinem Team das Panel — ohne einen einzigen Admin-Screen zu bauen.",
   "close.sdk.title": "Typisiert aus deinem eigenen Schema.",
   "close.sdk.blurb": "Scaffolde ein Projekt, und der Client entsteht aus den Tabellen, die du definierst. Keine handgeschriebenen Typen, die driften.",
   "close.product.title": "Beide Schichten, ein Befehl.",
   "close.product.blurb": "Scaffolde ein Projekt gegen dein eigenes Postgres und sieh genau, welche Teile du behältst.",
   "close.backend.title": "Richte es auf deine Datenbank.",
-  "close.backend.blurb": "Scaffolde gegen ein Postgres, das du schon betreibst, und lies die REST-Routen, das OpenAPI-Dokument und die erzeugten Policies.",
+  "close.backend.blurb": "Scaffolde ein Projekt und lies die REST-Routen, das OpenAPI-Dokument und die erzeugten Policies.",
   "close.cli.title": "Der ganze Lebenszyklus, ein Terminal.",
   "close.cli.blurb": "Scaffolde ein Projekt, push ein Schema, starte es, sichere es — jeder Schritt ist ein Befehl, den du in die CI packen kannst.",
   "close.about.title": "Bau etwas darauf.",
-  "close.about.blurb": "Rebase ist MIT-lizenziert und self-hosted. Richte es auf ein Postgres, das du schon betreibst.",
+  "close.about.blurb": "Rebase ist MIT-lizenziert. Betreib es auf deinen Servern oder in Rebase Cloud.",
   "close.admin.title": "Nimm das Panel dazu, wenn du es brauchst.",
   "close.admin.blurb":
     "Scaffolde ein Projekt, definiere eine Tabelle, und das Admin-Panel ist schon da — und liest dieselbe API wie deine App.",
@@ -1430,7 +1425,7 @@ export const de = {
   "close.studio.title": "Betreib deine Datenbank aus dem Panel.",
   "close.studio.blurb": "Scaffolde ein Projekt, und Studio kommt mit: SQL-Konsole, Schema-Visualisierung, RLS-Policy-Editor, Branches, Cron, Storage und Logs — gegen dein eigenes Postgres.",
   "close.contact.title": "Oder probier es, bevor du schreibst.",
-  "close.contact.blurb": "Die meisten Fragen beantworten sich nach einem Befehl gegen eine Datenbank, die du schon hast, von selbst.",
+  "close.contact.blurb": "Die meisten Fragen beantworten sich nach einem einzigen Befehl von selbst.",
   "close.europe.title": "Betreib es, wo du willst.",
   "close.europe.blurb": "MIT-lizenziert und self-hosted auf deiner eigenen Infrastruktur — oder auf Rebase Cloud, mit benanntem Auftragsverarbeiter und Unterauftragsverarbeiter.",
 

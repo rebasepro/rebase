@@ -1,6 +1,5 @@
 export const en = {
   "hero.badge": "PostgreSQL — yours, or one we run for you",
-  "hero.spec.license.value": "MIT open source",
   "hero.index": "The backend & the panel",
   "hero.subtitle": "Point Rebase at your database. Every table compiles to <strong>Postgres row-level security</strong>, a <strong>typed SDK, REST &amp; realtime</strong>, and a <strong>schema-driven admin panel</strong> that runs as an ordinary client.",
   "hero.consumers.title": "One definition · three consumers",
@@ -10,14 +9,22 @@ export const en = {
   "hero.pillar.team.desc": "Admin panel · 0 screens written",
   "hero.pillar.agents": "Postgres RLS & MCP",
   "hero.pillar.agents.desc": "Enforced in DB · rebase_user",
-  "hero.spec.data": "Data plane",
-  "hero.spec.heritage": "Heritage",
-  "hero.spec.heritage.value": "10,000+ FireCMS projects",
-  "hero.spec.audit": "Audit",
-  "hero.spec.license": "License",
   "hero.title.part1": "The backend for your Postgres.",
   "hero.title.part2": "Built for your team. Safe for your agents.",
   "hero.cta.demo": "Try the demo",
+  // The services grid straight under the hero: every service, named the way a
+  // developer searches for it, in the first scroll (2026-11-23).
+  "caps.badge": "In the box",
+  "caps.title": "Everything a product backend needs, in one server on one Postgres.",
+  "caps.link": "Explore the backend",
+  "caps.api.title": "Typed SDK & REST",
+  "caps.api.desc": "Generated from your tables, with OpenAPI and typed accessors.",
+  "caps.realtime.title": "Realtime",
+  "caps.realtime.desc": "Row changes pushed over a WebSocket, filtered by the same rules.",
+  "caps.panel.title": "Admin panel",
+  "caps.panel.desc": "Rebase CMS for your team, Rebase Studio for your developers.",
+  "caps.mcp.title": "MCP & agents",
+  "caps.mcp.desc": "Claude and other agents work your data under scoped keys.",
 
   // Free-tool section. The copy stays useful to someone who will never adopt
   // Rebase — the moment it reads as a funnel, it stops being worth running.
@@ -41,8 +48,9 @@ export const en = {
   // sub-block of the same chapter (merged 2026-09-09; panel.badge is no longer
   // rendered on the home page).
   "panel.badge": "Where your team works",
-  "panel.title": "Agents don't need a UI. Your team still does.",
-  "engine.badge": "What you get",
+  "panel.title": "Your team gets an admin panel. Nobody has to build it.",
+  "showcase.counter.of": "of",
+  "engine.badge": "The APIs",
   "engine.title": "Working APIs against your database, from minute one.",
   "engine.subtitle":
     "A typed SDK for your tables, REST over every table and realtime on a WebSocket, running against your database from minute one.",
@@ -143,7 +151,7 @@ export const en = {
   // opens in batches — see `cloud.status`, the one key every surface quotes.
   "cta.lane.local.title": "Run it locally",
   "cta.lane.local.desc":
-    "One command against the Postgres you already have. No account, no container to pull, nothing to sign up for.",
+    "One command, and it runs. No account, no container to pull, nothing to sign up for.",
   "cta.lane.local.link": "Quickstart",
   "cta.lane.selfhost.title": "Self-host it",
   "cta.lane.selfhost.desc":
@@ -868,7 +876,7 @@ export const en = {
   "cli.02": "Scaffold a project, introspect a database you already have, move the schema, regenerate the types, run both halves in dev, and install the skills your coding agent needs.",
   "cli.03": "The first five minutes",
   "cli.04": "Three commands, then it is running",
-  "cli.05": "Scaffold against a database you already have, move the schema onto it, and start both halves. Nothing between those steps is hidden from you — every one of them prints what it did.",
+  "cli.05": "Scaffold a project, push the schema to its database, and start both halves. Nothing between those steps is hidden from you — every one of them prints what it did.",
   "cli.06": "Install the agent skills",
   "cli.07": "Writes the Rebase skill files into the agent directories in your project, so a coding agent knows the table format and the API shape without being told each time.",
   "cli.08": "Back it up, restore it back",
@@ -1300,7 +1308,7 @@ export const en = {
 
   // ── startupspage ────────────────────────────────────────────────
   "startupspage.00": "The backend first.<br/>The back office when you need it.",
-  "startupspage.01": "Point Rebase at the Postgres you already run and you have REST, a typed SDK, auth, storage and realtime the same afternoon — with the access rules enforced by the database rather than by middleware nobody has time to review yet. Add the panel the day someone who is not an engineer needs to touch the data. <b>Minutes, not months</b>, and no second data model either way.",
+  "startupspage.01": "Start Rebase and you have REST, a typed SDK, auth, storage and realtime the same afternoon — with the access rules enforced by the database rather than by middleware nobody has time to review yet. Add the panel the day someone who is not an engineer needs to touch the data. <b>Minutes, not months</b>, and no second data model either way.",
   "startupspage.02": "The layer you were going to build twice",
   "startupspage.03": "Every product needs the same plumbing before it needs anything interesting: CRUD endpoints, a client, sessions, uploads, permissions. Rebase reads your existing Postgres and generates it — API first, and the admin panel off the same definition when a human needs one.",
   "startupspage.04": "What arrives on day one",
@@ -1442,7 +1450,7 @@ export const en = {
 
   // ── vsstrapi ────────────────────────────────────────────────────
   "vsstrapi.00": "Rebase vs Strapi",
-  "vsstrapi.01": "Strapi owns the schema: content types are created in Strapi, in Strapi's tables, and the database is an implementation detail. Rebase points at a Postgres you already have and works with the tables it finds. That is a difference in kind, and it decides which one is right for you before any feature does.",
+  "vsstrapi.01": "Strapi owns the schema: content types are created in Strapi, in Strapi's tables, and the database is an implementation detail. With Rebase the tables are yours, in your Postgres, and it works with the tables it finds. That is a difference in kind, and it decides which one is right for you before any feature does.",
   "vsstrapi.02": "Its tables, or yours",
   "vsstrapi.04": "Strapi models dynamic zones and relations through generated join tables and metadata of its own (<code class=\"font-mono text-tone-300\">components_*</code>). That is a reasonable design for a CMS that owns its schema — but it means a BI tool or a raw SQL query reads Strapi's shape rather than yours, and migrating content out goes through the API rather than the tables.",
   "vsstrapi.06": "Rebase uses Postgres-native definitions, powered by Drizzle ORM.",
@@ -1537,13 +1545,13 @@ export const en = {
 
   // ── close ───────────────────────────────────────────────────────
   "close.vs.title": "Don't take our word for it.",
-  "close.vs.blurb": "The comparison that matters is the one you run. Point Rebase at a Postgres database you already have and see how it holds up next to %s.",
+  "close.vs.blurb": "The comparison that matters is the one you run. Run Rebase yourself and see how it holds up next to %s.",
   "close.pricing.title": "Nothing to buy to start.",
   "close.pricing.blurb": "MIT-licensed and free to run yourself. Scaffold a project and see exactly what you get before you talk to anyone.",
   "close.compare.title": "Compare it on your own database.",
-  "close.compare.blurb": "The only honest comparison is the one you run yourself. Point Rebase at a Postgres database you already have.",
+  "close.compare.blurb": "The only honest comparison is the one you run yourself. One command starts Rebase.",
   "close.manifesto.title": "Own your stack.",
-  "close.manifesto.blurb": "An argument is only worth as much as the software under it. Point Rebase at a database you already run.",
+  "close.manifesto.blurb": "An argument is only worth as much as the software under it. One command starts Rebase.",
   "close.ui.title": "Build your own fields on it.",
   "close.ui.blurb": "Scaffold a project and drop your React components into the panel wherever the default field isn't enough.",
   "close.agencies.title": "Start the next client project here.",
@@ -1551,17 +1559,17 @@ export const en = {
   "close.security.title": "Read the policies it writes.",
   "close.security.blurb": "Scaffold a project and inspect the Postgres row-level security generated from your table definitions — before you trust it with anything.",
   "close.startups.title": "Ship the back office this sprint.",
-  "close.startups.blurb": "Scaffold against the Postgres you already run and hand the panel to your team — without building a single admin screen.",
+  "close.startups.blurb": "Scaffold a project and hand the panel to your team — without building a single admin screen.",
   "close.sdk.title": "Typed from your own schema.",
   "close.sdk.blurb": "Scaffold a project and the client is generated from the tables you define. No hand-written types to drift.",
   "close.product.title": "Both layers, one command.",
   "close.product.blurb": "Scaffold a project against your own Postgres and see exactly which parts you keep.",
   "close.backend.title": "Point it at your database.",
-  "close.backend.blurb": "Scaffold against a Postgres database you already run and read the REST routes, the OpenAPI document and the policies it generated.",
+  "close.backend.blurb": "Scaffold a project and read the REST routes, the OpenAPI document and the policies it generated.",
   "close.cli.title": "The whole lifecycle, one terminal.",
   "close.cli.blurb": "Scaffold a project, push a schema, run it, back it up — every step is a command you can put in CI.",
   "close.about.title": "Build something on it.",
-  "close.about.blurb": "Rebase is MIT-licensed and self-hosted. Point it at a Postgres database you already run.",
+  "close.about.blurb": "Rebase is MIT-licensed. Run it on your own servers or on Rebase Cloud.",
   "close.admin.title": "Add the panel when you need it.",
   "close.admin.blurb": "Scaffold a project, define one table, and the admin panel is already there, reading the same API your app does.",
   "close.developers.title": "Start the loop.",
@@ -1569,7 +1577,7 @@ export const en = {
   "close.studio.title": "Run your database from the panel.",
   "close.studio.blurb": "Scaffold a project and Studio comes with it: SQL console, schema visualizer, RLS policy editor, branches, cron, storage and logs — against your own Postgres.",
   "close.contact.title": "Or try it before you write.",
-  "close.contact.blurb": "Most questions answer themselves after one command against a database you already have.",
+  "close.contact.blurb": "Most questions answer themselves after one command.",
   "close.europe.title": "Run it where you choose.",
   "close.europe.blurb": "MIT-licensed and self-hosted on your own infrastructure — or on Rebase Cloud, with the processor and the sub-processor named.",
 

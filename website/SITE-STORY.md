@@ -74,8 +74,11 @@ the agent holding a key and the European buyer are real audiences, and each has
 a deep page — but none of them is addressed on `/` at the developer's expense,
 and none of them is the reason the hero says what it says. Naming the
 beachhead is what settles the hero: it leads with claim 1 because that is the
-claim this reader is already looking for, and "the Postgres you already have"
-is the sentence that tells them they will not have to move to get it.
+claim this reader is already looking for.
+
+> Revised 2026-11-23: "the Postgres you already have" is banned in copy. Rebase
+> also provides the database (Rebase Cloud, the managed dev database), and the
+> phrase says you must bring one. Never name a competitor in hero copy either.
 
 ## 2. The four claims we are allowed to lead with
 
