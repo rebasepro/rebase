@@ -1,5 +1,5 @@
 import { ui, defaultLang } from "../i18n/ui";
-import { CLOUD_FLAGS, CLOUD_PRICES, CLOUD_SIGNUP_URL, REGION_FACTS, cpuLabel, eur, fill, fromPrice, includedItems, memoryLabel, offerKey, regionPrices } from "../data/cloud-offer";
+import { CLOUD_FLAGS, CLOUD_PRICES, CLOUD_SIGNUP_URL, HOURS_IN_MONTH, REGION_FACTS, cpuLabel, defaultProjectLines, dialRates, eur, fill, fromPrice, includedItems, memoryLabel, offerKey, regionPrices } from "../data/cloud-offer";
 
 type LangKey = keyof typeof ui;
 
@@ -394,40 +394,68 @@ Rebase is the open-source backend for Postgres — REST, a typed SDK, realtime, 
   if (page === "pricing") {
     const region = regionPrices();
     const facts = REGION_FACTS[CLOUD_FLAGS.region];
+    const burst = facts.cpuBurst;
+    const burstValues: Record<string, string> = burst ? { times: String(burst.times), cap: String(burst.capVcpu) } : {};
     const from = fromPrice();
     const ex = region.examples;
+    const lines = defaultProjectLines();
+    const rates = dialRates();
     const size = (x: { cpu: string; memory: string }) => `${cpuLabel(x.cpu)} / ${memoryLabel(x.memory)}`;
-    const examples = [
-      ...(CLOUD_FLAGS.sleep ? [`- **${tr("pricing.examples.sleeping.name")}**: ${eur(ex.sleeping.monthlyEur)} a month (${eur(ex.sleeping.asleepMonthlyEur)} asleep, plus ${eur(ex.sleeping.awakeHourEur, 4)} per awake hour, ${ex.sleeping.awakeHours} hours awake)`] : []),
-      `- **${tr("pricing.examples.small.name")}**: ${eur(ex.smallest.monthlyEur)} a month — app ${size(ex.smallest.app)}, database ${size(ex.smallest.database)}, ${ex.smallest.diskGi} GB disk`,
-      `- **${tr("pricing.examples.production.name")}**: ${eur(ex.production.monthlyEur)} a month — app ${size(ex.production.app)}, database ${size(ex.production.database)}, ${ex.production.diskGi} GB disk, ${ex.production.filesGb} GB of files`
-    ].join("\n");
     const included = includedItems().map((i) => `- ${fill(tr(i.key), i.values)}`).join("\n");
-    const subtitle = CLOUD_FLAGS.sleep
-      ? fill(tr("pricing.hero.subtitle.sleep"), { place: facts.place, asleep: eur(ex.sleeping.asleepMonthlyEur) })
-      : fill(tr("pricing.hero.subtitle"), { place: facts.place });
+    const lede = [
+      fill(tr("pricing.hero.lede"), { place: facts.place }),
+      ...(CLOUD_FLAGS.sleep ? [fill(tr("pricing.hero.sleep"), { asleep: eur(ex.sleeping.asleepMonthlyEur) })] : [])
+    ].join(" ");
     const start = CLOUD_FLAGS.selfServe ? `Create a project: ${CLOUD_SIGNUP_URL}` : `${tr("cloud.status")}`;
+    const rules = [
+      `- **${tr("pricing.billing.hourly.title")}**: ${tr("pricing.billing.hourly.body")}`,
+      `- **${tr("pricing.billing.change.title")}**: ${tr("pricing.billing.change.body")}`,
+      `- **${tr("pricing.billing.resize.title")}**: ${cleanHtml(tr("pricing.billing.resize.app"))} ${cleanHtml(tr("pricing.billing.resize.db"))} ${cleanHtml(tr("pricing.billing.resize.db2"))}`,
+      ...(burst ? [`- **${tr("pricing.billing.burst.title")}**: ${fill(tr("pricing.billing.burst.body"), burstValues)}`] : [])
+    ].join("\n");
     return `# Rebase pricing
 
-Rebase is MIT-licensed and free to run on your own machines. Rebase Cloud runs it for you, priced per resource, not per seat. Prices exclude VAT.
+${tr("pricing.hero.headline")} ${burst ? tr("pricing.hero.headline2") : tr("pricing.hero.headline2.noburst")}
+
+${lede} ${tr("pricing.hero.vat")}
 
 ## Rebase Cloud: ${fill(tr("pricing.cloud.from"), { price: eur(from.amount) })}
 
-${subtitle}
-
 ${start}
 
-## What projects cost
+## ${tr("pricing.dials.title")}
 
-${examples}
+- ${tr("pricing.calc.line.platform")}: ${eur(lines.platform)}
+- ${tr("pricing.calc.line.app")} (${size(region.defaults.app)}): ${eur(lines.app)}
+- ${tr("pricing.calc.line.database")} (${size(region.defaults.database)}): ${eur(lines.database)}
+- ${tr("pricing.calc.line.disk")} (${region.defaults.diskGi} GB): ${eur(lines.disk)}
+- **Total: ${eur(lines.total)} a month** (about ${eur(lines.total / HOURS_IN_MONTH, 3)} an hour). ${fill(tr("pricing.dials.withSecondCopy"), { price: eur(lines.totalWithSecondCopy) })}
 
-Any other size: platform fee ${eur(CLOUD_PRICES.platformFeeEur)} a month, plus the app, the database and ${eur(region.diskEurPerGib, 4)} per GB of database disk. The calculator on https://rebase.pro/pricing uses the same list the console quotes from.
+## ${tr("pricing.dials.rates.title")} (a month)
+
+- ${tr("pricing.dials.rate.platform")}: ${eur(rates.platformEur)} ${tr("pricing.dials.per.project")}
+- ${tr("pricing.dials.rate.appCpu")}: ${eur(rates.appVcpuEur)} ${tr("pricing.dials.per.vcpu")}
+- ${tr("pricing.dials.rate.appMemory")}: ${eur(rates.appGbEur)} ${tr("pricing.dials.per.gb")}
+- ${tr("pricing.dials.rate.databaseCpu")}: ${eur(rates.databaseVcpuEur)} ${tr("pricing.dials.per.vcpu")}
+- ${tr("pricing.dials.rate.databaseMemory")}: ${eur(rates.databaseGbEur)} ${tr("pricing.dials.per.gb")}
+- ${tr("pricing.dials.rate.disk")}: ${eur(rates.diskGbEur, 3)} ${tr("pricing.dials.per.gb")}
+- ${tr("pricing.dials.rate.secondCopy")}: ${tr("pricing.dials.rate.secondCopyValue")}
+
+${fill(tr("pricing.dials.rates.note"), { hours: String(HOURS_IN_MONTH) })} The calculator on https://rebase.pro/pricing uses the same list the console quotes from.
+
+## ${tr("pricing.billing.title")}
+
+${rules}
 
 ## Included in every project
 
 ${included}
 
 Beyond them: files ${eur(CLOUD_PRICES.overage.filesEurPerGb)} per GB a month, requests ${eur(CLOUD_PRICES.overage.requestsEurPerMillion)} per million.
+
+## ${tr("pricing.faq.trial.q")}
+
+${tr("pricing.faq.trial.a")}
 
 ## Enterprise
 

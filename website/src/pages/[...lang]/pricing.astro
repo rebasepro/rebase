@@ -1,5 +1,6 @@
 ---
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+import { eur, fill, regionPrices } from '../../data/cloud-offer';
 
 export function getStaticPaths() {
   return Object.keys(languages).map((lang) => ({
@@ -15,7 +16,9 @@ import Layout from '../../layouts/Layout.astro';
 import PricingContent from '../../components/pages/PricingContent.astro';
 
 const title = t("pricing.meta.title");
-const description = t("pricing.meta.description");
+// The description carries the default project's price, filled from the
+// generated list like every other number on the page.
+const description = fill(t("pricing.meta.description"), { price: eur(regionPrices().examples.default.monthlyEur) });
 
 const breadcrumbs = [
     { name: "Home", url: "https://rebase.pro" },

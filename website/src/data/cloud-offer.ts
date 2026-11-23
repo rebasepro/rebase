@@ -25,6 +25,7 @@
  */
 import prices from "./cloud-prices.json";
 import { en } from "../i18n/en";
+import { priceAt, unitRates } from "./cloud-unit-rates.mjs";
 
 /** A key of the English dictionary — the one every language falls back to. */
 export type CopyKey = keyof typeof en;
@@ -75,15 +76,64 @@ export function memoryLabel(memory: string): string {
 }
 
 /**
- * The claims the pricing hero makes, with their sources: a PostgreSQL database
- * of the project's own (backend/src/utils/rate-card.ts — database lines exist
- * only as `dedicated`; OFFERING.md §1) and daily backups with restore to any
- * minute of the last 30 days (backend/src/k8s/orchestrator.ts
- * `retentionPolicy: "30d"`; docs deployment/cloud.md "Restore the database to
- * a point in time"). They are said there, so the list below does not repeat
- * them.
+ * A month is billed as this many hours: a size held for part of a month is
+ * charged for the part (Stripe prorates every change, saas billing.ts
+ * `syncProjectSubscription`). The rate card's own figure, exported with the
+ * sleep rule (`sleep/accounting.ts` hoursInMonth).
  */
-export const HERO_CLAIM_SOURCES = ["rate-card.ts dedicated database lines", "orchestrator.ts retentionPolicy 30d"] as const;
+export const HOURS_IN_MONTH = prices.sleep.hoursInMonth;
+
+/** What one unit of each dial costs a month in the current region, read back out of the sizes (`cloud-unit-rates.mjs`). */
+export function dialRates(region: RegionId = CLOUD_FLAGS.region): {
+    platformEur: number;
+    appVcpuEur: number;
+    appGbEur: number;
+    databaseVcpuEur: number;
+    databaseGbEur: number;
+    diskGbEur: number;
+} {
+    const r = unitRates(regionPrices(region));
+    return {
+        platformEur: prices.platformFeeEur,
+        appVcpuEur: r.app.perMillicore * 1000,
+        appGbEur: r.app.perMib * 1024,
+        databaseVcpuEur: r.database.perMillicore * 1000,
+        databaseGbEur: r.database.perMib * 1024,
+        diskGbEur: r.diskPerGib
+    };
+}
+
+/**
+ * The default project, line by line, as the invoice itemises it: each line
+ * priced from the rates and rounded to the cent, then summed. Throws when the
+ * lines do not add up to the exported `examples.default` — the page must never
+ * show a receipt whose total disagrees with the console.
+ */
+export function defaultProjectLines(region: RegionId = CLOUD_FLAGS.region): {
+    platform: number;
+    app: number;
+    database: number;
+    disk: number;
+    total: number;
+    secondCopy: number;
+    totalWithSecondCopy: number;
+} {
+    const p = regionPrices(region);
+    const r = unitRates(p);
+    const d = p.defaults;
+    const app = priceAt(r.app, d.app.cpu, d.app.memory);
+    const database = priceAt(r.database, d.database.cpu, d.database.memory);
+    const disk = Math.round(d.diskGi * r.diskPerGib * 100) / 100;
+    const total = Math.round((prices.platformFeeEur + app + database + disk) * 100) / 100;
+    if (total !== p.examples.default.monthlyEur) {
+        throw new Error(`The default project's lines add up to €${total}, the export says €${p.examples.default.monthlyEur}; re-export cloud-prices.json`);
+    }
+    // A second copy is a second database instance: its CPU, memory and its own
+    // copy of the volume are charged again (saas resource-pricing.ts: "Every
+    // instance carries its own copy of the volume").
+    const secondCopy = Math.round((database + disk) * 100) / 100;
+    return { platform: prices.platformFeeEur, app, database, disk, total, secondCopy, totalWithSecondCopy: Math.round((total + secondCopy) * 100) / 100 };
+}
 
 /**
  * What every project includes beyond the hero, each claim once, each with the place in the
@@ -94,6 +144,7 @@ export const HERO_CLAIM_SOURCES = ["rate-card.ts dedicated database lines", "orc
 export function includedItems(): { key: CopyKey; values?: Record<string, string>; source: string }[] {
     const facts = REGION_FACTS[CLOUD_FLAGS.region];
     const items: { key: CopyKey; values?: Record<string, string>; source: string }[] = [
+        { key: "pricing.included.backups", source: "backend/src/k8s/orchestrator.ts retentionPolicy 30d; docs deployment/cloud.md \"Restore the database to a point in time\"" },
         { key: "pricing.included.domains", source: "no domain line in backend/src/utils/rate-card.ts; website docs deployment/cloud.md" },
         { key: "pricing.included.members", source: "no seat or member limit in backend/src or frontend/src (grep)" },
         { key: "pricing.included.users", source: "nothing in backend/src/metering/quota.ts or rate-card.ts meters users" },
