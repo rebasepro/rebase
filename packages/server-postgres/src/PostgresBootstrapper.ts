@@ -376,19 +376,18 @@ export function pooledWithoutDirectUrlError(sourceKey: string): Error {
  * Is this the local database `rebase init` scaffolds — i.e. the one case where
  * "you are connected as a superuser" is not news?
  *
- * The scaffold's own `docker-compose.yml` sets `POSTGRES_USER: rebase_app`,
- * which makes that role the cluster superuser, so the superuser advisory below
+ * The scaffold's `docker-compose.yml` used to set `POSTGRES_USER: rebase_app`,
+ * which made that role the cluster superuser, so the superuser advisory below
  * was the only WARN a brand-new project ever saw and it was about a decision
  * the tool had made for the developer.
  *
- * Of the two available fixes — provision a non-superuser table-owner role in
- * the scaffold, or recognise the local shape and stay quiet — this is the
- * second, because the first breaks the scaffold it is meant to improve: a
- * non-superuser owner cannot `CREATE EXTENSION` (search collections need
- * `pg_trgm`/`unaccent`, applied by `rebase db push` and again by the boot
- * schema-ensure), so the very first `pnpm run db:push` on a scaffolded project
- * with a search block would fail. Trading a working first run for a quieter log
- * line is the wrong trade.
+ * The scaffold now connects as a non-superuser owner, as Rebase Cloud does
+ * (`templates/template/docker/postgres/init-roles.sh`). That was once rejected
+ * on the belief that such an owner cannot `CREATE EXTENSION` for search — but
+ * `pg_trgm` and `unaccent` are trusted extensions, which a database owner
+ * creates itself; only `vector` is not, and the init script creates that one as
+ * the superuser. This check stays for every volume created before the change,
+ * which keeps `rebase_app` as its superuser: its init script ran once.
  *
  * The condition is deliberately narrow — a *non-production* process talking to
  * a database on the loopback interface. A genuine production superuser

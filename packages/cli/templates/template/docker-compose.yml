@@ -31,7 +31,8 @@
 # shapes. The two agree on every environment variable except the database
 # password: this file reads DATABASE_PASSWORD, which `rebase init` also embeds
 # in the DATABASE_URL in your .env; that one reads POSTGRES_PASSWORD, generated
-# by its own quickstart script.
+# by its own quickstart script. This file also connects the runtime as a
+# non-superuser (see the `db` service), as Rebase Cloud does.
 #
 # To upgrade Rebase, change REBASE_VERSION and restart. Your bundle is untouched.
 # To run your OWN server code instead, `rebase eject` — it writes the entrypoint,
@@ -54,10 +55,23 @@ services:
     # never declare a vector property.
     image: pgvector/pgvector:pg18
     restart: unless-stopped
+    # The runtime connects as `rebase_app`, a non-superuser that owns the
+    # `rebase` database — the shape Rebase Cloud gives it. A superuser passes
+    # every privilege check, so a project that only boots because of one boots
+    # here and fails on Cloud. ./docker/postgres/init-roles.sh creates the role,
+    # the database, the `vector` extension and the row-level-security roles on
+    # the first start, then takes the superuser's password away; superuser work
+    # goes through `docker compose exec db psql -U postgres -d rebase`.
+    #
+    # A volume created by an older version of this file has `rebase_app` as its
+    # superuser and keeps it: the init script only runs on an empty volume.
     environment:
-      POSTGRES_USER: rebase_app
+      POSTGRES_USER: postgres
+      # Used only while the volume is initialised; the init script removes it.
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
-      POSTGRES_DB: rebase
+      REBASE_DB_USER: rebase_app
+      REBASE_DB_PASSWORD: ${DATABASE_PASSWORD:-changeme}
+      REBASE_DB_NAME: rebase
     # Published so `rebase db push` can reach it from the host. Remove this
     # mapping once the schema is in place if the database should not be
     # reachable from outside the compose network.
@@ -65,11 +79,16 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
+      - ./docker/postgres/init-roles.sh:/docker-entrypoint-initdb.d/10-rebase-roles.sh:ro
     healthcheck:
       # The runtime must not start before the database can answer, or its first
       # boot fails on a connection refused and the container restarts for no
       # reason a reader would understand.
-      test: ["CMD-SHELL", "pg_isready -U rebase_app -d rebase"]
+      #
+      # Over TCP on purpose: on the first start the image runs the init script
+      # against a temporary server that listens on the socket only, so a socket
+      # check reports ready before `rebase_app` and its database exist.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U rebase_app -d rebase"]
       interval: 5s
       timeout: 5s
       retries: 10

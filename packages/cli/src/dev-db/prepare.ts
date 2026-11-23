@@ -334,7 +334,7 @@ export async function prepareDatabaseEnv(
         if (!database.url) {
             throw new Refusal(
                 "--docker needs a docker-compose.yml with a db service in this project, " +
-                "and this one has none that names POSTGRES_USER, POSTGRES_DB and a published port. " +
+                "and this one has none that names a user, a database and a published port. " +
                 "Set DATABASE_URL in .env to point at the database you mean instead."
             );
         }

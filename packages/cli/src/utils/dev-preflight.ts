@@ -151,9 +151,8 @@ export function composeDatabaseUrl(
 ): string | null {
     const found = scanComposeDbService(yamlText);
 
-    const user = expandComposeValue(found.POSTGRES_USER, env);
-    const password = expandComposeValue(found.POSTGRES_PASSWORD, env);
-    const database = expandComposeValue(found.POSTGRES_DB, env);
+    const { user, password } = composeAppRole(found, env);
+    const database = expandComposeValue(found.REBASE_DB_NAME ?? found.POSTGRES_DB, env);
     if (!user || !password || !database || !found.hostPort) return null;
 
     return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}` +
@@ -203,12 +202,12 @@ function scanComposeDbService(yamlText: string): Record<string, string> & { host
         const key = line.match(/^\s+(environment|ports):\s*$/);
         if (key) { section = key[1] as "environment" | "ports"; continue; }
         // Any other key of the service ends the block we were reading.
-        if (/^\s+[A-Za-z_][\w-]*:\s*\S/.test(line) && !/^\s+POSTGRES_/.test(line)) {
+        if (/^\s+[A-Za-z_][\w-]*:\s*\S/.test(line) && !/^\s+(?:POSTGRES|REBASE_DB)_/.test(line)) {
             if (!/^\s*-\s/.test(line.trimStart())) section = null;
         }
 
         if (section === "environment") {
-            const pair = line.match(/^\s+(POSTGRES_(?:USER|PASSWORD|DB)):\s*(.+?)\s*$/);
+            const pair = line.match(/^\s+((?:POSTGRES|REBASE_DB)_(?:USER|PASSWORD|DB|NAME)):\s*(.+?)\s*$/);
             if (pair) found[pair[1]] = pair[2].replace(/^["']|["']$/g, "");
             continue;
         }
@@ -434,10 +433,33 @@ function composeCredentials(
     yamlText: string,
     env: Record<string, string | undefined>
 ): { user: string; password: string } | null {
-    const found = scanComposeDbService(yamlText);
-    const user = expandComposeValue(found.POSTGRES_USER, env);
-    const password = expandComposeValue(found.POSTGRES_PASSWORD, env);
+    const { user, password } = composeAppRole(scanComposeDbService(yamlText), env);
     return user && password ? { user, password } : null;
+}
+
+/**
+ * The role the application connects as.
+ *
+ * The scaffold's compose file names it in `REBASE_DB_USER` / `REBASE_DB_PASSWORD`:
+ * `POSTGRES_USER` there is the superuser, which its init script leaves with no
+ * network password, and the app role is the non-superuser that script creates —
+ * the shape Rebase Cloud gives the runtime. Compose files from before that change
+ * made the superuser the app role, and still read from `POSTGRES_*`.
+ */
+function composeAppRole(
+    found: Record<string, string>,
+    env: Record<string, string | undefined>
+): { user: string | null; password: string | null } {
+    if (found.REBASE_DB_USER) {
+        return {
+            user: expandComposeValue(found.REBASE_DB_USER, env),
+            password: expandComposeValue(found.REBASE_DB_PASSWORD, env)
+        };
+    }
+    return {
+        user: expandComposeValue(found.POSTGRES_USER, env),
+        password: expandComposeValue(found.POSTGRES_PASSWORD, env)
+    };
 }
 
 /**

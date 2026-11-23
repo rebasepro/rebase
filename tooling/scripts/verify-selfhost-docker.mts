@@ -483,7 +483,22 @@ const SCAFFOLD_ADMIN_EMAIL = readEnv("REBASE_ADMIN_EMAIL");
 const SCAFFOLD_ADMIN_PASSWORD = readEnv("REBASE_ADMIN_PASSWORD");
 const SCAFFOLD_SERVICE_KEY = readEnv("REBASE_SERVICE_KEY");
 
-fs.copyFileSync(path.join(scaffoldDir, "docker-compose.yml"), scaffoldComposeFile);
+// The compose file runs from app/ (so `./dist-bundle` is the reference app's
+// bundle), where the scaffold's relative mount of its database init script
+// names nothing — Docker would mount an empty directory in its place, and the
+// database would come up without the non-superuser app role the runtime
+// connects as. Point it at the template's own copy.
+const INIT_ROLES_MOUNT = "./docker/postgres/init-roles.sh";
+const scaffoldComposeText = fs.readFileSync(path.join(scaffoldDir, "docker-compose.yml"), "utf8");
+check(
+    "the scaffold's compose mounts its database init script",
+    scaffoldComposeText.includes(INIT_ROLES_MOUNT),
+    `expected a volume naming ${INIT_ROLES_MOUNT}`
+);
+fs.writeFileSync(
+    scaffoldComposeFile,
+    scaffoldComposeText.replaceAll(INIT_ROLES_MOUNT, path.join(TEMPLATE_DIR, "docker/postgres/init-roles.sh"))
+);
 // The one difference between this repository's reference app and a scaffolded
 // project, patched over rather than papered over: the scaffold ships
 // `backend/storage.ts` exporting a `storageAuthorize` hook, and `app/` does not.

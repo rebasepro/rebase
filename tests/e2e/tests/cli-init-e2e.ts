@@ -1314,7 +1314,11 @@ timeout: 10000 });
         // file that creates it says. Same reasoning as `composeDbPassword`
         // below — read the value, do not restate it — applied to the file that
         // actually owns this one.
-        const composeDbUser = readComposeEnv(projectPath, "POSTGRES_USER") ?? "rebase_app";
+        //
+        // `REBASE_DB_USER`, not `POSTGRES_USER`: the compose database now has a
+        // separate superuser (`postgres`, no network password) and the app role
+        // is the non-superuser its init script creates.
+        const composeDbUser = readComposeEnv(projectPath, "REBASE_DB_USER") ?? "rebase_app";
         console.log(`Compose database role: ${composeDbUser}`);
 
         // Wait for DB to be healthy

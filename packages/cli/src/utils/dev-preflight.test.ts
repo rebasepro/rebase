@@ -228,6 +228,24 @@ describe("composeDatabaseUrl", () => {
         );
     });
 
+    it("connects as the app role in the template's compose file, never its superuser", () => {
+        // The template's `POSTGRES_USER` is `postgres`, a superuser its init
+        // script leaves with no network password. The runtime's role is the
+        // non-superuser in REBASE_DB_USER — read the real file, so the scan and
+        // the template cannot drift apart again.
+        const template = fs.readFileSync(
+            path.join(import.meta.dirname, "../../templates/template/docker-compose.yml"),
+            "utf8"
+        );
+        expect(composeDatabaseUrl(template, { DATABASE_PASSWORD: "s3cret" })).toBe(
+            "postgresql://rebase_app:s3cret@127.0.0.1:5432/rebase?options=-c%20search_path%3Dpublic&sslmode=disable"
+        );
+    });
+
+    it("still reads POSTGRES_* from a compose file written before the app role was split out", () => {
+        expect(composeDatabaseUrl(SCAFFOLD, {})).toContain("rebase_app:changeme@");
+    });
+
     it("uses compose's own ${VAR:-default} when .env sets no password", () => {
         expect(composeDatabaseUrl(SCAFFOLD, {})).toContain("rebase_app:changeme@127.0.0.1:5435");
     });
