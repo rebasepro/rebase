@@ -35,6 +35,7 @@
         "packages/client/src/table.ts",
         "packages/client/src/sdk_query_builder.ts",
         "packages/server/src/services/driver-registry.ts",
+        "packages/server/src/services/request-driver.ts",
         "packages/server/src/db/**"
       ],
       "focus": "One operation set (find/list/get/count/aggregate/create/update/upsert/delete/batch/bulk, field operators, soft delete/restore, nested paths, keyset pagination, vector and full-text search) reached through five doors: REST, the SDK, websocket frames, MCP tools and the Postgres driver. Build the operation x door matrix and find every cell where a door disagrees: validation, required fields, defaults, coercion, hooks, history, error code/shape/status, pagination meta, missing-row and unknown-field behaviour. Check the query contract per operator per property type: the parser accepts what the builder emits, unsupported operators 400 rather than widen.",
@@ -67,6 +68,7 @@
         "packages/server-postgres/src/model/**",
         "packages/server-postgres/src/cli*.ts",
         "packages/server-postgres/src/db-command-line.ts",
+        "packages/server-postgres/src/database-target.ts",
         "packages/server-postgres/src/db-subcommands.ts",
         "packages/server-postgres/src/tsx-loader.ts",
         "packages/server-postgres/src/generated-sql.ts",
