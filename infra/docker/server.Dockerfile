@@ -145,6 +145,7 @@ RUN mkdir -p /runtime \
         "json-logic-js@^2.0.5" \
         "fast-equals@6.0.2" \
         "object-hash@^3.0.0" \
+        "bcryptjs@^3.0.3" \
     && mkdir -p node_modules/@rebasepro
 # `@aws-sdk/*`, `nodemailer`, `google-auth-library` and `ts-morph` are drivers
 # for features the RUNTIME implements and loads with `await import(...)` only
