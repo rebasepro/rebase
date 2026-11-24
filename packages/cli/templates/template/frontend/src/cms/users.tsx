@@ -51,10 +51,6 @@ export const usersCms = customizeTable<typeof users>("users", {
             hidden: true,
             hiddenInForm: true
         },
-        emailChangeToken: {
-            hidden: true,
-            hiddenInForm: true
-        },
         emailChangeSentAt: {
             hidden: true,
             hiddenInForm: true
