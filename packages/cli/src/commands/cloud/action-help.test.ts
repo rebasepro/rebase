@@ -19,7 +19,7 @@ import path from "node:path";
 import { ACTION_HELP, printActionHelp } from "./action-help";
 import { GLOBAL_SPEC_KEYS } from "./context";
 import { CREATE_PROJECT_FLAGS, LIST_PROJECTS_FLAGS, TRANSFER_PROJECT_FLAGS } from "./projects";
-import { CREATE_DATABASE_FLAGS } from "./databases";
+import { CREATE_DATABASE_FLAGS, DB_BACKUP_FLAGS } from "./databases";
 import { DB_CONNECT_FLAGS } from "./db-connect";
 import { DB_QUERY_FLAGS } from "./db-query";
 import { DB_ACCESS_FLAGS } from "./db-access";
@@ -73,7 +73,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "db connect": DB_CONNECT_FLAGS,
     "db query": DB_QUERY_FLAGS,
     "db access": DB_ACCESS_FLAGS,
-    "db backup": {},
+    "db backup": DB_BACKUP_FLAGS,
     "db pitr": { "--target": String },
     deploy: DEPLOY_FLAGS,
     deployments: null,

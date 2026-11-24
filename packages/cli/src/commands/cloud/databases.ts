@@ -623,13 +623,18 @@ const PITR_ACTIONS = ["status", "restore", "cutover", "discard"] as const;
  *
  * Exported so its tests drive the real parser.
  */
+/** What `db backup` parses besides the globals. Exported so its help page cannot drift. */
+export const DB_BACKUP_FLAGS = {
+    "--database": String
+} as const;
+
 export function resolveBackupArgs(rawArgs: string[]) {
     const { flags, positionals } = parseCloudArgs({
         // `--yes` is not declared here: `parseCloudArgs` merges the global spec
         // in, and a per-command key that repeats a global one OVERRIDES it in
         // that merge. Identical here, so it was harmless — but it is the same
         // shape as `webhooks create --url`, which was not.
-        spec: {},
+        spec: DB_BACKUP_FLAGS,
         rawArgs,
         commandWords: 3, // cloud db backup
         command: "cloud db backup",
@@ -651,8 +656,10 @@ async function backupCommand(rawArgs: string[]): Promise<void> {
         if (action === "create") {
             const res = await client.functions.invoke<{ success: boolean; backup?: BackupRow; error?: string }>(
                 "backup",
-                { projectId,
-type: "manual" },
+                // `--database <key>`: a dump of one of the project's other
+                // databases. Its name says which, and a restore of it goes
+                // back into that database.
+                { projectId, type: "manual", ...(args["--database"] ? { database: args["--database"] } : {}) },
                 { path: "create" }
             );
             if (!res.success) fail(res.error || "Backup failed.");

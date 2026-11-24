@@ -579,21 +579,25 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "db backup": {
         command: "cloud db backup",
-        usage: "cloud db backup <list|create|restore|status|download> [filename] [--yes]",
+        usage: "cloud db backup <list|create|restore|status|download> [filename] [--database <key>] [--yes]",
         summary:
             "Take, list, inspect, download and restore this project's database backups. "
             + "`list` is the default when no action is given.",
-        flags: [],
+        flags: [
+            ["--database <key>", "With create: dump one of the project's other databases (database(\"<key>\")). Its file carries the database's name, and restoring it writes back into that database"]
+        ],
         examples: [
             "rebase cloud db backup",
             "rebase cloud db backup create",
+            "rebase cloud db backup create --database analytics",
             "rebase cloud db backup status",
             "rebase cloud db backup restore base-20260831 --yes",
             "rebase cloud db backup download base-20260831"
         ],
         notes: [
             "`restore` replaces the live database. Nothing about it is undoable from here — `--yes`, the global flag listed below, is what skips that confirmation.",
-            "Backups are the project's own: a base backup on a schedule, plus continuous WAL archiving for point-in-time recovery."
+            "Backups are the project's own: a base backup on a schedule, plus continuous WAL archiving for point-in-time recovery. Every database on the project's server is in them.",
+            "A manual dump (`create`) is of one database: the default unless --database names another."
         ]
     },
 
