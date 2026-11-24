@@ -419,6 +419,8 @@ so a panel can grey the feature out instead of showing an error.
 | `UI_PREFERENCES_UNSUPPORTED` | 501 | This backend's driver cannot run SQL, so it stores no UI preferences; the panel keeps them in the browser. | Nothing to fix: preferences stay per browser. |
 | `UI_CONFIG_FILE_INVALID` | 500 | `frontend/src/cms/ui-config.json`, where the workspace's UI preferences are written in development, is not valid JSON. | Fix or delete it; the panel rewrites it on the next save. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` cannot stream a result here: the in-process development database (PGlite) has one connection, and a cursor held across a download would hold every other query behind it; or the data source has no SQL cursor. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one), or add a `LIMIT` and export the rows on screen. |
+| `SQL_SNIPPETS_NEED_A_USER` | 403 | `/api/admin/sql/snippets` was called with a credential that names no person (the service key). Saved SQL snippets belong to a signed-in person. | Sign in as a user. |
+| `SQL_SNIPPETS_UNSUPPORTED` | 501 | The data source runs no SQL, so it has nowhere to keep saved snippets; the SQL console keeps them in the browser. | Nothing to fix: snippets stay per browser. |
 
 ### Schema reconcile
 

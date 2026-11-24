@@ -59,7 +59,8 @@ const SHARED = new Map([
     ["studio_schema_select_all", "a SQL statement"],
     ["studio_schema_insert_into", "a SQL statement"],
     ["studio_schema_delete_from", "a SQL statement"],
-    ["studio_sql_limit_1000", "the SQL LIMIT clause the toggle applies"]
+    ["studio_sql_limit_1000", "the SQL LIMIT clause the toggle applies"],
+    ["studio_sql_explain_analyze", "the SQL command the menu item runs, EXPLAIN ANALYZE"]
 ]);
 
 const red = (s) => `\x1b[31m${s}\x1b[0m`;

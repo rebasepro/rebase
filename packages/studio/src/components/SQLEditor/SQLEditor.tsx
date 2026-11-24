@@ -8,6 +8,7 @@ import {
     type CellRendererParams,
     Checkbox,
     Chip,
+    ChevronDownIcon,
     CircularProgress,
     cls,
     DatabaseIcon,
@@ -21,6 +22,7 @@ import {
     iconSize,
     InputLabel,
     isKeyHandled,
+    Label,
     Menu,
     MenuIcon,
     MenuItem,
@@ -37,6 +39,7 @@ import {
     Tabs,
     TerminalIcon,
     TextField,
+    ToggleButtonGroup,
     Tooltip,
     Typography,
     VirtualTable,
@@ -48,12 +51,17 @@ import { useApiBase, useApiConfig, useRebaseContext, useSnackbarController, Conf
 import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { FixedEditorOverlay } from "./FixedEditorOverlay";
-import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
-import { buildExplainSql, formatSql, keepLatestColumnWidths, needsDestructiveConfirmation, quoteIdentifier, groupSchemaRows, quoteTableName, rememberColumnWidth, resolveCellEdit, resolveQueryCollections, resultsToCsv, typedJsonRows, withAutoLimit, type CellEditResolution, type ColumnWidthsByQuery, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
+import { SQLEditorSidebar, type Snippet } from "./SQLEditorSidebar";
+import { buildExplainAnalyzeScript, buildExplainSql, formatSql, keepLatestColumnWidths, needsDestructiveConfirmation, quoteIdentifier, groupSchemaRows, quoteTableName, rememberColumnWidth, resolveCellEdit, resolveQueryCollections, resultsToCsv, typedJsonRows, withAutoLimit, type CellEditResolution, type ColumnWidthsByQuery, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
+import { SqlParamsPanel } from "./SqlParamsPanel";
+import { ResultChart } from "./ResultChart";
+import { useSqlSnippets, type SqlSnippetRemote } from "./useSqlSnippets";
+import { explainResultOfRows } from "../../utils/explain_plan";
+import { missingSqlParameters, sqlParameterNames, substituteSqlParameters, type SqlParameterValue } from "../../utils/sql_params";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
-import type { SqlScriptNotice } from "@rebasepro/types";
+import type { SqlScriptNotice, SqlScriptResult } from "@rebasepro/types";
 
 export type { SQLEditorColumnInfo, TableInfo };
 
@@ -140,7 +148,62 @@ function isStoredTab(value: unknown): value is StoredTab {
         && typeof tab.sql === "string";
 }
 
-export const SQLEditor = () => {
+/**
+ * One statement's result, of a run that returned more than one: each is a
+ * tab of its own over the result grid.
+ */
+type ResultSetView = {
+    rows: Record<string, unknown>[];
+    provenance: ResultProvenance;
+    command?: string;
+    rowCount?: number;
+    /** See the tab's `truncatedFrom`. */
+    truncatedFrom: number | null;
+};
+
+/** The statements of a run, when it reported more than one; `null` for a run of one. */
+function resultSetsOf(run: SqlScriptResult | undefined): ResultSetView[] | null {
+    if (!run?.statements || run.statements.length < 2) return null;
+    return run.statements.map(statement => ({
+        rows: statement.rows,
+        provenance: { columns: statement.columns, tables: statement.tables },
+        command: statement.command,
+        rowCount: statement.rowCount,
+        truncatedFrom: statement.truncated ? statement.rowCount ?? null : null
+    }));
+}
+
+/** What a tab holds of its runs: nothing yet. */
+const noRun = () => ({
+    results: null,
+    loading: false,
+    error: null,
+    execTime: null,
+    lastExecutedSql: null,
+    lastExecutedConnection: null,
+    ranAs: null,
+    lastProvenance: null,
+    notices: [],
+    truncatedFrom: null,
+    resultSets: null,
+    activeResultIndex: 0,
+    planAnalyzed: false,
+    paramValues: {}
+});
+
+export interface SQLEditorProps {
+    /**
+     * SQL another view sent to the console — `/sql?sqlDraft=…` — opened in a
+     * new tab; {@link onDraftConsumed} is then called, once per draft, to
+     * take it out of the URL.
+     */
+    incomingDraft?: string | null;
+    onDraftConsumed?: () => void;
+    /** The project's snippet store. Without it, snippets stay in this browser. */
+    snippetRemote?: SqlSnippetRemote;
+}
+
+export const SQLEditor = ({ incomingDraft, onDraftConsumed, snippetRemote }: SQLEditorProps = {}) => {
     const { databaseAdmin, client } = useRebaseContext();
     const sidePanelController = useStudioSidePanelController();
     const snackbarController = useSnackbarController();
@@ -230,7 +293,17 @@ export const SQLEditor = () => {
          * only its first ones — see `SqlScriptResult.truncated`. `null` when
          * the rows on screen are all of them.
          */
-        truncatedFrom: number | null
+        truncatedFrom: number | null,
+        /**
+         * Every statement's result, when the last run returned more than one;
+         * the fields above are then the one at {@link activeResultIndex}.
+         */
+        resultSets: ResultSetView[] | null,
+        activeResultIndex: number,
+        /** The plan on screen was timed by running the statement (EXPLAIN ANALYZE). */
+        planAnalyzed: boolean,
+        /** What the `:name` placeholders of the tab's SQL are filled in with. */
+        paramValues: Readonly<Record<string, SqlParameterValue>>
     }>>(() => {
         const projectPrefixSync = getStoragePrefix(client?.baseUrl);
         // This runs during the first render, so anything it throws takes the
@@ -245,16 +318,7 @@ export const SQLEditor = () => {
         );
         const restored = saved.filter(isStoredTab).map(t => ({
             ...t,
-            results: null,
-            loading: false,
-            error: null,
-            execTime: null,
-            lastExecutedSql: null,
-            lastExecutedConnection: null,
-            ranAs: null,
-            lastProvenance: null,
-            notices: [],
-            truncatedFrom: null
+            ...noRun()
         }));
         if (restored.length > 0) return restored;
         return [{
@@ -263,16 +327,7 @@ export const SQLEditor = () => {
             sql: "SELECT * FROM ",
             database: readStoredString(`rebase_sql_selected_db_${projectPrefixSync}`) || undefined,
             role: readStoredString(`rebase_sql_selected_role_${projectPrefixSync}`) || undefined,
-            results: null,
-            loading: false,
-            error: null,
-            execTime: null,
-            lastExecutedSql: null,
-            lastExecutedConnection: null,
-            ranAs: null,
-            lastProvenance: null,
-            notices: [],
-            truncatedFrom: null
+            ...noRun()
         }];
     });
     const [activeTabId, setActiveTabId] = useState<string>(() => {
@@ -682,17 +737,14 @@ role: connection.role });
             { fallback: {}, accept: isRecordValue }
         ));
     });
-    const [snippets, setSnippets] = useState<Snippet[]>([]);
+    const { snippets, storage: snippetStorage, createSnippet, setFavorite, deleteSnippet } = useSqlSnippets(projectPrefix, snippetRemote);
     const [history, setHistory] = useState<string[]>([]);
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
     const [newSnippetName, setNewSnippetName] = useState("");
+    const [shareSnippetWithTeam, setShareSnippetWithTeam] = useState(false);
 
-    // Load from local storage
+    // History stays in this browser.
     useEffect(() => {
-        setSnippets(readStoredJson<Snippet[]>(
-            `rebase_sql_snippets_${projectPrefix}`,
-            { fallback: [], accept: isArrayValue }
-        ));
         setHistory(readStoredJson<string[]>(
             `rebase_sql_history_${projectPrefix}`,
             { fallback: [], accept: isArrayValue }
@@ -718,21 +770,26 @@ role: connection.role });
         writeStoredString(`rebase_sql_active_tab_${projectPrefix}`, activeTabId);
     }, [activeTabId, projectPrefix]);
 
-    const saveSnippets = (newSnippets: Snippet[]) => {
-        setSnippets(newSnippets);
-        writeStoredJson(`rebase_sql_snippets_${projectPrefix}`, newSnippets);
-    };
-
     const saveHistory = (newHistory: string[]) => {
         setHistory(newHistory);
         writeStoredJson(`rebase_sql_history_${projectPrefix}`, newHistory.slice(-50));
     };
 
+    /** A snippet store's refusal, said rather than lost. */
+    const reportSnippetFailure = (e: unknown) => snackbarController.open({
+        type: "error",
+        message: t("studio_sql_snippet_failed", { message: e instanceof Error ? e.message : String(e) })
+    });
+
     const handleDeleteSnippet = (id: string) => {
-        saveSnippets(snippets.filter(s => s.id !== id));
+        deleteSnippet(id).catch(reportSnippetFailure);
     };
 
-    const handleAddTab = () => {
+    const handleToggleFavorite = (snippet: Snippet) => {
+        setFavorite(snippet.id, !snippet.isFavorite).catch(reportSnippetFailure);
+    };
+
+    const handleAddTab = useCallback((initialSql = "SELECT * FROM ") => {
         const newId = Math.random().toString(36).substring(2, 9);
 
         // Find the next available query number
@@ -748,22 +805,28 @@ role: connection.role });
         setTabs(prev => [...prev, {
             id: newId,
             name,
-            sql: "SELECT * FROM ",
+            sql: initialSql,
             database: selectedDatabase,
             role: selectedRole,
-            results: null,
-            loading: false,
-            error: null,
-            execTime: null,
-            lastExecutedSql: null,
-            lastExecutedConnection: null,
-            ranAs: null,
-            lastProvenance: null,
-            notices: [],
-            truncatedFrom: null
+            ...noRun()
         }]);
         setActiveTabId(newId);
-    };
+    }, [tabs, selectedDatabase, selectedRole]);
+
+    // SQL another view sent: a tab of its own, then out of the URL. Once per
+    // draft — the effect runs twice in development, and a draft read twice
+    // opened two tabs.
+    const consumedDraftRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!incomingDraft) {
+            consumedDraftRef.current = null;
+            return;
+        }
+        if (consumedDraftRef.current === incomingDraft) return;
+        consumedDraftRef.current = incomingDraft;
+        handleAddTab(incomingDraft);
+        onDraftConsumed?.();
+    }, [incomingDraft, onDraftConsumed, handleAddTab]);
 
     const handleCloseTab = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -841,30 +904,60 @@ role: connection.role });
         }
     };
 
-    const handleExplain = async () => {
-        // The selected statement when there is one, as Cmd+Enter runs it; and
-        // planned, never executed — see `buildExplainSql`.
-        const explainSql = buildExplainSql(editorHandle.current?.getSelectedText() ?? currentEditorText());
+    /** The placeholders the last run or explain was refused for, marked in the params panel. */
+    const [missingParams, setMissingParams] = useState<string[]>([]);
+
+    /**
+     * `text` with its `:name` placeholders filled in from the tab's values,
+     * or `null` — the run refused, and the empty ones marked — when one has
+     * no value.
+     */
+    const paramValues = activeTab.paramValues;
+    const withParameters = useCallback((text: string): string | null => {
+        const missing = missingSqlParameters(text, paramValues);
+        setMissingParams(missing);
+        if (missing.length > 0) {
+            updateActiveTab({
+                results: null,
+                error: t("studio_sql_params_missing", { names: missing.map(name => `:${name}`).join(", ") })
+            });
+            return null;
+        }
+        return substituteSqlParameters(text, paramValues);
+    }, [paramValues, updateActiveTab, t]);
+
+    const handleExplain = async (analyze = false) => {
+        // The selected statement when there is one, as Cmd+Enter runs it.
+        // Planned only, unless ANALYZE was asked for — then run, and rolled
+        // back: see `buildExplainAnalyzeScript`.
+        const text = withParameters(editorHandle.current?.getSelectedText() ?? currentEditorText());
+        if (text === null) return;
+        const explainSql = analyze ? buildExplainAnalyzeScript(text) : buildExplainSql(text);
         if (!explainSql) {
             updateActiveTab({ results: null,
 error: t("studio_sql_explain_single_statement") });
             return;
         }
-        await runOnce(activeTab.id, () => explain(explainSql));
+        await runOnce(activeTab.id, () => analyze ? explainAnalyze(explainSql) : explain(explainSql));
+    };
+
+    /** What a plan replaces on screen: nothing left there is a row an edit could write back. */
+    const planStarted = {
+        loading: true,
+        error: null,
+        results: null,
+        lastExecutedSql: null,
+        lastExecutedConnection: null,
+        ranAs: null,
+        lastProvenance: null,
+        notices: [],
+        truncatedFrom: null,
+        resultSets: null,
+        activeResultIndex: 0
     };
 
     const explain = async (explainSql: string) => {
-        // The plan replaces the rows on screen, so nothing left there is a row
-        // an edit could write back.
-        updateActiveTab({ loading: true,
-error: null,
-results: null,
-lastExecutedSql: null,
-lastExecutedConnection: null,
-ranAs: null,
-lastProvenance: null,
-notices: [],
-truncatedFrom: null });
+        updateActiveTab({ ...planStarted, planAnalyzed: false });
         const start = performance.now();
         try {
             if (databaseAdmin?.executeSql) {
@@ -882,6 +975,46 @@ execTime: Math.round(performance.now() - start) });
     };
 
     /**
+     * Time the statement for real, in a transaction the script rolls back —
+     * through the script door, so it can be cancelled like any run.
+     */
+    const explainAnalyze = async (script: string) => {
+        const tabId = activeTab.id;
+        if (!databaseAdmin?.runSqlScript) {
+            updateActiveTab({ results: null, error: t("studio_sql_explain_analyze_unsupported") });
+            return;
+        }
+        updateActiveTab({ ...planStarted, planAnalyzed: true });
+        const start = performance.now();
+        const abort = new AbortController();
+        runAbortRef.current.set(tabId, abort);
+        setCancellable(tabId, true);
+        try {
+            const run = await databaseAdmin.runSqlScript(script, { database: selectedDatabase, role: selectedRole, signal: abort.signal });
+            // The plan is the EXPLAIN's rows, between the BEGIN and the ROLLBACK.
+            const explained = run.statements?.find(statement => statement.command === "EXPLAIN");
+            if (!explained) {
+                updateActiveTab({ error: t("studio_sql_explain_analyze_unsupported") });
+                return;
+            }
+            updateActiveTab({
+                results: explained.rows,
+                execTime: Math.round(performance.now() - start),
+                notices: run.notices
+            });
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : String(e);
+            updateActiveTab({ error: abort.signal.aborted ? t("studio_sql_run_cancelled") : message || t("studio_sql_error_explaining") });
+        } finally {
+            if (runAbortRef.current.get(tabId) === abort) {
+                runAbortRef.current.delete(tabId);
+                setCancellable(tabId, false);
+            }
+            updateActiveTab({ loading: false });
+        }
+    };
+
+    /**
      * Run `statement` — exactly the text the person ran, the selection or the
      * whole of `buffer` — and keep `buffer` in the history.
      */
@@ -892,7 +1025,10 @@ execTime: Math.round(performance.now() - start) });
 error: null,
 results: null,
 notices: [],
-truncatedFrom: null });
+truncatedFrom: null,
+resultSets: null,
+activeResultIndex: 0,
+planAnalyzed: false });
         const start = performance.now();
         const tabId = activeTab.id;
         const abort = databaseAdmin?.runSqlScript ? new AbortController() : undefined;
@@ -911,7 +1047,10 @@ truncatedFrom: null });
                     ? await databaseAdmin.runSqlScript(sqlToRun, { ...connection, signal: abort?.signal })
                     : undefined;
                 const rows: Record<string, unknown>[] = run ? run.rows : await databaseAdmin.executeSql!(sqlToRun, connection);
+                const resultSets = resultSetsOf(run);
                 updateActiveTab({
+                    resultSets,
+                    activeResultIndex: resultSets ? resultSets.length - 1 : 0,
                     results: rows,
                     execTime: Math.round(performance.now() - start),
                     lastExecutedSql: sqlToRun,
@@ -957,8 +1096,12 @@ truncatedFrom: null });
      */
     const handleRun = useCallback(async (selectedText?: string) => {
         const buffer = currentEditorText();
-        const statement = selectedText || buffer;
-        if (!statement.trim()) return;
+        const typed = selectedText || buffer;
+        if (!typed.trim()) return;
+        // What runs is the text with its placeholders filled in; the history
+        // keeps the text as typed.
+        const statement = withParameters(typed);
+        if (statement === null) return;
 
         if (needsDestructiveConfirmation(statement)) {
             setPendingAction(() => () => executeRun(statement, buffer));
@@ -967,7 +1110,7 @@ truncatedFrom: null });
         }
 
         executeRun(statement, buffer);
-    }, [currentEditorText, executeRun]);
+    }, [currentEditorText, executeRun, withParameters]);
 
     // Global keybindings
     useEffect(() => {
@@ -994,22 +1137,22 @@ truncatedFrom: null });
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [handleRun]);
 
-    const handleSaveSnippet = () => {
-        if (!newSnippetName.trim() || !sql.trim()) return;
-
-        const newSnippet: Snippet = {
-            id: Math.random().toString(36).substring(2, 9),
-            name: newSnippetName,
-            sql: sql,
-            createdAt: Date.now()
-        };
-
-        saveSnippets([...snippets, newSnippet]);
+    const handleSaveSnippet = async () => {
+        const name = newSnippetName.trim();
+        const text = currentEditorText();
+        if (!name || !text.trim()) return;
+        try {
+            await createSnippet({ name, sql: text, visibility: shareSnippetWithTeam ? "team" : "personal" });
+        } catch (e: unknown) {
+            reportSnippetFailure(e);
+            return;
+        }
         setNewSnippetName("");
+        setShareSnippetWithTeam(false);
         setIsSaveDialogOpen(false);
         snackbarController.open({
             type: "success",
-            message: t("studio_sql_snippet_saved", { name: newSnippetName })
+            message: t("studio_sql_snippet_saved", { name })
         });
     };
 
@@ -1284,6 +1427,32 @@ id: String(ra.entityId) })}
         );
     }, [getRowEntityActions, editingCell, handleCellSave, handleDoubleClick, sidePanelController, t]);
 
+    /** The grid or a chart of the rows on screen; back to the grid with every new result. */
+    const [resultView, setResultView] = useState<"grid" | "chart">("grid");
+    useEffect(() => setResultView("grid"), [results]);
+
+    const resultSets = activeTab.resultSets;
+    const activeResultSet = resultSets?.[activeTab.activeResultIndex] ?? null;
+
+    /** "SELECT · 3 rows", "CREATE TABLE": what a statement's result tab says. */
+    const resultSetLabel = (set: ResultSetView): string => {
+        const command = set.command ?? t("studio_sql_statement");
+        return set.rowCount !== undefined ? t("studio_sql_statement_rows", { command, count: set.rowCount }) : command;
+    };
+
+    /** Show statement `index` of the last run: its rows, columns and truncation take the grid. */
+    const selectResultSet = (index: string) => {
+        const set = resultSets?.[Number(index)];
+        if (!set) return;
+        setEditingCell(null);
+        updateActiveTab({
+            activeResultIndex: Number(index),
+            results: set.rows,
+            lastProvenance: set.provenance,
+            truncatedFrom: set.truncatedFrom
+        });
+    };
+
     const renderResults = () => {
         if (loading) {
             return (
@@ -1315,30 +1484,34 @@ id: String(ra.entityId) })}
             );
         }
 
-        // Check for EXPLAIN (FORMAT JSON) response
-        if (results.length === 1 && results[0]["QUERY PLAN"] && Array.isArray(results[0]["QUERY PLAN"])) {
-            try {
-                const plan = results[0]["QUERY PLAN"][0].Plan;
-                if (plan) {
-                    return (
-                        <div className="flex-grow overflow-auto p-4 bg-surface-sheet flex flex-col items-start">
-                            <Typography variant="label" color="secondary" className="mb-4">{t("studio_sql_visual_execution_plan")}</Typography>
-                            <div className="pb-12">
-                                <ExplainVisualizer plan={plan}/>
-                            </div>
-                        </div>
-                    );
-                }
-            } catch (e) {
-                console.warn("Failed to parse EXPLAIN JSON output:", e);
-            }
+        // An EXPLAIN (FORMAT JSON) result — the Explain buttons', or one typed
+        // and run — is drawn as its plan.
+        const explained = explainResultOfRows(results);
+        if (explained) {
+            return (
+                <div className="flex-grow overflow-auto p-4 bg-surface-sheet flex flex-col items-start gap-2">
+                    <Typography variant="label" color="secondary">
+                        {explained.analyzed ? t("studio_sql_visual_execution_plan_analyzed") : t("studio_sql_visual_execution_plan")}
+                    </Typography>
+                    {activeTab.planAnalyzed && (
+                        <Alert color="info" size="small">{t("studio_sql_explain_analyze_note")}</Alert>
+                    )}
+                    <div className="pb-12">
+                        <ExplainVisualizer result={explained}/>
+                    </div>
+                </div>
+            );
         }
 
         if (results.length === 0) {
             return (
                 <div className="flex-grow p-6 flex flex-col items-center justify-center">
                     <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark font-mono border-b border-hairline pb-2 mb-2">{t("studio_sql_success")}</Typography>
-                    <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_no_results")}</Typography>
+                    <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">
+                        {activeResultSet?.command
+                            ? resultSetLabel(activeResultSet)
+                            : t("studio_sql_no_results")}
+                    </Typography>
                 </div>
             );
         }
@@ -1367,15 +1540,17 @@ id: String(ra.entityId) })}
                     </div>
                 )}
                 <div className="flex-grow relative h-full min-h-0 min-w-0">
-                    <VirtualTable
-                        data={results}
-                        columns={resultColumns}
-                        rowHeight={32}
-                        headerHeight={32}
-                        extraData={editingCell}
-                        onColumnResizeEnd={handleColumnResize}
-                        cellRenderer={renderResultCell}
-                    />
+                    {resultView === "chart"
+                        ? <ResultChart rows={results} columns={resultColumnKeys} provenance={activeTab.lastProvenance}/>
+                        : <VirtualTable
+                            data={results}
+                            columns={resultColumns}
+                            rowHeight={32}
+                            headerHeight={32}
+                            extraData={editingCell}
+                            onColumnResizeEnd={handleColumnResize}
+                            cellRenderer={renderResultCell}
+                        />}
                 </div>
 
                 <div className={cls("p-2 px-4 border-t bg-surface-sheet flex justify-between items-center shrink-0", defaultBorderMixin)}>
@@ -1390,6 +1565,15 @@ id: String(ra.entityId) })}
                         </div>
                     </div>
                     <div className="flex gap-2 overflow-x-auto no-scrollbar items-center px-2">
+                        <ToggleButtonGroup<"grid" | "chart">
+                            aria-label={t("studio_sql_result_view")}
+                            value={resultView}
+                            onValueChange={setResultView}
+                            options={[
+                                { value: "grid", label: t("studio_sql_result_view_grid") },
+                                { value: "chart", label: t("studio_sql_result_view_chart") }
+                            ]}
+                        />
                         <Button
                             size="small"
                             variant="text"
@@ -1448,6 +1632,15 @@ id: String(ra.entityId) })}
         writeStoredString(`rebase_sql_editor_height_${projectPrefix}`, editorHeight.toString());
     }, [editorHeight, projectPrefix]);
 
+    // The editor's placeholders, from the tab's text — which follows every edit.
+    const parameterNames = useMemo(() => sqlParameterNames(sql), [sql]);
+    const handleParamChange = useCallback((name: string, value: SqlParameterValue) => {
+        setMissingParams(previous => previous.filter(entry => entry !== name));
+        setTabs(previous => previous.map(tab => tab.id === activeTabId
+            ? { ...tab, paramValues: { ...tab.paramValues, [name]: value } }
+            : tab));
+    }, [activeTabId]);
+
     const activeSnippet = snippets.find(s => s.sql === activeTab.sql);
     const isFavorite = activeSnippet?.isFavorite || false;
 
@@ -1466,6 +1659,7 @@ id: String(ra.entityId) })}
                         onSelectSnippet={setSql}
                         onTableClick={setSql}
                         onDeleteSnippet={handleDeleteSnippet}
+                        onToggleFavorite={handleToggleFavorite}
                         schemas={schemas}
                         isSchemaLoading={isSchemaLoading}
                         schemaError={schemaError}
@@ -1510,7 +1704,7 @@ id: String(ra.entityId) })}
                                     </Tabs>
                                     <IconButton
                                         size="small"
-                                        onClick={handleAddTab}
+                                        onClick={() => handleAddTab()}
                                         aria-label={t("studio_sql_new_tab")}
                                         title={t("studio_sql_new_tab")}
                                         className="ml-2 flex-shrink-0"
@@ -1526,14 +1720,36 @@ id: String(ra.entityId) })}
                                     </IconButton>
                                 </Tooltip>
 
-                                <Button
-                                    variant="text"
-                                    size="small"
-                                    onClick={handleExplain}
-                                    disabled={loading}
-                                >
-                                    {t("studio_sql_explain")}
-                                </Button>
+                                <div className="flex items-center">
+                                    <Button
+                                        variant="text"
+                                        size="small"
+                                        onClick={() => handleExplain()}
+                                        disabled={loading}
+                                    >
+                                        {t("studio_sql_explain")}
+                                    </Button>
+                                    <Menu
+                                        trigger={
+                                            <IconButton size="small" disabled={loading} aria-label={t("studio_sql_explain_options")}>
+                                                <ChevronDownIcon size={iconSize.smallest}/>
+                                            </IconButton>
+                                        }
+                                    >
+                                        <MenuItem dense onClick={() => handleExplain()}>
+                                            <div className="flex flex-col">
+                                                <Typography variant="body2">{t("studio_sql_explain_plan_only")}</Typography>
+                                                <Typography variant="caption" color="secondary">{t("studio_sql_explain_plan_only_hint")}</Typography>
+                                            </div>
+                                        </MenuItem>
+                                        <MenuItem dense onClick={() => handleExplain(true)}>
+                                            <div className="flex flex-col max-w-[280px]">
+                                                <Typography variant="body2">{t("studio_sql_explain_analyze")}</Typography>
+                                                <Typography variant="caption" color="secondary" className="whitespace-normal">{t("studio_sql_explain_analyze_hint")}</Typography>
+                                            </div>
+                                        </MenuItem>
+                                    </Menu>
+                                </div>
 
                                 <div className="h-4 w-px bg-hairline mx-1"></div>
 
@@ -1565,8 +1781,7 @@ id: String(ra.entityId) })}
                                                 });
                                                 return;
                                             }
-                                            saveSnippets(snippets.map(s => s.id === activeSnippet.id ? { ...s,
-isFavorite: !s.isFavorite } : s));
+                                            handleToggleFavorite(activeSnippet);
                                         }}
                                     >
                                         <HeartIcon size={iconSize.smallest} fill={isFavorite ? "currentColor" : "none"} className={cls(isFavorite ? "text-red-500" : "text-text-disabled dark:text-text-disabled-dark hover:text-text-primary")}/>
@@ -1667,6 +1882,12 @@ isFavorite: !s.isFavorite } : s));
                             minPanelSizePx={100}
                             firstPanel={
                                 <div className="h-full w-full relative flex flex-col min-h-0">
+                                    <SqlParamsPanel
+                                        names={parameterNames}
+                                        values={activeTab.paramValues}
+                                        missing={missingParams}
+                                        onChange={handleParamChange}
+                                    />
                                     <MonacoEditor
                                         ref={editorHandle}
                                         value={sql}
@@ -1678,8 +1899,27 @@ isFavorite: !s.isFavorite } : s));
                             }
                             secondPanel={
                                 <div className="h-full w-full flex flex-col bg-surface-well overflow-hidden min-h-0">
-                                    <div className={cls("p-2 px-4 bg-surface-raised border-b shrink-0 flex items-center", defaultBorderMixin)}>
-                                        <Typography variant="caption" className="font-semibold text-text-disabled dark:text-text-disabled-dark uppercase tracking-widest text-[10px]">{t("studio_sql_query_results")}</Typography>
+                                    <div className={cls("px-4 bg-surface-raised border-b shrink-0 flex items-center gap-3 min-h-[37px]", defaultBorderMixin)}>
+                                        <Typography variant="caption" className="font-semibold text-text-disabled dark:text-text-disabled-dark uppercase tracking-widest text-[10px] shrink-0">{t("studio_sql_query_results")}</Typography>
+                                        {!loading && resultSets && (
+                                            <div className="flex items-center no-scrollbar overflow-x-auto min-w-0">
+                                                <Tabs
+                                                    value={String(activeTab.activeResultIndex)}
+                                                    onValueChange={selectResultSet}
+                                                    variant="boxy"
+                                                    className="w-[unset] flex-shrink-0"
+                                                    aria-label={t("studio_sql_statement_results")}
+                                                >
+                                                    {resultSets.map((set, index) => (
+                                                        <Tab key={index} value={String(index)} className="whitespace-nowrap">
+                                                            <span className="text-text-disabled dark:text-text-disabled-dark mr-1.5 font-mono">{index + 1}</span>
+                                                            {resultSetLabel(set)}
+                                                            {set.truncatedFrom !== null && <span className="ml-1 text-text-disabled dark:text-text-disabled-dark">*</span>}
+                                                        </Tab>
+                                                    ))}
+                                                </Tabs>
+                                            </div>
+                                        )}
                                     </div>
                                     {!loading && results && activeTab.ranAs && activeTab.lastExecutedConnection?.role && activeTab.ranAs !== activeTab.lastExecutedConnection.role && (
                                         <div className="px-4 pt-2 shrink-0">
@@ -1693,7 +1933,7 @@ isFavorite: !s.isFavorite } : s));
                                             <Alert
                                                 color="info"
                                                 size="small"
-                                                action={activeTab.lastExecutedSql && apiBase
+                                                action={activeTab.lastExecutedSql && apiBase && !resultSets
                                                     ? <Button
                                                         size="small"
                                                         variant="text"
@@ -1748,7 +1988,15 @@ isFavorite: !s.isFavorite } : s));
                                 }
                             }}
                         />
-                        <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark block">{t("studio_sql_snippet_saved_local")}</Typography>
+                        {snippetStorage === "server" && (
+                            <Label className="flex items-center gap-2 cursor-pointer">
+                                <Checkbox checked={shareSnippetWithTeam} onCheckedChange={setShareSnippetWithTeam}/>
+                                {t("studio_sql_snippet_share_team")}
+                            </Label>
+                        )}
+                        <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark block">
+                            {snippetStorage === "server" ? t("studio_sql_snippet_saved_project") : t("studio_sql_snippet_saved_local")}
+                        </Typography>
                     </div>
                 </DialogContent>
                 <DialogActions>

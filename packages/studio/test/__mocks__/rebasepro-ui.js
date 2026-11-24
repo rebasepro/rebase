@@ -75,9 +75,9 @@ large: 32 },
     // `<button>` in the SQL console's tab strip for as long as it stood in.
     // Pressing one changes the value, as Radix's does, so a pane's other tabs
     // can be reached.
-    Tabs: ({ children, value, onValueChange, variant: _var, className: _c, innerClassName: _i }) =>
+    Tabs: ({ children, value, onValueChange, variant: _var, className: _c, innerClassName: _i, "aria-label": ariaLabel }) =>
         React.createElement(SelectionContext.Provider, { value: { value, onValueChange } },
-            React.createElement("div", { role: "tablist" }, children)),
+            React.createElement("div", { role: "tablist", "aria-label": ariaLabel }, children)),
     Tab: function Tab({ children, value, className: _c, disabled }) {
         const selection = React.useContext(SelectionContext);
         return React.createElement("button", { type: "button",
@@ -113,9 +113,11 @@ large: 32 },
         ),
     SelectItem: ({ value, children }) =>
         React.createElement("option", { value }, children),
-    TextField: ({ value, onChange, ...props }) =>
+    // `error` and `size` are styling props, not attributes of an `<input>`.
+    TextField: ({ value, onChange, error, size: _size, ...props }) =>
         React.createElement("input", { value,
             onChange,
+            "aria-invalid": error ? true : undefined,
             ...props }),
     // `padding` and `size` are styling props the real component takes and a bare
     // `<input>` would render as invalid DOM attributes.
@@ -131,14 +133,21 @@ large: 32 },
             ...props }, children),
     CircularProgressCenter: () => React.createElement("div", { "data-testid": "loading" }),
     // A segmented control: one pressable button per option.
-    ToggleButtonGroup: ({ value, onValueChange, options }) =>
-        React.createElement("div", { role: "group" }, options.map((option) =>
+    ToggleButtonGroup: ({ value, onValueChange, options, "aria-label": ariaLabel }) =>
+        React.createElement("div", { role: "group", "aria-label": ariaLabel }, options.map((option) =>
             React.createElement("button", {
                 key: option.value,
                 type: "button",
                 "aria-pressed": value === option.value,
                 onClick: () => onValueChange(option.value)
             }, option.label))),
+    // A menu shown open: its trigger, then its items, each pressable. The
+    // fallback dropped the trigger — an icon-only button the test names — and
+    // every item's handler.
+    Menu: ({ trigger, children }) =>
+        React.createElement(React.Fragment, null, trigger, React.createElement("div", { role: "menu" }, children)),
+    MenuItem: ({ children, onClick, disabled, dense: _dense, className: _c }) =>
+        React.createElement("div", { role: "menuitem", "aria-disabled": disabled || undefined, onClick: disabled ? undefined : onClick }, children),
     useIsDarkMode: () => false,
     // The real one adds retry and chunk-error handling around React.lazy. A test
     // that renders a Studio view is not exercising any of that, and the loader

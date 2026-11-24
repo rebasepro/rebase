@@ -158,6 +158,36 @@ describe("what a script returns", () => {
         ]);
     });
 
+    it("returns every statement, each with its own columns, provenance and command", async () => {
+        const result = await driver.runSqlScript(
+            "SELECT id, name FROM authors ORDER BY id; CREATE TABLE scratch_statements (n int); UPDATE posts SET title = title WHERE id = 1; SELECT 2 AS b"
+        );
+
+        expect(result.statements?.map(statement => statement.command)).toEqual(["SELECT", "CREATE TABLE", "UPDATE", "SELECT"]);
+        const [authors, created, updated, last] = result.statements ?? [];
+        expect(authors.rows).toEqual([{ id: "1", name: "Ada" }, { id: "2", name: "Grace" }]);
+        expect(authors.rowCount).toBe(2);
+        expect(authors.columns[0]).toEqual({ name: "id", type: "integer", source: { schema: "public", table: "authors", column: "id" } });
+        expect(authors.tables).toEqual([{ schema: "public", table: "authors", kind: "table", primaryKey: ["id"], hasInheritors: false }]);
+        expect(created).toEqual({ rows: [], columns: [], tables: [], command: "CREATE TABLE" });
+        expect(updated).toMatchObject({ rows: [], columns: [], command: "UPDATE", rowCount: 1 });
+        expect(last).toEqual({ rows: [{ b: "2" }], columns: [{ name: "b", type: "integer" }], tables: [], command: "SELECT", rowCount: 1 });
+        // The top level is the last statement.
+        expect(result.rows).toEqual(last.rows);
+        expect(result.tables).toEqual([]);
+    });
+
+    it("explains with ANALYZE inside a transaction it rolls back: the plan comes back, the write does not stay", async () => {
+        const result = await driver.runSqlScript(
+            "BEGIN; EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) UPDATE accounts SET balance = balance + 1 WHERE id = 1; ROLLBACK;"
+        );
+
+        expect(result.statements?.map(statement => statement.command)).toEqual(["BEGIN", "EXPLAIN", "ROLLBACK"]);
+        const plan: unknown = JSON.parse(result.statements?.[1].rows[0]["QUERY PLAN"] ?? "null");
+        expect(plan).toEqual([expect.objectContaining({ Plan: expect.objectContaining({ "Node Type": "ModifyTable", "Actual Loops": 1 }) })]);
+        expect((await pool.query("SELECT balance FROM accounts WHERE id = 1")).rows[0].balance).toBe(100);
+    });
+
     it("writes back what it read: every value round-trips through its text", async () => {
         const read = await driver.runSqlScript("SELECT tags, body, meta, price, published_at FROM posts WHERE id = 1");
         const row = read.rows[0];
@@ -202,6 +232,11 @@ describe("how much of a result a run keeps", () => {
         expect(result.rows).toEqual([{ one: "1" }]);
         expect(result.truncated).toBeUndefined();
         expect(result.rowCount).toBe(1);
+        // One budget for the script: the first statement keeps what fits beside it.
+        const [first] = result.statements ?? [];
+        expect(first.rows).toHaveLength(9_999);
+        expect(first.truncated).toBe(true);
+        expect(first.rowCount).toBe(50_000);
     });
 });
 

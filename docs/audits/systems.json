@@ -111,7 +111,9 @@
         "packages/server/src/api/live-schema-routes.ts",
         "packages/server/src/api/schema-editor-routes.ts",
         "packages/server/src/api/logs-routes.ts",
-        "packages/server/src/api/sql-export-routes.ts"
+        "packages/server/src/api/sql-export-routes.ts",
+        "packages/server/src/api/sql-snippet-routes.ts",
+        "packages/server/src/api/sql-snippet-store.ts"
       ],
       "focus": "Every edit the UI can express (add/rename/delete/retype a property, add each relation kind, change enum values, rename a collection) must leave source code AND database agreeing, on a fresh DB and one with rows. An edit that cannot be applied must say so truthfully and leave no half state. Two tabs editing one collection. SQL console: session/role isolation, result editing, huge results, cancel. Storage browser, logs, cron and functions views. Screens built from @rebasepro/ui and consistent with UIReferenceView.",
       "audits": [

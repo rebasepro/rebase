@@ -939,6 +939,29 @@ describe("WebSocket Server SQL console scripts", () => {
         });
     });
 
+    it("sends every statement of a script, the last one's rows once", async () => {
+        const { mockWs, send } = await signedIn();
+        const multi: SqlScriptResult = {
+            ...script,
+            statements: [
+                { rows: [{ g: "1" }, { g: "2" }], columns: [{ name: "g", type: "integer" }], tables: [], command: "SELECT", rowCount: 2 },
+                { rows: [], columns: [], tables: [], command: "CREATE TABLE" },
+                { rows: script.rows, columns: script.columns, tables: script.tables, command: "SELECT", rowCount: 1 }
+            ]
+        };
+        mockDriver.admin.runSqlScript.mockResolvedValueOnce(multi);
+
+        await send({ type: "EXECUTE_SQL", requestId: "req-multi", payload: { sql: "SELECT …; CREATE TABLE …; SELECT …", mode: "script" } });
+
+        const answer = JSON.parse(mockWs.send.mock.calls[mockWs.send.mock.calls.length - 1][0]);
+        expect(answer.payload.result).toEqual(script.rows);
+        expect(answer.payload.statements).toEqual([
+            { rows: [{ g: "1" }, { g: "2" }], columns: [{ name: "g", type: "integer" }], tables: [], command: "SELECT", rowCount: 2 },
+            { rows: [], columns: [], tables: [], command: "CREATE TABLE" },
+            { columns: script.columns, tables: script.tables, command: "SELECT", rowCount: 1 }
+        ]);
+    });
+
     /**
      * With `DISABLE_DB_ROLE_SWITCHING` every statement runs as the connection
      * owner, whatever role the console asked for. The answer said nothing of

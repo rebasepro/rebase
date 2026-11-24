@@ -147,6 +147,27 @@ describe("readSqlScriptResult", () => {
         expect(readSqlScriptResult({ result: [], truncated: "yes" }).truncated).toBeUndefined();
     });
 
+    it("reads every statement of a script, giving the last one the rows the frame sent once", () => {
+        const result = readSqlScriptResult({
+            result: [{ id: "1" }],
+            columns: [{ name: "id" }],
+            command: "SELECT",
+            rowCount: 1,
+            statements: [
+                { rows: [{ g: 1 }], columns: [{ name: "g", type: "integer" }], tables: [], command: "SELECT", rowCount: 50_000, truncated: true },
+                { columns: [], tables: [], command: "CREATE TABLE" },
+                { columns: [{ name: "id" }], tables: [], command: "SELECT", rowCount: 1 }
+            ]
+        });
+
+        expect(result.statements).toEqual([
+            { rows: [{ g: "1" }], columns: [{ name: "g", type: "integer" }], tables: [], command: "SELECT", rowCount: 50_000, truncated: true },
+            { rows: [], columns: [], tables: [], command: "CREATE TABLE" },
+            { rows: [{ id: "1" }], columns: [{ name: "id" }], tables: [], command: "SELECT", rowCount: 1 }
+        ]);
+        expect(readSqlScriptResult({ result: [] }).statements).toBeUndefined();
+    });
+
     it("drops a source it cannot read, and reads an unknown inheritance as the unsafe answer", () => {
         const result = readSqlScriptResult({
             result: [],

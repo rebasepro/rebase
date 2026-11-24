@@ -169,6 +169,10 @@ a table reaches none of this. See [Roles and scopes](/docs/backend/roles-and-sco
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Roles, users' rule roles and live service keys an administrator can simulate |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Each table as `{ role?, userId?, apiKeyId? }` reaches it: visible rows against the caller's, hidden by scope or RLS, masked fields. Administrator's session only |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streams one read-only query's whole result as CSV — [Studio](/docs/studio/)'s "Download full result as CSV" |
+| `GET` | `/api/admin/sql/snippets` | `database:read` | The SQL console's saved snippets the caller sees: their own and the team's |
+| `POST` | `/api/admin/sql/snippets` | `database:write` | Saves a snippet (`name`, `sql`, `visibility`: `personal` or `team`, `favorite`) |
+| `PATCH` | `/api/admin/sql/snippets/:id` | `database:write` | Changes a snippet's fields; only its owner or an admin |
+| `DELETE` | `/api/admin/sql/snippets/:id` | `database:write` | Deletes a snippet; only its owner or an admin |
 | `GET` | `/api/admin/branches/:name/diff` | `database:write` | What a [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) changed: schema, policies and rows, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Writes the branch's rows to its parent, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` when either side changed since the diff, or rows conflict |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
