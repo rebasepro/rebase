@@ -47,6 +47,7 @@ COPY packages/client/package.json packages/client/
 COPY packages/codegen/package.json packages/codegen/
 COPY packages/ui/package.json packages/ui/
 COPY packages/mcp-apps/package.json packages/mcp-apps/
+COPY packages/rls-check/package.json packages/rls-check/
 COPY packages/server/package.json packages/server/
 COPY packages/server-postgres/package.json packages/server-postgres/
 # The admin panel, for the MCP App views only (see the source COPY below).
@@ -78,6 +79,9 @@ COPY packages/utils packages/utils
 COPY packages/common packages/common
 COPY packages/client packages/client
 COPY packages/codegen packages/codegen
+# The Database view's security advisor runs rls-check's checks; the server
+# inlines it, so it builds first and reaches the runtime only inside its dist.
+COPY packages/rls-check packages/rls-check
 # The server inlines every @rebasepro/* package it imports, and `/mcp` imports
 # @rebasepro/mcp-apps, whose built HTML is the MCP App views. Those views are
 # built from the UI kit, so ui and mcp-apps build before the server; neither
@@ -120,6 +124,7 @@ RUN pnpm --filter @rebasepro/types build \
     && pnpm --filter @rebasepro/ui build \
     && pnpm --filter @rebasepro/studio build:standalone \
     && pnpm --filter @rebasepro/mcp-apps build \
+    && pnpm --filter @rebasepro/rls-check build \
     && pnpm --filter @rebasepro/server build \
     && pnpm --filter @rebasepro/server-postgres build
 

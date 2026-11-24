@@ -3,7 +3,7 @@ import { isIlikeSearchable } from "@rebasepro/common";
 import type { DatabaseHealthSample, SQLAdmin, TableDescriptor } from "@rebasepro/types";
 import { ApiError, errorHandler, extractDbError } from "../api/errors";
 import type { HonoEnv } from "../api/types";
-import { ddlRefusal, PROTECTED_SCHEMAS, quoteIdent } from "./db-admin-routes";
+import { ddlRefusal, PROTECTED_SCHEMAS, quoteIdent } from "./db-sql-guards";
 import { createSourceResolver, DEFAULT_SOURCE_KEY, type DbSqlSource } from "./db-sources";
 
 /**

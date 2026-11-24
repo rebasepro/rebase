@@ -3,7 +3,7 @@ import type { SQLAdmin } from "@rebasepro/types";
 import { ApiError, errorHandler, extractDbError } from "../api/errors";
 import type { HonoEnv } from "../api/types";
 import { notifySchemaChanged } from "./catalog-ddl";
-import { assertIdent, assertSchema, ddlRefusal, PROTECTED_SCHEMAS, quoteIdent } from "./db-admin-routes";
+import { assertIdent, assertSchema, ddlRefusal, PROTECTED_SCHEMAS, quoteIdent } from "./db-sql-guards";
 import { createSourceResolver, type DbSqlSource } from "./db-sources";
 
 /**
