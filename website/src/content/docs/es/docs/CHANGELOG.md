@@ -11,6 +11,8 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-24
+
 ### Added
 
 - **The schema commands reach every database a project declares.** `rebase db push`, `db generate` and `db migrate` take `--database <key>` and `--all-databases`. A project that declares a second database (`database("analytics")` in `backend/resources.ts`) can now push, generate migrations for and migrate it from the CLI: `--database analytics` acts on that database alone, at `DATABASE_URL__ANALYTICS` (or `--database-url`), with only the tables whose `database` names it. Each database keeps its own migration history, the default's in `drizzle/migrations` and another's in `drizzle/migrations/<key>`, or the directory its declaration's `migrations` option names. `--all-databases` runs the default and then each declared database in turn. A key nothing declares is refused, listing the declared ones, and so is a declared database nothing binds; nothing runs in either case. On `rebase dev`'s managed database, `rebase db`, `doctor`, `console`, `verify` and `schema` now bind `DATABASE_URL__<KEY>` for every declared database, as `rebase dev` already did.

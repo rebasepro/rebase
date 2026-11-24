@@ -57,7 +57,7 @@ before it agrees to boot:
 ```jsonc
 {
   "bundleFormat": 3,
-  "runtime": { "range": "^1", "builtAgainst": "0.35.1", "contract": 2 },
+  "runtime": { "range": "^1", "builtAgainst": "0.36.0", "contract": 2 },
   "schemaVersion": "v2:3f0c9a1e7d2b5c48",
   "kind": "backend",
   "entry": {
@@ -123,7 +123,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.35.1   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.36.0   # a newer tag — your bundle is untouched
 ```
 
 ## Development uses the same path
