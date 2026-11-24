@@ -1,5 +1,5 @@
 ---
-sourceHash: 27b170adac8e577c
+sourceHash: 50cf2ade9a030f08
 title: Múltiples bases de datos y buckets
 sidebar_label: Múltiples fuentes
 description: Enruta tablas a diferentes bases de datos y columnas de almacenamiento a diferentes buckets, y configura cada una desde el entorno.
@@ -150,6 +150,8 @@ El driver se elige a partir del `engine` declarado — `postgres` es aquel para 
 En desarrollo no configuras nada de esto: `rebase dev` sirve cada base de datos declarada desde su Postgres gestionado — una segunda instancia para `analytics`, iniciada bajo demanda — y exporta `DATABASE_URL__ANALYTICS` automáticamente. Una variable configurada manualmente nunca se sobrescribe.
 
 Las tablas y las políticas de seguridad a nivel de fila (row-level security) se aprovisionan **por fuente**: una tabla enrutada a `analytics` obtiene su tabla y sus políticas en la base de datos de analytics.
+
+En [Rebase Cloud](/docs/deployment/cloud/#more-than-one-database) tampoco configuras nada de esto: cada base de datos declarada se crea en el servidor Postgres gestionado del proyecto al desplegar y se vincula como `DATABASE_URL__<KEY>`, y cada bucket declarado obtiene un bucket propio en cuanto el almacenamiento del proyecto se ejecuta en Rebase Storage.
 
 ### Almacenamiento
 

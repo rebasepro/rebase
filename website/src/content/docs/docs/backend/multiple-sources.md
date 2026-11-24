@@ -205,6 +205,12 @@ Tables and row-level-security policies are provisioned **per source**: a
 table routed to `analytics` gets its table, and its policies, in the
 analytics database.
 
+On [Rebase Cloud](/docs/deployment/cloud/#more-than-one-database) you set none
+of this either: each declared database is created on the project's managed
+Postgres server at deploy and bound as `DATABASE_URL__<KEY>`, and each declared
+bucket gets a bucket of its own once the project's storage runs on Rebase
+Storage.
+
 ### Storage
 
 ```bash

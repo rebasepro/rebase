@@ -1,5 +1,5 @@
 ---
-sourceHash: 27b170adac8e577c
+sourceHash: 50cf2ade9a030f08
 title: Database e bucket multipli
 sidebar_label: Più sorgenti
 description: Instrada le tabelle verso diversi database e le colonne di archiviazione verso diversi bucket, e configura ciascuno di essi dall'ambiente.
@@ -205,6 +205,11 @@ manualmente non viene mai sovrascritta.
 Le tabelle e i criteri di row-level security vengono sottoposti a provisioning **per sorgente**: una
 tabella instradata verso `analytics` ottiene la propria tabella e i propri criteri nel
 database analytics.
+
+Anche su [Rebase Cloud](/docs/deployment/cloud/#more-than-one-database) non devi impostare nulla di
+tutto questo: ogni database dichiarato viene creato sul server Postgres gestito del progetto al momento
+del deploy e associato come `DATABASE_URL__<KEY>`, e ogni bucket dichiarato ottiene un bucket dedicato
+non appena lo storage del progetto è su Rebase Storage.
 
 ### Storage
 

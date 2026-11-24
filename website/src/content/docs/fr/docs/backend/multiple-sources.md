@@ -1,5 +1,5 @@
 ---
-sourceHash: 27b170adac8e577c
+sourceHash: 50cf2ade9a030f08
 title: Bases de données et buckets multiples
 sidebar_label: Sources multiples
 description: Acheminez des tables vers différentes bases de données et des colonnes de stockage vers différents buckets, et configurez chacun d'eux depuis l'environnement.
@@ -150,6 +150,8 @@ Le pilote est choisi à partir du `engine` déclaré — `postgres` est celui po
 En développement, vous n'avez rien de tout cela à configurer : `rebase dev` dessert chaque base de données déclarée à partir de son instance Postgres gérée — une deuxième instance pour `analytics`, démarrée à la demande — et exporte lui-même `DATABASE_URL__ANALYTICS`. Une variable que vous définissez manuellement n'est jamais écrasée.
 
 Les tables et les stratégies de sécurité au niveau des lignes (row-level security) sont provisionnées **par source** : une table acheminée vers `analytics` obtient sa table et ses politiques dans la base de données `analytics`.
+
+Sur [Rebase Cloud](/docs/deployment/cloud/#more-than-one-database), vous n'avez rien de tout cela à configurer non plus : chaque base de données déclarée est créée sur le serveur Postgres géré du projet lors du déploiement et liée sous `DATABASE_URL__<KEY>`, et chaque bucket déclaré obtient son propre bucket dès que le stockage du projet tourne sur Rebase Storage.
 
 ### Stockage
 

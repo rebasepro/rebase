@@ -64,6 +64,11 @@ The platform sets these environment variables on the app:
 | `S3_SECRET_ACCESS_KEY` | The app's secret |
 | `S3_FORCE_PATH_STYLE` | `true` |
 
+A bucket the app's code declares beyond the default — `bucket("media")` in
+`backend/resources.ts` — gets a bucket and key of its own on the next deploy,
+bound with the same variables suffixed by its key: `S3_BUCKET__MEDIA`,
+`S3_ACCESS_KEY_ID__MEDIA`, and so on. A project can have up to 100 buckets.
+
 Traffic between the app and Rebase Storage stays inside the cluster. How the
 app serves and authorizes files is covered in
 [File storage](/docs/backend/storage/) and
@@ -117,7 +122,8 @@ which S3 clients retry with backoff.
 ## Pricing
 
 Each project includes **10 GB**. Above that, storage costs **€0.03 per
-GB-month**, counted on the current version of each object only.
+GB-month**, counted on the current version of each object only, across all of
+the project's buckets.
 
 Deleted and overwritten files are kept for 30 days and can be restored by
 support during that time. They are not billed.

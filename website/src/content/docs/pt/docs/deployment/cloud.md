@@ -1,5 +1,5 @@
 ---
-sourceHash: 77300c47e9692bd9
+sourceHash: f2cfc1c2f8667566
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se vincula e é implantado, e o que o beta privado ainda não inclui.
@@ -235,6 +235,45 @@ e-mails para o seu app: defina `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS
 próprio `GET /api/auth/config` do app (seu campo `unavailable`), e o `deploy` informa
 o mesmo sob sua verificação live.
 
+## Mais de um banco de dados
+
+O PostgreSQL gerenciado de um projeto é um **servidor de banco de dados**, e ele pode conter mais
+de um banco de dados. Declare cada um no seu código, como você faria em qualquer outro lugar
+([Múltiplos Bancos de Dados e Buckets](/docs/backend/multiple-sources/)):
+
+```ts
+// backend/resources.ts
+import { database } from "@rebasepro/types";
+
+export const main = database();
+export const analytics = database("analytics");
+```
+
+No próximo deploy, a plataforma cria um banco de dados chamado `analytics` no servidor do projeto
+e o vincula ao seu app como `DATABASE_URL__ANALYTICS`, a mesma variável que um backend
+auto-hospedado lê. Nada mais muda:
+
+- **Cobrança.** Todos os bancos de dados no servidor compartilham sua CPU, memória e disco,
+  que são o que é cobrado do projeto. Um segundo banco de dados não custa nada por si só; os dados
+  que ele armazena aumentam o disco, e o disco é cobrado pelo tamanho.
+  Dimensione o servidor para todos eles em **Compute**.
+- **Backups e recuperação.** Eles estão nos backups do servidor e o acompanham em uma
+  [recuperação point-in-time](#restaurar-o-banco-de-dados-para-um-ponto-no-tempo-pitr).
+- **Conexão.** `rebase cloud db list` os exibe, e `db info`, `db connect`
+  e `db query` aceitam `--database <key>`:
+
+  ```bash
+  rebase cloud db connect --database analytics
+  ```
+
+- **Remoção.** Um deploy nunca exclui um banco de dados. Um que seu código deixa de declarar
+  permanece no servidor até que você execute `rebase cloud resources prune database analytics`.
+
+Uma variável definida por você tem prioridade: com sua própria `DATABASE_URL__ANALYTICS` no
+ambiente do projeto, a plataforma não cria nada para essa chave. Em um projeto que traz seu próprio
+servidor de banco de dados, nenhum banco de dados é criado; em vez disso, defina uma
+`DATABASE_URL__<KEY>` para cada um.
+
 ## Armazenamento de arquivos
 
 Um novo projeto não tem bucket: uploads são recusados com `501 STORAGE_NOT_CONFIGURED`,
@@ -254,8 +293,12 @@ rebase cloud storage attach --bucket <name> \
 rebase cloud deploy
 ```
 
-`rebase cloud storage` lista os buckets do projeto. Um projeto com vários
-conecta cada um com `--source <key>`; um que configura o armazenamento no código não precisa de nenhum dos dois.
+`rebase cloud storage` lista os buckets do projeto. Um projeto pode ter quantos declarar:
+assim que seu bucket padrão roda no Rebase Storage, cada `bucket("media")` no seu código recebe um
+bucket próprio no próximo deploy, vinculado como `S3_BUCKET__MEDIA` e as demais variáveis `__MEDIA`.
+Os bytes armazenados são medidos por projeto, somando todos os seus buckets
+(o [Rebase Storage](/docs/deployment/rebase-storage/) informa quando são cobrados). Com buckets próprios,
+conecte cada um com `--source <key>`; um que configura o armazenamento no código não precisa de nenhum dos dois.
 
 ## Visualizar alterações em preview
 
