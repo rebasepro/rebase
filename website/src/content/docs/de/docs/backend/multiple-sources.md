@@ -1,5 +1,5 @@
 ---
-sourceHash: 27b170adac8e577c
+sourceHash: 50cf2ade9a030f08
 title: Mehrere Datenbanken und Buckets
 sidebar_label: Mehrere Quellen
 description: Tabellen an verschiedene Datenbanken und Storage-Spalten an verschiedene Buckets weiterleiten und jede einzelne über die Umgebung konfigurieren.
@@ -202,6 +202,11 @@ die Sie manuell setzen, wird niemals überschrieben.
 
 Tabellen und Row-Level-Security-Policies werden **pro Quelle** bereitgestellt: Eine Tabelle,
 die an `analytics` weitergeleitet wird, erhält ihre Tabelle und ihre Policies in der Analytics-Datenbank.
+
+Auf [Rebase Cloud](/docs/deployment/cloud/#more-than-one-database) müssen Sie ebenfalls nichts davon
+festlegen: Jede deklarierte Datenbank wird beim Deploy auf dem verwalteten Postgres-Server des Projekts
+erstellt und als `DATABASE_URL__<KEY>` gebunden, und jeder deklarierte Bucket erhält einen eigenen
+Bucket, sobald der Speicher des Projekts auf Rebase Storage läuft.
 
 ### Storage
 

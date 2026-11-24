@@ -234,6 +234,45 @@ mail for your app: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and
 app's own `GET /api/auth/config` (its `unavailable` field), and `deploy` says the
 same under its live check.
 
+## More than one database
+
+A project's managed PostgreSQL is a **database server**, and it can hold more
+than one database. Declare each one in your code, as you would anywhere else
+([Multiple Databases and Buckets](/docs/backend/multiple-sources/)):
+
+```ts
+// backend/resources.ts
+import { database } from "@rebasepro/types";
+
+export const main = database();
+export const analytics = database("analytics");
+```
+
+On the next deploy the platform creates a database named `analytics` on the
+project's server and binds it to your app as `DATABASE_URL__ANALYTICS`, the same
+variable a self-hosted backend reads. Nothing else changes:
+
+- **Billing.** Every database on the server shares its CPU, memory and disk,
+  which are what the project is billed for. A second database costs nothing by
+  itself; the data it holds grows the disk, and the disk is billed by size.
+  Size the server for all of them under **Compute**.
+- **Backups and recovery.** They are in the server's backups and move with it
+  in a [point-in-time recovery](#restore-the-database-to-a-point-in-time).
+- **Connecting.** `rebase cloud db list` shows them, and `db info`, `db connect`
+  and `db query` take `--database <key>`:
+
+  ```bash
+  rebase cloud db connect --database analytics
+  ```
+
+- **Removing.** A deploy never deletes a database. One your code stops declaring
+  stays on the server until you run `rebase cloud resources prune database analytics`.
+
+A variable you set yourself wins: with your own `DATABASE_URL__ANALYTICS` in the
+project's environment the platform creates nothing for that key. A project that
+brings its own database server gets no databases created on it; set a
+`DATABASE_URL__<KEY>` for each one instead.
+
 ## File storage
 
 A new project has no bucket: uploads are refused with `501 STORAGE_NOT_CONFIGURED`,
@@ -253,8 +292,14 @@ rebase cloud storage attach --bucket <name> \
 rebase cloud deploy
 ```
 
-`rebase cloud storage` lists the project's buckets. A project with several
-attaches each with `--source <key>`; one that configures storage in code needs neither.
+`rebase cloud storage` lists the project's buckets. A project can have as many as
+it declares: once its default bucket runs on Rebase Storage, every
+`bucket("media")` in its code gets a bucket of its own on the next deploy, bound
+as `S3_BUCKET__MEDIA` and the rest of its `__MEDIA` variables. Stored bytes are
+measured per project, across all of its buckets ([Rebase
+Storage](/docs/deployment/rebase-storage/) says when they are billed). With
+buckets of your own, attach
+each with `--source <key>`; one that configures storage in code needs neither.
 
 ## Preview a change
 

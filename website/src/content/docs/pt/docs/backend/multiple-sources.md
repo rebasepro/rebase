@@ -1,5 +1,5 @@
 ---
-sourceHash: 27b170adac8e577c
+sourceHash: 50cf2ade9a030f08
 title: Múltiplos Bancos de Dados e Buckets
 sidebar_label: Múltiplas Fontes
 description: Direcione tabelas para diferentes bancos de dados e colunas de armazenamento para diferentes buckets, e configure cada um a partir do ambiente.
@@ -205,6 +205,11 @@ manualmente nunca é sobrescrita.
 Tabelas e políticas de row-level-security são provisionadas **por fonte**: uma
 tabela direcionada para `analytics` obtém sua tabela, e suas políticas, no
 banco de dados analytics.
+
+No [Rebase Cloud](/docs/deployment/cloud/#more-than-one-database) você também não define nada
+disso: cada banco de dados declarado é criado no servidor Postgres gerenciado do projeto durante o
+deploy e vinculado como `DATABASE_URL__<KEY>`, e cada bucket declarado recebe um bucket próprio
+assim que o armazenamento do projeto roda no Rebase Storage.
 
 ### Armazenamento
 
