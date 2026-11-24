@@ -28,6 +28,8 @@ if [ "$PRIMARY" = "$WORKTREE" ]; then
     exit 2
 fi
 
+PRIMARY_REAL="$(cd "$PRIMARY" && pwd -P)"
+
 link_importer() {
     local rel="$1"
     local src="$PRIMARY/$rel/node_modules"
@@ -51,8 +53,18 @@ link_importer() {
             [ -e "$entry" ] || continue
             local name
             name="$(basename "$entry")"
+            # Where the primary's link really lands. A workspace package
+            # outside packages/ (tooling/rebase-agent-skills is
+            # @rebasepro/agent-skills) resolves into the primary checkout too,
+            # and must be swapped for the worktree's copy the same way.
+            local real
+            real="$(cd "$entry" 2>/dev/null && pwd -P || true)"
             if [ -d "$WORKTREE/packages/$name" ]; then
                 ln -s "$WORKTREE/packages/$name" "$dst/@rebasepro/$name"
+            elif [ -n "$real" ] && [ "${real#"$PRIMARY_REAL"/}" != "$real" ] \
+                && [ "${real#"$PRIMARY_REAL"/node_modules/}" = "$real" ] \
+                && [ -d "$WORKTREE/${real#"$PRIMARY_REAL"/}" ]; then
+                ln -s "$WORKTREE/${real#"$PRIMARY_REAL"/}" "$dst/@rebasepro/$name"
             else
                 ln -s "$entry" "$dst/@rebasepro/$name"
             fi
