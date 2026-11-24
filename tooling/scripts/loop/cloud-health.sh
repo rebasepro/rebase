@@ -42,7 +42,10 @@ K get nodes --no-headers
 # what the kubelet's eviction threshold compares; MemoryPressure is its verdict;
 # requests over allocatable is what decides whether the next pod still fits
 # (and whether the autoscaler has to add a node).
-echo "-- memory: node | available | pressure | requests/allocatable | top% (info only)"
+# A node is LOW only when the kubelet could soon evict (available < 512Mi or
+# MemoryPressure=True) or the next pod may not fit (requests > 90%). Anything
+# else is OK however high top% reads (decided 2026-11-24: accept, no resize).
+echo "-- memory: verdict | node | available | pressure | requests/allocatable | top% (info only, never a verdict)"
 top="$(K top nodes --no-headers 2>/dev/null)"
 for n in $(K get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
   case "$n" in *unreachable*) continue ;; esac
@@ -51,7 +54,10 @@ for n in $(K get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
   pressure="$(K get node "$n" -o jsonpath='{.status.conditions[?(@.type=="MemoryPressure")].status}')"
   req="$(K describe node "$n" 2>/dev/null | awk '/Allocated resources/{f=1} f && $1=="memory"{print $3; exit}')"
   pct="$(printf '%s\n' "$top" | awk -v n="$n" '$1==n{print $5}')"
-  printf '%s | %s | MemoryPressure=%s | requests %s | top %s\n' "${n#rebase-fsn1-}" "$avail" "$pressure" "$req" "$pct"
+  verdict=OK
+  a="${avail%Mi}"; r="${req//[()%]/}"
+  { [ "$pressure" = "True" ] || { [ "$a" != "?" ] && [ "${a:-0}" -lt 512 ]; } || [ "${r:-0}" -gt 90 ]; } && verdict=LOW
+  printf '%s | %s | %s | MemoryPressure=%s | requests %s | top %s\n' "$verdict" "${n#rebase-fsn1-}" "$avail" "$pressure" "$req" "$pct"
 done
 
 section "Pods not Running/Completed, or restarting"
@@ -87,8 +93,16 @@ echo "(nothing listed = no failures)"
 section "Scheduled jobs: latest run failed, or suspended"
 # A failure a later success superseded is history, not a problem (and with
 # ttlSecondsAfterFinished it removes itself); only the latest run counts.
-K get cronjob -A -o jsonpath='{range .items[*]}{.metadata.namespace} {.metadata.name} {.spec.suspend} {.status.lastScheduleTime} {.status.lastSuccessfulTime}{"\n"}{end}' 2>/dev/null |
-  awk '$3=="true" {print "SUSPENDED: " $1 "/" $2 " (last ran " $4 ")"; next} $4!="" && ($5=="" || $5<$4) {print "LATEST RUN NOT SUCCESSFUL: " $1 "/" $2 " (scheduled " $4 ", last success " ($5==""?"never":$5) ")"}'
+# A CronJob suspended on purpose says why in the annotation
+# rebase.pro/suspended-reason (set in its manifest); that is information, not a
+# finding. One suspended with no reason is a finding: nobody can tell whether it
+# was meant.
+# Fields are '|'-separated: an empty one (never succeeded, no reason) must not
+# shift the rest the way runs of spaces do.
+K get cronjob -A -o jsonpath='{range .items[*]}{.metadata.namespace}|{.metadata.name}|{.spec.suspend}|{.status.lastScheduleTime}|{.status.lastSuccessfulTime}|{.metadata.annotations.rebase\.pro/suspended-reason}{"\n"}{end}' 2>/dev/null |
+  awk -F'|' '$3=="true" && $6!="" {print "suspended on purpose (info): " $1 "/" $2 " (" $6 ")"; next}
+       $3=="true" {print "SUSPENDED, NO REASON RECORDED: " $1 "/" $2 " (last ran " ($4==""?"never":$4) ")"; next}
+       $4!="" && ($5=="" || $5<$4) {print "LATEST RUN NOT SUCCESSFUL: " $1 "/" $2 " (scheduled " $4 ", last success " ($5==""?"never":$5) ")"}'
 echo "-- one-off Jobs (no CronJob) that failed:"
 K get jobs -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name} {.metadata.ownerReferences[0].kind} {.status.failed}{"\n"}{end}' 2>/dev/null | awk '$2!="CronJob" && $NF+0>0 && $NF!="" {print $1}' | grep -v '^rebase-tenant-' || true
 
@@ -96,12 +110,17 @@ section "Tenant databases (CNPG)"
 K get clusters.postgresql.cnpg.io -A --no-headers
 echo "-- WAL archiving (last archived / failed):"
 K get clusters.postgresql.cnpg.io -A -o jsonpath='{range .items[*]}{.metadata.namespace} {.status.firstRecoverabilityPoint} last={.status.lastSuccessfulBackup} cond={range .status.conditions[?(@.type=="ContinuousArchiving")]}{.status}{end}{"\n"}{end}'
-echo "-- backups failed in the last runs:"
-K get backups.postgresql.cnpg.io -A --no-headers 2>/dev/null | awk '$NF!="completed"' | tail -10
+echo "-- backups not completed, with no later completed backup of the same cluster:"
+# CNPG never removes a Backup object, so a failure a later completed backup
+# superseded stays listed for ever. It is history, not a problem.
+K get backups.postgresql.cnpg.io -A -o jsonpath='{range .items[*]}{.metadata.namespace} {.metadata.name} {.spec.cluster.name} {.metadata.creationTimestamp} {.status.phase}{"\n"}{end}' 2>/dev/null |
+  awk '{k=$1"/"$3} $5=="completed" {if ($4>done[k]) done[k]=$4; next} {bad[NR]=$0; key[NR]=k; at[NR]=$4}
+       END {for (i in bad) if (at[i]>done[key[i]]) print bad[i]}' | tail -10
 
 section "Tenant ingresses answer"
 K get ingress -A -o jsonpath='{range .items[*]}{range .spec.rules[*]}{.host}{"\n"}{end}{end}' | sort -u | while read -r h; do
   [ -n "$h" ] || continue
+  case "$h" in '*.'*) continue ;; esac  # a wildcard rule names no host to curl
   printf '%s -> ' "$h"; curl -s -o /dev/null -m 15 -w '%{http_code} %{time_total}s\n' "https://$h/"
 done
 
