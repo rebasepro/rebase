@@ -192,6 +192,7 @@ Rebase eliminates the custom boilerplate work between database, API, and UI by g
 - **${cleanHtml(tr("showcase.sync.title"))}**: ${cleanHtml(tr("showcase.sync.subtitle"))}
   - **${cleanHtml(tr("showcase.sync.tab1.title"))}**: ${cleanHtml(tr("showcase.sync.tab1.desc"))}
   - **${cleanHtml(tr("showcase.sync.tab2.title"))}**: ${cleanHtml(tr("showcase.sync.tab2.desc"))}
+  - **${cleanHtml(tr("showcase.sync.tab3.title"))}**: ${cleanHtml(tr("showcase.sync.tab3.desc"))}
 `;
   }
 

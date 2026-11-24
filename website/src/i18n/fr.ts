@@ -213,6 +213,8 @@ export const fr = {
   "showcase.sync.tab1.desc": "Les mêmes lignes Postgres en tableau, cartes, liste ou Kanban. Changez de vue à la volée, filtrez en direct, éditez inline — sans construire le moindre écran d'admin.",
   "showcase.sync.tab2.title": "Le SQL reste roi",
   "showcase.sync.tab2.desc": "L'UI ne vous limite jamais. Ouvrez l'éditeur SQL intégré pour des requêtes brutes — onglets multiples, autocomplétion, EXPLAIN — directement sur votre base, avec des résultats éditables sur place.",
+  "showcase.sync.tab3.title": "Les politiques vivent dans Postgres",
+  "showcase.sync.tab3.desc": "Inspectez, éditez et synchronisez les politiques Row-Level Security directement sur vos tables. Les mêmes règles protègent REST, le temps réel, les agents et le panneau — fermées par défaut.",
   "power.title": "Vous écrivez ce fichier.<br/>Vous n'écrivez pas le reste.",
   "power.subtitle":
     "Le schéma, l'API REST, le SDK typé, les formulaires d'édition et chaque vue du panneau en découlent, et évoluent avec lui. Que vous l'écriviez vous-même ou qu'un agent le modifie, il n'y a aucun second modèle de données à synchroniser ni aucun écran CRUD à maintenir lorsqu'un champ change de nom.",

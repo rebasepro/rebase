@@ -326,6 +326,9 @@ export const en = {
   "showcase.sync.tab2.title": "SQL stays first-class",
   "showcase.sync.tab2.desc":
     "You never outgrow the UI. Drop into the built-in SQL editor for raw queries — multiple tabs, autocomplete, EXPLAIN — running directly against your database, with results you can edit in place.",
+  "showcase.sync.tab3.title": "Policies live in Postgres",
+  "showcase.sync.tab3.desc":
+    "Inspect, edit and sync Row-Level Security policies straight against your tables. The same rules guard REST, realtime, agents and the panel itself — fail-closed by default.",
   "power.title":
     'You write this file.<br/>You don\u2019t write the rest.',
   "power.subtitle":

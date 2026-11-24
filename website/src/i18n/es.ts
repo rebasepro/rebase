@@ -213,6 +213,8 @@ export const es = {
   "showcase.sync.tab1.desc": "Las mismas filas de Postgres como tabla, tarjetas, lista o tablero Kanban. Cambia de vista al vuelo, filtra en vivo, edita inline — sin construir ni una sola pantalla de administración.",
   "showcase.sync.tab2.title": "SQL de primera clase",
   "showcase.sync.tab2.desc": "La UI nunca se te queda pequeña. Abre el editor SQL integrado para consultas en bruto — múltiples pestañas, autocompletado, EXPLAIN — directamente sobre tu base de datos, con resultados editables en el sitio.",
+  "showcase.sync.tab3.title": "Las políticas viven en Postgres",
+  "showcase.sync.tab3.desc": "Inspecciona, edita y sincroniza políticas de Row-Level Security directamente sobre tus tablas. Las mismas reglas protegen REST, realtime, los agentes y el propio panel — cerradas por defecto.",
   "power.title": "Escribes este archivo.<br/>No escribes el resto.",
   "power.subtitle":
     "El esquema, la API REST, el SDK tipado, los formularios de edición y cada vista del panel salen de él, y evolucionan a la par. Ya lo escribas tú o lo edite un agente, no hay un segundo modelo de datos que mantener sincronizado ni pantallas CRUD que mantener cuando un campo cambia de nombre.",

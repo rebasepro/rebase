@@ -212,6 +212,8 @@ export const de = {
   "showcase.sync.tab1.desc": "Dieselben Postgres-Zeilen als Tabelle, Karten, Liste oder Kanban-Board. Wechsle die Ansicht on the fly, filtere live, editiere inline — ohne eine einzige Admin-Oberfläche zu bauen.",
   "showcase.sync.tab2.title": "SQL bleibt erstklassig",
   "showcase.sync.tab2.desc": "Du wächst nie aus der UI heraus. Öffne den eingebauten SQL-Editor für rohe Queries — mehrere Tabs, Autocomplete, EXPLAIN — direkt auf deiner Datenbank, mit Ergebnissen, die du an Ort und Stelle editierst.",
+  "showcase.sync.tab3.title": "Policies leben in Postgres",
+  "showcase.sync.tab3.desc": "Prüfe, bearbeite und synchronisiere Row-Level-Security-Policies direkt auf deinen Tabellen. Dieselben Regeln schützen REST, Realtime, Agenten und das Panel selbst — standardmäßig fail-closed.",
   "power.title": "Du schreibst diese Datei.<br/>Den Rest schreibst du nicht.",
   "power.subtitle":
     "Schema, REST API, typisiertes SDK, Bearbeitungsformulare und jede Panel-Ansicht entstehen daraus – und ändern sich mit ihr. Egal ob du sie selbst schreibst oder ein Agent sie bearbeitet: Es gibt kein zweites Datenmodell, das synchron gehalten werden muss, und keine CRUD-Maske, die gewartet werden muss, wenn sich ein Feldname ändert.",
