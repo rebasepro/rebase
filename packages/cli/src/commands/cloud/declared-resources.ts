@@ -7,7 +7,8 @@
  * still declares it, and whether the platform made it. The two disagree in
  * exactly two ways worth a line — declared and not configured, which is a 501
  * waiting to happen, and provisioned and no longer declared, which is a
- * database the platform keeps, binds and bills until somebody prunes it.
+ * database the platform keeps on the project's database server until somebody
+ * prunes it.
  *
  * Pruning is here rather than in the deploy on purpose. A deploy that deleted
  * a database because a line went missing from a commit would be data deleted
@@ -124,7 +125,8 @@ async function pruneResource(rawArgs: string[]): Promise<void> {
 
     await confirmDestructive({
         yes: Boolean(args["--yes"]),
-        prompt: `Drop database "${key}" from project ${projectRef}? Its rows are gone for good; the platform keeps no copy.`
+        prompt: `Drop database "${key}" from project ${projectRef}'s database server? Its rows are gone from the server at once; ` +
+            "they survive only in the server's backups until those age out."
     });
 
     try {

@@ -528,6 +528,14 @@ describe("helpers", () => {
         expect(lines).toContain("S3_FORCE_PATH_STYLE=true");
     });
 
+    it("suffixes every line for a declared bucket, so they never configure the default", () => {
+        const lines = s3EnvLines(ISSUED, "media");
+        expect(lines).toContain("STORAGE_TYPE__MEDIA=s3");
+        expect(lines.find(l => l.startsWith("S3_ACCESS_KEY_ID"))).toMatch(/^S3_ACCESS_KEY_ID__MEDIA=/);
+        expect(lines.every(l => l.split("=")[0].endsWith("__MEDIA"))).toBe(true);
+        expect(s3EnvLines(ISSUED).every(l => !l.includes("__"))).toBe(true);
+    });
+
     it("accepts a bare array of rules", () => {
         expect(parseCorsFile('[{"allowedOrigins":["*"],"allowedMethods":["GET"]}]', "f.json")).toHaveLength(1);
     });

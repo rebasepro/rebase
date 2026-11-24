@@ -87,7 +87,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "storage create": {},
     "storage delete": {},
     "storage keys": {},
-    "storage keys create": { "--name": String, "--read-only": Boolean, "--bucket": String },
+    "storage keys create": { "--name": String, "--read-only": Boolean, "--bucket": String, "--source": String },
     "storage keys rotate": {},
     "storage keys revoke": {},
     "storage usage": {},

@@ -14,7 +14,7 @@
  * echoed from the response.
  */
 import { describe, expect, it } from "vitest";
-import { tunnelUrl, localDsn } from "./db-connect";
+import { tunnelUrl, localDsn, databaseInfoPath } from "./db-connect";
 
 describe("tunnelUrl", () => {
     it("upgrades https to wss on the same host", () => {
@@ -78,5 +78,18 @@ describe("localDsn", () => {
         expect(localDsn({ port: 5432, username: null, database: null })).toBe(
             "postgresql://postgres@127.0.0.1:5432/rebase"
         );
+    });
+});
+
+describe("databaseInfoPath", () => {
+    it("asks for the default when no database, or the default's, is named", () => {
+        expect(databaseInfoPath("p1", undefined)).toBe("p1");
+        expect(databaseInfoPath("p1", " ")).toBe("p1");
+        expect(databaseInfoPath("p1", "(default)")).toBe("p1");
+    });
+
+    it("names one of the project's other databases in the query", () => {
+        expect(databaseInfoPath("p1", "analytics")).toBe("p1?database=analytics");
+        expect(databaseInfoPath("p1", "a b")).toBe("p1?database=a%20b");
     });
 });

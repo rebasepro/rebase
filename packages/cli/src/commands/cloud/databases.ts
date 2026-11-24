@@ -1,7 +1,7 @@
 /**
  * `rebase cloud db` — database + backup management for a project.
  *
- *   db list                List databases attached to the project
+ *   db list                The project's database server and every database on it
  *   db create              Attach a managed or bring-your-own database
  *   db info                Where the database is, and what it is called
  *   db connect             A local port that IS the project's database
@@ -34,7 +34,7 @@ import {
     cloudRows,
     requireCloudRow
 } from "./context";
-import { dbConnect } from "./db-connect";
+import { databaseInfoPath, dbConnect } from "./db-connect";
 import { dbQuery } from "./db-query";
 import { dbAccessCommand } from "./db-access";
 
@@ -128,6 +128,7 @@ maxPositionals: 0 });
             where: { project: ["==", projectId] },
             limit: 50
         })).data);
+        const named = await namedDatabases(client, projectId);
 
         emit(
             () => {
@@ -146,10 +147,24 @@ maxPositionals: 0 });
                         ["PITR", d.pitrEnabled ? "enabled" : undefined]
                     ]);
                 }
+                if (named.length > 0) {
+                    console.log("");
+                    console.log(chalk.bold("  On this server"));
+                    for (const n of named) {
+                        const state = n.status === "ready" ? chalk.green(n.status) : chalk.yellow(n.status);
+                        console.log(`  ${chalk.bold(n.key)}  ${chalk.gray(`database ${n.databaseName} · ${n.envVar}`)}  ${state}`);
+                        if (n.message) console.log(chalk.yellow(`      └ ${n.message}`));
+                    }
+                    console.log(chalk.gray("  Connect to one with `rebase cloud db connect --database <key>`."));
+                } else if (dbs.length > 0) {
+                    console.log(chalk.gray("  More databases: declare database(\"analytics\") in config/resources.ts and deploy;"));
+                    console.log(chalk.gray("  each is made on this server and bound as DATABASE_URL__<KEY>."));
+                }
                 console.log("");
             },
             {
                 projectId,
+                named,
                 databases: dbs.map((d) => ({
                     id: String(d.id),
                     type: d.type ?? null,
@@ -161,6 +176,30 @@ maxPositionals: 0 });
         );
     } catch (e) {
         reportError(e, "Failed to list databases");
+    }
+}
+
+/** One database on the project's server, as the control plane's `resources` function lists it. */
+interface NamedDatabase {
+    key: string;
+    databaseName: string;
+    status: string;
+    envVar: string;
+    message?: string;
+}
+
+/**
+ * The project's databases beyond the default, from `GET /resources`. Empty on
+ * a control plane that predates them (no `databases` field), or when the
+ * listing cannot be read: this decorates `db list`, which must still print the
+ * server it can read.
+ */
+async function namedDatabases(client: CloudClient, projectId: string): Promise<NamedDatabase[]> {
+    try {
+        const res = await client.functions.invoke<{ databases?: NamedDatabase[] }>("resources", undefined, { method: "GET", path: projectId });
+        return (res.databases ?? []).filter(d => d && d.key && d.key !== "(default)");
+    } catch {
+        return [];
     }
 }
 
@@ -241,9 +280,10 @@ async function createDatabase(rawArgs: string[]): Promise<void> {
     const existing = await firstAttachedDatabase(client, projectId);
     if (existing) {
         fail(
-            `Project ${projectRef} already has a ${existing.type ?? "database"} attached (${existing.id}).`,
-            "A project has exactly one database. Remove that one first, or run "
-            + "`rebase cloud db info` to see what it points at.",
+            `Project ${projectRef} already has a ${existing.type ?? "database"} database server attached (${existing.id}).`,
+            "A project has one database server. For more databases, declare them in config/resources.ts — "
+            + "export const analytics = database(\"analytics\") — and deploy: each is made on that server and bound "
+            + "as DATABASE_URL__<KEY>. `rebase cloud db list` shows them.",
             "database_exists"
         );
     }
@@ -450,7 +490,9 @@ interface DbInfoResponse {
 }
 
 /**
- * `rebase cloud db info [--reveal]` — where a project's database actually lives.
+ * `rebase cloud db info [--reveal] [--database <key>]` — where a project's
+ * database actually lives. `--database` names one of its other databases,
+ * which share the server: only the database in the URL differs.
  *
  * The password is NEVER in the default output; `--reveal` fetches it through the
  * separate reveal call, and it appears in JSON only when `--reveal` is given.
@@ -462,7 +504,7 @@ async function dbInfo(rawArgs: string[]): Promise<void> {
     // `db info --revel` refuses instead of quietly masking the password it
     // was asked to show.
     const { flags: args } = parseCloudArgs({
-        spec: { "--reveal": Boolean },
+        spec: { "--reveal": Boolean, "--database": String },
         rawArgs,
         commandWords: 3, // cloud db info
         command: "cloud db",
@@ -473,8 +515,9 @@ async function dbInfo(rawArgs: string[]): Promise<void> {
     const projectRef = displayProjectRef(rawArgs);
 
     try {
+        const database = args["--database"];
         const info = await client.functions.invoke<DbInfoResponse>("db-info", undefined, { method: "GET",
-path: projectId });
+path: databaseInfoPath(projectId, database) });
 
         let password: string | undefined;
         let connectionString: string | undefined;
@@ -484,7 +527,7 @@ path: projectId });
             }
             const revealed = await client.functions.invoke<{ password: string; connectionString: string }>(
                 "db-info",
-                { projectId },
+                { projectId, ...(database ? { database } : {}) },
                 { path: "reveal" }
             );
             password = revealed.password;
@@ -862,7 +905,7 @@ export function printDbHelp(): void {
         actions: [
             { action: "list",
 section: "Database",
-description: "List databases attached to the project" },
+description: "The project's database server and every database on it" },
             {
                 action: "create",
                 section: "Database",
@@ -878,7 +921,10 @@ description: "List databases attached to the project" },
                 action: "info",
                 section: "Database",
                 description: "Connection details",
-                flags: [["--reveal", "Include the password (owner or admin). Without it, the value is masked"]]
+                flags: [
+                    ["--reveal", "Include the password (owner or admin). Without it, the value is masked"],
+                    ["--database <key>", "One of the project's other databases. Default: the default database"]
+                ]
             },
             {
                 action: "connect",
@@ -886,7 +932,8 @@ description: "List databases attached to the project" },
                 description: "Open a local port that IS the project's database",
                 flags: [
                     ["--port <n>", "Local port to listen on. Default: 5432"],
-                    ["--reveal", "Print the password in the connection URL"]
+                    ["--reveal", "Print the password in the connection URL"],
+                    ["--database <key>", "One of the project's other databases. Default: the default database"]
                 ]
             },
             {
@@ -894,7 +941,10 @@ description: "List databases attached to the project" },
                 section: "Database",
                 args: "[sql]",
                 description: "Run SQL on the project's database (owner or admin), with no local psql",
-                flags: [["--file <path>", "Run the statements in a file, stopping at the first error"]]
+                flags: [
+                    ["--file <path>", "Run the statements in a file, stopping at the first error"],
+                    ["--database <key>", "One of the project's other databases. Default: the default database"]
+                ]
             },
             { action: "test",
 section: "Database",

@@ -52,7 +52,8 @@ import {
 /** Documented in `action-help.ts`, and paired with it by `action-help.test.ts`. */
 export const DB_CONNECT_FLAGS = {
     "--port": Number,
-    "--reveal": Boolean
+    "--reveal": Boolean,
+    "--database": String
 } as const;
 
 /** What `db-info` answers. Mirrors `saas/backend/functions/db-info.ts`. */
@@ -68,6 +69,12 @@ interface DbInfoResponse {
         kubectl?: { namespace: string; service: string; localPort: number; remotePort: number };
     } | null;
     unavailableReason: string | null;
+}
+
+/** `db-info`'s path for one of the project's databases; the default's when none is named. */
+export function databaseInfoPath(projectId: string, database: string | undefined): string {
+    const key = (database ?? "").trim();
+    return key && key !== "(default)" ? `${projectId}?database=${encodeURIComponent(key)}` : projectId;
 }
 
 /** The default, because it is what every Postgres client assumes. */
@@ -123,13 +130,19 @@ export function localDsn(opts: {
 export async function loadTunnelAccess(
     client: CloudClient,
     projectId: string,
-    reveal: boolean
+    reveal: boolean,
+    /**
+     * One of the project's other databases (`database("analytics")`), which
+     * live on the same server: same host, same tunnel, same role — only the
+     * database in the URL differs. Absent: the default.
+     */
+    database?: string
 ): Promise<{ info: DbInfoResponse; password?: string }> {
     let info: DbInfoResponse;
     try {
         info = await client.functions.invoke<DbInfoResponse>("db-info", undefined, {
             method: "GET",
-            path: projectId
+            path: databaseInfoPath(projectId, database)
         });
     } catch (e) {
         return reportError(e, "Failed to load database info");
@@ -162,7 +175,7 @@ export async function loadTunnelAccess(
         }
         try {
             password = (
-                await client.functions.invoke<{ password: string }>("db-info", { projectId }, { path: "reveal" })
+                await client.functions.invoke<{ password: string }>("db-info", { projectId, ...(database ? { database } : {}) }, { path: "reveal" })
             ).password;
         } catch (e) {
             return reportError(e, "Failed to reveal the database password");
@@ -183,7 +196,7 @@ export async function dbConnect(rawArgs: string[]): Promise<void> {
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
 
-    const { info, password } = await loadTunnelAccess(client, projectId, args["--reveal"] === true);
+    const { info, password } = await loadTunnelAccess(client, projectId, args["--reveal"] === true, args["--database"]);
 
     const requested = args["--port"] ?? DEFAULT_LOCAL_PORT;
     if (!Number.isInteger(requested) || requested < 0 || requested > 65535) {

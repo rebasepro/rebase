@@ -32,7 +32,8 @@ import { loadTunnelAccess, localDsn, tunnelListener, tunnelUrl } from "./db-conn
 
 /** Documented in `action-help.ts`, and paired with it by `action-help.test.ts`. */
 export const DB_QUERY_FLAGS = {
-    "--file": String
+    "--file": String,
+    "--database": String
 } as const;
 
 /** The most rows of a result printed as a table; the JSON form carries them all. */
@@ -92,7 +93,7 @@ export async function dbQuery(rawArgs: string[]): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
-    const { info, password } = await loadTunnelAccess(client, projectId, true);
+    const { info, password } = await loadTunnelAccess(client, projectId, true, flags["--database"]);
 
     const server = tunnelListener(client, tunnelUrl(url, projectId));
     await new Promise<void>((resolve, reject) => {
