@@ -1,17 +1,58 @@
 #!/usr/bin/env bash
 # Read-only health facts for Rebase Cloud on Hetzner (fsn1). Changes nothing.
 # Usage: tooling/scripts/loop/cloud-health.sh [cp-ip]
-# Reaches the cluster with ssh root@<cp-ip> + kubectl there (read verbs only).
+# Reaches the cluster with the local kubeconfig first, else ssh root@<cp-ip> +
+# kubectl there (read verbs only). Both are allowed only from the addresses on
+# the Hetzner firewall (operator_cidrs in infra/hetzner/terraform.tfvars); when
+# neither answers it says so, with this machine's address, and runs only the
+# checks that work from outside.
 set -u
 CP="${1:-88.99.35.49}"
+KCFG="${REBASE_FSN1_KUBECONFIG:-$HOME/.kube/rebase-fsn1-admin.yaml}"
 # printf %q keeps jsonpath brackets and quotes intact through the remote shell.
-K() { ssh -o BatchMode=yes -o ConnectTimeout=10 "root@$CP" "$(printf '%q ' kubectl "$@")" 2>&1; }
+K_ssh() { ssh -o BatchMode=yes -o ConnectTimeout=10 "root@$CP" "$(printf '%q ' kubectl "$@")" 2>&1; }
+K_api() { kubectl --kubeconfig "$KCFG" --request-timeout=20s "$@" 2>&1; }
+if [ -r "$KCFG" ] && K_api get --raw /readyz >/dev/null 2>&1; then
+  K() { K_api "$@"; }; VIA="kube API ($KCFG)"
+elif ssh -o BatchMode=yes -o ConnectTimeout=10 "root@$CP" true >/dev/null 2>&1; then
+  K() { K_ssh "$@"; }; VIA="ssh root@$CP"
+else
+  K() { echo "(cluster unreachable)"; }; VIA=""
+fi
 
 section() { printf '\n## %s\n' "$1"; }
 
+section "Access"
+if [ -n "$VIA" ]; then
+  echo "via $VIA"
+else
+  ip="$(curl -s -m 10 https://api.ipify.org || echo unknown)"
+  echo "BLIND: neither the kube API nor ssh answers from this machine (egress $ip)."
+  echo "It is most likely not on the Hetzner firewall's operator list (6443/22). Everything below"
+  echo "that needs the cluster prints '(cluster unreachable)'; the outside-in curls still run."
+  echo "Act: add { name = \"<who>-<where>\", cidr = \"$ip/32\" } to operator_cidrs and push the firewall rule."
+fi
+
 section "Nodes"
 K get nodes --no-headers
-K top nodes --no-headers 2>/dev/null || echo "(metrics-server unavailable)"
+# Judge memory by what the kernel can still hand out, not by `kubectl top`.
+# top's percentage is working set (which counts active page cache) over
+# ALLOCATABLE, and k3s reserves ~2.3 GiB on a control-plane node, so a cpx32
+# server with ~1.5 GiB of process memory reads 95-103% there. availableBytes is
+# what the kubelet's eviction threshold compares; MemoryPressure is its verdict;
+# requests over allocatable is what decides whether the next pod still fits
+# (and whether the autoscaler has to add a node).
+echo "-- memory: node | available | pressure | requests/allocatable | top% (info only)"
+top="$(K top nodes --no-headers 2>/dev/null)"
+for n in $(K get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+  case "$n" in *unreachable*) continue ;; esac
+  avail="$(K get --raw "/api/v1/nodes/$n/proxy/stats/summary" 2>/dev/null |
+    python3 -c 'import json,sys; print(f"{json.load(sys.stdin)["node"]["memory"]["availableBytes"]/1048576:.0f}Mi")' 2>/dev/null || echo "?")"
+  pressure="$(K get node "$n" -o jsonpath='{.status.conditions[?(@.type=="MemoryPressure")].status}')"
+  req="$(K describe node "$n" 2>/dev/null | awk '/Allocated resources/{f=1} f && $1=="memory"{print $3; exit}')"
+  pct="$(printf '%s\n' "$top" | awk -v n="$n" '$1==n{print $5}')"
+  printf '%s | %s | MemoryPressure=%s | requests %s | top %s\n' "${n#rebase-fsn1-}" "$avail" "$pressure" "$req" "$pct"
+done
 
 section "Pods not Running/Completed, or restarting"
 K get pods -A --no-headers | awk '$4!="Running" && $4!="Completed" {print} $4=="Running" && $5+0>3 {print "restarts: " $0}' | head -40
@@ -29,6 +70,27 @@ K -n rebase-saas logs deploy/rebase-saas-control-plane --since=2h 2>/dev/null | 
 for u in https://app.rebase.pro https://api.rebase.pro/health https://rebase.pro; do
   printf '%s -> ' "$u"; curl -s -o /dev/null -m 15 -w '%{http_code} %{time_total}s %{remote_ip}\n' "$u"
 done
+
+section "Database probe failures by node (2h)"
+# The health check opens a NEW connection (DNS + TCP + auth) with 2.5 s; pooled
+# requests never notice what it catches. Failures concentrated on one node and
+# absent on the others point at that node (2026-11-24: lost DNS answers on
+# shared-auto), not at any database.
+for ns in $(K get ns -o name 2>/dev/null | sed -n 's#^namespace/##p' | grep -E '^(rebase-tenant-|rebase-saas$)'); do
+  for pod in $(K -n "$ns" get pods -l 'app in (rebase-backend,rebase-saas-control-plane)' -o jsonpath='{range .items[*]}{.metadata.name}:{.spec.nodeName}{" "}{end}' 2>/dev/null); do
+    c="$(K -n "$ns" logs "${pod%%:*}" --since=2h 2>/dev/null | grep -c 'Health check failed')"
+    [ "${c:-0}" -gt 0 ] && echo "${pod#*:} ${ns#rebase-tenant-} $c"
+  done
+done | awk '{n[$1]+=$3; d[$1]=d[$1]" "$2"="$3} END{for(k in n) print k": "n[k]" failures ("d[k]" )"}' | sed 's/^rebase-fsn1-//' | sort
+echo "(nothing listed = no failures)"
+
+section "Scheduled jobs: latest run failed, or suspended"
+# A failure a later success superseded is history, not a problem (and with
+# ttlSecondsAfterFinished it removes itself); only the latest run counts.
+K get cronjob -A -o jsonpath='{range .items[*]}{.metadata.namespace} {.metadata.name} {.spec.suspend} {.status.lastScheduleTime} {.status.lastSuccessfulTime}{"\n"}{end}' 2>/dev/null |
+  awk '$3=="true" {print "SUSPENDED: " $1 "/" $2 " (last ran " $4 ")"; next} $4!="" && ($5=="" || $5<$4) {print "LATEST RUN NOT SUCCESSFUL: " $1 "/" $2 " (scheduled " $4 ", last success " ($5==""?"never":$5) ")"}'
+echo "-- one-off Jobs (no CronJob) that failed:"
+K get jobs -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name} {.metadata.ownerReferences[0].kind} {.status.failed}{"\n"}{end}' 2>/dev/null | awk '$2!="CronJob" && $NF+0>0 && $NF!="" {print $1}' | grep -v '^rebase-tenant-' || true
 
 section "Tenant databases (CNPG)"
 K get clusters.postgresql.cnpg.io -A --no-headers
