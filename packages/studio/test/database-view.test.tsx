@@ -47,7 +47,7 @@ import { sqlDraftLink, tableLink } from "../src/components/Database/links";
 interface Call { method: string; path: string; body: unknown }
 
 let calls: Call[] = [];
-let routes: Record<string, (body: unknown) => unknown> = {};
+let routes: Partial<Record<string, (body: unknown) => unknown>> = {};
 const originalFetch = globalThis.fetch;
 
 const OVERVIEW = {
