@@ -122,7 +122,7 @@ describe("POST /auth/refresh with { probe: true }", () => {
         expect(res.status).toBe(204);
     });
 
-    it("restores the session of a live cookie, as any refresh does", async () => {
+    it("restores the session of a live cookie, like every refresh", async () => {
         const { app } = await createServer();
         const cookie = await signedInCookie(app);
 
