@@ -18,8 +18,9 @@ export const CLOUD_FLAGS = {
     /**
      * Where a new project is created. `fsn1` (Falkenstein, Hetzner) since the
      * November 2026 move: the control plane runs there, the tenants were moved
-     * there (11-22/23) and its rates are the held card (saas
-     * `rate-card.ts` HELD_PRICES, default project €24.28). `europe-west1`
+     * there (11-22/23) and its rates are one margin over cost with no
+     * platform fee (saas `rate-card.ts` REGION_MARGINS, default project
+     * €24.63, since 2026-11-25). `europe-west1`
      * (Belgium, Google Cloud) is still `sellable` in saas `substrate-rates.ts`
      * and is still saas's `DEFAULT_REGION`; switch back only if new projects
      * are sold there again.

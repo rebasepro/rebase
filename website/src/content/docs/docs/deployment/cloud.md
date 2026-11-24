@@ -553,7 +553,7 @@ fails, `rebase cloud compute apply` tries it again.
 | `deploy-hooks` | Secret URLs a git host or CI calls to deploy the project: list, create (the URL is shown once), revoke. |
 | `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
 | `sleep` | Sleep when idle: `on [--after 15m\|30m\|1h\|4h]`, `off`, `wake`, and `status` (the default). Asleep, a project holds no CPU or memory and the next request wakes it; scheduled jobs and background work do not run meanwhile. Where a project cannot sleep, the control plane refuses and says why |
-| `start`, `stop`, `restart` | Pausing a project and bringing it back. A stopped project keeps its subscription, unless the platform bills stopped projects for storage and the platform fee only; the console's **Billing** row says so when it does |
+| `start`, `stop`, `restart` | Pausing a project and bringing it back. A stopped project keeps its subscription and pays only its disk, or the monthly minimum when the disk costs less; the console's **Billing** row says what it pays |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `alerts` | The project's open incidents, and acknowledging or snoozing one. |
 | `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |

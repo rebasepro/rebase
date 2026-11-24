@@ -66,9 +66,10 @@ if (contentHash !== actual) {
 const isNum = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0;
 const isSize = (s) => s && typeof s.cpu === "string" && typeof s.memory === "string";
 
-if (doc.schemaVersion !== 1) fail(`schemaVersion is ${doc.schemaVersion}; the page reads version 1`);
+// Version 2 (2026-11-25): no platform fee; `minimumEur` replaced `platformFeeEur`, and `sleep` has no fee of its own.
+if (doc.schemaVersion !== 2) fail(`schemaVersion is ${doc.schemaVersion}; the page reads version 2`);
 if (doc.currency !== "EUR") fail("currency is not EUR");
-for (const path of ["platformFeeEur", "included.filesGb", "included.requestsPerMonth", "overage.filesEurPerGb", "overage.requestsEurPerMillion", "sleep.platformFeeEur", "sleep.hoursInMonth"]) {
+for (const path of ["minimumEur", "included.filesGb", "included.requestsPerMonth", "overage.filesEurPerGb", "overage.requestsEurPerMillion", "sleep.hoursInMonth"]) {
     const v = path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), doc);
     if (!isNum(v)) fail(`${path} is missing or not a number`);
 }
