@@ -169,9 +169,11 @@ function StudioStandaloneShell({
     const labelGroup = useNavigationGroupLabel();
     const { t } = useTranslation();
 
+    /** Every view gets a route; only the ones not hidden from navigation are listed in the rail. */
+    const routedViews = useMemo(() => registry.studioConfig?.devViews ?? [], [registry.studioConfig?.devViews]);
     const views = useMemo(
-        () => (registry.studioConfig?.devViews ?? []).filter((v) => !v.hideFromNavigation),
-        [registry.studioConfig?.devViews]
+        () => routedViews.filter((v) => !v.hideFromNavigation),
+        [routedViews]
     );
 
     const groupedViews = useMemo(() => {
@@ -304,7 +306,7 @@ function StudioStandaloneShell({
             <div className="flex-1 min-w-0 h-full overflow-hidden bg-surface-sheet">
                 <Routes>
                     <Route path="/" element={registry.studioConfig?.homePage ?? <StudioHomePage />} />
-                    {views.map((view) => {
+                    {routedViews.map((view) => {
                         const ViewEl = view.view;
                         const element = typeof ViewEl === "function" ? <ViewEl /> : ViewEl;
                         return <Route key={view.slug} path={`/${view.slug}/*`} element={element} />;

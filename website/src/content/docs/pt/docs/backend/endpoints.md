@@ -1,5 +1,5 @@
 ---
-sourceHash: 724a8d58e7df46ee
+sourceHash: 0496dc717e6c7873
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Todas as rotas HTTP que um backend Rebase monta — dados, autenticação, armazenamento, administração, meta — com a restrição de cada uma e a página que a explica.
@@ -170,6 +170,10 @@ uma tabela não acessa nada disso. Consulte [Papéis e escopos](/docs/backend/ro
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Papéis, papéis de regras de usuários e chaves de serviço ativas que um administrador pode simular |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Cada tabela conforme `{ role?, userId?, apiKeyId? }` a acessa: linhas visíveis em relação às do chamador, ocultadas por escopo ou RLS, campos mascarados. Somente sessão de administrador |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Faz streaming de todo o resultado de uma consulta somente leitura como CSV — "Download full result as CSV" do [Studio](/docs/studio/) |
+| `GET` | `/api/admin/sql/snippets` | `database:read` | Os snippets guardados da consola SQL que quem chama vê: os seus e os da equipa |
+| `POST` | `/api/admin/sql/snippets` | `database:write` | Guarda um snippet (`name`, `sql`, `visibility`: `personal` ou `team`, `favorite`) |
+| `PATCH` | `/api/admin/sql/snippets/:id` | `database:write` | Altera os campos de um snippet; apenas o seu proprietário ou um administrador |
+| `DELETE` | `/api/admin/sql/snippets/:id` | `database:write` | Elimina um snippet; apenas o seu proprietário ou um administrador |
 | `GET` | `/api/admin/branches/:name/diff` | `database:write` | O que uma [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) alterou: schema, políticas e linhas, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Escreve as linhas da branch na sua branch pai, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` quando qualquer um dos lados foi alterado desde o diff, ou quando houver conflito de linhas |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Edição de schema ao vivo](/docs/backend/live-schema-editing/) |
@@ -189,6 +193,33 @@ uma tabela não acessa nada disso. Consulte [Papéis e escopos](/docs/backend/ro
 | `DELETE` | `/api/admin/db/tables/:table/indexes/:index` | `database:write` | Remove um índice de uma tabela PostgreSQL |
 | `POST` | `/api/admin/db/tables/:table/policies` | `database:write` | Cria uma política RLS PostgreSQL em uma tabela e recarrega ao vivo |
 | `DELETE` | `/api/admin/db/tables/:table/policies/:policy` | `database:write` | Remove uma política RLS PostgreSQL de uma tabela e recarrega ao vivo |
+| `GET` | `/api/admin/db/tables/:table/details` | `database:read` | Restrições de uma tabela, chaves estrangeiras nos dois sentidos, triggers, permissões, políticas, uso de índices, estatísticas de armazenamento e definição em SQL |
+| `POST` | `/api/admin/db/tables/:table/constraints` | `database:write` | Adiciona uma restrição de chave estrangeira, única ou de verificação (`dryRun: true` mostra o SQL antes) |
+| `DELETE` | `/api/admin/db/tables/:table/constraints/:constraint` | `database:write` | Remove uma restrição |
+| `PATCH` | `/api/admin/db/tables/:table/triggers/:trigger` | `database:write` | Ativa ou desativa um trigger (`{ enabled }`) |
+| `DELETE` | `/api/admin/db/tables/:table/triggers/:trigger` | `database:write` | Remove um trigger |
+| `POST` | `/api/admin/db/tables/:table/maintenance` | `database:write` | Executa `ANALYZE` ou `VACUUM (ANALYZE)` na tabela (`{ action }`) |
+| `POST` | `/api/admin/db/tables/:table/refresh` | `database:write` | Atualiza uma view materializada |
+| `GET` | `/api/admin/db/tables/:table/rows` | `database:read` | Linhas como dono do banco de dados: `limit`, `offset`, `orderBy`, `direction` e `filters` (JSON); `format=csv` transmite todas as correspondências |
+| `POST` | `/api/admin/db/tables/:table/rows` | `database:write` | Insere linhas (`{ rows }`), todas ou nenhuma |
+| `PATCH` | `/api/admin/db/tables/:table/rows` | `database:write` | Atualiza uma linha pela sua chave primária (`{ key, values }`) |
+| `DELETE` | `/api/admin/db/tables/:table/rows` | `database:write` | Exclui linhas pela chave primária (`{ keys }`) |
+| `GET` | `/api/admin/db/insights/sources` | `database:read` | Os bancos de dados que a view Banco de dados pode inspecionar (`?source=` nas rotas abaixo) |
+| `GET` | `/api/admin/db/insights/overview` | `database:read` | Versão do servidor, tamanho do banco de dados e conexões em uso |
+| `GET` | `/api/admin/db/insights/advisors` | `database:read` | Achados de segurança do `rls-check` e de desempenho (índices sem uso ou duplicados, chaves estrangeiras sem índice, chaves primárias ausentes, linhas mortas) |
+| `GET` | `/api/admin/db/insights/queries` | `database:read` | As instruções mais pesadas do `pg_stat_statements` (`sort`, `limit`), ou por que não pode ser lido |
+| `POST` | `/api/admin/db/insights/queries/reset` | `database:write` | Reinicia o `pg_stat_statements` |
+| `GET` | `/api/admin/db/insights/activity` | `database:read` | Sessões ativas com suas esperas, durações e bloqueios |
+| `POST` | `/api/admin/db/insights/activity/:pid/cancel` | `database:write` | Cancela a instrução em execução de uma sessão (`pg_cancel_backend`) |
+| `POST` | `/api/admin/db/insights/activity/:pid/terminate` | `database:write` | Encerra uma sessão (`pg_terminate_backend`) |
+| `GET` | `/api/admin/db/catalog/functions` | `database:read` | Funções fora dos esquemas protegidos, com suas definições |
+| `DELETE` | `/api/admin/db/catalog/functions/:schema/:name` | `database:write` | Remove uma função (sua assinatura no corpo) |
+| `GET` | `/api/admin/db/catalog/triggers` | `database:read` | Todos os triggers, com sua tabela e função |
+| `GET` | `/api/admin/db/catalog/types` | `database:read` | Enums com seus valores, domínios e tipos compostos |
+| `POST` | `/api/admin/db/catalog/types/:schema/:name/values` | `database:write` | Adiciona um valor a um enum (`ALTER TYPE … ADD VALUE`) |
+| `GET` | `/api/admin/db/catalog/extensions` | `database:read` | Extensões que o servidor oferece e quais estão instaladas |
+| `POST` | `/api/admin/db/catalog/extensions/:name` | `database:write` | Instala uma extensão (`CREATE EXTENSION`) |
+| `DELETE` | `/api/admin/db/catalog/extensions/:name` | `database:write` | Remove uma extensão (`DROP EXTENSION`) |
 | `GET` | `/api/admin/storage/policies` | `database:read` | Lista políticas de armazenamento declarativas zero-code de `rebase.storage_policies` |
 | `POST` | `/api/admin/storage/policies` | `database:write` | Cria uma política declarativa de acesso ao armazenamento |
 | `PATCH` | `/api/admin/storage/policies/:id` | `database:write` | Atualiza uma política declarativa de acesso ao armazenamento |

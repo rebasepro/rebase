@@ -139,5 +139,37 @@ export function useAdminFetch() {
         return parsed;
     }, []);
 
-    return { apiBase, requestJson };
+    /**
+     * The same authenticated request, answered as the raw `Response`: for a
+     * body that is not JSON (a CSV export) or that should be streamed.
+     */
+    const requestRaw = useCallback(async (path: string, options: AdminFetchOptions = {}): Promise<Response> => {
+        const base = (apiBaseRef.current ?? "/api").replace(/\/+$/, "");
+        const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+        const getToken = apiConfigRef.current?.getAuthToken ?? authRef.current.getAuthToken;
+        const token = getToken ? await getToken() : null;
+        const headers: Record<string, string> = { ...(options.headers ?? {}) };
+        if (token) headers.Authorization = `Bearer ${token}`;
+        if (options.body !== undefined && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+        const res = await fetch(`${base}${normalizedPath}`, {
+            method: options.method ?? "GET",
+            headers,
+            body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+            signal: options.signal
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            let parsed: unknown = text;
+            try {
+                parsed = JSON.parse(text);
+            } catch {
+                // a plain-text error body
+            }
+            const { message, code } = extractError(parsed, res.status, res.statusText);
+            throw new AdminRequestError(message, res.status, code);
+        }
+        return res;
+    }, []);
+
+    return { apiBase, requestJson, requestRaw };
 }

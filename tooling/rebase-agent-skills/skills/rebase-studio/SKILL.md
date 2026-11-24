@@ -5,11 +5,11 @@ description: Guide for using and customizing the Rebase Studio developer tools l
 
 # Rebase Studio
 
-Rebase Studio (`@rebasepro/studio`) is the developer tools layer for Rebase. It provides 14 built-in tools — Tables, SQL Console, JS Console, RLS Editor, Storage browser, Cron Jobs manager, Schema Visualizer, Branches manager, Backups, API Explorer, Webhooks, Logs Explorer, Users & Roles, and API Keys — accessible via the "Studio" mode toggle in the sidebar or standalone via `<RebaseStudioApp />`.
+Rebase Studio (`@rebasepro/studio`) is the developer tools layer for Rebase. It provides 15 built-in tools — Tables, SQL Console, JS Console, RLS Editor, Storage browser, Cron Jobs manager, Schema Visualizer, Branches manager, Backups, Database, API Explorer, Webhooks, Logs Explorer, Users & Roles, and API Keys — accessible via the "Studio" mode toggle in the sidebar or standalone via `<RebaseStudioApp />`.
 
 ## Overview
 
-- **14 built-in dev tools** — all lazy-loaded and code-split so they don't impact initial bundle size
+- **15 built-in dev tools** — all lazy-loaded and code-split so they don't impact initial bundle size
 - **StudioHomePage** — customizable landing page with tool cards grouped by section
 - **Studio Bridge** — hooks that connect Studio tools to CMS data (collections, navigation, side panels)
 
@@ -82,19 +82,19 @@ function RoleSimulator() {
 
 ## Studio Dev Tools
 
-The Studio ships 14 built-in dev tools, all **lazy-loaded** (code-split) so they don't impact the initial bundle. Heavy dependencies (Monaco, `@xyflow/react`, `dagre`, `pgsql-ast-parser`) are only loaded when a tool is visited.
+The Studio ships 15 built-in dev tools, all **lazy-loaded** (code-split) so they don't impact the initial bundle. Heavy dependencies (Monaco, `@xyflow/react`, `dagre`, `pgsql-ast-parser`) are only loaded when a tool is visited.
 
 ### Tool Reference
 
 | Tool Key | Component | Name | Group | Icon | Description |
 |----------|-----------|------|-------|------|-------------|
-| `"tables"` | `TableEditorView` | Tables | Database | `Table` | Create tables, edit rows, columns, indexes, and zero-code table metadata |
+| `"tables"` | `TableEditorView` | Tables | Database | `Table` | Per table: Data (owner reads with paging, filters, FK links, CSV import/export, "Read as" an API user), Structure (columns, indexes, constraints, triggers), Policies, Relations, Stats, Settings, and View SQL; the list switches to a Diagram of the whole schema. Deep links: `/tables?table=schema.name&tableTab=policies`, `/tables?tablesView=diagram` |
 | `"sql"` | `SQLEditor` | SQL Console | Database | `terminal` | Execute raw SQL queries against the database |
 | `"js"` | `JSEditor` | JS Console | Compute | `code` | Run JavaScript with the Rebase SDK in a live sandbox |
 | `"rls"` | `RLSEditor` | RLS Policies | Database | `ShieldCheck` | Configure Row Level Security for fine-grained data access |
 | `"storage"` | `StorageView` | Storage | Storage | `HardDrive` | Browse, upload, and manage files and declarative storage policies |
 | `"cron"` | `CronJobsView` | Cron Jobs | Compute | `Clock` | Monitor and manage scheduled background tasks |
-| `"schema-visualizer"` | `SchemaVisualizer` | Schema Visualizer | Database | `Network` | Interactive ERD showing tables, columns, and relationships |
+| `"schema-visualizer"` | `SchemaDiagramView` | Schema Visualizer | Database | `Network` | ERD of the declared tables plus, where `/api/admin/db` is served, the catalog's other tables and foreign keys. With `"tables"` registered it is hidden from navigation (the diagram is a mode of the Tables view); its route still works |
 | `"branches"` | `BranchesView` | Branches | Database | `GitBranch` | Create and manage isolated database copies for development |
 | `"backups"` | `BackupsView` | Backups | Database | `Database` | Browse and download database backups |
 | `"api"` | `ApiExplorer` | API Explorer | API | `BookOpen` | Interactive API documentation with live request testing |
@@ -118,19 +118,19 @@ By default, **all 14 tools** are enabled. Use the `tools` prop on `<RebaseStudio
 <RebaseStudio tools={["sql", "rls", "storage"]} />
 
 // Enable everything except branches
-<RebaseStudio tools={["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "backups", "api", "webhooks", "logs", "users", "api-keys"]} />
+<RebaseStudio tools={["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "backups", "database", "api", "webhooks", "logs", "users", "api-keys"]} />
 ```
 
 The `tools` prop accepts an array of tool key strings:
 
 ```typescript
 type ToolKey = "tables" | "sql" | "js" | "rls" | "storage" | "cron"
-    | "schema-visualizer" | "branches" | "backups" | "api" | "webhooks" | "logs" | "users" | "api-keys";
+    | "schema-visualizer" | "branches" | "backups" | "database" | "api" | "webhooks" | "logs" | "users" | "api-keys";
 
 // Default when tools is undefined:
 const DEFAULT_TOOLS: ToolKey[] = [
     "tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer",
-    "branches", "backups", "api", "webhooks", "logs", "users", "api-keys"
+    "branches", "backups", "database", "api", "webhooks", "logs", "users", "api-keys"
 ];
 ```
 
@@ -381,7 +381,7 @@ interface NavigationGroupMapping {
 ```typescript
 interface RebaseStudioConfig {
     tools?: ("tables" | "sql" | "js" | "rls" | "storage" | "cron"
-        | "schema-visualizer" | "branches" | "backups" | "api" | "webhooks" | "logs" | "users" | "api-keys")[];
+        | "schema-visualizer" | "branches" | "backups" | "database" | "api" | "webhooks" | "logs" | "users" | "api-keys")[];
     homePage?: ReactNode;
     devViews?: AppView[];  // Your own Studio tools, added beside the built-in ones
 }

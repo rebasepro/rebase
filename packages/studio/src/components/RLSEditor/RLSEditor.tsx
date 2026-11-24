@@ -1,10 +1,8 @@
-import { useStudioCapabilities, useStudioSchemaEditing, useTableDescriptors } from "@rebasepro/app";
-import { useApiBase, useApiConfig } from "@rebasepro/app";
+import { useTableDescriptors } from "@rebasepro/app";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router";
 import {
-    Alert,
     AlertTriangleIcon,
-    Button,
     Chip,
     CircularProgress,
     cls,
@@ -12,88 +10,27 @@ import {
     defaultBorderMixin,
     IconButton,
     iconSize,
-    KeyIcon,
     LockIcon,
-    Paper,
     RefreshCwIcon,
     ResizablePanels,
     ShieldIcon,
     Tab,
     Tabs,
     Tooltip,
-    Trash2Icon,
     Typography
 } from "@rebasepro/ui";
-import { useRebaseContext, useSnackbarController, ErrorView, useTranslation, ConfirmationDialog } from "@rebasepro/app";
-import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL, policyToSecurityRule } from "@rebasepro/common";
-import { adminRequestPolicyName } from "@rebasepro/utils";
-import { PolicyEditor } from "./PolicyEditor";
-import { saveRules, isCancellation } from "./saveRules";
-import { applyPolicyEdit, type PolicyEditRefusal, type PolicyRule } from "./policyRules";
-import { declaredPoliciesOf, listPolicies, readPolicyRoles, type DeclaredPolicies, type ListedPolicy } from "./policyListing";
-import { quoteIdentifier } from "../../utils/sql_utils";
-import { schemaSourceProblem, SchemaSourceProblemAlert } from "../schema-source";
+import { useRebaseContext, ErrorView, useTranslation } from "@rebasepro/app";
+import { REBASE_INTERNAL_SCHEMAS, JUNCTION_TABLES_SQL } from "@rebasepro/common";
+import { readPolicyRoles } from "./policyListing";
 import { DirectRlsPoliciesPanel } from "./DirectRlsPoliciesPanel";
+import { classifyTableClient, mapsTable, servedJunctionsOf, TablePolicies, type TableCategory } from "./TablePolicies";
 
-type TableCategory = "collection" | "junction" | "internal" | "other";
-
-/**
- * Whether `descriptor` is the table the server declares for a live table: the
- * same SQL table in the same schema, as the server resolved both.
- *
- * Matched once by name, a table was taken for any collection whose `id`,
- * `path`, `table`, `slug` or `collectionId` equalled its name, in any schema.
- * So an unmapped table named like another table's slug, or a same-named table
- * in another schema, was taken for that table: it listed the declared
- * policies as missing from the table, and offered to import the table's own
- * policies into the declaration. A view is never a `pg_tables` row.
- */
-function mapsTable(descriptor: TableDescriptor, table: { schemaName: string; tableName: string }): boolean {
-    return descriptor.kind === "table" && descriptor.table === table.tableName && descriptor.schema === table.schemaName;
-}
-
-/** What the editor says when an edit has no declared rule to go back to. */
-const POLICY_EDIT_REFUSALS: Record<PolicyEditRefusal, string> = {
-    generated: "studio_rls_edit_generated",
-    not_declared: "studio_rls_edit_not_declared",
-    several_operations: "studio_rls_edit_several_operations",
-    redacted: "studio_rls_edit_redacted"
-};
-
-function classifyTableClient(
-    tableName: string,
-    schemaName: string,
-    isJunction: boolean,
-    isMappedToCollection: boolean
-): TableCategory {
-    // A table the project's own schema maps is the CUSTOMER'S, whatever schema
-    // Postgres put it in. This test used to come second, behind a rule that
-    // claims the whole `rebase` schema as platform plumbing — and Rebase
-    // creates a tenant's collection tables in exactly that schema. So every
-    // table a customer owns was filed under a dimmed, collapsed "Rebase
-    // Internal" section beside `refresh_tokens` and `mfa_factors`, the
-    // "Schema Tables" section rendered empty and disappeared, and the
-    // console's answer to "what am I securing" was four unmapped tables the
-    // project barely uses.
-    //
-    // The schema can never decide this on its own: `users` and `branches` are
-    // both platform tables AND, on a project that defines them, collections
-    // the customer writes policies for. The mapping is the only thing that
-    // knows, so it is asked first.
-    if (isMappedToCollection) return "collection";
-    if (
-        REBASE_INTERNAL_SCHEMAS.includes(schemaName) ||
-        REBASE_INTERNAL_PREFIXES.some((prefix) => tableName.startsWith(prefix))
-    ) {
-        return "internal";
-    }
-    if (isJunction) return "junction";
-    return "other";
-}
+/** The query parameter that names the selected table, `schema.table`, so another view can link straight to it. */
+export const RLS_TABLE_PARAM = "table";
 
 // Re-exported for the components that used to import it from here.
 export type { PostgresPolicy } from "@rebasepro/types";
-import type { JunctionPolicyDescriptor, PostgresPolicy, SecurityRule, TableDescriptor } from "@rebasepro/types";
+import type { PostgresPolicy } from "@rebasepro/types";
 
 interface TableRLSStatus {
     schemaName: string;
@@ -200,161 +137,38 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
     );
 };
 
-const RLSEditorInspector = ({ apiUrl = "" }: { apiUrl?: string }) => {
+const RLSEditorInspector = ({ apiUrl: _apiUrl = "" }: { apiUrl?: string }) => {
     const { databaseAdmin } = useRebaseContext();
-    const snackbarController = useSnackbarController();
-    // The tables the server declares, with the policies it compiles for each:
-    // the server is the one compiler, this editor only compares its answer
-    // with what Postgres holds.
     const descriptors = useTableDescriptors();
-    const schemaProblem = schemaSourceProblem(descriptors);
     const declaredTables = descriptors.tables;
-    const { codebase: hasCodebase } = useStudioCapabilities();
-    const apiConfig = useApiConfig();
-    /* `apiUrl` is a bare origin; the routes live under the backend's
-       `basePath`, which is `/api` only by default. */
-    const apiBase = useApiBase() ?? `${apiUrl.replace(/\/+$/, "")}/api`;
-
-    const schemaEditing = useStudioSchemaEditing();
-
-    /**
-     * Through the plan/apply dialog when there is one — see `saveRules`. A
-     * save changes the source the served tables come from, so they are asked
-     * for again: the declared side of the list follows the edit.
-     */
-    const reloadDeclared = descriptors.reload;
-
-    /**
-     * Saving rules on a table that inherits them from `defaultRls` detaches it
-     * into rules of its own: asked here, never done silently. Settled by the
-     * dialog below — "OK" detaches, "Cancel" keeps `"inherit"`.
-     */
-    const [detaching, setDetaching] = useState<string | null>(null);
-    const settleDetach = useRef<((detach: boolean) => void) | null>(null);
-    const confirmDetach = useCallback((slug: string) => new Promise<boolean>(resolve => {
-        settleDetach.current?.(false);
-        settleDetach.current = resolve;
-        setDetaching(slug);
-    }), []);
-    const answerDetach = useCallback((detach: boolean) => {
-        settleDetach.current?.(detach);
-        settleDetach.current = null;
-        setDetaching(null);
-    }, []);
-
-    const saveSecurityRules = useCallback(
-        async (table: TableDescriptor, securityRules: readonly PolicyRule[]) => {
-            await saveRules(
-                schemaEditing,
-                { apiBase, getAuthToken: apiConfig?.getAuthToken },
-                table,
-                securityRules,
-                { confirmDetach }
-            );
-            reloadDeclared();
-        },
-        [apiBase, apiConfig, schemaEditing, reloadDeclared, confirmDetach]);
-
-    /** Closing the plan dialog is an answer, not a failure — see `saveRules`. */
-    const reportSaveFailure = useCallback((e: unknown) => {
-        if (isCancellation(e)) return;
-        snackbarController.open({ type: "error",
-            message: e instanceof Error ? e.message : String(e) });
-    }, [snackbarController]);
-
-    const [editingPolicy, setEditingPolicy] = useState<ListedPolicy | "new" | null>(null);
-
-    /**
-     * The two destructive actions used `window.confirm`, which is the browser's
-     * dialog and not this app's: it cannot be styled, cannot be translated, and
-     * is suppressed outright in a sandboxed iframe — where the click then did
-     * the thing silently, with no confirmation at all.
-     */
-    const [confirmToggleRls, setConfirmToggleRls] = useState<{
-        table: string;
-        schema: string;
-        enabled: boolean;
-        /** The server re-asserts this table's RLS on every start, so a disable here does not last. */
-        managed: boolean;
-    } | null>(null);
-    const [confirmDropPolicy, setConfirmDropPolicy] = useState<{ policyName: string; table: string; schema: string } | null>(null);
-    const [confirming, setConfirming] = useState(false);
-
-    const applyToggleRls = useCallback(async () => {
-        if (!confirmToggleRls) return;
-        const { table, schema, enabled } = confirmToggleRls;
-        const action = enabled ? "DISABLE" : "ENABLE";
-        setConfirming(true);
-        try {
-            await databaseAdmin!.executeSql!(
-                `ALTER TABLE ${quoteIdentifier(schema)}.${quoteIdentifier(table)} ${action} ROW LEVEL SECURITY`
-            );
-            snackbarController.open({ type: "success",
-                message: `RLS ${action.toLowerCase()}d on ${table}` });
-            setConfirmToggleRls(null);
-            fetchRLSData();
-        } catch (e: unknown) {
-            snackbarController.open({ type: "error",
-                message: e instanceof Error ? e.message : String(e) });
-        } finally {
-            setConfirming(false);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [confirmToggleRls, databaseAdmin, snackbarController]);
-
-    const applyDropPolicy = useCallback(async () => {
-        if (!confirmDropPolicy) return;
-        const { policyName, table, schema } = confirmDropPolicy;
-        setConfirming(true);
-        try {
-            // Its admin-request companion (`USING (true)` for every admin) goes
-            // with it, in the same implicit transaction: left behind, it would
-            // keep admitting every admin to every row the dropped policy did.
-            const target = `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
-            await databaseAdmin!.executeSql!(
-                `DROP POLICY ${quoteIdentifier(policyName)} ON ${target}; ` +
-                `DROP POLICY IF EXISTS ${quoteIdentifier(adminRequestPolicyName(policyName))} ON ${target}`
-            );
-            snackbarController.open({ type: "success",
-                message: `Policy "${policyName}" dropped` });
-            setConfirmDropPolicy(null);
-            fetchRLSData();
-        } catch (e: unknown) {
-            snackbarController.open({ type: "error",
-                message: e instanceof Error ? e.message : String(e) });
-        } finally {
-            setConfirming(false);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [confirmDropPolicy, databaseAdmin, snackbarController]);
-
     const { t } = useTranslation();
+
+    const [searchParams, setSearchParams] = useSearchParams();
+    const linkedTable = searchParams.get(RLS_TABLE_PARAM);
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [tables, setTables] = useState<TableRLSStatus[]>([]);
-    const [selectedTable, setSelectedTable] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState(0);
+    // The selection is the link itself, so another view can open a table here
+    // and a selection made here can be shared. Only this view's own parameter
+    // is touched: the hosted console keeps its own in the same query string.
+    const selectedTable = linkedTable;
+    const setSelectedTable = useCallback((next: string | null | ((previous: string | null) => string | null)) => {
+        setSearchParams(prev => {
+            const current = prev.get(RLS_TABLE_PARAM);
+            const value = typeof next === "function" ? next(current) : next;
+            if (value === current) return prev;
+            const params = new URLSearchParams(prev);
+            if (value) params.set(RLS_TABLE_PARAM, value); else params.delete(RLS_TABLE_PARAM);
+            return params;
+        }, { replace: true });
+    }, [setSearchParams]);
     const [junctionTableNames, setJunctionTableNames] = useState<Set<string>>(new Set());
-
-    /**
-     * Native PostgreSQL roles, for the policy editor's `TO` list.
-     *
-     * `fetchAvailableRoles` and not `fetchApplicationRoles`: a policy's `TO`
-     * clause names database roles, and an application role put there produces a
-     * policy that either fails to create or matches nothing. The editor falls
-     * back to a static pair when the driver cannot answer.
-     */
-    const [pgRoleOptions, setPgRoleOptions] = useState<string[]>([]);
-
-    useEffect(() => {
-        let mounted = true;
-        if (!databaseAdmin?.fetchAvailableRoles) return;
-        databaseAdmin.fetchAvailableRoles()
-            .then((roles) => { if (mounted) setPgRoleOptions(roles); })
-            .catch((e) => console.error("Failed to fetch database roles", e));
-        return () => { mounted = false; };
-    }, [databaseAdmin]);
+    // Read by the catalogue fetch through a ref: react-router hands out a new
+    // `setSearchParams` whenever the query changes, and the fetch must not run
+    // again because a table was picked.
+    const setSelectedTableRef = useRef(setSelectedTable);
+    setSelectedTableRef.current = setSelectedTable;
 
     const [sidebarSize, setSidebarSize] = useState(() => {
         try {
@@ -488,7 +302,7 @@ const RLSEditorInspector = ({ apiUrl = "" }: { apiUrl?: string }) => {
                 // table re-read the whole catalogue, and the first load (which
                 // picks one) run twice.
                 const firstUserTable = sortedTables.find(t => !REBASE_INTERNAL_SCHEMAS.includes(t.schemaName)) ?? sortedTables[0];
-                setSelectedTable(previous => previous ?? `${firstUserTable.schemaName}.${firstUserTable.tableName}`);
+                setSelectedTableRef.current(previous => previous ?? `${firstUserTable.schemaName}.${firstUserTable.tableName}`);
             }
 
         } catch (e: unknown) {
@@ -497,11 +311,7 @@ const RLSEditorInspector = ({ apiUrl = "" }: { apiUrl?: string }) => {
         } finally {
             setIsLoading(false);
         }
-    }, [databaseAdmin]);
-
-    useEffect(() => {
-        setEditingPolicy(null);
-    }, [selectedTable]);
+    }, [databaseAdmin, t]);
 
     useEffect(() => {
         fetchRLSData();
@@ -512,27 +322,7 @@ const RLSEditorInspector = ({ apiUrl = "" }: { apiUrl?: string }) => {
         return tables.find(t => `${t.schemaName}.${t.tableName}` === selectedTable) || null;
     }, [selectedTable, tables]);
 
-    /**
-     * Every junction the server derives, with its policies, by
-     * `schema.table`. A junction has no descriptor of its own: it is listed
-     * under each table that declares a relation through it.
-     */
-    const servedJunctions = useMemo(() => {
-        const junctions = new Map<string, JunctionPolicyDescriptor>();
-        for (const table of declaredTables) {
-            for (const junction of table.rls.junctions ?? []) {
-                junctions.set(`${junction.schema}.${junction.table}`, junction);
-            }
-            // Without the compiled policies (no `schema:read`) the relation
-            // still names its junction: it is still the platform's table.
-            for (const relation of table.relations) {
-                if (relation.kind !== "manyToMany") continue;
-                const key = `${table.schema}.${relation.through.table}`;
-                if (!junctions.has(key)) junctions.set(key, { table: relation.through.table, schema: table.schema, policies: [] });
-            }
-        }
-        return junctions;
-    }, [declaredTables]);
+    const servedJunctions = useMemo(() => servedJunctionsOf(declaredTables), [declaredTables]);
 
     /** Categorize tables into 4 buckets for the sidebar. */
     const categorizedTables = useMemo(() => {
@@ -542,83 +332,13 @@ const RLSEditorInspector = ({ apiUrl = "" }: { apiUrl?: string }) => {
             internal: [],
             other: []
         };
-
         tables.forEach(table => {
             const isMapped = declaredTables.some(descriptor => mapsTable(descriptor, table));
             const isJunction = junctionTableNames.has(table.tableName) || servedJunctions.has(`${table.schemaName}.${table.tableName}`);
-            const cat = classifyTableClient(table.tableName, table.schemaName, isJunction, isMapped);
-            groups[cat].push(table);
+            groups[classifyTableClient(table.tableName, table.schemaName, isJunction, isMapped)].push(table);
         });
-
         return groups;
     }, [tables, junctionTableNames, servedJunctions, declaredTables]);
-
-    /** The table the server declares for the selected one, if any. */
-    const activeDescriptor = useMemo(() => {
-        if (!activeTableData) return null;
-        return declaredTables.find(descriptor => mapsTable(descriptor, activeTableData)) ?? null;
-    }, [activeTableData, declaredTables]);
-
-    /**
-     * The junction a relation derives this table as, when it is one. Its
-     * policies are Rebase's — derived from the endpoints' relations — and the
-     * server re-creates them on every start, like a declared table's.
-     */
-    const activeJunction = useMemo(() => {
-        if (!activeTableData || activeDescriptor) return null;
-        return servedJunctions.get(`${activeTableData.schemaName}.${activeTableData.tableName}`) ?? null;
-    }, [activeTableData, activeDescriptor, servedJunctions]);
-
-    /** The category of the currently selected table. */
-    const activeTableCategory = useMemo((): TableCategory | null => {
-        if (!activeTableData) return null;
-        const isJunction = Boolean(activeJunction) || junctionTableNames.has(activeTableData.tableName);
-        return classifyTableClient(activeTableData.tableName, activeTableData.schemaName, isJunction, Boolean(activeDescriptor));
-    }, [activeTableData, activeDescriptor, activeJunction, junctionTableNames]);
-
-    /**
-     * Whether the server re-asserts this table's RLS on every start: it switches
-     * RLS back on and re-creates every policy the project declares for it.
-     */
-    const activeTableManaged = Boolean(activeDescriptor || activeJunction);
-
-    /**
-     * What the server says the selected table's policies are — `undefined`
-     * when it declares none, or withheld them from this caller.
-     */
-    const activeDeclared = useMemo((): DeclaredPolicies | undefined => {
-        if (activeDescriptor) return declaredPoliciesOf(activeDescriptor.rls);
-        // Only from the compiled answer: a junction listed from a relation
-        // alone (policies withheld) has nothing to compare against.
-        if (activeJunction && activeJunction.policies.length > 0) return { rules: [], policies: activeJunction.policies };
-        return undefined;
-    }, [activeDescriptor, activeJunction]);
-
-    /**
-     * The table is declared, but this caller is not shown what it compiles to
-     * (no `schema:read`): the list is what the database holds, and nothing is
-     * written to the declaration — its raw rules may be redacted.
-     */
-    const declaredWithheld = activeDescriptor !== null && activeDeclared === undefined;
-
-    /** A save to the declaration needs the declaration, and a codebase to write it into. */
-    const savesToCodebase = activeDescriptor !== null && hasCodebase;
-
-    /**
-     * What Postgres enforces on the selected table, and what the code declares
-     * that it does not have yet.
-     *
-     * A policy in both is listed with the *database's* fields, and the
-     * declaration rides beside it with where the two differ (`listPolicies`).
-     * The declaration's fields in their place would make a policy changed in
-     * SQL look exactly like its declaration, and would show every rule written
-     * as a structured condition — all of Rebase's own policies — with no USING.
-     */
-    const mergedPolicies = useMemo((): ListedPolicy[] => {
-        if (!activeTableData) return [];
-        return listPolicies(activeTableData.policies || [], activeDeclared, activeTableData.tableName)
-            .sort((a, b) => a.policyname.localeCompare(b.policyname));
-    }, [activeTableData, activeDeclared]);
 
     // Stats for the info tab
     const rlsStats = useMemo(() => {
@@ -626,24 +346,8 @@ const RLSEditorInspector = ({ apiUrl = "" }: { apiUrl?: string }) => {
         const enabled = tables.filter(t => t.rlsEnabled).length;
         const withPolicies = tables.filter(t => t.policies.length > 0).length;
         const totalPolicies = tables.reduce((sum, t) => sum + t.policies.length, 0);
-        return { total,
-enabled,
-withPolicies,
-totalPolicies };
+        return { total, enabled, withPolicies, totalPolicies };
     }, [tables]);
-
-    const renderPolicyTag = (label: string, value: string) => {
-        return (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-well border border-hairline">
-                <span className="text-[10px] uppercase text-text-secondary dark:text-text-secondary-dark font-medium tracking-wider">
-                    {label}:
-                </span>
-                <span className="font-mono text-xs text-text-primary dark:text-text-primary-dark break-all">
-                    {value}
-                </span>
-            </div>
-        );
-    };
 
     return (
         <div className="flex h-full w-full bg-surface-card overflow-hidden text-text-primary dark:text-text-primary-dark">
@@ -830,61 +534,20 @@ totalPolicies };
                 }
                 secondPanel={
                     <div className="flex-grow flex flex-col min-w-0 h-full w-full bg-surface-card">
-                        {/* Toolbar Header matching SQL/JS Editor style */}
                         <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-sheet h-[42px] shrink-0", defaultBorderMixin)}>
-                            <div className="flex items-center flex-grow overflow-hidden px-4">
+                            <div className="flex items-center flex-grow overflow-hidden px-4 gap-3">
                                 <Typography variant="subtitle2" className="font-mono text-text-secondary dark:text-text-secondary-dark truncate">
                                     {activeTableData ? `${activeTableData.schemaName}.${activeTableData.tableName}` : t("studio_rls_select_table")}
                                 </Typography>
                                 {activeTableData && (
-                                    <div className="ml-3">
-                                        {activeTableData.rlsEnabled ? (
-                                            <Chip size="smallest" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800">{t("studio_rls_enabled")}</Chip>
-                                        ) : (
-                                            <Chip size="smallest" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">{t("studio_rls_disabled")}</Chip>
-                                        )}
-                                    </div>
+                                    <Chip size="smallest" colorScheme={activeTableData.rlsEnabled ? "greenLight" : "orangeLight"}>
+                                        {activeTableData.rlsEnabled ? t("studio_rls_enabled") : t("studio_rls_disabled")}
+                                    </Chip>
                                 )}
                             </div>
-                            <div className="flex shrink-0 items-center justify-end gap-1.5">
-                                {activeTableData && (
-                                    <>
-                                        <Button
-                                            variant="text"
-                                            size="small"
-                                            onClick={() => setConfirmToggleRls({
-                                                table: activeTableData.tableName,
-                                                schema: activeTableData.schemaName,
-                                                enabled: activeTableData.rlsEnabled,
-                                                managed: activeTableManaged
-                                            })}
-                                        >
-                                            {activeTableData.rlsEnabled ? t("studio_rls_disable_rls") : t("studio_rls_enable_rls")}
-                                        </Button>
-
-                                        <div className="h-4 w-px bg-hairline mx-1"/>
-
-                                        <Button
-                                            variant="text"
-                                            size="small"
-                                            onClick={fetchRLSData}
-                                            startIcon={<RefreshCwIcon size={iconSize.smallest}/>}
-                                        >
-                                            Refresh
-                                        </Button>
-
-                                        <div className="h-4 w-px bg-hairline mx-1"/>
-
-                                        <Button
-                                            size="small"
-                                            color="primary"
-                                            onClick={() => setEditingPolicy("new")}
-                                        >
-                                            {t("studio_rls_create_policy")}
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
+                            <IconButton aria-label={t("refresh")} size="small" onClick={fetchRLSData}>
+                                <RefreshCwIcon size={iconSize.smallest}/>
+                            </IconButton>
                         </div>
 
                         {isLoading && !activeTableData ? (
@@ -897,433 +560,25 @@ totalPolicies };
                             </div>
                         ) : !activeTableData ? (
                             <div className="flex-grow flex items-center justify-center text-text-disabled h-full">
-                                <div className="text-center">
-                                    <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                                    <Typography variant="body2">{t("studio_rls_select_table")}</Typography>
-                                </div>
+                                <Typography variant="body2">{t("studio_rls_select_table")}</Typography>
                             </div>
-                        ) : editingPolicy ? (
-                            <PolicyEditor
-                                policy={editingPolicy === "new" ? undefined : editingPolicy}
-                                schema={activeTableData.schemaName}
-                                table={activeTableData.tableName}
-                                roleOptions={pgRoleOptions}
-                                onSave={async (newPolicy) => {
-                                    /*
-                                     * Where a policy for a *mapped* table belongs depends
-                                     * on the host, not on the table.
-                                     *
-                                     * Beside its own source, the collection file is the
-                                     * right home: the rule is checked in, and the next
-                                     * migration applies it. The hosted console has no
-                                     * source — the container is rebuilt from the
-                                     * customer's repository on every deploy — and the
-                                     * schema-editor routes it would POST to are not even
-                                     * mounted, because the framework switches them off
-                                     * under NODE_ENV=production, which every tenant runs.
-                                     * So this branch used to make "Create Policy" and
-                                     * "Edit" fail with "Failed to save policy" on every
-                                     * mapped table in the console, which is most of them.
-                                     * There, the database is the only place a policy can
-                                     * live, so write it there — the same path unmapped
-                                     * tables have always used.
-                                     */
-                                    if (savesToCodebase && activeDescriptor) {
-                                        // A declared table: save its rules to the source.
-                                        // The editor edits a `PostgresPolicy`, whose `roles`
-                                        // is the `TO` list — `policyToSecurityRule` files it
-                                        // under `pgRoles`, never `roles`.
-                                        if (declaredWithheld) {
-                                            snackbarController.open({ type: "error",
-                                                message: t("studio_rls_save_needs_schema_read", { table: activeTableData.tableName }) });
-                                            return;
-                                        }
-                                        // The rules as written. A table on the project's
-                                        // `defaultRls` serves those rules, and saving one
-                                        // edit writes them into the table as its own.
-                                        const existingRules: readonly SecurityRule[] = activeDescriptor.rls.rules;
-                                        let newRules: PolicyRule[];
-                                        if (editingPolicy === "new") {
-                                            newRules = [...existingRules, policyToSecurityRule(newPolicy)];
-                                        } else {
-                                            // Back to the rule the policy compiles from, or
-                                            // a refusal that says why there is none — never
-                                            // the unchanged rules reported as saved.
-                                            const edit = applyPolicyEdit(existingRules, editingPolicy, newPolicy);
-                                            if (!edit.ok) {
-                                                snackbarController.open({ type: "error",
-                                                    message: t(POLICY_EDIT_REFUSALS[edit.reason], { policy: editingPolicy.policyname }) });
-                                                return;
-                                            }
-                                            newRules = edit.rules;
-                                            // Nothing the form changed reaches the rule. Saving
-                                            // it would plan an empty change, apply nothing, and
-                                            // still report "saved".
-                                            if (JSON.stringify(newRules) === JSON.stringify(existingRules)) {
-                                                snackbarController.open({ type: "info",
-                                                    message: t("studio_rls_nothing_changed") });
-                                                return;
-                                            }
-                                        }
-
-                                        try {
-                                            await saveSecurityRules(
-                                                // Addressed by its slug: the schema editor
-                                                // finds tables by it, never by the SQL name.
-                                                activeDescriptor,
-                                                newRules
-                                            );
-
-                                            snackbarController.open({ type: "success",
-message: "Policy saved successfully" });
-                                            setEditingPolicy(null);
-                                            fetchRLSData();
-                                        } catch (e: unknown) {
-                                            reportSaveFailure(e);
-                                        }
-                                    } else {
-                                        // No codebase to write to (hosted console), or an
-                                        // unmapped table (internal/junction/other): apply
-                                        // the policy to the database directly.
-                                        //
-                                        // Except a policy Rebase generates. The server
-                                        // re-creates it on its next start, and what the
-                                        // database holds for it is a compiled condition
-                                        // the form only shows as text: rewriting it here
-                                        // is a change that cannot last, and one slip in
-                                        // that text drops the condition — on a restrictive
-                                        // tenancy or auth-write gate, every restriction.
-                                        // The source path refuses the same edit.
-                                        if (editingPolicy !== "new" && editingPolicy.generated) {
-                                            snackbarController.open({ type: "error",
-                                                message: t(POLICY_EDIT_REFUSALS.generated, { policy: editingPolicy.policyname }) });
-                                            return;
-                                        }
-                                        try {
-                                            const qualifiedTable = `${quoteIdentifier(activeTableData.schemaName)}.${quoteIdentifier(activeTableData.tableName)}`;
-                                            const policyName = quoteIdentifier(newPolicy.policyname || "unnamed_policy");
-                                            const cmd = newPolicy.cmd || "ALL";
-                                            const permissive = (newPolicy.permissive || "PERMISSIVE") === "PERMISSIVE" ? "PERMISSIVE" : "RESTRICTIVE";
-                                            const roles = newPolicy.roles && newPolicy.roles.length > 0
-                                                ? newPolicy.roles.map(r => quoteIdentifier(r)).join(", ")
-                                                : "public";
-
-                                            let sql = `CREATE POLICY ${policyName} ON ${qualifiedTable}`;
-                                            sql += ` AS ${permissive}`;
-                                            sql += ` FOR ${cmd}`;
-                                            sql += ` TO ${roles}`;
-                                            if (newPolicy.qual) sql += ` USING (${newPolicy.qual})`;
-                                            if (newPolicy.with_check) sql += ` WITH CHECK (${newPolicy.with_check})`;
-
-                                            // An edit replaces the policy under the name it
-                                            // *had* — the new one, when it was renamed, drops
-                                            // nothing and leaves the old policy granting
-                                            // beside its replacement.
-                                            //
-                                            // And in the same statement as the CREATE: Postgres
-                                            // runs a multi-statement simple query as one
-                                            // implicit transaction, so a CREATE that fails
-                                            // (a typo in USING) takes the DROP back with it
-                                            // instead of leaving the table without the policy.
-                                            // No explicit BEGIN/COMMIT — on a failure the
-                                            // COMMIT is skipped and the pooled connection is
-                                            // returned inside an aborted transaction.
-                                            if (editingPolicy !== "new") {
-                                                const previousName = quoteIdentifier(editingPolicy.policyname);
-                                                // And its admin-request companion: the edit may have
-                                                // narrowed what every admin passes. A server that
-                                                // provisions writes it again if it still applies.
-                                                const companion = quoteIdentifier(adminRequestPolicyName(editingPolicy.policyname));
-                                                sql = `DROP POLICY IF EXISTS ${previousName} ON ${qualifiedTable}; DROP POLICY IF EXISTS ${companion} ON ${qualifiedTable}; ${sql}`;
-                                            }
-
-                                            await databaseAdmin!.executeSql!(sql);
-
-                                            snackbarController.open({ type: "success",
-message: `Policy "${newPolicy.policyname}" applied to the database` });
-                                            setEditingPolicy(null);
-                                            fetchRLSData();
-                                        } catch (e: unknown) {
-                                            snackbarController.open({ type: "error",
-message: e instanceof Error ? e.message : String(e) });
-                                        }
-                                    }
-                                }}
-                                onCancel={() => setEditingPolicy(null)}
-                            />
                         ) : (
-                            <div className="flex-grow flex flex-col overflow-hidden">
-                                <div className="p-6 pt-4 flex-grow overflow-auto bg-surface-sheet">
-                                    <div className="max-w-4xl mx-auto flex flex-col gap-6">
-                                    {/* Without the served tables the list is only what the
-                                        database holds: say why, rather than file every table
-                                        under "Other Tables" as if the project declared none. */}
-                                    {schemaProblem && <SchemaSourceProblemAlert problem={schemaProblem}/>}
-                                    {activeTableData && declaredWithheld && (
-                                        <Alert color="info">
-                                            <Typography variant="caption">
-                                                {t("studio_rls_declared_withheld", { table: activeTableData.tableName })}
-                                            </Typography>
-                                        </Alert>
-                                    )}
-                                    {/* A table the server re-asserts on every start, where
-                                        this editor writes straight to the database: what is
-                                        changed here does not outlive the next start. Where
-                                        saves go to the source instead, the source is what
-                                        the next start applies. */}
-                                    {activeTableData && activeTableManaged && !savesToCodebase && (
-                                        <Alert color="info">
-                                            <div className="flex items-start gap-2">
-                                                <Typography variant="caption">
-                                                    {t("studio_rls_reapplied_on_start", { table: activeTableData.tableName })}
-                                                </Typography>
-                                            </div>
-                                        </Alert>
-                                    )}
-                                    {/* Context-aware banner based on table category */}
-                                    {activeTableData && activeTableCategory === "internal" && (
-                                        <Alert color="info">
-                                            <div className="flex items-start gap-2">
-                                                <div>
-                                                    <Typography variant="body2" className="mb-1 font-semibold">
-                                                        Rebase System Table
-                                                    </Typography>
-                                                    <Typography variant="caption" className="opacity-80">
-                                                        This table is managed internally by Rebase. Its security policies are configured automatically.
-                                                        Editing policies on system tables is an advanced operation.
-                                                    </Typography>
-                                                </div>
-                                            </div>
-                                        </Alert>
-                                    )}
-                                    {activeTableData && activeTableCategory === "junction" && (
-                                        <Alert color="info">
-                                            <div className="flex items-start gap-2">
-                                                <div>
-                                                    <Typography variant="body2" className="mb-1 font-semibold">
-                                                        Junction Table
-                                                    </Typography>
-                                                    <Typography variant="caption" className="opacity-80">
-                                                        This is an auto-generated junction table for a many-to-many relation.
-                                                        Rebase derives its policies: rows are readable when both related rows
-                                                        are, and writable following the declaring table&apos;s update rules
-                                                        (plus the server/admin baseline). You can still add RLS policies
-                                                        directly to broaden access.
-                                                    </Typography>
-                                                </div>
-                                            </div>
-                                        </Alert>
-                                    )}
-
-                                    {activeTableData && !activeTableData.rlsEnabled && (
-                                        <div className={cls("p-4 sm:p-5 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between", defaultBorderMixin)}>
-                                            <div className="flex gap-3 items-start">
-                                                <div className="mt-1 bg-yellow-100 dark:bg-yellow-900/50 p-1.5 rounded-md shrink-0 flex items-center justify-center">
-                                                    <AlertTriangleIcon size={iconSize.smallest}/>
-                                                </div>
-                                                <div>
-                                                    <Typography variant="subtitle2" className="text-yellow-800 dark:text-yellow-500">
-                                                        Row Level Security (RLS) is disabled
-                                                    </Typography>
-                                                    <Typography variant="body2" className="text-yellow-700 dark:text-yellow-600/90 mt-1 max-w-2xl">
-                                                        Your table is completely readable and writable by anyone with access privileges. Enable RLS to create policies that restrict access to specific rows.
-                                                    </Typography>
-                                                </div>
-                                            </div>
-                                            <Button
-                                                size="medium"
-                                                variant="filled"
-                                                color="neutral"
-                                                onClick={() => setEditingPolicy("new")}
-                                                className="shrink-0 whitespace-nowrap"
-                                                disabled={!activeDescriptor}
-                                            >
-                                                {t("studio_rls_create_policy")}
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                    {activeTableData && mergedPolicies && mergedPolicies.length > 0 && (
-                                        <div className="flex flex-col gap-3">
-                                            <Typography variant="subtitle2" className="text-text-secondary dark:text-text-secondary-dark uppercase tracking-wider mb-1">{t("studio_rls_policies")}</Typography>
-                                            {mergedPolicies.map(policy => (
-                                                <Paper key={policy.policyname} className={cls("p-3 sm:px-4 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border rounded-lg", defaultBorderMixin)}>
-                                                    <div className="flex flex-col gap-2 min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <KeyIcon size={iconSize.smallest} className="text-text-secondary dark:text-text-secondary-dark shrink-0"/>
-                                                            <Typography variant="body2" className="truncate">{policy.policyname}</Typography>
-                                                            {policy.status === "code_only" && (
-                                                                <Tooltip title={t("studio_rls_unapplied_tooltip")}>
-                                                                    <div className="px-1.5 py-0.5 rounded text-[10px] uppercase bg-primary/10 text-primary border border-primary/20 shrink-0">
-                                                                        {t("studio_rls_unapplied")}
-                                                                    </div>
-                                                                </Tooltip>
-                                                            )}
-                                                            {/* The database holds this policy differently from
-                                                                its declaration. Compared as `rebase doctor`
-                                                                compares: TO list, command, mode, and whether
-                                                                each clause is there — never the clause text,
-                                                                which Postgres rewrites. */}
-                                                            {policy.drift && policy.drift.length > 0 && (
-                                                                <Tooltip title={t("studio_rls_drift_tooltip", { fields: policy.drift.join(", ") })}>
-                                                                    <div className="px-1.5 py-0.5 rounded text-xs bg-orange-500/10 text-orange-600 border border-orange-500/20 shrink-0">
-                                                                        {`${t("studio_rls_drift")}: ${policy.drift.join(", ")}`}
-                                                                    </div>
-                                                                </Tooltip>
-                                                            )}
-                                                            {/* "DB Only" is a *drift* signal — it means the
-                                                                codebase does not declare this policy. Where
-                                                                there is no codebase to compare against, every
-                                                                policy trivially qualifies, so the badge said
-                                                                nothing and said it about everything. */}
-                                                            {policy.status === "live" && hasCodebase && (
-                                                                <Tooltip title="This policy is live in the database but missing from your codebase schema.">
-                                                                    <div className="px-1.5 py-0.5 rounded text-[10px] uppercase bg-orange-500/10 text-orange-600 border border-orange-500/20 shrink-0">
-                                                                        DB Only
-                                                                    </div>
-                                                                </Tooltip>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-1.5 text-sm">
-                                                            {renderPolicyTag("Action", policy.cmd)}
-                                                            {renderPolicyTag("Roles", Array.isArray(policy.roles) ? policy.roles.join(", ") : policy.roles)}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex gap-2 shrink-0 items-center">
-                                                        {/* Writes a collection source file, so it needs a
-                                                            codebase on the other end. In the console the
-                                                            endpoint is not mounted and the button 404'd. */}
-                                                        {policy.status === "live" && savesToCodebase && activeDescriptor && !declaredWithheld && (
-                                                            <Button
-                                                                size="small"
-                                                                variant="outlined"
-                                                                color="primary"
-                                                                onClick={async () => {
-                                                                    // A live policy's `roles` is its `TO` list:
-                                                                    // database roles, so `pgRoles`. Copied into
-                                                                    // `roles`, `TO public` became an application-role
-                                                                    // check nobody passes — and on a restrictive
-                                                                    // policy, which compiles to `NOT (roles) OR …`,
-                                                                    // a gate everybody passes.
-                                                                    const rule = policyToSecurityRule(policy);
-
-                                                                    const newRules: PolicyRule[] = [...activeDescriptor.rls.rules, rule];
-
-                                                                    try {
-                                                                        await saveSecurityRules(
-                                                                            activeDescriptor,
-                                                                            newRules
-                                                                        );
-
-                                                                        snackbarController.open({ type: "success",
-message: "Policy imported successfully" });
-                                                                        fetchRLSData();
-                                                                    } catch (e: unknown) {
-                                                                        reportSaveFailure(e);
-                                                                    }
-                                                                }}
-                                                            >
-                                                                Import to codebase
-                                                            </Button>
-                                                        )}
-                                                        <Button size="small" variant="text" color="primary" onClick={() => setEditingPolicy(policy)}>
-                                                            {t("studio_rls_edit")}
-                                                        </Button>
-                                                        {policy.status !== "code_only" && (
-                                                            <Tooltip title={t("studio_rls_delete")} asChild={true}>
-                                                                <IconButton aria-label={t("studio_rls_delete")}
-                                                                    size="small"
-                                                                    onClick={() => setConfirmDropPolicy({
-                                                                        policyName: policy.policyname,
-                                                                        table: activeTableData!.tableName,
-                                                                        schema: activeTableData!.schemaName
-                                                                    })}
-                                                                >
-                                                                    <Trash2Icon size={iconSize.smallest}/>
-                                                                </IconButton>
-                                                            </Tooltip>
-                                                        )}
-                                                    </div>
-                                                </Paper>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {activeTableData && mergedPolicies.length === 0 && activeTableData.rlsEnabled && (
-                                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                                            <ShieldIcon size={40} className="text-surface-300 dark:text-surface-600 mb-4"/>
-                                            <Typography variant="subtitle2" className="text-text-secondary dark:text-text-secondary-dark mb-2">
-                                                No policies defined
-                                            </Typography>
-                                            <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark max-w-sm mb-4">
-                                                RLS is enabled on this table but no policies exist. All access is denied by default (Postgres deny-all). Create a policy to allow specific access.
-                                            </Typography>
-                                            <Button
-                                                size="small"
-                                                variant="filled"
-                                                color="primary"
-                                                onClick={() => setEditingPolicy("new")}
-                                            >
-                                                {t("studio_rls_create_policy")}
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                    {activeTableData && mergedPolicies.length === 0 && !activeTableData.rlsEnabled && activeDescriptor && (
-                                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                                            <AlertTriangleIcon size={40} className="text-yellow-400 dark:text-yellow-600 mb-4"/>
-                                            <Typography variant="subtitle2" className="text-text-secondary dark:text-text-secondary-dark mb-2">
-                                                No access control
-                                            </Typography>
-                                            <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark max-w-sm">
-                                                This table has neither RLS nor policies. Enable RLS and create policies to restrict row-level access.
-                                            </Typography>
-                                        </div>
-                                    )}
-
-                                    </div>
+                            <div className="p-6 pt-4 flex-grow overflow-auto bg-surface-sheet">
+                                <div className="max-w-4xl mx-auto">
+                                    <TablePolicies
+                                        key={`${activeTableData.schemaName}.${activeTableData.tableName}`}
+                                        schemaName={activeTableData.schemaName}
+                                        tableName={activeTableData.tableName}
+                                        rlsEnabled={activeTableData.rlsEnabled}
+                                        policies={activeTableData.policies}
+                                        isJunction={junctionTableNames.has(activeTableData.tableName)}
+                                        onChanged={fetchRLSData}
+                                    />
                                 </div>
                             </div>
                         )}
                     </div>
                 }
-            />
-
-            <ConfirmationDialog
-                open={confirmToggleRls !== null}
-                loading={confirming}
-                onAccept={applyToggleRls}
-                onCancel={() => setConfirmToggleRls(null)}
-                title={confirmToggleRls?.enabled
-                    ? t("studio_rls_disable_confirm_title")
-                    : t("studio_rls_enable_confirm_title")}
-                body={confirmToggleRls?.enabled
-                    ? [
-                        t("studio_rls_disable_confirm_body", { table: confirmToggleRls.table }),
-                        // The server switches a managed table's RLS back on at
-                        // its next start, so a disable here is temporary.
-                        confirmToggleRls.managed ? t("studio_rls_disable_reapplied", { table: confirmToggleRls.table }) : ""
-                    ].filter(Boolean).join(" ")
-                    : t("studio_rls_enable_confirm_body", { table: confirmToggleRls?.table ?? "" })}
-            />
-
-            <ConfirmationDialog
-                open={detaching !== null}
-                onAccept={() => answerDetach(true)}
-                onCancel={() => answerDetach(false)}
-                title={t("schema_rules_detach_title")}
-                body={t("schema_rules_detach_body", { table: detaching ?? "" })}
-            />
-            <ConfirmationDialog
-                open={confirmDropPolicy !== null}
-                loading={confirming}
-                onAccept={applyDropPolicy}
-                onCancel={() => setConfirmDropPolicy(null)}
-                title={t("studio_rls_drop_policy_title")}
-                body={t("studio_rls_drop_policy_body", {
-                    policy: confirmDropPolicy?.policyName ?? "",
-                    table: confirmDropPolicy?.table ?? ""
-                })}
             />
         </div>
     );

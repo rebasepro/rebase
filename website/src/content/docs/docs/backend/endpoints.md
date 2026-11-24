@@ -169,6 +169,10 @@ a table reaches none of this. See [Roles and scopes](/docs/backend/roles-and-sco
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Roles, users' rule roles and live service keys an administrator can simulate |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Each table as `{ role?, userId?, apiKeyId? }` reaches it: visible rows against the caller's, hidden by scope or RLS, masked fields. Administrator's session only |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streams one read-only query's whole result as CSV — [Studio](/docs/studio/)'s "Download full result as CSV" |
+| `GET` | `/api/admin/sql/snippets` | `database:read` | The SQL console's saved snippets the caller sees: their own and the team's |
+| `POST` | `/api/admin/sql/snippets` | `database:write` | Saves a snippet (`name`, `sql`, `visibility`: `personal` or `team`, `favorite`) |
+| `PATCH` | `/api/admin/sql/snippets/:id` | `database:write` | Changes a snippet's fields; only its owner or an admin |
+| `DELETE` | `/api/admin/sql/snippets/:id` | `database:write` | Deletes a snippet; only its owner or an admin |
 | `GET` | `/api/admin/branches/:name/diff` | `database:write` | What a [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) changed: schema, policies and rows, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Writes the branch's rows to its parent, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` when either side changed since the diff, or rows conflict |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
@@ -188,6 +192,33 @@ a table reaches none of this. See [Roles and scopes](/docs/backend/roles-and-sco
 | `DELETE` | `/api/admin/db/tables/:table/indexes/:index` | `database:write` | Drops an index on a PostgreSQL table |
 | `POST` | `/api/admin/db/tables/:table/policies` | `database:write` | Creates a PostgreSQL RLS policy on a table and reloads live |
 | `DELETE` | `/api/admin/db/tables/:table/policies/:policy` | `database:write` | Drops a PostgreSQL RLS policy on a table and reloads live |
+| `GET` | `/api/admin/db/tables/:table/details` | `database:read` | One table's constraints, foreign keys both ways, triggers, grants, policies, index usage, storage statistics and definition as SQL |
+| `POST` | `/api/admin/db/tables/:table/constraints` | `database:write` | Adds a foreign key, unique or check constraint (`dryRun: true` previews SQL) |
+| `DELETE` | `/api/admin/db/tables/:table/constraints/:constraint` | `database:write` | Drops a constraint |
+| `PATCH` | `/api/admin/db/tables/:table/triggers/:trigger` | `database:write` | Enables or disables a trigger (`{ enabled }`) |
+| `DELETE` | `/api/admin/db/tables/:table/triggers/:trigger` | `database:write` | Drops a trigger |
+| `POST` | `/api/admin/db/tables/:table/maintenance` | `database:write` | Runs `ANALYZE` or `VACUUM (ANALYZE)` on the table (`{ action }`) |
+| `POST` | `/api/admin/db/tables/:table/refresh` | `database:write` | Refreshes a materialized view |
+| `GET` | `/api/admin/db/tables/:table/rows` | `database:read` | Rows as the database owner: `limit`, `offset`, `orderBy`, `direction` and `filters` (JSON); `format=csv` streams every match |
+| `POST` | `/api/admin/db/tables/:table/rows` | `database:write` | Inserts rows (`{ rows }`), all or none |
+| `PATCH` | `/api/admin/db/tables/:table/rows` | `database:write` | Updates one row by its primary key (`{ key, values }`) |
+| `DELETE` | `/api/admin/db/tables/:table/rows` | `database:write` | Deletes rows by primary key (`{ keys }`) |
+| `GET` | `/api/admin/db/insights/sources` | `database:read` | The databases the Database view can inspect (`?source=` on the routes below) |
+| `GET` | `/api/admin/db/insights/overview` | `database:read` | Server version, database size and connections in use |
+| `GET` | `/api/admin/db/insights/advisors` | `database:read` | Security findings from `rls-check` and performance findings (unused or duplicate indexes, unindexed foreign keys, missing primary keys, dead rows) |
+| `GET` | `/api/admin/db/insights/queries` | `database:read` | The heaviest statements from `pg_stat_statements` (`sort`, `limit`), or why it cannot be read |
+| `POST` | `/api/admin/db/insights/queries/reset` | `database:write` | Resets `pg_stat_statements` |
+| `GET` | `/api/admin/db/insights/activity` | `database:read` | Working sessions with their waits, durations and blockers |
+| `POST` | `/api/admin/db/insights/activity/:pid/cancel` | `database:write` | Cancels a session's running statement (`pg_cancel_backend`) |
+| `POST` | `/api/admin/db/insights/activity/:pid/terminate` | `database:write` | Ends a session (`pg_terminate_backend`) |
+| `GET` | `/api/admin/db/catalog/functions` | `database:read` | Functions outside the protected schemas, with their definitions |
+| `DELETE` | `/api/admin/db/catalog/functions/:schema/:name` | `database:write` | Drops a function (its signature in the body) |
+| `GET` | `/api/admin/db/catalog/triggers` | `database:read` | Every trigger, with its table and function |
+| `GET` | `/api/admin/db/catalog/types` | `database:read` | Enums with their values, domains and composite types |
+| `POST` | `/api/admin/db/catalog/types/:schema/:name/values` | `database:write` | Adds a value to an enum (`ALTER TYPE … ADD VALUE`) |
+| `GET` | `/api/admin/db/catalog/extensions` | `database:read` | Extensions the server offers, and which are installed |
+| `POST` | `/api/admin/db/catalog/extensions/:name` | `database:write` | Installs an extension (`CREATE EXTENSION`) |
+| `DELETE` | `/api/admin/db/catalog/extensions/:name` | `database:write` | Removes an extension (`DROP EXTENSION`) |
 | `GET` | `/api/admin/storage/policies` | `database:read` | Lists declarative zero-code storage policies from `rebase.storage_policies` |
 | `POST` | `/api/admin/storage/policies` | `database:write` | Creates a declarative storage access policy |
 | `PATCH` | `/api/admin/storage/policies/:id` | `database:write` | Updates a declarative storage access policy |

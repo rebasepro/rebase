@@ -20,8 +20,8 @@
 export { runCli, scan, scanWithSnapshot, selectCheckIds, EXIT_OK, EXIT_FINDINGS, EXIT_ERROR } from "./cli";
 export type { ScanOptions, CliIo, CliOptions, OutputFormat } from "./cli";
 
-export { introspect } from "./introspect";
-export type { ConnectOptions } from "./introspect";
+export { introspect, introspectWith } from "./introspect";
+export type { ConnectOptions, IntrospectDiagnostics, IntrospectResult, SnapshotQuery } from "./introspect";
 
 export { CHECKS, runChecks } from "./checks";
 

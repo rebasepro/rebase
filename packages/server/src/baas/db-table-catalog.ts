@@ -241,6 +241,9 @@ const CONSTRAINTS_SQL = `
                           ORDER BY k.ord)) AS columns
       FROM pg_constraint con
      WHERE con.conrelid = $1::regclass
+       -- Postgres 18 records NOT NULL as constraints too ('n'); the column's
+       -- definition already says NOT NULL, so listing them would say it twice.
+       AND con.contype <> 'n'
      ORDER BY CASE con.contype WHEN 'p' THEN 0 WHEN 'u' THEN 1 WHEN 'f' THEN 2 WHEN 'c' THEN 3 ELSE 4 END, con.conname`;
 
 /** Foreign keys, filtered by the caller's WHERE on `con`, `src_ns`, `src`. */

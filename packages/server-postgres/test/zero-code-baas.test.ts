@@ -24,6 +24,8 @@ import {
 import {
     ensureBaasCatalogTables,
     createDbAdminRoutes,
+    createDbCatalogRoutes,
+    createDbInsightsRoutes,
     createStoragePoliciesStore,
     createWebhooksStore,
     createRolesStore,
@@ -737,5 +739,240 @@ describe("Zero-code BaaS foundation (PGlite)", () => {
         } finally {
             await hookDb.close();
         }
+    });
+});
+
+describe("Database view routes: /api/admin/db/catalog and /api/admin/db/insights (PGlite)", () => {
+    let db: PGlite;
+    let admin: SQLAdmin;
+    let reloads = 0;
+    let served: TableDescriptor[] = [];
+    let catalog: ReturnType<typeof createDbCatalogRoutes>;
+    let insights: ReturnType<typeof createDbInsightsRoutes>;
+
+    const json = (body: unknown, method = "POST") => ({
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+    });
+
+    beforeAll(async () => {
+        db = new PGlite();
+        await db.waitReady;
+        for (const statement of RLS_BOOTSTRAP_STATEMENTS) await db.exec(statement);
+        admin = makePgliteSqlAdmin(db);
+        await ensureBaasCatalogTables(admin);
+        await db.exec(`
+            CREATE ROLE rebase_user NOLOGIN;
+            CREATE TYPE public.mood AS ENUM ('sad', 'happy');
+            CREATE DOMAIN public.positive_int AS integer CHECK (VALUE > 0);
+            CREATE FUNCTION public.add_one(n integer) RETURNS integer LANGUAGE sql IMMUTABLE AS $$ SELECT n + 1 $$;
+            CREATE FUNCTION public.touch() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;
+
+            CREATE TABLE public.authors (id serial PRIMARY KEY, name text NOT NULL);
+            ALTER TABLE public.authors ENABLE ROW LEVEL SECURITY;
+            CREATE TABLE public.books (
+                id serial PRIMARY KEY,
+                author_id integer NOT NULL REFERENCES public.authors (id),
+                title text NOT NULL,
+                mood public.mood
+            );
+            ALTER TABLE public.books ENABLE ROW LEVEL SECURITY;
+            CREATE INDEX books_title_a ON public.books (title);
+            CREATE INDEX books_title_b ON public.books (title);
+            CREATE TRIGGER books_touch BEFORE INSERT OR UPDATE ON public.books FOR EACH ROW EXECUTE FUNCTION public.touch();
+
+            CREATE TABLE public.event_log (happened_at timestamptz NOT NULL DEFAULT now(), message text);
+            GRANT SELECT, INSERT ON public.event_log TO rebase_user;
+
+            CREATE TABLE public.articles (id serial PRIMARY KEY, body text NOT NULL);
+            ALTER TABLE public.articles ENABLE ROW LEVEL SECURITY;
+            INSERT INTO public.articles (body) SELECT 'article ' || g FROM generate_series(1, 10050) g;
+            ANALYZE public.articles;
+        `);
+        served = (await introspectTables(db, "public")).tables;
+        catalog = createDbCatalogRoutes({ admin, reloadSchema: async () => { reloads++; } });
+        insights = createDbInsightsRoutes({
+            admin,
+            getServedTables: () => served,
+            // The checker's modules, from source. Its package entry also loads
+            // the CLI, which reads `import.meta` — not something jest's
+            // CommonJS transform can compile. The default loader is exercised
+            // by the Docker e2e, which runs as ESM.
+            loadRlsCheck: async () => {
+                const [{ introspectWith }, { runChecks }, { remediationFor }] = await Promise.all([
+                    import("../../rls-check/src/introspect"),
+                    import("../../rls-check/src/checks"),
+                    import("../../rls-check/src/remediation")
+                ]);
+                return { introspectWith, runChecks, remediationFor };
+            }
+        });
+    });
+
+    afterAll(async () => {
+        await db.close();
+    });
+
+    it("lists functions, marks the framework's own as protected, and drops one by its exact signature", async () => {
+        const listed = await (await catalog.request("/functions")).json() as {
+            functions: { schema: string; name: string; args: string; kind: string; protected: boolean; definition: string }[];
+        };
+        const addOne = listed.functions.find(f => f.schema === "public" && f.name === "add_one");
+        expect(addOne).toMatchObject({ args: "n integer", kind: "function", protected: false });
+        expect(addOne?.definition).toContain("CREATE OR REPLACE FUNCTION public.add_one");
+        expect(listed.functions.some(f => f.schema === "rebase" && f.protected)).toBe(true);
+
+        const wrong = await catalog.request("/functions/public/add_one", json({ args: "text" }, "DELETE"));
+        expect(wrong.status).toBe(404);
+
+        const protectedDrop = await catalog.request("/functions/rebase/uid", json({ args: "" }, "DELETE"));
+        expect(protectedDrop.status).toBe(400);
+
+        const preview = await catalog.request("/functions/public/add_one", json({ args: "n integer", dryRun: true }, "DELETE"));
+        expect(await preview.json()).toEqual({ dryRun: true, statements: ['DROP FUNCTION "public"."add_one"(n integer);'] });
+        expect((await db.query("SELECT 1 FROM pg_proc WHERE proname = 'add_one'")).rows).toHaveLength(1);
+
+        const dropped = await catalog.request("/functions/public/add_one", json({ args: "n integer" }, "DELETE"));
+        expect(dropped.status).toBe(200);
+        expect((await db.query("SELECT 1 FROM pg_proc WHERE proname = 'add_one'")).rows).toHaveLength(0);
+    });
+
+    it("lists triggers with their timing, events and level", async () => {
+        const listed = await (await catalog.request("/triggers")).json() as {
+            triggers: { schema: string; table: string; name: string; timing: string; events: string[]; level: string; function: string; enabled: boolean }[];
+        };
+        expect(listed.triggers.find(t => t.name === "books_touch")).toMatchObject({
+            schema: "public",
+            table: "books",
+            timing: "BEFORE",
+            events: ["INSERT", "UPDATE"],
+            level: "ROW",
+            function: "public.touch",
+            enabled: true
+        });
+    });
+
+    it("lists enums and domains, and adds an enum value after previewing it", async () => {
+        const listed = await (await catalog.request("/types")).json() as {
+            types: { schema: string; name: string; kind: string; values: string[]; baseType: string | null }[];
+        };
+        expect(listed.types.find(t => t.name === "mood")).toMatchObject({ schema: "public", kind: "enum", values: ["sad", "happy"] });
+        expect(listed.types.find(t => t.name === "positive_int")).toMatchObject({ kind: "domain", baseType: "integer" });
+
+        const preview = await catalog.request("/types/public/mood/values", json({ value: "content", after: "sad", dryRun: true }));
+        expect(await preview.json()).toEqual({ dryRun: true, statements: [`ALTER TYPE "public"."mood" ADD VALUE 'content' AFTER 'sad';`] });
+        expect(reloads).toBe(0);
+
+        const badAnchor = await catalog.request("/types/public/mood/values", json({ value: "content", after: "angry" }));
+        expect(badAnchor.status).toBe(400);
+
+        const added = await catalog.request("/types/public/mood/values", json({ value: "content", after: "sad" }));
+        expect(added.status).toBe(200);
+        expect(reloads).toBe(1);
+        const values = await db.query<{ label: string }>(
+            "SELECT enumlabel AS label FROM pg_enum WHERE enumtypid = 'public.mood'::regtype ORDER BY enumsortorder"
+        );
+        expect(values.rows.map(r => r.label)).toEqual(["sad", "content", "happy"]);
+
+        const duplicate = await catalog.request("/types/public/mood/values", json({ value: "happy" }));
+        expect(duplicate.status).toBe(409);
+
+        const protectedSchema = await catalog.request("/types/rebase/mood/values", json({ value: "x" }));
+        expect(protectedSchema.status).toBe(400);
+    });
+
+    it("previews CREATE EXTENSION, explains a library the server lacks, and keeps plpgsql", async () => {
+        const listed = await (await catalog.request("/extensions")).json() as { extensions: { name: string; installed: boolean }[] };
+        expect(listed.extensions.find(e => e.name === "plpgsql")).toMatchObject({ installed: true });
+
+        const preview = await catalog.request("/extensions/pg_trgm", json({ dryRun: true }));
+        expect(await preview.json()).toEqual({ dryRun: true, statements: ['CREATE EXTENSION IF NOT EXISTS "pg_trgm";'] });
+
+        // This PGlite was created without the pg_trgm bundle: the server has no
+        // library, which is the refusal the hint is for.
+        const refused = await catalog.request("/extensions/pg_trgm", json({}));
+        expect(refused.status).toBe(400);
+        const body = await refused.json() as { error: { message: string } };
+        expect(body.error.message).toContain("is a server extension");
+
+        expect((await catalog.request("/extensions/plpgsql", json({}, "DELETE"))).status).toBe(400);
+        expect((await catalog.request("/extensions/hstore", json({}, "DELETE"))).status).toBe(404);
+        expect((await catalog.request("/extensions/bad%20name", json({ dryRun: true }))).status).toBe(400);
+    });
+
+    it("describes the in-process database: engine, size and no query statistics or other sessions", async () => {
+        const overview = await (await insights.request("/overview")).json() as {
+            engine: string; version: string; sizeBytes: number | null; connections: { max: number | null };
+        };
+        expect(overview.engine).toBe("pglite");
+        expect(overview.version).toMatch(/PostgreSQL/);
+        expect(typeof overview.sizeBytes).toBe("number");
+
+        const queries = await (await insights.request("/queries")).json() as { status: string };
+        expect(queries.status).toBe("unavailable");
+        expect((await insights.request("/queries?sort=nope")).status).toBe(400);
+
+        const activity = await (await insights.request("/activity")).json() as { sessions: unknown[] };
+        expect(activity.sessions).toEqual([]);
+        expect((await insights.request("/activity/999999/cancel", json({ dryRun: true }))).status).toBe(404);
+        expect((await insights.request("/activity/abc/terminate", json({}))).status).toBe(400);
+    });
+
+    it("answers for a declared database with ?source= and refuses one it does not serve", async () => {
+        const other = new PGlite();
+        await other.waitReady;
+        try {
+            await other.exec("CREATE TYPE public.only_in_analytics AS ENUM ('a');");
+            const multi = createDbCatalogRoutes({
+                admin,
+                sources: () => [{ key: "analytics", admin: makePgliteSqlAdmin(other) }],
+                reloadSchema: async () => undefined
+            });
+            const typeNames = async (query: string) =>
+                ((await (await multi.request(`/types${query}`)).json()) as { types: { name: string }[] }).types.map(t => t.name);
+            expect(await typeNames("?source=analytics")).toContain("only_in_analytics");
+            expect(await typeNames("")).not.toContain("only_in_analytics");
+            expect(await typeNames("?source=(default)")).toContain("mood");
+            expect((await multi.request("/types?source=nope")).status).toBe(404);
+
+            const multiInsights = createDbInsightsRoutes({
+                admin,
+                sources: () => [{ key: "analytics", admin: makePgliteSqlAdmin(other) }],
+                getServedTables: () => served
+            });
+            expect(await (await multiInsights.request("/sources")).json()).toEqual({
+                sources: [{ key: "(default)", isDefault: true }, { key: "analytics", isDefault: false }]
+            });
+            const overview = await (await multiInsights.request("/overview?source=analytics")).json() as { source: string };
+            expect(overview.source).toBe("analytics");
+        } finally {
+            await other.close();
+        }
+    });
+
+    it("reports security findings from rls-check and the performance advisors", async () => {
+        const res = await insights.request("/advisors");
+        expect(res.status).toBe(200);
+        const body = await res.json() as {
+            findings: { id: string; check: string; category: string; severity: string; table?: string; remediationSql?: string }[];
+            errors: unknown[];
+        };
+        expect(body.errors).toEqual([]);
+        const byCheck = (check: string, table: string) => body.findings.find(f => f.check === check && f.table === table);
+
+        // event_log is granted to the request role and has RLS off.
+        const rlsOff = byCheck("rls-disabled", "public.event_log");
+        expect(rlsOff).toMatchObject({ category: "security" });
+        expect(rlsOff?.remediationSql).toContain("ENABLE ROW LEVEL SECURITY");
+
+        expect(byCheck("no-primary-key", "public.event_log")).toMatchObject({ category: "performance", severity: "medium" });
+        expect(byCheck("fk-without-index", "public.books")?.remediationSql).toBe('CREATE INDEX ON "public"."books" ("author_id");');
+        expect(byCheck("duplicate-index", "public.books")?.remediationSql).toBe('DROP INDEX "public"."books_title_b";');
+        expect(byCheck("unindexed-search", "public.articles")).toMatchObject({ category: "performance" });
+        // A table the framework owns is not the project's to tune.
+        expect(body.findings.some(f => f.table?.startsWith("rebase."))).toBe(false);
+        // Ids are unique, so a list can key on them.
+        expect(new Set(body.findings.map(f => f.id)).size).toBe(body.findings.length);
     });
 });

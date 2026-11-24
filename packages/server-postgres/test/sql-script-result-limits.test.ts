@@ -9,8 +9,8 @@ import { ScriptRun, SQL_CONSOLE_RESULT_LIMITS, sqlScriptResultFromRows, type Sta
  * objects and built a 475 MB string, and a 1 GiB server died of it — with every
  * other user's connection. `SELECT * FROM big; SELECT 1` showed one row and
  * peaked at the same 417 MB, for rows nobody would see. A run now keeps at most
- * {@link SQL_CONSOLE_RESULT_LIMITS} of the statement the console shows, and
- * nothing of the ones before it.
+ * {@link SQL_CONSOLE_RESULT_LIMITS} over the whole script: the statements
+ * before the last give rows up so the last keeps as many as it would alone.
  *
  * The messages are the ones node-postgres hands the active query, in the order
  * Postgres sends them — what `runSqlScriptOnPool` reads off a real server
@@ -64,31 +64,95 @@ describe("the rows a SQL console run keeps", () => {
         expect(last.received).toBe(200);
     });
 
-    it("holds no row of a statement once the next one starts: only the last is shown", async () => {
-        const run = new ScriptRun("SELECT g FROM generate_series(1, 50000) g; SELECT 1 AS one");
-        sendStatement(run, 50_000);
-        run.handleRowDescription({ fields: [integerColumn("one")] });
+    it("keeps every statement's rows when the script fits the budget", async () => {
+        const run = new ScriptRun("SELECT g FROM generate_series(1, 3) g; SELECT 1 AS one; UPDATE t SET x = 1");
+        sendStatement(run, 3);
+        sendStatement(run, 1, () => "1", "one");
+        run.handleCommandComplete({ text: "UPDATE 3" });
+        run.handleReadyForQuery();
 
-        const held = run.statements.reduce((total, statement) => total + statement.rows.length, 0);
-        expect(held).toBe(0);
-
-        run.handleDataRow({ fields: ["1"] });
-        run.handleCommandComplete({ text: "SELECT 1" });
-        const last = await lastStatement(run);
-        expect(last.rows).toEqual([{ one: "1" }]);
-        expect(last.truncated).toBe(false);
+        const statements = await run.done;
+        expect(statements.map(statement => statement.rows)).toEqual([
+            [{ g: "1" }, { g: "2" }, { g: "3" }],
+            [{ one: "1" }],
+            []
+        ]);
+        expect(statements.map(statement => statement.tag)).toEqual(["SELECT 3", "SELECT 1", "UPDATE 3"]);
+        expect(statements.some(statement => statement.truncated)).toBe(false);
     });
 
-    it("drops the rows of a SELECT that an UPDATE after it ends the script with", async () => {
+    it("shares one budget across the script: the earlier statement gives rows up so the last keeps its own", async () => {
+        const run = new ScriptRun("SELECT g FROM generate_series(1, 50000) g; SELECT 1 AS one");
+        sendStatement(run, 50_000);
+        sendStatement(run, 1, () => "1", "one");
+        run.handleReadyForQuery();
+
+        const [first, second] = await run.done;
+        expect(second.rows).toEqual([{ one: "1" }]);
+        expect(second.truncated).toBe(false);
+        // The first keeps its first rows, one fewer than the whole budget.
+        expect(first.rows).toHaveLength(SQL_CONSOLE_RESULT_LIMITS.maxRows - 1);
+        expect(first.rows[0]).toEqual({ g: "1" });
+        expect(first.rows[first.rows.length - 1]).toEqual({ g: String(SQL_CONSOLE_RESULT_LIMITS.maxRows - 1) });
+        expect(first.truncated).toBe(true);
+        expect(first.received).toBe(50_000);
+        const held = run.statements.reduce((total, statement) => total + statement.rows.length, 0);
+        expect(held).toBe(SQL_CONSOLE_RESULT_LIMITS.maxRows);
+    });
+
+    it("never holds more than one statement's limits, however many statements fill it", async () => {
+        const limits = { maxRows: 100, maxTextLength: 1_000_000 };
+        const run = new ScriptRun("SELECT …; SELECT …; SELECT …", limits);
+        sendStatement(run, 80);
+        sendStatement(run, 80);
+        sendStatement(run, 80);
+        run.handleReadyForQuery();
+
+        const statements = await run.done;
+        expect(statements.map(statement => statement.rows.length)).toEqual([0, 20, 80]);
+        expect(statements.map(statement => statement.truncated)).toEqual([true, true, false]);
+        // The second statement kept its first rows, not its last.
+        expect(statements[1].rows[0]).toEqual({ g: "1" });
+    });
+
+    it("cuts the last statement short only once the earlier ones hold nothing", async () => {
+        const limits = { maxRows: 100, maxTextLength: 1_000_000 };
+        const run = new ScriptRun("SELECT …; SELECT …", limits);
+        sendStatement(run, 30);
+        sendStatement(run, 150);
+        run.handleReadyForQuery();
+
+        const [first, second] = await run.done;
+        expect(first.rows).toEqual([]);
+        expect(first.truncated).toBe(true);
+        expect(second.rows).toHaveLength(100);
+        expect(second.truncated).toBe(true);
+        expect(second.received).toBe(150);
+    });
+
+    it("does not empty the earlier statements for a row too wide to keep at all", async () => {
+        const limits = { maxRows: 100, maxTextLength: 100 };
+        const run = new ScriptRun("SELECT …; SELECT repeat('x', 500)", limits);
+        sendStatement(run, 3);
+        sendStatement(run, 1, () => "x".repeat(500), "wide");
+        run.handleReadyForQuery();
+
+        const [first, second] = await run.done;
+        expect(first.rows).toHaveLength(3);
+        expect(first.truncated).toBe(false);
+        expect(second.rows).toEqual([]);
+        expect(second.truncated).toBe(true);
+    });
+
+    it("keeps the rows of a SELECT that an UPDATE after it ends the script with", async () => {
         const run = new ScriptRun("SELECT g FROM generate_series(1, 5000) g; UPDATE t SET x = 1");
         sendStatement(run, 5_000);
         run.handleCommandComplete({ text: "UPDATE 3" });
 
-        const held = run.statements.reduce((total, statement) => total + statement.rows.length, 0);
-        expect(held).toBe(0);
         const last = await lastStatement(run);
         expect(last.tag).toBe("UPDATE 3");
         expect(last.rows).toEqual([]);
+        expect(run.statements[0].rows).toHaveLength(5_000);
     });
 });
 

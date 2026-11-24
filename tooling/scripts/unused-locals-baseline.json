@@ -49,8 +49,6 @@
   "packages/firebase/src/hooks/useFirestoreDriver.ts::resolvedPath": 1,
   "packages/server-postgres/src/services/PersistService.ts::primaryKeyFields": 1,
   "packages/server/src/utils/dev-port.ts::attempt": 1,
-  "packages/studio/src/components/RLSEditor/RLSEditor.tsx::activeTab": 1,
-  "packages/studio/src/components/RLSEditor/RLSEditor.tsx::setActiveTab": 1,
   "packages/studio/src/components/SQLEditor/SQLEditor.tsx::QueryLoadingView": 1,
   "packages/studio/src/components/SQLEditor/SQLEditor.tsx::setError": 1,
   "packages/studio/src/components/SQLEditor/SQLEditor.tsx::setLoading": 1,

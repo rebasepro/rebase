@@ -110,6 +110,9 @@ import {
     createCronJobsStore,
     createCronJobsAdminRoutes,
     createDbAdminRoutes,
+    createDbCatalogRoutes,
+    createDbInsightsRoutes,
+    type DbSqlSource,
     type StoragePoliciesStore,
     type WebhooksStore,
     type RolesStore,
@@ -3316,6 +3319,25 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 getServedTables: () => tableRegistry.list(),
                 reloadSchema
             }));
+            // The Database view's health, advice and catalog, under the same
+            // gate, for the default database and every declared SQL one
+            // (`database("analytics")`), keyed as `rebase.sql({ database })` keys them.
+            const dbSqlSources = (): DbSqlSource[] => bootstrappers.flatMap(bootstrapper => {
+                if (bootstrapper === defaultBootstrapper) return [];
+                const result = driverResults.get(bootstrapper);
+                const admin = result ? bootstrapper.getAdmin?.(result) : undefined;
+                return isSQLAdmin(admin) ? [{ key: bootstrapper.id || bootstrapper.type, admin }] : [];
+            });
+            dbRouter.route("/insights", createDbInsightsRoutes({
+                admin: defaultSqlAdmin,
+                sources: dbSqlSources,
+                getServedTables: () => tableRegistry.list()
+            }));
+            dbRouter.route("/catalog", createDbCatalogRoutes({
+                admin: defaultSqlAdmin,
+                sources: dbSqlSources,
+                reloadSchema
+            }));
             dbAdminSurface = dbRouter;
 
             if (rolesStore) {
@@ -4062,6 +4084,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let backupSurface: Hono<HonoEnv> | undefined;
     let rlsAuditSurface: Hono<HonoEnv> | undefined;
     let sqlExportSurface: Hono<HonoEnv> | undefined;
+    let sqlSnippetsSurface: Hono<HonoEnv> | undefined;
     let branchSurface: Hono<HonoEnv> | undefined;
     let devMailSurface: Hono<HonoEnv> | undefined;
     let logsSurface: Hono<HonoEnv> | undefined;
@@ -4144,6 +4167,16 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         applyAdminGate(sqlExportRouter, "SQL export", "database:write");
         sqlExportRouter.route("/", createSqlExportRoutes({ getAdmin: () => defaultDriver.admin }));
         sqlExportSurface = sqlExportRouter;
+    }
+
+    // 6b-ii-a'. The SQL console's saved snippets: `database:read` to list
+    // them, `database:write` to save, change or delete one.
+    if (surfaces.admin) {
+        const { createSqlSnippetRoutes } = await import("../api/sql-snippet-routes");
+        const sqlSnippetsRouter = new Hono<HonoEnv>();
+        applyAdminGate(sqlSnippetsRouter, "SQL snippets", { read: "database:read", write: "database:write" });
+        sqlSnippetsRouter.route("/", createSqlSnippetRoutes({ getDriver: () => defaultDriver }));
+        sqlSnippetsSurface = sqlSnippetsRouter;
     }
 
     // 6b-ii-b. Studio's branch review: a branch's diff, and merging it.
@@ -4522,6 +4555,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             if (backupSurface) adminGroup.route("/backups", backupSurface);
             if (rlsAuditSurface) adminGroup.route("/rls-audit", rlsAuditSurface);
             if (rlsSimulatorSurface) adminGroup.route("/rls-simulator", rlsSimulatorSurface);
+            // Ahead of `/sql`, whose `database:write` gate covers `/sql/*`:
+            // a `database:read` caller lists snippets without reaching it.
+            if (sqlSnippetsSurface) adminGroup.route("/sql/snippets", sqlSnippetsSurface);
             if (sqlExportSurface) adminGroup.route("/sql", sqlExportSurface);
             if (branchSurface) adminGroup.route("/branches", branchSurface);
             if (devMailSurface) adminGroup.route("/dev/emails", devMailSurface);

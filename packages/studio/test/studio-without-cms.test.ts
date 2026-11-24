@@ -66,7 +66,7 @@ describe("Studio without the CMS", () => {
     });
 
     it("reads its tables from @rebasepro/app, not from the bridge's collection registry", () => {
-        const schemaViews = ["components/SchemaVisualizer/SchemaVisualizer.tsx", "components/RLSEditor/RLSEditor.tsx", "components/ApiKeys/CreateApiKeyDialog.tsx"];
+        const schemaViews = ["components/SchemaVisualizer/SchemaDiagramView.tsx", "components/SchemaVisualizer/TablesDiagram.tsx", "components/RLSEditor/TablePolicies.tsx", "components/RLSEditor/RLSEditor.tsx", "components/ApiKeys/CreateApiKeyDialog.tsx"];
         for (const view of schemaViews) {
             const source = fs.readFileSync(path.join(SRC, view), "utf8");
             expect(source).toContain("useTableDescriptors");

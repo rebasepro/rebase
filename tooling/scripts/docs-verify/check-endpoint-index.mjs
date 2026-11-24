@@ -117,6 +117,7 @@ const MOUNTS = new Map([
     // Mounted beside `/api/meta` under the same `surfaces.meta` switch.
     ["packages/server/src/api/schema-tables-routes.ts#router", "/api/schema"],
     ["packages/server/src/api/sql-export-routes.ts#router", "/api/admin/sql"],
+    ["packages/server/src/api/sql-snippet-routes.ts#router", "/api/admin/sql/snippets"],
     ["packages/server/src/auth/rls-simulator-routes.ts#router", "/api/admin/rls-simulator"],
     ["packages/server/src/api/branch-routes.ts#router", "/api/admin/branches"],
     // These four build no router of their own: `createAuthRoutes` passes them
@@ -156,6 +157,10 @@ const MOUNTS = new Map([
 
     // Zero-code BaaS admin surfaces (`packages/server/src/baas/*`).
     ["packages/server/src/baas/db-admin-routes.ts#router", "/api/admin/db"],
+    // `mountTableRoutes` adds the per-table routes to the db admin router itself.
+    ["packages/server/src/baas/db-table-routes.ts#router", "/api/admin/db"],
+    ["packages/server/src/baas/db-insights-routes.ts#router", "/api/admin/db/insights"],
+    ["packages/server/src/baas/db-catalog-routes.ts#router", "/api/admin/db/catalog"],
     ["packages/server/src/baas/roles-and-crons-store.ts#rolesRouter", "/api/admin/roles"],
     ["packages/server/src/baas/roles-and-crons-store.ts#cronJobsRouter", "/api/admin/cron/jobs"],
     ["packages/server/src/baas/storage-policies-store.ts#router", "/api/admin/storage/policies"],
@@ -185,6 +190,7 @@ const MOUNTS = new Map([
     ["packages/server/src/backend/create-backend.ts#rlsAuditRouter", "/api/admin/rls-audit"],
     ["packages/server/src/backend/create-backend.ts#rlsSimulatorRouter", "/api/admin/rls-simulator"],
     ["packages/server/src/backend/create-backend.ts#sqlExportRouter", "/api/admin/sql"],
+    ["packages/server/src/backend/create-backend.ts#sqlSnippetsRouter", "/api/admin/sql/snippets"],
     ["packages/server/src/backend/create-backend.ts#branchRouter", "/api/admin/branches"],
     ["packages/server/src/backend/create-backend.ts#devMailRouter", "/api/admin/dev/emails"],
     ["packages/server/src/backend/create-backend.ts#logsRouter", "/api/admin/logs"],

@@ -4,13 +4,13 @@ import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
 // Lazy-loaded studio tools — each fetched only when its route is visited.
 // This keeps Monaco, @xyflow/react, dagre, pgsql-ast-parser etc. out of the initial bundle.
+const SchemaDiagramView = lazyChunk(() => import("./SchemaVisualizer/SchemaDiagramView").then(m => ({ default: m.SchemaDiagramView })));
 const TableEditorView = lazyChunk(() => import("./TableEditor/TableEditorView").then(m => ({ default: m.TableEditorView })));
-const SQLEditor = lazyChunk(() => import("./SQLEditor/SQLEditor").then(m => ({ default: m.SQLEditor })));
+const SQLEditor = lazyChunk(() => import("./SQLEditor/SQLEditorRoute").then(m => ({ default: m.SQLEditorRoute })));
 const JSEditor = lazyChunk(() => import("./JSEditor/JSEditor").then(m => ({ default: m.JSEditor })));
 const RLSEditor = lazyChunk(() => import("./RLSEditor/RLSEditor").then(m => ({ default: m.RLSEditor })));
 const StorageView = lazyChunk(() => import("./StorageView/StorageView").then(m => ({ default: m.StorageView })));
 const CronJobsView = lazyChunk(() => import("./CronJobs/CronJobsView").then(m => ({ default: m.CronJobsView })));
-const SchemaVisualizer = lazyChunk(() => import("./SchemaVisualizer/SchemaVisualizer").then(m => ({ default: m.SchemaVisualizer })));
 const BranchesView = lazyChunk(() => import("./Branches/BranchesView").then(m => ({ default: m.BranchesView })));
 const BackupsView = lazyChunk(() => import("./Backups/BackupsView").then(m => ({ default: m.BackupsView })));
 const ApiExplorer = lazyChunk(() => import("./ApiExplorer/ApiExplorer").then(m => ({ default: m.ApiExplorer })));
@@ -18,6 +18,7 @@ const WebhooksView = lazyChunk(() => import("./Webhooks/WebhooksView").then(m =>
 const LogsExplorer = lazyChunk(() => import("./LogsExplorer/LogsExplorer").then(m => ({ default: m.LogsExplorer })));
 const UsersAndRolesView = lazyChunk(() => import("./UsersAndRoles/UsersAndRolesView").then(m => ({ default: m.UsersAndRolesView })));
 const ApiKeysView = lazyChunk(() => import("./ApiKeys/ApiKeysView").then(m => ({ default: m.ApiKeysView })));
+const DatabaseView = lazyChunk(() => import("./Database/DatabaseView").then(m => ({ default: m.DatabaseView })));
 
 import { StudioHomePage } from "./StudioHomePage";
 
@@ -26,6 +27,7 @@ import { StudioHomePage } from "./StudioHomePage";
  * Renders nothing — purely registers config into the RebaseRegistry.
  */
 const DEFAULT_HOME_PAGE = <StudioHomePage/>;
+
 
 /**
  * Studio: the developer tools, registered beside the admin.
@@ -62,10 +64,11 @@ function RebaseStudioRegistration({ tools, homePage, devViews: extraViews }: Reb
 
     const devViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
-        const activeTools = tools ?? ["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "backups", "api", "webhooks", "logs", "users", "api-keys"];
+        const activeTools = tools ?? ["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "backups", "database", "api", "webhooks", "logs", "users", "api-keys"];
         const suspense = (el: React.ReactNode) => <Suspense fallback={<CircularProgressCenter/>}>{el}</Suspense>;
+        const hasTables = activeTools.includes("tables");
 
-        if (activeTools.includes("tables")) {
+        if (hasTables) {
             views.push({ slug: "tables",
 name: t("studio_tool_tables"),
 group: "Database",
@@ -113,13 +116,18 @@ icon: "Clock",
 description: t("studio_tool_cron_description"),
 view: suspense(<CronJobsView/>) });
         }
+        // With the Tables view, the schema diagram is one of its modes, so this
+        // stays out of the navigation (its route still answers old links).
+        // Without it — a host that does not serve the table editor — it is a
+        // tool of its own.
         if (activeTools.includes("schema-visualizer")) {
             views.push({ slug: "schema-visualizer",
 name: t("studio_tool_schema_visualizer"),
 group: "Database",
 icon: "Network",
+hideFromNavigation: hasTables,
 description: t("studio_tool_schema_visualizer_description"),
-view: suspense(<SchemaVisualizer/>) });
+view: suspense(<SchemaDiagramView linksToTables={hasTables}/>) });
         }
         if (activeTools.includes("branches")) {
             views.push({ slug: "branches",
@@ -136,6 +144,14 @@ group: "Database",
 icon: "Database",
 description: t("studio_tool_backups_description"),
 view: suspense(<BackupsView/>) });
+        }
+        if (activeTools.includes("database")) {
+            views.push({ slug: "database",
+name: t("studio_tool_database"),
+group: "Database",
+icon: "ServerCog",
+description: t("studio_tool_database_description"),
+view: suspense(<DatabaseView/>) });
         }
         if (activeTools.includes("api")) {
             views.push({ slug: "api",

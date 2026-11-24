@@ -1,5 +1,5 @@
 ---
-sourceHash: 8732e8711cde4c20
+sourceHash: 5b80afdd275fa940
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Handlungsanweisungen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -75,6 +75,13 @@ Das Senden einer eigenen ID sorgt dafür, dass ein Trace über Hops hinweg erhal
 | `CHALLENGE_EXHAUSTED` | 401 | Zu viele falsche Codes für eine MFA-Challenge. | Starten Sie eine neue Challenge. |
 | `CONFIRMATION_REQUIRED` | 400 | Eine destruktive DDL-Operation (`DELETE /api/admin/db/tables/:table` oder `DELETE …/columns/:column`) wurde ohne `{ confirm: "<name>" }` aufgerufen. | Senden Sie die Anfrage erneut mit dem exakten Zielnamen in `confirm` oder übergeben Sie `dryRun: true`, um eine SQL-Vorschau anzuzeigen. |
 | `DDL_REJECTED` | 400, oder 409, wenn das Objekt bereits existiert | PostgreSQL hat eine Anweisung abgelehnt, die `/api/admin/db/*` für Sie ausgeführt hat – ein Typ, ein Standardwert, eine Policy-Bedingung, ein bereits vergebener Name. Die Nachricht stammt von Postgres selbst, und `details.dbCode` ist der SQLSTATE. | Ändern Sie das, was die Nachricht benennt, und senden Sie die Anfrage erneut; `dryRun: true` zeigt das SQL vorab. |
+| `EXTENSION_NOT_FOUND` | 404 | Eine Erweiterung, die nicht installiert ist, sollte entfernt werden (`DELETE /api/admin/db/catalog/extensions/:name`). | Die installierten Erweiterungen mit `GET /api/admin/db/catalog/extensions` auflisten. |
+| `NOT_INSTALLED` | 400 | `POST /api/admin/db/insights/queries/reset` auf einer Datenbank ohne die Erweiterung `pg_stat_statements`. | Unter Erweiterungen in der Datenbank-Ansicht installieren, oder mit `CREATE EXTENSION pg_stat_statements`. |
+| `NOT_PRELOADED` | 400 | `pg_stat_statements` ist installiert, aber der Server hat es nicht geladen, daher lassen sich seine Statistiken nicht zurücksetzen. | Zu `shared_preload_libraries` hinzufügen und Postgres neu starten. |
+| `SESSION_NOT_FOUND` | 404 | Keine Sitzung der Datenbank hat diese Prozess-ID (`POST /api/admin/db/insights/activity/:pid/cancel` oder `/terminate`). Sie ist vielleicht schon beendet. | `GET /api/admin/db/insights/activity` erneut lesen. |
+| `SOURCE_NOT_FOUND` | 404 | `?source=` auf einer Route unter `/api/admin/db/insights` oder `/api/admin/db/catalog` nennt keine SQL-Datenbank, die dieses Backend bereitstellt. | Eine aus `GET /api/admin/db/insights/sources` wählen. |
+| `TYPE_NOT_FOUND` | 404 | Kein Enum-Typ hat dieses Schema und diesen Namen (`POST /api/admin/db/catalog/types/:schema/:name/values`). | Die Typen mit `GET /api/admin/db/catalog/types` auflisten. |
+| `UNAVAILABLE` | 400 | Abfragestatistiken wurden von der eingebetteten Entwicklungsdatenbank verlangt, die keine sammelt. | Gegen einen eigenen Postgres-Server ausführen. |
 | `DEVICE_LOGIN_DECIDED` | 409 | Die Geräte-Anmeldung wurde bereits genehmigt oder abgelehnt. Eine Anmeldung wird nur einmal entschieden. | Starten Sie eine neue auf dem Gerät. |
 | `DEVICE_LOGIN_EXPIRED` | 410 | Das Zeitfenster von zehn Minuten für die Geräte-Anmeldung ist vor der Entscheidung abgelaufen. | Starten Sie eine neue auf dem Gerät. |
 | `DEVICE_LOGIN_NOT_FOUND` | 404 | Keine Geräte-Anmeldung besitzt diesen Benutzercode. Das Polling des Geräts selbst antwortet stattdessen mit den kleingeschriebenen RFC 8628-Codes: `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, `invalid_grant`. | Überprüfen Sie den Code anhand der Anzeige auf dem Gerät. |
@@ -386,6 +393,8 @@ Diese Codes zeigen an, dass ein Feature deaktiviert oder unkonfiguriert ist, und
 | `UI_PREFERENCES_UNSUPPORTED` | 501 | Der Treiber dieses Backends unterstützt kein SQL und speichert daher keine UI-Einstellungen; das Panel verwaltet sie im Browser. | Nichts zu beheben: Einstellungen verbleiben pro Browser. |
 | `UI_CONFIG_FILE_INVALID` | 500 | `frontend/src/cms/ui-config.json`, worin die UI-Einstellungen des Workspace in der Entwicklungsumgebung geschrieben werden, ist kein gültiges JSON. | Korrigieren oder löschen Sie die Datei; das Panel schreibt sie beim nächsten Speichern neu. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` kann hier kein Streaming eines Ergebnisses durchführen: Die prozessinterne Entwicklungsdatenbank (PGlite) besitzt nur eine einzige Verbindung, und ein während eines Downloads gehaltener Cursor würde jede andere Abfrage dahinter blockieren; oder die Datenquelle besitzt keinen SQL-Cursor. | Richten Sie `DATABASE_URL` auf ein eigenes Postgres (`rebase dev --docker` startet eines) oder fügen Sie ein `LIMIT` hinzu und exportieren Sie die Zeilen über die Oberfläche. |
+| `SQL_SNIPPETS_NEED_A_USER` | 403 | `/api/admin/sql/snippets` wurde mit einem Zugangsnachweis aufgerufen, der keine Person benennt (dem Service-Key). Gespeicherte SQL-Snippets gehören einer angemeldeten Person. | Melden Sie sich als Benutzer an. |
+| `SQL_SNIPPETS_UNSUPPORTED` | 501 | Die Datenquelle führt kein SQL aus und hat daher keinen Ort für gespeicherte Snippets; die SQL-Konsole behält sie im Browser. | Nichts zu tun: Snippets bleiben pro Browser. |
 
 ### Schema-Reconcile
 

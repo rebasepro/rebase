@@ -25,12 +25,15 @@ export function ddlRefusal(error: unknown): unknown {
         pg.detail,
         pg.hint ? `Hint: ${pg.hint}` : undefined
     ].filter(Boolean).join(" ");
-    const status = pg.code && ALREADY_EXISTS_CODES.has(pg.code) ? 409 : 400;
-    return new ApiError(status, "DDL_REJECTED", message, { dbCode: pg.code }, true);
+    const details = { dbCode: pg.code };
+    return pg.code && ALREADY_EXISTS_CODES.has(pg.code)
+        ? new ApiError(409, "DDL_REJECTED", message, details, true)
+        : new ApiError(400, "DDL_REJECTED", message, details, true);
 }
 
 const IDENTIFIER_RE = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/;
-const PROTECTED_SCHEMAS = new Set(["pg_catalog", "information_schema", "pg_toast", "rebase", "auth"]);
+/** Schemas no `/api/admin/db` route reads or changes: the catalog and Rebase's own. */
+export const PROTECTED_SCHEMAS = new Set(["pg_catalog", "information_schema", "pg_toast", "rebase", "auth"]);
 
 const ALLOWED_SQL_TYPES_RE = /^(?:text|boolean|bool|smallint|int2|integer|int|int4|bigint|int8|real|float4|double precision|float8|uuid|date|time|timetz|timestamp|timestamptz|timestamp with time zone|timestamp without time zone|json|jsonb|bytea|inet|cidr|macaddr|tsvector|serial|bigserial|smallserial|varchar(?:\(\d{1,5}\))?|character varying(?:\(\d{1,5}\))?|char(?:\(\d{1,5}\))?|numeric(?:\(\d{1,3}(?:,\s*\d{1,3})?\))?|decimal(?:\(\d{1,3}(?:,\s*\d{1,3})?\))?|vector\(\d{1,5}\))(?:\[\])?$/i;
 

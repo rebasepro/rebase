@@ -53,6 +53,15 @@ const ALLOWED = new Map([
         + "inlines every @rebasepro/* import, so the view's HTML ships as a chunk of "
         + "the server's own dist (loaded with import(\"./dist-….js\")) and no bare "
         + "specifier reaches a consumer. It is a devDependency so the build finds it."
+    ],
+    [
+        "@rebasepro/server::@rebasepro/rls-check",
+        "The Database view's security advisor runs rls-check's checks. "
+        + "packages/server/vite.config.ts inlines every @rebasepro/* import that is "
+        + "neither runtime-provided nor a consumer external, so its code ships inside "
+        + "the server's dist and no bare specifier reaches a consumer; its one runtime "
+        + "dependency, pg, is a dependency of the server already. It is a "
+        + "devDependency so the build finds it."
     ]
 ]);
 
