@@ -1,5 +1,5 @@
 ---
-sourceHash: a439eb40c100e881
+sourceHash: 1b348957b0f0152a
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con relativo stato HTTP, significato e azioni da intraprendere — oltre all'envelope della risposta, X-Request-ID e le regole per details.
@@ -419,6 +419,8 @@ consentendo al pannello di disabilitare visivamente la funzione nell'interfaccia
 | `UI_PREFERENCES_UNSUPPORTED` | 501 | Il driver di questo backend non può eseguire comandi SQL, pertanto non può memorizzare le preferenze UI; il pannello le manterrà salvate localmente nel browser. | Nessuna azione richiesta: le preferenze rimarranno memorizzate nei singoli browser. |
 | `UI_CONFIG_FILE_INVALID` | 500 | Il file `frontend/src/cms/ui-config.json`, in cui vengono scritte le preferenze dell'interfaccia dell'area di lavoro in fase di sviluppo, contiene JSON non valido. | Correggi la formattazione del file o eliminalo; verrà riscritto automaticamente dal pannello al salvataggio successivo. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | L'endpoint `POST /api/admin/sql/csv` non può inviare i risultati in streaming su questo ambiente: il database di sviluppo integrato (PGlite) supporta una sola connessione, e mantenere aperto un cursore durante il download bloccherebbe tutte le altre query; in alternativa, la sorgente dati non supporta i cursori SQL. | Imposta `DATABASE_URL` verso un'istanza PostgreSQL indipendente (avviabile con `rebase dev --docker`), oppure limita la query con `LIMIT` ed esporta le righe visibili a schermo. |
+| `SQL_SNIPPETS_NEED_A_USER` | 403 | `/api/admin/sql/snippets` è stato chiamato con una credenziale che non indica alcuna persona (la service key). Gli snippet SQL salvati appartengono a una persona che ha effettuato l'accesso. | Accedi come utente. |
+| `SQL_SNIPPETS_UNSUPPORTED` | 501 | La sorgente dati non esegue SQL, quindi non ha dove conservare gli snippet; la console SQL li tiene nel browser. | Niente da correggere: gli snippet restano per browser. |
 
 ### Riconciliazione dello schema
 

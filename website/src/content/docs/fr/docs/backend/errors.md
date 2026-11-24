@@ -1,5 +1,5 @@
 ---
-sourceHash: a439eb40c100e881
+sourceHash: 1b348957b0f0152a
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et ce qu'il faut faire — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -385,6 +385,8 @@ Ces codes indiquent qu'une fonctionnalité est désactivée ou non configurée, 
 | `UI_PREFERENCES_UNSUPPORTED` | 501 | Le pilote de ce backend ne peut pas exécuter de SQL, il ne stocke donc aucune préférence d'interface ; le panneau les conserve dans le navigateur. | Rien à corriger : les préférences restent propres à chaque navigateur. |
 | `UI_CONFIG_FILE_INVALID` | 500 | `frontend/src/cms/ui-config.json`, où sont stockées les préférences d'interface de l'espace de travail en développement, n'est pas un fichier JSON valide. | Corrigez-le ou supprimez-le ; le panneau le réécrira lors de la prochaine sauvegarde. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` ne peut pas diffuser de résultat ici : la base de données de développement locale (PGlite) ne gère qu'une seule connexion, et maintenir un curseur ouvert pendant un téléchargement bloquerait toutes les autres requêtes en attente ; ou la source de données ne prend pas en charge les curseurs SQL. | Pointez `DATABASE_URL` vers votre propre instance Postgres (`rebase dev --docker` en démarre une), ou ajoutez un `LIMIT` et exportez les lignes affichées à l'écran. |
+| `SQL_SNIPPETS_NEED_A_USER` | 403 | `/api/admin/sql/snippets` a été appelé avec un identifiant qui ne désigne personne (la clé de service). Les extraits SQL enregistrés appartiennent à une personne connectée. | Connectez-vous en tant qu'utilisateur. |
+| `SQL_SNIPPETS_UNSUPPORTED` | 501 | La source de données n'exécute pas de SQL et n'a donc nulle part où conserver les extraits ; la console SQL les garde dans le navigateur. | Rien à corriger : les extraits restent propres à chaque navigateur. |
 
 ### Réconciliation de schéma
 

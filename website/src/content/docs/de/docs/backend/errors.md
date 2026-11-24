@@ -1,5 +1,5 @@
 ---
-sourceHash: a439eb40c100e881
+sourceHash: 1b348957b0f0152a
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Handlungsanweisungen – plus Response-Envelope, X-Request-ID und die Details-Regeln.
@@ -423,6 +423,8 @@ das Feature ausgrauen kann, anstatt einen Fehler anzuzeigen.
 | `UI_PREFERENCES_UNSUPPORTED` | 501 | Der Treiber dieses Backends kann kein SQL ausführen und speichert daher keine UI-Einstellungen; das Panel behält sie im Browser. | Kein Handlungsbedarf: Einstellungen verbleiben pro Browser. |
 | `UI_CONFIG_FILE_INVALID` | 500 | `frontend/src/cms/ui-config.json`, worin die UI-Einstellungen des Workspace in der Entwicklung geschrieben werden, ist kein valides JSON. | Korrigieren oder löschen Sie die Datei; das Panel schreibt sie beim nächsten Speichern neu. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` kann hier kein Ergebnis streamen: Die prozessinterne Entwicklungsdatenbank (PGlite) besitzt nur eine Verbindung, und ein über einen Download gehaltener Cursor würde jede andere Abfrage dahinter blockieren; oder die Datenquelle besitzt keinen SQL-Cursor. | Richten Sie `DATABASE_URL` auf ein eigenes Postgres (`rebase dev --docker` startet eines) oder fügen Sie ein `LIMIT` hinzu und exportieren Sie die Zeilen über die Bildschirmanzeige. |
+| `SQL_SNIPPETS_NEED_A_USER` | 403 | `/api/admin/sql/snippets` wurde mit einem Zugangsnachweis aufgerufen, der keine Person benennt (dem Service-Key). Gespeicherte SQL-Snippets gehören einer angemeldeten Person. | Melden Sie sich als Benutzer an. |
+| `SQL_SNIPPETS_UNSUPPORTED` | 501 | Die Datenquelle führt kein SQL aus und hat daher keinen Ort für gespeicherte Snippets; die SQL-Konsole behält sie im Browser. | Nichts zu tun: Snippets bleiben pro Browser. |
 
 ### Schema-Abgleich (Reconcile)
 

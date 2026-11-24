@@ -1,5 +1,5 @@
 ---
-sourceHash: c2fabe52d7bfc689
+sourceHash: a96349255e38fd48
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend bereitstellt – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -172,6 +172,10 @@ Schlüssel erreicht nichts davon. Siehe [Rollen und Scopes](/docs/backend/roles-
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Rollen, Regelrollen von Benutzern und aktive Service-Schlüssel, die ein Administrator simulieren kann |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Jede Tabelle so, wie `{ role?, userId?, apiKeyId? }` sie erreicht: sichtbare Zeilen im Vergleich zu denen des Aufrufers, ausgeblendet durch Scope oder RLS, maskierte Felder. Nur mit Administrator-Sitzung |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streamt das gesamte Ergebnis einer schreibgeschützten Abfrage als CSV – [Studio](/docs/studio/)s „Download full result as CSV“ |
+| `GET` | `/api/admin/sql/snippets` | `database:read` | Die gespeicherten Snippets der SQL-Konsole, die der Aufrufer sieht: seine eigenen und die des Teams |
+| `POST` | `/api/admin/sql/snippets` | `database:write` | Speichert ein Snippet (`name`, `sql`, `visibility`: `personal` oder `team`, `favorite`) |
+| `PATCH` | `/api/admin/sql/snippets/:id` | `database:write` | Ändert die Felder eines Snippets; nur sein Eigentümer oder ein Admin |
+| `DELETE` | `/api/admin/sql/snippets/:id` | `database:write` | Löscht ein Snippet; nur sein Eigentümer oder ein Admin |
 | `GET` | `/api/admin/branches/:name/diff` | `database:write` | Was ein [Branch](/docs/backend/branching/#reviewing-and-merging-a-branch) geändert hat: Schema, Policies und Zeilen, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Schreibt die Zeilen des Branches in seinen Parent, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409`, wenn sich eine Seite seit dem Diff geändert hat oder Zeilen kollidieren |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live-Schema-Bearbeitung](/docs/backend/live-schema-editing/) |

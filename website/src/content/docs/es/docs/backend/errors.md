@@ -1,5 +1,5 @@
 ---
-sourceHash: a439eb40c100e881
+sourceHash: 1b348957b0f0152a
 title: Códigos de error
 sidebar_label: Códigos de error
 description: Cada código de error que un backend de Rebase puede devolver, con su estado HTTP, qué significa y qué hacer al respecto — además del envelope de respuesta, X-Request-ID y las reglas de details.
@@ -420,6 +420,8 @@ la opción visualmente en lugar de mostrar un error.
 | `UI_PREFERENCES_UNSUPPORTED` | 501 | El driver de este backend no soporta SQL, por lo que no guarda preferencias de UI; el panel las mantiene en el navegador. | No requiere acción: las preferencias se mantienen por navegador. |
 | `UI_CONFIG_FILE_INVALID` | 500 | `frontend/src/cms/ui-config.json`, donde se guardan las preferencias de UI del espacio de trabajo en desarrollo, no contiene JSON válido. | Corrígelo o elimínalo; el panel lo regenerará en el próximo guardado. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` no puede transmitir resultados en este entorno: la base de datos de desarrollo en proceso (PGlite) tiene una sola conexión, y retener un cursor durante una descarga bloquearía todas las demás consultas; o la fuente de datos carece de cursor SQL. | Apunta `DATABASE_URL` a una instancia Postgres propia (`rebase dev --docker` inicia una), o añade un `LIMIT` y exporta las filas en pantalla. |
+| `SQL_SNIPPETS_NEED_A_USER` | 403 | Se llamó a `/api/admin/sql/snippets` con una credencial que no nombra a ninguna persona (la clave de servicio). Los fragmentos SQL guardados pertenecen a una persona con sesión iniciada. | Inicia sesión como usuario. |
+| `SQL_SNIPPETS_UNSUPPORTED` | 501 | La fuente de datos no ejecuta SQL, así que no tiene dónde guardar fragmentos; la consola SQL los conserva en el navegador. | Nada que corregir: los fragmentos se quedan en cada navegador. |
 
 ### Conciliación de esquemas (Schema reconcile)
 

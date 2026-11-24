@@ -1,5 +1,5 @@
 ---
-sourceHash: c2fabe52d7bfc689
+sourceHash: a96349255e38fd48
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec le contrôle d'accès sur chacune et la page qui l'explique.
@@ -173,6 +173,10 @@ tout cela. Voir [Rôles et scopes](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Rôles, rôles de règles des utilisateurs et clés de service actives qu'un administrateur peut simuler |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Chaque table telle que `{ role?, userId?, apiKeyId? }` y accède : lignes visibles par rapport à celles de l'appelant, masquées par un scope ou par RLS, champs masqués. Session administrateur uniquement |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Diffuse en flux l'intégralité du résultat d'une requête en lecture seule au format CSV — option "Télécharger le résultat complet au format CSV" de [Studio](/docs/studio/) |
+| `GET` | `/api/admin/sql/snippets` | `database:read` | Les extraits enregistrés de la console SQL que voit l'appelant : les siens et ceux de l'équipe |
+| `POST` | `/api/admin/sql/snippets` | `database:write` | Enregistre un extrait (`name`, `sql`, `visibility` : `personal` ou `team`, `favorite`) |
+| `PATCH` | `/api/admin/sql/snippets/:id` | `database:write` | Modifie les champs d'un extrait ; seulement son propriétaire ou un administrateur |
+| `DELETE` | `/api/admin/sql/snippets/:id` | `database:write` | Supprime un extrait ; seulement son propriétaire ou un administrateur |
 | `GET` | `/api/admin/branches/:name/diff` | `database:write` | Ce qu'une [branche](/docs/backend/branching/#reviewing-and-merging-a-branch) a modifié : schéma, politiques et lignes, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Écrit les lignes de la branche vers son parent, `{ expectedFingerprint, onConflict?, skipBlocked? }` ; `409` si l'un des côtés a changé depuis le diff ou si des lignes sont en conflit |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Modification de schéma en direct](/docs/backend/live-schema-editing/) |

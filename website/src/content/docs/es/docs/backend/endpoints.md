@@ -1,5 +1,5 @@
 ---
-sourceHash: c2fabe52d7bfc689
+sourceHash: a96349255e38fd48
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -170,6 +170,10 @@ una tabla no accede a nada de esto. Consulte [Roles y scopes](/docs/backend/role
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Roles, roles de reglas de usuarios y claves de servicio activas que un administrador puede simular |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Cada tabla según cómo accede `{ role?, userId?, apiKeyId? }`: filas visibles frente a las del emisor, ocultas por scope o RLS, campos enmascarados. Solo para sesión de administrador |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Transmite el resultado completo de una consulta de solo lectura como CSV — opción "Download full result as CSV" de [Studio](/docs/studio/) |
+| `GET` | `/api/admin/sql/snippets` | `database:read` | Los fragmentos guardados de la consola SQL que ve quien llama: los suyos y los del equipo |
+| `POST` | `/api/admin/sql/snippets` | `database:write` | Guarda un fragmento (`name`, `sql`, `visibility`: `personal` o `team`, `favorite`) |
+| `PATCH` | `/api/admin/sql/snippets/:id` | `database:write` | Cambia los campos de un fragmento; solo su propietario o un administrador |
+| `DELETE` | `/api/admin/sql/snippets/:id` | `database:write` | Elimina un fragmento; solo su propietario o un administrador |
 | `GET` | `/api/admin/branches/:name/diff` | `database:write` | Lo que modificó una [rama](/docs/backend/branching/#reviewing-and-merging-a-branch): esquema, políticas y filas, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Escribe las filas de la rama en su rama principal, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` si cualquiera de los lados cambió desde el diff o si hay conflicto de filas |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Edición de esquemas en vivo](/docs/backend/live-schema-editing/) |

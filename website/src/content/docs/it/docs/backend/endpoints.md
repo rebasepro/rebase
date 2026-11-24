@@ -1,5 +1,5 @@
 ---
-sourceHash: c2fabe52d7bfc689
+sourceHash: a96349255e38fd48
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Tutte le route HTTP montate da un backend Rebase — dati, autenticazione, storage, admin, meta — con il gate associato a ciascuna e la pagina di approfondimento.
@@ -172,6 +172,10 @@ tabella non accede a nulla di tutto questo. Consulta [Roles and scopes](/docs/ba
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Ruoli, ruoli di regola degli utenti e service key attive che un amministratore può simulare |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Ciascuna tabella nel modo in cui `{ role?, userId?, apiKeyId? }` vi accede: righe visibili rispetto a quelle del chiamante, nascoste per scope o RLS, campi mascherati. Solo per sessioni di amministratore |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Trasmette in streaming l'intero risultato di una query in sola lettura come CSV — \"Download full result as CSV\" di [Studio](/docs/studio/) |
+| `GET` | `/api/admin/sql/snippets` | `database:read` | Gli snippet salvati della console SQL che il chiamante vede: i propri e quelli del team |
+| `POST` | `/api/admin/sql/snippets` | `database:write` | Salva uno snippet (`name`, `sql`, `visibility`: `personal` o `team`, `favorite`) |
+| `PATCH` | `/api/admin/sql/snippets/:id` | `database:write` | Modifica i campi di uno snippet; solo il suo proprietario o un amministratore |
+| `DELETE` | `/api/admin/sql/snippets/:id` | `database:write` | Elimina uno snippet; solo il suo proprietario o un amministratore |
 | `GET` | `/api/admin/branches/:name/diff` | `database:write` | Cosa ha modificato un [branch](/docs/backend/branching/#reviewing-and-merging-a-branch): schema, policy e righe, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Scrive le righe del branch nel suo parent, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` quando uno dei due lati è cambiato rispetto al diff, o se le righe sono in conflitto |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
