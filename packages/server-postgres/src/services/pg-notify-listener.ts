@@ -16,6 +16,7 @@
 import { Client as PgClient } from "pg";
 import { logger } from "@rebasepro/server";
 import { unref } from "@rebasepro/utils";
+import { serverKeyOf, trackConnectionDemand } from "../connection-budget";
 
 export interface PgNotifyListenerOptions {
     /** Direct Postgres connection string (must bypass a transaction-mode pooler). */
@@ -160,17 +161,29 @@ export class PgNotifyListener {
     async start(): Promise<void> {
         if (this.running) return;
         this.running = true;
+        // One connection for as long as it runs, counted toward the process's
+        // demand on the database — see `connection-budget.ts`.
+        this.releaseDemand = trackConnectionDemand(this, {
+            label: `LISTEN ${this.options.channel}`,
+            max: 1,
+            server: serverKeyOf(this.options.connectionString),
+            pooled: false
+        });
         try {
             await this.connect({ first: true });
         } catch (err) {
             this.running = false;
+            this.releaseDemand();
             throw err;
         }
     }
 
+    private releaseDemand: () => void = () => {};
+
     /** Stop listening and release the connection. Idempotent. */
     async stop(): Promise<void> {
         this.running = false;
+        this.releaseDemand();
         this.stopHeartbeat();
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);

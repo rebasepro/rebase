@@ -1,8 +1,8 @@
-import { Pool } from "pg";
+import { Pool, type PoolConfig } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
-import { guardPoolAgainstDirtyRelease, pinSearchPath, cappedPoolMax, defaultPoolTimeouts } from "./connection";
+import { guardPoolAgainstDirtyRelease, pinSearchPath, cappedPoolMax, defaultPoolTimeouts, trackPoolDemand } from "./connection";
 import { reportPoolError } from "./pool-disconnects";
 
 export class DatabasePoolManager {
@@ -45,7 +45,7 @@ export class DatabasePoolManager {
         const url = new URL(this.rootConnectionString);
         url.pathname = `/${databaseName}`;
 
-        const pool = new Pool({
+        const config: PoolConfig = {
             // Same pin as the primary pool: these are branch/multi-database
             // connections to the *same* server, so they inherit the same
             // `"$user"` hazard. See `pinSearchPath`.
@@ -59,11 +59,13 @@ export class DatabasePoolManager {
             // The main pool's limits: a full pool answers 503 after 10 s rather
             // than queueing forever, and a statement stops at 30 s server-side.
             ...defaultPoolTimeouts()
-        });
+        };
+        const pool = new Pool(config);
 
         // Prevent idle client errors from crashing the Node.js process
         pool.on("error", (err) => reportPoolError(`DatabasePoolManager:${databaseName}`, err));
         guardPoolAgainstDirtyRelease(pool, `pg-pool:${databaseName}`);
+        trackPoolDemand(pool, config, `database "${databaseName}" pool`, 10);
 
         this.pools.set(databaseName, pool);
         return pool;

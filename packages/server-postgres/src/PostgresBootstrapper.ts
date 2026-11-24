@@ -63,6 +63,7 @@ import { createChannelBus, resolveChannelBusSetting } from "./services/channel-b
 import { declaredDatabaseRls, declaredRlsPolicyShape, isChannelBusInstance } from "@rebasepro/types";
 import { configureUnknownFilterFields, type UnknownFilterFieldsMode } from "./utils/drizzle-conditions";
 import { isPooledPool, closeWithPool } from "./connection";
+import { labelConnectionDemand, readConnectionLimits, watchConnectionBudget } from "./connection-budget";
 import { ReadRouter, readReplicaLagMs, readRoutingOptionsFromEnv, sameDatabaseTarget, type ReadRoutingOptions } from "./read-routing";
 import { ensurePooledRoleDefaults } from "./pooled-database";
 
@@ -1055,6 +1056,7 @@ export async function openPostgresDriver(
         const session = createDirectDatabaseConnection(directUrl, undefined, { max: 3, idleTimeoutMillis: 10_000 });
         sessionDb = session.db;
         sessionPool = session.pool;
+        labelConnectionDemand(session.pool, "SQL console session pool");
     }
 
     // Branching and cross-database SQL hold session advisory locks and run
@@ -1735,6 +1737,23 @@ export async function openPostgresDriver(
         // nothing listens on this channel and the notification is
         // dropped by the database.
         realtimeService.startPublishing();
+    }
+
+    // ── Connection budget ────────────────────────────────────────────
+    // Every pool and LISTEN connection this process opened so far counts
+    // itself (`connection-budget.ts`); read what the database accepts and
+    // warn when one process may use more than half of it. Last of the
+    // connection-opening steps, so the realtime connections are counted;
+    // later ones are weighed as they open. Behind a pooler the main pool's
+    // connections are the pooler's clients, so it is read — and the demand
+    // counted — on the direct server. Never fails the boot.
+    {
+        const budgetPool = pooled ? sessionPool : rawClient;
+        const budgetUrl = pooled ? directUrl : primaryUrl;
+        if (budgetUrl && budgetPool && typeof budgetPool.query === "function") {
+            const limits = await readConnectionLimits(async (text) => (await budgetPool.query(text)).rows);
+            if (limits) watchConnectionBudget(budgetUrl, limits, { behindPooler: pooled });
+        }
     }
 
     // ── Startup Schema Validation ────────────────────────────────────
