@@ -1,57 +1,57 @@
 ---
-sourceHash: 4acb34e54a96f397
+sourceHash: 76cb1578ad9289ff
 title: "Receita: Migrando do Supabase"
 sidebar_label: Migrando do Supabase
-description: "Mova um projeto do Supabase para o Rebase: faça a introspecção do esquema, aplique os objetos SQL que não são tabelas, copie os dados mantendo os IDs de usuário, porte edge functions e faça o deploy, tudo a partir da CLI."
+description: "Mova um projeto Supabase para o Rebase: faça a introspecção do esquema, aplique os objetos SQL que não são tabelas, copie os dados mantendo os IDs de usuário, porte as edge functions e faça o deploy, tudo a partir da CLI."
 ---
 
-## Visão geral
+## Visão Geral
 
-Isso move um projeto Supabase (tabelas, row-level security, funções e triggers
-SQL, usuários, um bucket de storage, edge functions) para um projeto Rebase,
-primeiro localmente e depois no [Rebase Cloud](/docs/deployment/cloud/). Tudo
-é feito por comandos da CLI. Para continuar executando no banco de dados do
-Supabase em vez de abandoná-lo, consulte [Supabase](/docs/deployment/existing-database/#supabase)
-na página de banco de dados existente.
+Isto move um projeto Supabase (tabelas, segurança em nível de linha [row-level security], funções e
+gatilhos SQL, usuários, um bucket de armazenamento, edge functions) para um projeto Rebase,
+localmente primeiro e depois no [Rebase Cloud](/docs/deployment/cloud/). Tudo
+é feito via comando CLI. Para continuar executando no banco de dados do Supabase em vez de
+abandoná-lo, consulte [Supabase](/docs/deployment/existing-database/#supabase) na
+página de banco de dados existente.
 
 A ordem importa: gere as tabelas a partir da **origem**, depois aponte o
-projeto para o **destino** antes que qualquer gravação ocorra.
+projeto para o **destino** antes que qualquer coisa faça alterações de escrita.
 
 ## 1. Gerar as tabelas
 
-Faça a introspecção do banco de dados do Supabase, ou de uma cópia local dele.
-`SUPABASE_DB_URL` abaixo é sua string de conexão direta, usando a role `postgres`
-(no painel do Supabase: Connect → Direct connection); defina-a no seu shell primeiro:
+Faça a introspecção do banco de dados do Supabase, ou de uma cópia local dele. `SUPABASE_DB_URL`
+abaixo é sua string de conexão direta, como a role `postgres` (dashboard do Supabase:
+Connect → Direct connection); defina-a no seu shell primeiro:
 
 ```bash
 SUPABASE_DB_URL="postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
 rebase schema introspect --database-url "$SUPABASE_DB_URL" --from supabase
 ```
 
-`--from supabase` traduz o que um banco de dados Rebase não possui nativamente:
+`--from supabase` traduz o que um banco de dados Rebase não possui:
 
 | No Supabase | Escrito como |
 |---|---|
-| `owner_id uuid default auth.uid()` | `col.text().onCreateUser().userId()`: o servidor grava o ID do chamador |
+| `owner_id uuid default auth.uid()` | `col.text().onCreateUser().userId()`: o servidor grava o id do chamador |
 | `owner_id uuid references auth.users(id)` | `col.text().userId()`, e a chave estrangeira listada em "Not carried over" |
-| `auth.uid()` em uma policy | `rebase.uid()` |
-| `TO authenticated` / `TO anon` | a role é removida e a regra passa a exigir um chamador autenticado / não autenticado |
-| uma policy apenas `TO service_role` | removida: o código do servidor executa em seu próprio contexto |
+| `auth.uid()` em uma política | `rebase.uid()` |
+| `TO authenticated` / `TO anon` | a role é removida e a regra requer um chamador autenticado (signed-in) / não autenticado (signed-out) |
+| uma política apenas `TO service_role` | descartada: o código do servidor é executado no próprio contexto do servidor |
 | índices simples | os `indexes` da tabela |
 
-Colunas de ID de usuário tornam-se `text` porque `rebase.users.id` e `rebase.uid()` são
-texto: uma coluna `uuid` comparada com `rebase.uid()` em uma policy falha.
+Colunas de ID de usuário se tornam `text` porque `rebase.users.id` e `rebase.uid()` são
+text: uma coluna `uuid` comparada com `rebase.uid()` em uma política falha.
 
-A execução termina com uma lista do que ela **não** transferiu (funções,
-triggers, extensões, restrições CHECK, outros índices, chaves estrangeiras compostas)
-e grava o SQL correspondente em `backend/sql/_introspected-left-behind.sql`, um
+A execução termina com uma lista do que **não** foi transferido (funções,
+gatilhos, extensões, restrições CHECK, outros índices, chaves estrangeiras compostas)
+e grava o SQL de cada um em `backend/sql/_introspected-left-behind.sql`, um
 rascunho que o `rebase db push` não aplica até que você o renomeie.
 
 ## 2. Apontar o projeto para o novo banco de dados
 
-A variável `DATABASE_URL` ainda aponta para o Supabase após a etapa 1, e a saída da
-introspecção alerta sobre isso. Altere-a (ou remova-a, para usar o banco de dados
-de desenvolvimento gerenciado) antes do primeiro push:
+`DATABASE_URL` ainda aponta para o Supabase após a etapa 1, e a saída da introspecção
+informa isso. Altere-a (ou remova-a, para usar o banco de dados de desenvolvimento gerenciado)
+antes do primeiro push:
 
 ```bash
 rebase db push
@@ -61,25 +61,25 @@ rebase db push
 
 Edite `backend/sql/_introspected-left-behind.sql` da mesma forma que as tabelas foram
 editadas: `auth.uid()` → `rebase.uid()`, `auth.users` → `rebase.users`, sem
-`GRANT … TO anon, authenticated`. Funções que chamavam `pg_net` funcionam melhor como
-uma [custom function](/docs/backend/custom-functions/). Torne cada instrução segura para
-executar de novo (`DROP TRIGGER IF EXISTS` antes de cada `CREATE TRIGGER`), depois
-renomeie o arquivo sem o `_` inicial e faça o push:
+`GRANT … TO anon, authenticated`. Funções que chamavam `pg_net` funcionam melhor como uma
+[função customizada](/docs/backend/custom-functions/). Torne cada instrução segura para
+ser executada novamente (`DROP TRIGGER IF EXISTS` antes de cada `CREATE TRIGGER`), renomeie
+o arquivo sem o `_` inicial e faça o push:
 
 ```bash
 mv backend/sql/_introspected-left-behind.sql backend/sql/introspected.sql
 rebase db push
 ```
 
-`rebase db push` aplica cada arquivo `.sql` em `backend/sql` em ordem alfabética de
-nome, depois das tabelas e antes das políticas, e registra cada um por hash em
-`rebase.sql_files`, de modo que um arquivo só roda novamente quando muda. Um deploy os
-aplica da mesma forma (passo 8).
+O `rebase db push` aplica cada arquivo `.sql` em `backend/sql` em ordem alfabética de nome, após
+as tabelas e antes das políticas, e registra cada um por hash em
+`rebase.sql_files`, para que um arquivo só seja executado novamente quando for modificado. Um deploy os
+aplica da mesma forma (etapa 8).
 
 Uma função que o navegador chamava com `supabase.rpc('fn')` é declarada com
-[`defineRpc`](/docs/backend/rpc/), junto às tabelas. Ela é então servida em
-`POST /api/rpc/<name>` e executa como o chamador sob row-level security, de modo que
-uma função `SECURITY DEFINER` se comporte exatamente como no Supabase:
+[`defineRpc`](/docs/backend/rpc/), ao lado das tabelas. Ela é então servida em
+`POST /api/rpc/<name>` e roda como o chamador sob row-level security, de modo que uma
+função `SECURITY DEFINER` se comporte como fazia no Supabase:
 
 ```ts
 // backend/schema/rpc.ts, exported from backend/schema/index.ts
@@ -96,33 +96,35 @@ export const getPublicProposal = defineRpc("get_public_proposal", {
 const proposal = await rebase.rpc("get_public_proposal", { token });
 ```
 
-Apenas funções declaradas podem ser chamadas, e toda função `public` tem limite de taxa (rate limit).
+Apenas funções declaradas podem ser chamadas, e cada uma do tipo `public` possui rate limit.
 Uma função que realiza escritas precisa de `write: true`.
 
 ## 4. Copiar os dados, mantendo os IDs de usuário
 
-Mantenha os IDs de usuário do Supabase para que cada `owner_id` continue apontando
-para seu respectivo usuário: importe os usuários primeiro, com seus IDs, e depois
-as tabelas da aplicação. O comando `rebase users import` cria as contas mantendo os IDs
-originais, sem senha e sem envio de e-mails, ignorando registros cujo ID ou e-mail já
-existam, permitindo que seja executado novamente. Ele se conecta ao Rebase Cloud como
-qualquer outro comando `rebase users` (`--project <slug>`, ou `--cloud` em um diretório vinculado).
+Mantenha os IDs de usuário do Supabase para que cada `owner_id` continue apontando para o seu usuário:
+importe os usuários primeiro, com seus IDs, e depois as tabelas da aplicação.
+O comando `rebase users import` cria as contas com os IDs que elas tinham, com seus
+hashes de senha do Supabase quando você passa `--password-hashes bcrypt`, não envia
+e-mails e ignora contas cujo ID ou e-mail já existam, permitindo que seja executado
+novamente. Ele alcança o Rebase Cloud como qualquer outro comando `rebase users`
+(`--project <slug>`, ou `--cloud` em um diretório vinculado).
 
 ```bash
 SUPABASE_DB_URL="postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
-psql "$SUPABASE_DB_URL" -c "\copy (select id, email, created_at, email_confirmed_at is not null as email_verified from auth.users) to users.csv csv header"
-rebase users import users.csv --dry-run
-rebase users import users.csv
+psql "$SUPABASE_DB_URL" -c "\copy (select id, email, created_at, email_confirmed_at is not null as email_verified, encrypted_password from auth.users) to users.csv csv header"
+rebase users import users.csv --password-hashes bcrypt --dry-run
+rebase users import users.csv --password-hashes bcrypt
+rm users.csv
 ```
 
-Ele reporta cada conta como criada, ignorada ou com falha acompanhada do motivo, e
-encerra com código 1 caso haja algum erro. Consulte [Importing accounts](/docs/cli/project/#importing-accounts)
-para conhecer as colunas que ele aceita (`display_name` e `roles` também).
+Ele reporta cada conta como criada, ignorada ou falha com o motivo, e
+retorna código 1 quando houver falhas. Consulte [Importando contas](/docs/cli/project/#importing-accounts)
+para conhecer as colunas que ele lê (`display_name` e `roles` também).
 
-Em seguida, copie as tabelas da aplicação com o `pg_dump` entre a origem e o
-destino. `TARGET_URL` é a string de conexão do novo banco de dados: a sua
-`DATABASE_URL`, ou no Rebase Cloud a `connectionString` que o comando
-`rebase cloud db connect --reveal` exibe enquanto está em execução.
+Em seguida, as tabelas da aplicação, com o `pg_dump` apontando para a origem e o
+destino. `TARGET_URL` é a string de conexão do novo banco de dados: sua
+`DATABASE_URL`, ou no Rebase Cloud a `connectionString` que
+`rebase cloud db connect --reveal` exibe enquanto estiver em execução.
 
 ```bash
 SUPABASE_DB_URL="postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
@@ -131,19 +133,24 @@ pg_dump "$SUPABASE_DB_URL" --data-only --schema=public --no-owner > data.sql
 psql "$TARGET_URL" -f data.sql
 ```
 
-As senhas não são migradas. Um usuário importado faz login por meio de um magic link,
-código por e-mail ou redefinição de senha, mantendo o mesmo ID de antes.
+As senhas são transferidas como hashes. O Supabase armazena bcrypt em
+`auth.users.encrypted_password`, então cada usuário faz login com a senha que
+já possui, com o mesmo ID de antes, e seu primeiro login substitui o
+hash pelo padrão do próprio Rebase. Uma conta que não possuía senha (magic link, um
+provedor OAuth) tem um `encrypted_password` vazio e faz login da mesma forma que antes. Omita
+a coluna e a flag para importar sem senhas: esses usuários farão login
+com um magic link, um código por e-mail ou redefinição de senha.
 
 ## 5. Storage
 
 Um bucket público do Supabase mapeia para uma fonte de [storage](/docs/backend/storage/)
-com caminhos em `public/`, que são servidos sem token. Copie os objetos
-usando qualquer cliente S3, preservando suas chaves.
+com caminhos sob `public/`, que são servidos sem token. Copie os objetos
+usando qualquer cliente S3, mantendo suas chaves.
 
 ## 6. Edge functions
 
-Uma edge function do Deno torna-se uma [custom function](/docs/backend/custom-functions/)
-em `backend/functions/`. As substituições comuns são:
+Uma edge function em Deno torna-se uma [função customizada](/docs/backend/custom-functions/)
+em `backend/functions/`. As substituições habituais:
 
 | Supabase | Rebase |
 |---|---|
@@ -151,11 +158,11 @@ em `backend/functions/`. As substituições comuns são:
 | `Deno.env.get("X")` | `requireEnv(c, "X")` dentro do handler |
 | `createClient(url, serviceRoleKey)` | `rebase.dataAsAdmin` ou `rebase.sql` no servidor |
 | um cliente com o JWT do usuário | `getSql(c)`: SQL como o chamador, sob row-level security |
-| `EdgeRuntime.waitUntil(p)` | `waitUntil(c, p)` ([trabalho em segundo plano](/docs/backend/background-work/)) |
+| `EdgeRuntime.waitUntil(p)` | `waitUntil(c, p)` ([tarefas em segundo plano](/docs/backend/background-work/)) |
 
-O Supabase permite que uma edge function execute por até 150 s; o padrão do Rebase é 30 s.
-Uma função que faz chamadas a um LLM deve declarar seu próprio timeout, que o servidor
-limita a `REBASE_FUNCTIONS_MAX_TIMEOUT_MS` (300 s por padrão):
+O Supabase permite que uma edge function execute por até 150 s; o padrão do Rebase é de 30 s. Uma
+função que faz chamadas a um LLM declara seu próprio timeout, o qual o servidor limita a
+`REBASE_FUNCTIONS_MAX_TIMEOUT_MS` (300 s por padrão):
 
 ```ts
 export default defineFunction((app) => {
@@ -163,15 +170,15 @@ export default defineFunction((app) => {
 }, { timeoutMs: 150_000 });
 ```
 
-Passe `getSignal(c)` para o `fetch` que chama o modelo, para que a chamada seja
-interrompida caso a requisição seja cancelada. Consulte [o timeout próprio de uma função](/docs/backend/custom-functions/#timeouts-and-rate-limits).
+Passe `getSignal(c)` para o `fetch` que chama o modelo, para que a chamada seja interrompida
+quando a requisição for cancelada. Consulte [o timeout próprio de uma função](/docs/backend/custom-functions/#timeouts-and-rate-limits).
 
 ## 7. E-mail de login
 
-O login via magic link e código por e-mail requer um serviço de e-mail configurado.
-Defina `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` e `SMTP_FROM` (`rebase cloud env set`
-no Cloud). Sem essas configurações, a rota responderá com 503, e `rebase cloud status`
-reportará `blockedOn: email_not_configured`.
+O login por magic link e por código de e-mail requer um serviço de e-mail. Defina `SMTP_HOST`,
+`SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` e `SMTP_FROM` (`rebase cloud env set`
+no Cloud). Sem eles, a rota responde com 503, e `rebase cloud status`
+reporta `blockedOn: email_not_configured`.
 
 ## 8. Deploy
 
@@ -180,8 +187,7 @@ rebase cloud projects create --name Triptelier --link
 rebase cloud deploy
 ```
 
-O deploy aplica `backend/sql` como o `rebase db push` faz: o bundle leva os arquivos, e o
-boot da nova revisão executa cada um que seja novo ou tenha mudado uma única vez,
-depois das tabelas e antes das políticas. Um arquivo que falha interrompe o boot e
-informa o nome do arquivo, de modo que um erro em um deles aparece no deploy, e não em
-uma aplicação em execução.
+O deploy aplica `backend/sql` da mesma forma que o `rebase db push`: o bundle transporta
+os arquivos, e a inicialização da nova revisão executa cada arquivo novo ou modificado uma única vez, após
+as tabelas e antes das políticas. Um arquivo que falhar interrompe a inicialização e exibe
+o nome do arquivo, de forma que um erro em um deles apareça no deploy, e não em uma aplicação em execução.
