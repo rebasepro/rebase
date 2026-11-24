@@ -19,7 +19,7 @@ const { prepareDatabaseEnv, declaredAdditionalDatabases } = vi.hoisted(() => ({
         database: { kind: "managed" as const, source: "managed" as const },
         description: "the managed development database (PGlite)"
     })),
-    declaredAdditionalDatabases: vi.fn(async () => ["analytics"])
+    declaredAdditionalDatabases: vi.fn(async (_root: string) => ["analytics"])
 }));
 
 vi.mock("../utils/project", async importOriginal => ({

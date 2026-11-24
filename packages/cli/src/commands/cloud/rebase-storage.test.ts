@@ -77,7 +77,7 @@ const OVERVIEW: StorageOverview = {
 };
 
 const ISSUED = {
-    id: "k2", name: "ci", accessKeyId: "RKCI", secretAccessKey: "issued-secret", permission: "read",
+    id: "k2", name: "ci", accessKeyId: "RKCI", secretAccessKey: "issued-secret", permission: "read" as const,
     bucket: "shop-assets", endpoint: OVERVIEW.endpoint, region: OVERVIEW.region
 };
 
