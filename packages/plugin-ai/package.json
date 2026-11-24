@@ -1,12 +1,15 @@
 {
   "name": "@rebasepro/plugin-ai",
   "version": "0.35.1",
-  "description": "AI plugin for the Rebase admin panel: field generation and content assistance.",
+  "description": "AI plugin for the admin panel of Rebase, the open-source Postgres BaaS: field generation and content assistance.",
   "keywords": [
     "rebase",
     "plugin",
     "ai",
-    "cms"
+    "cms",
+    "baas",
+    "backend-as-a-service",
+    "postgres"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {

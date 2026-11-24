@@ -1,14 +1,16 @@
 {
   "name": "@rebasepro/client",
   "version": "0.35.1",
-  "description": "HTTP SDK client for the Rebase custom backend",
+  "description": "Typed TypeScript SDK for Rebase, the open-source Postgres BaaS — CRUD, auth, storage and realtime",
   "keywords": [
     "rebase",
     "sdk",
     "client",
     "postgres",
     "backend",
-    "typescript"
+    "typescript",
+    "baas",
+    "backend-as-a-service"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {

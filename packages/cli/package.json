@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/cli",
   "version": "0.35.1",
-  "description": "Developer tools for Rebase projects",
+  "description": "CLI for Rebase, the open-source Postgres BaaS — scaffold, run, migrate and deploy a Postgres backend",
   "keywords": [
     "cli",
     "create-rebase-app",
@@ -9,7 +9,9 @@
     "cms",
     "react",
     "typescript",
-    "postgresql"
+    "postgresql",
+    "baas",
+    "backend-as-a-service"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {

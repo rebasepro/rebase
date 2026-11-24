@@ -1,14 +1,17 @@
 {
   "name": "@rebasepro/cms-types",
   "version": "0.35.1",
-  "description": "Type definitions for the Rebase admin panel — CMS and Studio — the React-flavoured half of the type surface",
+  "description": "Type definitions for the admin panel (CMS and Studio) of Rebase, the open-source Postgres BaaS",
   "keywords": [
     "rebase",
     "admin",
     "cms",
     "typescript",
     "react",
-    "headless cms"
+    "headless cms",
+    "baas",
+    "backend-as-a-service",
+    "postgres"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {

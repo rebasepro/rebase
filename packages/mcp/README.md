@@ -1,6 +1,6 @@
 # @rebasepro/mcp
 
-Model Context Protocol (MCP) server that exposes Rebase schema, database, document CRUD, user management, and dev server tools to AI assistants.
+Model Context Protocol (MCP) server that exposes the schema, database, document CRUD, user management, and dev server tools of [Rebase](https://rebase.pro), the open-source Postgres BaaS to AI assistants.
 
 ## Installation
 

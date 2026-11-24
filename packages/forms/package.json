@@ -1,13 +1,16 @@
 {
   "name": "@rebasepro/forms",
   "version": "0.35.1",
-  "description": "Schema-driven form components for Rebase collections.",
+  "description": "Schema-driven form components for Rebase, the open-source Postgres BaaS.",
   "keywords": [
     "rebase",
     "forms",
     "typescript",
     "react",
-    "admin"
+    "admin",
+    "baas",
+    "backend-as-a-service",
+    "postgres"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {

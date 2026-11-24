@@ -1,6 +1,6 @@
 # @rebasepro/server
 
-Database-agnostic backend core for Rebase.
+Backend core of [Rebase](https://rebase.pro), the open-source Postgres BaaS: REST, auth, row-level security, realtime, storage, functions and cron over your Postgres.
 
 ## Installation
 
