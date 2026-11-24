@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
 
 import { reportPoolError } from "./pool-disconnects";
+import { serverKeyOf, trackConnectionDemand } from "./connection-budget";
 
 /**
  * Configuration for the Postgres connection pool.
@@ -223,6 +224,27 @@ function registerPooled(pool: Pool, opts: Required<PostgresPoolConfig>): void {
 }
 
 /**
+ * Count `pool` toward this process's connection demand, until it is ended —
+ * see `connection-budget.ts`. `requested` is the size asked for before
+ * `REBASE_DB_POOL_MAX`, or `undefined` for a pool the ceiling does not apply to.
+ */
+export function trackPoolDemand(
+    pool: Pool,
+    config: Pick<PoolConfig, "connectionString" | "max">,
+    label: string,
+    requested: number | undefined,
+    pooled = false
+): void {
+    const { connectionString, max } = config;
+    if (!connectionString || max === undefined) return;
+    trackConnectionDemand(
+        pool,
+        { label, max, requested, server: serverKeyOf(connectionString), pooled },
+        () => !pool.ending && !pool.ended
+    );
+}
+
+/**
  * Pin `search_path` into a connection string, so unqualified SQL resolves to a
  * schema this framework chose rather than to one Postgres inferred.
  *
@@ -364,6 +386,9 @@ export function createPostgresDatabaseConnection(
 
     const pool = new Pool(pgPoolConfig);
     registerPooled(pool, opts);
+    // A caller that read no ceiling (`env` not the process's) sized the pool
+    // itself, and REBASE_DB_POOL_MAX would not change it.
+    trackPoolDemand(pool, pgPoolConfig, "main pool", env === process.env ? opts.max : undefined, opts.pooled);
 
     // ── Pool event logging ────────────────────────────────────────────────
     // Uses console.* because the structured logger lives in server
@@ -407,6 +432,7 @@ export function createDirectDatabaseConnection(
 
     const pool = new Pool(pgPoolConfig);
     registerPooled(pool, opts);
+    trackPoolDemand(pool, pgPoolConfig, "direct pool", opts.max, opts.pooled);
 
     pool.on("error", (err) => reportPoolError("pg-direct-pool", err));
     guardPoolAgainstDirtyRelease(pool, "pg-direct-pool");
@@ -437,6 +463,7 @@ export function createReadReplicaConnection(
 
     const pool = new Pool(pgPoolConfig);
     registerPooled(pool, opts);
+    trackPoolDemand(pool, pgPoolConfig, "read replica pool", opts.max, opts.pooled);
 
     pool.on("error", (err) => reportPoolError("pg-replica-pool", err));
     guardPoolAgainstDirtyRelease(pool, "pg-replica-pool");

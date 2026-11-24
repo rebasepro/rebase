@@ -491,6 +491,7 @@
         "packages/server-postgres/src/backup/**",
         "packages/server-postgres/src/backup-argv.ts",
         "packages/server-postgres/src/connection.ts",
+        "packages/server-postgres/src/connection-budget.ts",
         "packages/server-postgres/src/pooled-database.ts",
         "packages/server-postgres/src/read-routing.ts",
         "packages/server-postgres/src/database-health.ts",
