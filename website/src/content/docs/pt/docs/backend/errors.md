@@ -1,5 +1,5 @@
 ---
-sourceHash: 8732e8711cde4c20
+sourceHash: 5b80afdd275fa940
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Cada código de erro que um backend Rebase pode retornar, com seu status HTTP, o que significa e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -101,6 +101,13 @@ ID recebido. Leia o cabeçalho da resposta.
 | `CHALLENGE_EXHAUSTED` | 401 | Tentativas incorretas em excesso para um mesmo desafio MFA. | Inicie um novo desafio. |
 | `CONFIRMATION_REQUIRED` | 400 | Uma operação DDL destrutiva (`DELETE /api/admin/db/tables/:table` ou `DELETE …/columns/:column`) foi chamada sem `{ confirm: "<name>" }`. | Reenvie com o nome de destino exato em `confirm` ou passe `dryRun: true` para pré-visualizar o SQL. |
 | `DDL_REJECTED` | 400 ou 409 quando o objeto já existe | O PostgreSQL recusou uma instrução executada por `/api/admin/db/*` — um tipo, um valor padrão, uma condição de política, um nome já em uso. A mensagem é do próprio Postgres, e `details.dbCode` é o seu SQLSTATE. | Altere o que a mensagem aponta e envie a requisição novamente; `dryRun: true` mostra o SQL primeiro. |
+| `EXTENSION_NOT_FOUND` | 404 | Remoção de uma extensão que não está instalada (`DELETE /api/admin/db/catalog/extensions/:name`). | Liste as extensões instaladas com `GET /api/admin/db/catalog/extensions`. |
+| `NOT_INSTALLED` | 400 | `POST /api/admin/db/insights/queries/reset` num banco de dados sem a extensão `pg_stat_statements`. | Instale-a em Extensões na view Banco de dados, ou com `CREATE EXTENSION pg_stat_statements`. |
+| `NOT_PRELOADED` | 400 | `pg_stat_statements` está instalada, mas o servidor não a carregou, então suas estatísticas não podem ser reiniciadas. | Adicione-a a `shared_preload_libraries` e reinicie o Postgres. |
+| `SESSION_NOT_FOUND` | 404 | Nenhuma sessão do banco de dados tem esse id de processo (`POST /api/admin/db/insights/activity/:pid/cancel` ou `/terminate`). Ela pode já ter terminado. | Leia `GET /api/admin/db/insights/activity` de novo. |
+| `SOURCE_NOT_FOUND` | 404 | `?source=` numa rota de `/api/admin/db/insights` ou `/api/admin/db/catalog` não nomeia nenhum banco de dados SQL que este backend serve. | Escolha um de `GET /api/admin/db/insights/sources`. |
+| `TYPE_NOT_FOUND` | 404 | Nenhum tipo enum tem esse esquema e nome (`POST /api/admin/db/catalog/types/:schema/:name/values`). | Liste os tipos com `GET /api/admin/db/catalog/types`. |
+| `UNAVAILABLE` | 400 | Foram pedidas estatísticas de consultas ao banco de dados de desenvolvimento integrado, que não as coleta. | Execute contra um servidor Postgres próprio. |
 | `DEVICE_LOGIN_DECIDED` | 409 | O login do dispositivo já foi aprovado ou negado. Um login é decidido apenas uma vez. | Inicie um novo no dispositivo. |
 | `DEVICE_LOGIN_EXPIRED` | 410 | O login do dispositivo ultrapassou o limite de dez minutos antes de ser decidido. | Inicie um novo no dispositivo. |
 | `DEVICE_LOGIN_NOT_FOUND` | 404 | Nenhum login de dispositivo possui esse código de usuário. A própria consulta (poll) do dispositivo responde aos códigos em minúsculas da RFC 8628: `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, `invalid_grant`. | Verifique o código em relação ao que o dispositivo exibe. |
@@ -424,6 +431,8 @@ recurso na interface em vez de exibir um erro.
 | `UI_PREFERENCES_UNSUPPORTED` | 501 | O driver deste backend não suporta execução de SQL; portanto, não armazena preferências de UI; o painel as mantém localmente no navegador. | Nada a corrigir: as preferências permanecem salvas por navegador. |
 | `UI_CONFIG_FILE_INVALID` | 500 | `frontend/src/cms/ui-config.json`, onde as preferências de UI do workspace são salvas em desenvolvimento, não é um JSON válido. | Corrija ou apague o arquivo; o painel o recriará no próximo salvamento. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` não pode transmitir resultados aqui: o banco de desenvolvimento em processo (PGlite) possui apenas uma conexão, e reter um cursor durante um download bloquearia qualquer outra consulta; ou a fonte de dados não suporta cursores SQL. | Aponte `DATABASE_URL` para uma instância Postgres própria (`rebase dev --docker` inicia uma) ou adicione um `LIMIT` e exporte as linhas visíveis na tela. |
+| `SQL_SNIPPETS_NEED_A_USER` | 403 | `/api/admin/sql/snippets` foi chamado com uma credencial que não identifica nenhuma pessoa (a chave de serviço). Os snippets SQL guardados pertencem a uma pessoa com sessão iniciada. | Inicie sessão como utilizador. |
+| `SQL_SNIPPETS_UNSUPPORTED` | 501 | A fonte de dados não executa SQL, por isso não tem onde guardar snippets; a consola SQL mantém-nos no navegador. | Nada a corrigir: os snippets ficam em cada navegador. |
 
 ### Reconciliação de schema
 

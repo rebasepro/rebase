@@ -1,5 +1,5 @@
 ---
-sourceHash: 8732e8711cde4c20
+sourceHash: 5b80afdd275fa940
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -75,6 +75,13 @@ Le champ `details` a une vocation diagnostique et non contractuelle. Trois règl
 | `CHALLENGE_EXHAUSTED` | 401 | Trop de codes erronés saisis pour un même challenge MFA. | Démarrez un nouveau challenge. |
 | `CONFIRMATION_REQUIRED` | 400 | Une opération DDL destructrice (`DELETE /api/admin/db/tables/:table` ou `DELETE …/columns/:column`) a été appelée sans `{ confirm: "<name>" }`. | Renvoyez la requête avec le nom exact de la cible dans `confirm`, ou passez `dryRun: true` pour prévisualiser le SQL. |
 | `DDL_REJECTED` | 400, ou 409 si l'objet existe déjà | PostgreSQL a rejeté une instruction exécutée par `/api/admin/db/*` pour votre compte — un type, une valeur par défaut, une condition de politique, un nom déjà pris. Le message est celui de Postgres, et `details.dbCode` contient son SQLSTATE. | Modifiez l'élément mentionné dans le message et renvoyez la requête ; `dryRun: true` permet de vérifier le SQL au préalable. |
+| `EXTENSION_NOT_FOUND` | 404 | Suppression d'une extension qui n'est pas installée (`DELETE /api/admin/db/catalog/extensions/:name`). | Listez les extensions installées avec `GET /api/admin/db/catalog/extensions`. |
+| `NOT_INSTALLED` | 400 | `POST /api/admin/db/insights/queries/reset` sur une base sans l'extension `pg_stat_statements`. | Installez-la depuis Extensions dans la vue Base de données, ou avec `CREATE EXTENSION pg_stat_statements`. |
+| `NOT_PRELOADED` | 400 | `pg_stat_statements` est installée mais le serveur ne l'a pas chargée, ses statistiques ne peuvent donc pas être réinitialisées. | Ajoutez-la à `shared_preload_libraries` et redémarrez Postgres. |
+| `SESSION_NOT_FOUND` | 404 | Aucune session de la base n'a cet identifiant de processus (`POST /api/admin/db/insights/activity/:pid/cancel` ou `/terminate`). Elle est peut-être déjà terminée. | Relisez `GET /api/admin/db/insights/activity`. |
+| `SOURCE_NOT_FOUND` | 404 | `?source=` sur une route `/api/admin/db/insights` ou `/api/admin/db/catalog` ne nomme aucune base SQL que ce backend sert. | Choisissez-en une dans `GET /api/admin/db/insights/sources`. |
+| `TYPE_NOT_FOUND` | 404 | Aucun type enum n'a ce schéma et ce nom (`POST /api/admin/db/catalog/types/:schema/:name/values`). | Listez les types avec `GET /api/admin/db/catalog/types`. |
+| `UNAVAILABLE` | 400 | Des statistiques de requêtes ont été demandées à la base de développement intégrée, qui n'en collecte pas. | Exécutez-le sur votre propre serveur Postgres. |
 | `DEVICE_LOGIN_DECIDED` | 409 | La connexion de l'appareil a déjà été approuvée ou refusée. Une décision ne peut être prise qu'une seule fois. | Démarrez une nouvelle tentative sur l'appareil. |
 | `DEVICE_LOGIN_EXPIRED` | 410 | Le délai de dix minutes pour la connexion de l'appareil a expiré avant qu'une décision ne soit prise. | Démarrez une nouvelle tentative sur l'appareil. |
 | `DEVICE_LOGIN_NOT_FOUND` | 404 | Aucune connexion d'appareil ne correspond à ce code utilisateur. Le polling de l'appareil lui-même renvoie plutôt les codes en minuscules de la RFC 8628 : `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, `invalid_grant`. | Comparez le code avec celui affiché sur l'appareil. |
@@ -386,6 +393,8 @@ Ces codes indiquent qu'une fonctionnalité est désactivée ou non configurée, 
 | `UI_PREFERENCES_UNSUPPORTED` | 501 | Le pilote de ce backend ne supporte pas l'exécution de requêtes SQL et ne peut donc stocker de préférences d'interface ; le panneau les conserve au niveau du navigateur. | Rien à corriger : les préférences restent propres à chaque navigateur. |
 | `UI_CONFIG_FILE_INVALID` | 500 | Le fichier `frontend/src/cms/ui-config.json`, où sont enregistrées les préférences d'interface du workspace en développement, ne contient pas du JSON valide. | Corrigez-le ou supprimez-le ; le panneau d'administration le régénérera lors de la prochaine sauvegarde. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` ne peut pas streamer de résultat dans cet environnement : la base embarquée de développement (PGlite) ne gère qu'une seule connexion, et maintenir un curseur ouvert pendant un téléchargement bloquerait toutes les autres requêtes ; ou bien la source de données ne supporte pas les curseurs SQL. | Pointez `DATABASE_URL` vers votre propre instance Postgres (`rebase dev --docker` en lance une), ou ajoutez une clause `LIMIT` et exportez les lignes affichées à l'écran. |
+| `SQL_SNIPPETS_NEED_A_USER` | 403 | `/api/admin/sql/snippets` a été appelé avec un identifiant qui ne désigne personne (la clé de service). Les extraits SQL enregistrés appartiennent à une personne connectée. | Connectez-vous en tant qu'utilisateur. |
+| `SQL_SNIPPETS_UNSUPPORTED` | 501 | La source de données n'exécute pas de SQL et n'a donc nulle part où conserver les extraits ; la console SQL les garde dans le navigateur. | Rien à corriger : les extraits restent propres à chaque navigateur. |
 
 ### Réconciliation de schéma
 
