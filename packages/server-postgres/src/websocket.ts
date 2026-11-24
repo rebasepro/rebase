@@ -7,7 +7,7 @@ import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import type { RuntimeTable } from "./model/runtime-table";
 import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
-import type { SqlScriptResult } from "@rebasepro/types";
+import type { SqlScriptResult, SqlStatementResult } from "@rebasepro/types";
 import { deserializeFilter, redactSqlLiterals, relationOf, UnknownFilterOperatorError } from "@rebasepro/common";
 import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
 import { closerOf, noteServerClose, socketStats } from "./services/socket-stats";
@@ -71,8 +71,20 @@ export function isSocketRealtimeService(provider: RealtimeProvider): provider is
 }
 
 /** What a script run says besides its rows, which an `EXECUTE_SQL` answer carries as `result`. */
-function scriptDescription({ rows: _rows, ...description }: SqlScriptResult): Omit<SqlScriptResult, "rows"> {
-    return description;
+function scriptDescription({ rows: _rows, statements, ...description }: SqlScriptResult): Omit<SqlScriptResult, "rows" | "statements"> & {
+    statements?: (Omit<SqlStatementResult, "rows"> & { rows?: SqlStatementResult["rows"] })[];
+} {
+    if (!statements) return description;
+    // The last statement's rows are the top level's, already in `result`:
+    // sent once, and put back by the client (`readSqlScriptResult`).
+    return {
+        ...description,
+        statements: statements.map((statement, index) => {
+            if (index < statements.length - 1) return statement;
+            const { rows: _lastRows, ...rest } = statement;
+            return rest;
+        })
+    };
 }
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */

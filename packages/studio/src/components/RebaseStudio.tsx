@@ -5,7 +5,7 @@ import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 // Lazy-loaded studio tools — each fetched only when its route is visited.
 // This keeps Monaco, @xyflow/react, dagre, pgsql-ast-parser etc. out of the initial bundle.
 const TableEditorView = lazyChunk(() => import("./TableEditor/TableEditorView").then(m => ({ default: m.TableEditorView })));
-const SQLEditor = lazyChunk(() => import("./SQLEditor/SQLEditor").then(m => ({ default: m.SQLEditor })));
+const SQLEditor = lazyChunk(() => import("./SQLEditor/SQLEditorRoute").then(m => ({ default: m.SQLEditorRoute })));
 const JSEditor = lazyChunk(() => import("./JSEditor/JSEditor").then(m => ({ default: m.JSEditor })));
 const RLSEditor = lazyChunk(() => import("./RLSEditor/RLSEditor").then(m => ({ default: m.RLSEditor })));
 const StorageView = lazyChunk(() => import("./StorageView/StorageView").then(m => ({ default: m.StorageView })));

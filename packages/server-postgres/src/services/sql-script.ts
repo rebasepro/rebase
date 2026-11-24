@@ -1,5 +1,5 @@
 import { Client, DatabaseError, type Connection, type Pool, type PoolClient, type Submittable } from "pg";
-import type { SqlCursor, SqlScriptColumn, SqlScriptNotice, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
+import type { SqlCursor, SqlScriptColumn, SqlScriptNotice, SqlScriptResult, SqlScriptTable, SqlStatementResult } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 
 /**
@@ -69,19 +69,63 @@ export interface SqlResultLimits {
  */
 export const SQL_CONSOLE_RESULT_LIMITS: SqlResultLimits = { maxRows: 10_000, maxTextLength: 32 * 1024 * 1024 };
 
-/** The rows of one result kept so far, against {@link SqlResultLimits}. */
+/**
+ * The rows a run keeps, against {@link SqlResultLimits}: one budget for every
+ * statement of the script together.
+ *
+ * The statement being read always has the whole budget to itself. When it
+ * needs room, the statements before it give rows up — the oldest statement
+ * first, each from its end, so what it keeps is still its first rows — and
+ * only once none of them holds a row is the statement being read cut short.
+ * `SELECT * FROM big; SELECT 1` keeps the one row of the second and as much of
+ * the first as fits beside it; the run never holds more than one statement's
+ * limits however many statements it has.
+ */
 class ResultBudget {
     private rows = 0;
     private textLength = 0;
+    /** The text length of every kept row, by statement, in row order — what giving one up returns. */
+    private readonly held = new Map<StatementOutcome, { lengths: number[]; textLength: number }>();
 
     constructor(private readonly limits: SqlResultLimits) {}
 
-    /** Whether a row with `textLength` characters of values is kept; counted when it is. */
-    admit(textLength: number): boolean {
-        if (this.rows >= this.limits.maxRows || this.textLength + textLength > this.limits.maxTextLength) return false;
+    /**
+     * Whether `statement` — the one being read — keeps a row with `textLength`
+     * characters of values; counted when it does. Earlier statements' rows are
+     * let go to make room, and only when the row fits once they are.
+     */
+    admit(statement: StatementOutcome, textLength: number): boolean {
+        let own = this.held.get(statement);
+        // Past what the statement could keep with the whole budget to itself:
+        // nothing the earlier statements give up would make room for it.
+        const ownRows = own?.lengths.length ?? 0;
+        const ownText = own?.textLength ?? 0;
+        if (ownRows >= this.limits.maxRows || ownText + textLength > this.limits.maxTextLength) return false;
+        while (this.rows >= this.limits.maxRows || this.textLength + textLength > this.limits.maxTextLength) {
+            this.releaseEarlierRow(statement);
+        }
         this.rows++;
         this.textLength += textLength;
+        if (!own) this.held.set(statement, own = { lengths: [], textLength: 0 });
+        own.lengths.push(textLength);
+        own.textLength += textLength;
         return true;
+    }
+
+    /** Let go of the last kept row of the oldest statement other than `current` that holds one. */
+    private releaseEarlierRow(current: StatementOutcome): void {
+        for (const [statement, own] of this.held) {
+            if (statement === current) continue;
+            const released = own.lengths.pop();
+            if (released === undefined) continue;
+            statement.rows.pop();
+            statement.truncated = true;
+            own.textLength -= released;
+            this.rows--;
+            this.textLength -= released;
+            if (own.lengths.length === 0) this.held.delete(statement);
+            return;
+        }
     }
 }
 
@@ -109,23 +153,22 @@ export class ScriptRun implements Submittable {
     callback?: (error: Error | null) => void;
 
     /**
-     * Every statement of the script, as it came back. Only the last holds its
-     * rows: the console shows the last, and a statement's rows are let go when
-     * the next one begins — `SELECT * FROM big; SELECT 1` held every row of
-     * `big` to the end, to show one.
+     * Every statement of the script, as it came back, with the rows the run
+     * kept of each: one {@link ResultBudget} for all of them, which the
+     * statement being read may take back from the ones before it.
      */
     readonly statements: StatementOutcome[] = [];
     readonly done: Promise<StatementOutcome[]>;
 
     /** The statement whose row description arrived and whose command has not completed. */
     private open?: StatementOutcome;
-    /** What {@link open} has kept of its rows. */
-    private budget: ResultBudget;
+    /** What the run has kept of every statement's rows. */
+    private readonly budget: ResultBudget;
     private settled = false;
     private resolveRun: (statements: StatementOutcome[]) => void = () => undefined;
     private rejectRun: (error: Error) => void = () => undefined;
 
-    constructor(private readonly text: string, private readonly limits: SqlResultLimits = SQL_CONSOLE_RESULT_LIMITS) {
+    constructor(private readonly text: string, limits: SqlResultLimits = SQL_CONSOLE_RESULT_LIMITS) {
         this.budget = new ResultBudget(limits);
         this.done = new Promise((resolve, reject) => {
             this.resolveRun = resolve;
@@ -138,8 +181,6 @@ export class ScriptRun implements Submittable {
     }
 
     handleRowDescription(message: { fields: WireField[] }): void {
-        this.releaseRows();
-        this.budget = new ResultBudget(this.limits);
         this.open = {
             fields: message.fields.map(({ name, tableID, columnID, dataTypeID }) => ({ name, tableID, columnID, dataTypeID })),
             rows: [],
@@ -154,7 +195,7 @@ export class ScriptRun implements Submittable {
         if (!statement) return;
         statement.received++;
         if (statement.truncated) return;
-        if (!this.budget.admit(textLengthOf(message.fields))) {
+        if (!this.budget.admit(statement, textLengthOf(message.fields))) {
             statement.truncated = true;
             return;
         }
@@ -167,10 +208,7 @@ export class ScriptRun implements Submittable {
 
     handleCommandComplete(message: { text: string }): void {
         const statement = this.open ?? { fields: [], rows: [], received: 0, truncated: false };
-        if (!this.open) {
-            this.releaseRows();
-            this.statements.push(statement);
-        }
+        if (!this.open) this.statements.push(statement);
         this.open = undefined;
         statement.tag = message.text;
     }
@@ -203,12 +241,6 @@ export class ScriptRun implements Submittable {
 
     handleReadyForQuery(): void {
         this.settle(null);
-    }
-
-    /** Let go of the rows of the statement before the one beginning: only the last is shown. */
-    private releaseRows(): void {
-        const previous = this.statements[this.statements.length - 1];
-        if (previous) previous.rows = [];
     }
 
     private settle(error: Error | null): void {
@@ -245,16 +277,24 @@ function relationKind(relkind: string): SqlScriptTable["kind"] {
     }
 }
 
+/** What the catalogue says about some fields: each one's column, and the relations they were read from by OID. */
+interface FieldDescription {
+    columns: SqlScriptColumn[];
+    tables: Map<number, SqlScriptTable>;
+}
+
 /**
- * Name the tables, columns and types the row description referred to by OID.
+ * Name the tables, columns and types the row descriptions referred to by OID
+ * — every statement's fields at once, so a script of many queries costs the
+ * same three catalogue reads as one.
  *
  * On the run's own session, after it was reset: the catalogue is readable by
  * every role, and the OIDs belong to this database. A failure here costs the
  * result its provenance, never its rows — a column with no source is one the
  * console will not edit.
  */
-async function describeColumns(connection: PoolClient, fields: WireField[]): Promise<{ columns: SqlScriptColumn[]; tables: SqlScriptTable[] }> {
-    const unnamed = { columns: fields.map(field => ({ name: field.name })), tables: [] };
+async function describeFields(connection: PoolClient, fields: WireField[]): Promise<FieldDescription> {
+    const unnamed: FieldDescription = { columns: fields.map(field => ({ name: field.name })), tables: new Map() };
     if (fields.length === 0) return unnamed;
     try {
         const typeOids = [...new Set(fields.map(field => field.dataTypeID))];
@@ -293,32 +333,42 @@ async function describeColumns(connection: PoolClient, fields: WireField[]): Pro
             [tableOids]
         )).rows;
 
-        const relationByOid = new Map(relations.map(relation => [Number(relation.oid), relation]));
+        const tables = new Map(relations.map((relation): [number, SqlScriptTable] => [Number(relation.oid), {
+            schema: relation.schema,
+            table: relation.table,
+            kind: relationKind(relation.relkind),
+            primaryKey: relation.primary_key ?? [],
+            hasInheritors: relation.has_inheritors
+        }]));
         const attributeName = new Map(attributes.map(attribute => [`${attribute.oid}:${attribute.attnum}`, attribute.name]));
 
         const columns = fields.map((field): SqlScriptColumn => {
             const column: SqlScriptColumn = { name: field.name };
             const type = typeNames.get(field.dataTypeID);
             if (type) column.type = type;
-            const relation = field.tableID !== 0 ? relationByOid.get(field.tableID) : undefined;
+            const relation = field.tableID !== 0 ? tables.get(field.tableID) : undefined;
             const sourceColumn = attributeName.get(`${field.tableID}:${field.columnID}`);
             if (relation && sourceColumn) {
                 column.source = { schema: relation.schema, table: relation.table, column: sourceColumn };
             }
             return column;
         });
-        const tables = relations.map((relation): SqlScriptTable => ({
-            schema: relation.schema,
-            table: relation.table,
-            kind: relationKind(relation.relkind),
-            primaryKey: relation.primary_key ?? [],
-            hasInheritors: relation.has_inheritors
-        }));
         return { columns, tables };
     } catch (error: unknown) {
         logger.warn("[SQL console] Could not describe the result's columns; none of them will be editable", { error });
         return unnamed;
     }
+}
+
+/** One statement's columns, cut from a {@link describeFields} of every statement's fields, and the tables they name. */
+function describedStatement(statement: StatementOutcome, described: FieldDescription, offset: number): { columns: SqlScriptColumn[]; tables: SqlScriptTable[] } {
+    const columns = described.columns.slice(offset, offset + statement.fields.length);
+    const tables: SqlScriptTable[] = [];
+    for (const oid of new Set(statement.fields.map(field => field.tableID))) {
+        const table = described.tables.get(oid);
+        if (table) tables.push(table);
+    }
+    return { columns, tables };
 }
 
 /**
@@ -515,10 +565,34 @@ function deepestCause(error: unknown): Error | undefined {
 const MAX_NOTICES = 100;
 
 /**
- * Run `sql` on a connection of its own from `pool` and return what the last
- * statement returned, with each column's provenance and what the database
- * said along the way — `there is no transaction in progress` for a ROLLBACK
- * with nothing to roll back, which used to read as success.
+ * How many statements a result describes one by one: the last 1,000. A
+ * script of ten thousand `INSERT`s is a migration, not ten thousand results
+ * to look at, and each one described is a part of the frame.
+ */
+export const MAX_STATEMENT_RESULTS = 1000;
+
+const NO_STATEMENT: StatementOutcome = { fields: [], rows: [], received: 0, truncated: false };
+
+/** A statement's command, count and rows as {@link SqlStatementResult} says them. */
+function statementResult(statement: StatementOutcome, columns: SqlScriptColumn[], tables: SqlScriptTable[]): SqlStatementResult {
+    const tag = parseCommandTag(statement.tag);
+    return {
+        rows: statement.rows,
+        columns,
+        tables,
+        ...tag,
+        // The tag counts every row the statement returned; a command whose
+        // tag carries no count was counted here.
+        ...(statement.truncated ? { truncated: true, rowCount: tag.rowCount ?? statement.received } : {})
+    };
+}
+
+/**
+ * Run `sql` on a connection of its own from `pool` and return what every
+ * statement returned — the last one's at the top level — with each column's
+ * provenance and what the database said along the way: `there is no
+ * transaction in progress` for a ROLLBACK with nothing to roll back, which
+ * used to read as success.
  */
 export async function runSqlScriptOnPool(pool: Pool, sql: string, options: OwnSessionOptions = {}): Promise<SqlScriptResult> {
     const notices: SqlScriptNotice[] = [];
@@ -530,25 +604,22 @@ export async function runSqlScriptOnPool(pool: Pool, sql: string, options: OwnSe
         try {
             const script = new ScriptRun(sql);
             connection.query(script);
-            const statements = await script.done;
-            const last: StatementOutcome = statements[statements.length - 1] ?? { fields: [], rows: [], received: 0, truncated: false };
-            return { last, described: { columns: last.fields.map((field): SqlScriptColumn => ({ name: field.name })), tables: [] as SqlScriptTable[] } };
+            const statements = (await script.done).slice(-MAX_STATEMENT_RESULTS);
+            const fields = statements.flatMap(statement => statement.fields);
+            return { statements, described: { columns: fields.map((field): SqlScriptColumn => ({ name: field.name })), tables: new Map() } as FieldDescription };
         } finally {
             connection.removeListener("notice", listen);
         }
-    }, async (connection, value) => ({ ...value, described: await describeColumns(connection, value.last.fields) }));
+    }, async (connection, value) => ({ ...value, described: await describeFields(connection, value.statements.flatMap(statement => statement.fields)) }));
 
-    const tag = parseCommandTag(run.last.tag);
-    return {
-        rows: run.last.rows,
-        columns: run.described.columns,
-        tables: run.described.tables,
-        ...tag,
-        // The tag counts every row the statement returned; a command whose
-        // tag carries no count was counted here.
-        ...(run.last.truncated ? { truncated: true, rowCount: tag.rowCount ?? run.last.received } : {}),
-        notices
-    };
+    let offset = 0;
+    const statements = run.statements.map(statement => {
+        const { columns, tables } = describedStatement(statement, run.described, offset);
+        offset += statement.fields.length;
+        return statementResult(statement, columns, tables);
+    });
+    const last = statements[statements.length - 1] ?? statementResult(NO_STATEMENT, [], []);
+    return { ...last, notices, statements };
 }
 
 /**
@@ -559,10 +630,11 @@ export async function runSqlScriptOnPool(pool: Pool, sql: string, options: OwnSe
 export function sqlScriptResultFromRows(rows: Record<string, unknown>[], limits: SqlResultLimits = SQL_CONSOLE_RESULT_LIMITS): SqlScriptResult {
     const names = rows.length > 0 ? Object.keys(rows[0]) : [];
     const budget = new ResultBudget(limits);
+    const statement: StatementOutcome = { fields: [], rows: [], received: rows.length, truncated: false };
     const kept: Record<string, string | null>[] = [];
     for (const row of rows) {
         const entries = Object.entries(row).map(([key, value]): [string, string | null] => [key, valueAsText(value)]);
-        if (!budget.admit(textLengthOf(entries.map(([, value]) => value)))) break;
+        if (!budget.admit(statement, textLengthOf(entries.map(([, value]) => value)))) break;
         kept.push(Object.fromEntries(entries));
     }
     return {

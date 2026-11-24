@@ -702,6 +702,38 @@ export interface SqlScriptResult {
      * statement as the connection owner, who is named here instead.
      */
     effectiveRole?: string;
+    /**
+     * Every statement of the script, in order, the last one included — the
+     * same statement the fields above describe. Absent when the transport
+     * cannot tell the statements apart (an in-process database, a server
+     * that does not report them).
+     *
+     * One row budget covers the whole script: when the statements together
+     * return more than a run keeps, the earlier statements give up their last
+     * rows first, so the last statement keeps as many as it would alone. A
+     * statement that gave rows up says so with {@link SqlStatementResult.truncated}.
+     */
+    statements?: SqlStatementResult[];
+}
+
+/**
+ * One statement of a script — see {@link SqlScriptResult.statements}.
+ *
+ * @group Admin
+ */
+export interface SqlStatementResult {
+    /** Its rows, every value as the database's text; see {@link SqlScriptResult.rows}. */
+    rows: Record<string, string | null>[];
+    /** Its columns, in order. Empty for a statement that returns no rows (`CREATE TABLE`, `BEGIN`). */
+    columns: SqlScriptColumn[];
+    /** The tables and views its columns' {@link SqlScriptColumn.source} names. */
+    tables: SqlScriptTable[];
+    /** Its command: `SELECT`, `INSERT`, `CREATE TABLE` … */
+    command?: string;
+    /** How many rows it returned or changed, when its command reports a count; see {@link SqlScriptResult.rowCount}. */
+    rowCount?: number;
+    /** It returned more rows than the run kept, and {@link rows} holds its first ones. */
+    truncated?: boolean;
 }
 
 /**

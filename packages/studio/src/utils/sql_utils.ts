@@ -24,11 +24,37 @@ function parseStatements(sqlText: string): Statement[] | null {
  * second statement in it.
  */
 export function buildExplainSql(sqlText: string): string | null {
+    const statement = singleStatement(sqlText);
+    return statement === null ? null : `EXPLAIN (FORMAT JSON) ${statement}`;
+}
+
+/** `sqlText` without its trailing semicolons, when it is exactly one statement; see {@link buildExplainSql}. */
+function singleStatement(sqlText: string): string | null {
     const statement = sqlText.trim().replace(/;+$/, "").trim();
     if (!statement) return null;
     const statements = parseStatements(statement);
     const single = statements ? statements.length === 1 : !statement.includes(";");
-    return single ? `EXPLAIN (FORMAT JSON) ${statement}` : null;
+    return single ? statement : null;
+}
+
+/**
+ * The script that times one statement for real — `EXPLAIN (ANALYZE, BUFFERS,
+ * FORMAT JSON)` — inside a transaction that is rolled back, or `null` when
+ * `sqlText` is not exactly one statement.
+ *
+ * ANALYZE executes the statement, so a `DELETE` deletes; the `ROLLBACK`
+ * undoes what the transaction did. What no transaction undoes is not undone:
+ * a sequence advanced by an `INSERT`, a notification sent, a row written
+ * through `dblink`. The console says so beside the button. Only one
+ * statement, for the reason {@link buildExplainSql} gives: a second one would
+ * run inside the transaction and be rolled back with it, or end it early.
+ *
+ * The statement's last line may be a `--` comment, so the `;` after it goes
+ * on a line of its own.
+ */
+export function buildExplainAnalyzeScript(sqlText: string): string | null {
+    const statement = singleStatement(sqlText);
+    return statement === null ? null : `BEGIN;\nEXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${statement}\n;\nROLLBACK;`;
 }
 
 /**

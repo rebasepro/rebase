@@ -1,4 +1,4 @@
-import type { SqlScriptColumn, SqlScriptNotice, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
+import type { SqlScriptColumn, SqlScriptNotice, SqlScriptResult, SqlScriptTable, SqlStatementResult } from "@rebasepro/types";
 
 /**
  * Read an `EXECUTE_SQL_SUCCESS` payload for a script run as a
@@ -21,7 +21,27 @@ export function readSqlScriptResult(payload: unknown): SqlScriptResult {
     if (typeof record?.rowCount === "number") result.rowCount = record.rowCount;
     if (record?.truncated === true) result.truncated = true;
     if (typeof record?.effectiveRole === "string") result.effectiveRole = record.effectiveRole;
+    if (Array.isArray(record?.statements) && record.statements.length > 0) {
+        const entries = record.statements;
+        // The last statement is the top level, whose rows the frame carries
+        // once, as `result`.
+        result.statements = entries.map((entry, index) => readStatement(entry, index === entries.length - 1 ? rows : []));
+    }
     return result;
+}
+
+function readStatement(value: unknown, fallbackRows: Record<string, string | null>[]): SqlStatementResult {
+    const record = asRecord(value);
+    const rows = Array.isArray(record?.rows) ? record.rows.map(asRecord).filter(isDefined).map(textRow) : fallbackRows;
+    const statement: SqlStatementResult = {
+        rows,
+        columns: Array.isArray(record?.columns) ? record.columns.map(readColumn).filter(isDefined) : [],
+        tables: Array.isArray(record?.tables) ? record.tables.map(readTable).filter(isDefined) : []
+    };
+    if (typeof record?.command === "string") statement.command = record.command;
+    if (typeof record?.rowCount === "number") statement.rowCount = record.rowCount;
+    if (record?.truncated === true) statement.truncated = true;
+    return statement;
 }
 
 function isDefined<T>(value: T | undefined): value is T {
