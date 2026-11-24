@@ -118,19 +118,19 @@ By default, **all 14 tools** are enabled. Use the `tools` prop on `<RebaseStudio
 <RebaseStudio tools={["sql", "rls", "storage"]} />
 
 // Enable everything except branches
-<RebaseStudio tools={["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "backups", "api", "webhooks", "logs", "users", "api-keys"]} />
+<RebaseStudio tools={["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "backups", "database", "api", "webhooks", "logs", "users", "api-keys"]} />
 ```
 
 The `tools` prop accepts an array of tool key strings:
 
 ```typescript
 type ToolKey = "tables" | "sql" | "js" | "rls" | "storage" | "cron"
-    | "schema-visualizer" | "branches" | "backups" | "api" | "webhooks" | "logs" | "users" | "api-keys";
+    | "schema-visualizer" | "branches" | "backups" | "database" | "api" | "webhooks" | "logs" | "users" | "api-keys";
 
 // Default when tools is undefined:
 const DEFAULT_TOOLS: ToolKey[] = [
     "tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer",
-    "branches", "backups", "api", "webhooks", "logs", "users", "api-keys"
+    "branches", "backups", "database", "api", "webhooks", "logs", "users", "api-keys"
 ];
 ```
 
@@ -381,7 +381,7 @@ interface NavigationGroupMapping {
 ```typescript
 interface RebaseStudioConfig {
     tools?: ("tables" | "sql" | "js" | "rls" | "storage" | "cron"
-        | "schema-visualizer" | "branches" | "backups" | "api" | "webhooks" | "logs" | "users" | "api-keys")[];
+        | "schema-visualizer" | "branches" | "backups" | "database" | "api" | "webhooks" | "logs" | "users" | "api-keys")[];
     homePage?: ReactNode;
     devViews?: AppView[];  // Your own Studio tools, added beside the built-in ones
 }
