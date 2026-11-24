@@ -1,5 +1,5 @@
 ---
-sourceHash: f2cfc1c2f8667566
+sourceHash: 8292c377d5271c6f
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist dasselbe Rebase, für Sie betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die Private Beta noch nicht enthält.
@@ -236,43 +236,9 @@ Hinweis im Rahmen des Live-Checks aus.
 
 ## Mehr als eine Datenbank
 
-Das verwaltete PostgreSQL eines Projekts ist ein **Datenbankserver**, und es kann mehr als eine
-Datenbank enthalten. Deklarieren Sie jede davon in Ihrem Code, wie Sie es auch anderswo tun würden
-([Mehrere Datenbanken und Buckets](/docs/backend/multiple-sources/)):
-
-```ts
-// backend/resources.ts
-import { database } from "@rebasepro/types";
-
-export const main = database();
-export const analytics = database("analytics");
-```
-
-Beim nächsten Deploy erstellt die Plattform auf dem Server des Projekts eine Datenbank namens `analytics`
-und bindet sie als `DATABASE_URL__ANALYTICS` an Ihre App – dieselbe Variable, die ein selbst gehostetes
-Backend liest. Sonst ändert sich nichts:
-
-- **Abrechnung.** Alle Datenbanken auf dem Server teilen sich dessen CPU, Arbeitsspeicher und Festplatte,
-  und genau diese werden dem Projekt in Rechnung gestellt. Eine zweite Datenbank kostet für sich genommen
-  nichts; die darin gespeicherten Daten vergrößern die Festplatte, und die Festplatte wird nach Größe
-  abgerechnet. Dimensionieren Sie den Server unter **Compute** für alle zusammen.
-- **Backups und Wiederherstellung.** Sie sind in den Backups des Servers enthalten und werden bei einer
-  [Point-in-Time-Recovery](#die-datenbank-auf-einen-bestimmten-zeitpunkt-wiederherstellen) mit ihm
-  zusammen zurückgesetzt.
-- **Verbinden.** `rebase cloud db list` zeigt sie an, und `db info`, `db connect`
-  und `db query` akzeptieren `--database <key>`:
-
-  ```bash
-  rebase cloud db connect --database analytics
-  ```
-
-- **Entfernen.** Ein Deploy löscht niemals eine Datenbank. Eine, die Ihr Code nicht mehr deklariert,
-  bleibt auf dem Server, bis Sie `rebase cloud resources prune database analytics` ausführen.
-
-Eine Variable, die Sie selbst setzen, hat Vorrang: Mit Ihrer eigenen `DATABASE_URL__ANALYTICS` in der
-Umgebung des Projekts erstellt die Plattform für diesen Schlüssel nichts. Bei einem Projekt, das seinen
-eigenen Datenbankserver mitbringt, werden darauf keine Datenbanken erstellt; setzen Sie stattdessen für
-jede eine `DATABASE_URL__<KEY>`.
+Deklarieren Sie jede in Ihrem Code (`database("analytics")`) und deployen Sie: Sie wird auf dem
+Postgres-Server des Projekts als `DATABASE_URL__ANALYTICS` erstellt und teilt sich dessen CPU, Arbeitsspeicher,
+Festplatte, Backups und Rechnung ([Details](/docs/backend/multiple-sources/#on-rebase-cloud)).
 
 ## Dateispeicher
 
@@ -293,12 +259,8 @@ rebase cloud storage attach --bucket <name> \
 rebase cloud deploy
 ```
 
-`rebase cloud storage` listet die Buckets des Projekts auf. Ein Projekt kann so viele haben, wie es
-deklariert: Sobald sein Standard-Bucket auf Rebase Storage läuft, erhält jedes `bucket("media")` in
-seinem Code beim nächsten Deploy einen eigenen Bucket, gebunden als `S3_BUCKET__MEDIA` und die übrigen
-`__MEDIA`-Variablen. Gespeicherte Bytes werden pro Projekt über alle seine Buckets hinweg gemessen
-([Rebase Storage](/docs/deployment/rebase-storage/) nennt, ab wann sie abgerechnet werden). Mit eigenen
-Buckets binden Sie jeden einzelnen mit `--source <key>` an; ein Projekt, das den Speicher im Code konfiguriert, benötigt keines von beiden.
+`rebase cloud storage` listet die Buckets des Projekts auf; jedes deklarierte `bucket("media")` erhält einen eigenen ([Mehrere Datenbanken und Buckets](/docs/backend/multiple-sources/#on-rebase-cloud)).
+Mit eigenen Buckets binden Sie jeden einzelnen mit `--source <key>` an; ein Projekt, das den Speicher im Code konfiguriert, benötigt keines von beiden.
 
 ## Eine Änderung in der Vorschau ansehen (Preview)
 
