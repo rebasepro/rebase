@@ -62,10 +62,22 @@ export function parseDriverLine<S extends arg.Spec>(
     return arg({ ...RELAYED_FLAGS, ...spec }, { argv: args.slice(2), permissive: true });
 }
 
+/**
+ * Which of the project's databases a schema command acts on — see
+ * `database-target.ts`. `--database <key>` names one declared database (the
+ * default when absent); `--all-databases` runs the command for the default and
+ * then each declared one in turn.
+ */
+const DATABASE_TARGET_FLAGS = {
+    "--database": String,
+    "--all-databases": Boolean
+} satisfies arg.Spec;
+
 /** Keyed by `"<domain> <subcommand>"`, the way the user types it. */
 export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
     "db push": {
         "--schema-dir": String,
+        ...DATABASE_TARGET_FLAGS,
         "--dry-run": Boolean,
         "--allow-destructive": Boolean,
         // Drop the policies on declared tables that no table declares
@@ -75,7 +87,8 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "-y": "--yes"
     },
     "db generate": {
-        "--schema-dir": String
+        "--schema-dir": String,
+        ...DATABASE_TARGET_FLAGS
     },
     // Bare positionals still pass through to `atlas migrate apply`, which takes
     // an optional amount; flags do not, apart from `--baseline`.
@@ -94,6 +107,7 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
     // migration created as the tables' rules make them, so it reads the schema.
     "db migrate": {
         "--schema-dir": String,
+        ...DATABASE_TARGET_FLAGS,
         "--baseline": String,
         "--refuse-destructive": Boolean
     },

@@ -8,12 +8,12 @@ import { writePostgresDdl } from "./generate-files";
  * serve it the first version forever. One-shot generation runs in the driver's
  * own process instead; see `generate-files.ts`.
  */
-const runGeneration = async (schemaDir?: string, outputPath?: string) => {
+const runGeneration = async (schemaDir?: string, outputPath?: string, database?: string) => {
     if (!schemaDir) {
         throw new Error("No schema directory provided.");
     }
     try {
-        await writePostgresDdl({ schemaDir: path.resolve(schemaDir), outputPath });
+        await writePostgresDdl({ schemaDir: path.resolve(schemaDir), outputPath, database });
     } catch (error) {
         // A caller that reads nothing but this process's exit code must not
         // see 0 after an error was printed — see `writePostgresDdl`.
@@ -29,10 +29,15 @@ export const main = async () => {
     const outputPathArg = process.argv.find(arg => arg.startsWith("--output="));
     const outputPath = outputPathArg ? outputPathArg.split("=")[1] : undefined;
 
+    // One database's tables (`rebase db push --database <key>`), which the
+    // driver passes here because this process does not inherit its scope.
+    const databaseArg = process.argv.find(arg => arg.startsWith("--database="));
+    const database = databaseArg ? databaseArg.slice("--database=".length) : undefined;
+
     const watch = process.argv.includes("--watch");
 
     if (!schemaDir) {
-        out("Usage: ts-node generate-postgres-ddl.ts --schema-dir=<backend/schema> [--output=<path-to-output-file>] [--watch]");
+        out("Usage: ts-node generate-postgres-ddl.ts --schema-dir=<backend/schema> [--output=<path-to-output-file>] [--database=<key>] [--watch]");
         return;
     }
 
@@ -63,10 +68,10 @@ export const main = async () => {
             // A watch session outlives a bad edit: the cause is already on
             // stderr, and the next save is the retry. Only the one-shot run
             // below turns a failure into an exit code.
-            void runGeneration(resolvedPath, resolvedOutputPath).catch(() => undefined);
+            void runGeneration(resolvedPath, resolvedOutputPath, database).catch(() => undefined);
         });
     } else {
-        await runGeneration(resolvedPath, resolvedOutputPath);
+        await runGeneration(resolvedPath, resolvedOutputPath, database);
     }
 };
 

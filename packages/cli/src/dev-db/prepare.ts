@@ -54,8 +54,12 @@ export interface PrepareOptions {
      * environment, unless the developer set that variable themselves. On an
      * external database nothing is added: whoever chose the database binds
      * the rest of them.
+     *
+     * A function is called only on the managed path, which is the only one
+     * that reads the keys — so a command on an external database does not
+     * evaluate the project's resources to learn them (`declaredAdditionalKeys`).
      */
-    additionalKeys?: readonly string[];
+    additionalKeys?: readonly string[] | (() => Promise<readonly string[]>);
 }
 
 export interface PreparedDatabase {
@@ -359,7 +363,10 @@ export async function prepareDatabaseEnv(
     // Only the keys nobody bound by hand. A developer who set
     // DATABASE_URL__ANALYTICS to a warehouse of their own has said which
     // database that is, and the managed one fills a vacuum, never a choice.
-    const unbound = (options.additionalKeys ?? []).filter((key) => {
+    const additionalKeys = typeof options.additionalKeys === "function"
+        ? await options.additionalKeys()
+        : options.additionalKeys ?? [];
+    const unbound = additionalKeys.filter((key) => {
         const name = `DATABASE_URL${resourceEnvSuffix(key)}`;
         return !process.env[name] && !envFile[name];
     });

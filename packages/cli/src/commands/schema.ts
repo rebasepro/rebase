@@ -24,6 +24,7 @@ import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir, refuseRemovedCollectionsF
 import { schemaDirArgs } from "../utils/schema-dir";
 import { RECONCILE_USAGE } from "./schema-reconcile";
 import { adoptSchemaInCodeInstructions, cliTemplatesDir, instructionsAfterIntrospectLines } from "../utils/introspected-instructions";
+import { declaredAdditionalKeys } from "../dev-db/declared-databases";
 
 /**
  * The line handed to the driver, its paths resolved from where the command was
@@ -134,7 +135,8 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
         const prepared = await prepareDatabaseEnv(projectRoot, {
             flagUrl: flags["--database-url"] ?? null,
             flagDocker: flags["--docker"] === true,
-            onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+            onProgress: (message) => console.log(chalk.gray(`  ${message}`)),
+            additionalKeys: declaredAdditionalKeys(projectRoot)
         });
         Object.assign(env, prepared.env);
         env[DEV_DATABASE_KIND_ENV] = prepared.database.kind;

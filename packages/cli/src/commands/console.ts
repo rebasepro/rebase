@@ -20,6 +20,7 @@ import { schemaDirArgs } from "../utils/schema-dir";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { DEV_DATABASE_KIND_ENV, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import { absolutizeLocalPathArgs, ensureDockerDatabase, resolveDriverCli, spawnDriverCli } from "./db";
+import { declaredAdditionalKeys } from "../dev-db/declared-databases";
 
 export const CONSOLE_FLAGS = {
     "--eval": String,
@@ -107,7 +108,8 @@ export async function consoleCommand(rawArgs: string[]): Promise<void> {
     const prepared = await prepareDatabaseEnv(projectRoot, {
         flagUrl: flags["--database-url"] ?? null,
         flagDocker: flags["--docker"] === true,
-        onProgress: say
+        onProgress: say,
+        additionalKeys: declaredAdditionalKeys(projectRoot)
     });
     Object.assign(resolved.env, prepared.env);
     // The database this run resolved, flags included, so the driver words a

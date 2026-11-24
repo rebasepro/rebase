@@ -17,6 +17,7 @@
  * record, and the command says so instead of claiming it recorded something.
  */
 import { withAppClient } from "../cli-helpers";
+import { DEFAULT_MIGRATIONS_DIR } from "../database-target";
 
 export type BaselinePlan =
     /** No history: `migrate apply --baseline <version>`, Atlas's own mechanism. */
@@ -61,12 +62,13 @@ const VERSIONS_NAMED = 5;
  * "Nothing to record" and migrated on, though it named nothing to baseline.
  *
  * @param files the migration files, sorted oldest first.
+ * @param dir the directory they are in, as the message names it.
  * @returns the refusal, its first line the error and the rest the detail.
  */
-export function baselineVersionProblem(version: string, files: readonly string[]): string | null {
+export function baselineVersionProblem(version: string, files: readonly string[], dir = DEFAULT_MIGRATIONS_DIR): string | null {
     const versions = files.map(migrationVersionOf);
     if (versions.length === 0) {
-        return `--baseline ${version}: There are no migrations in drizzle/migrations to baseline. Nothing was run.\n` +
+        return `--baseline ${version}: There are no migrations in ${dir} to baseline. Nothing was run.\n` +
             "Run `rebase db generate` to write the first one.";
     }
     if (versions.includes(version)) return null;
@@ -74,7 +76,7 @@ export function baselineVersionProblem(version: string, files: readonly string[]
     const which = versions.length > VERSIONS_NAMED
         ? `The newest ${VERSIONS_NAMED} of the ${versions.length} versions there`
         : "The versions there";
-    return `--baseline ${version} names no migration in drizzle/migrations. Nothing was run.\n` +
+    return `--baseline ${version} names no migration in ${dir}. Nothing was run.\n` +
         `${which}: ${named}. A baseline is one of them: the newest migration the database already holds.`;
 }
 

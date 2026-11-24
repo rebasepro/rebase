@@ -57,6 +57,10 @@ its policies in its own database, and routes every request — REST, realtime,
 - A declared database with no connection string **fails the boot**, naming the
   variable. The alternative — falling back to the default database — is data
   landing in the wrong place behind a server that reports itself healthy.
+- A table whose `database` names a database the server has not opened (not
+  declared in `backend/resources.ts`) is never served by the default database
+  in its place. Boot warns, naming the table, and its requests answer
+  `503 NOT_CONFIGURED`, the database's key in the message and in `details.database`.
 - A `database("x", { engine: "mongodb" })` (the `database` kind's frozen engine
   list still admits the name) refuses the boot: Postgres is the only server
   engine. `REBASE_DRIVER__<KEY>` overrides the driver *package*, never the engine.
@@ -134,6 +138,49 @@ collection cannot reach any of them: it is declared in the frontend. Before
 the SQL ones out — a Firestore collection called `exercises` once put a real,
 unrelated `public.exercises` table on the list of names Atlas was allowed to
 drop.
+
+Within those tables, each database gets its own. The generated Drizzle schema
+(`src/schema.generated.ts`) holds every table, because the server reads it for
+all of its databases. Everything that is applied to a database — boot's table
+creation and policies, and the DDL, migrations and include list of
+`rebase db push | generate | migrate` — holds only the tables that database
+stores: those whose `database` names it, and on the default database those that
+name none.
+
+## Several databases from the CLI
+
+`rebase db push`, `rebase db generate` and `rebase db migrate` act on one
+database per run. Without a flag it is the default database, at `DATABASE_URL`,
+with only the default database's tables — exactly what these commands do in a
+project with one database.
+
+```bash
+rebase db push                          # the default database
+rebase db push --database analytics     # analytics, at DATABASE_URL__ANALYTICS
+rebase db generate --database analytics # a migration for analytics alone
+rebase db migrate --all-databases       # the default, then every declared database
+```
+
+- `--database <key>` names a database declared in `backend/resources.ts`. Its
+  connection string is `DATABASE_URL__<KEY>`, or `--database-url` when given. A
+  key nothing declares is refused, listing the declared ones; so is a declared
+  database nothing binds. Nothing runs in either case.
+- Each database keeps its own migration history: the default's in
+  `drizzle/migrations`, another's in `drizzle/migrations/<key>` (Atlas reads only
+  the files directly in a directory, so the two never mix). `database("analytics",
+  { migrations: "db/analytics" })` names another directory, relative to the
+  directory `resources.ts` is in; the same option on the default database moves
+  its history too.
+- `--all-databases` runs the command for the default database and then each
+  declared one, in declaration order, stopping at the first that fails. It does
+  not take `--database-url`: one connection string cannot be several databases.
+- The users table, the auth tables and the schema-version stamp belong to the
+  default database, so a run on another database creates neither. The RLS
+  helper functions and the request role are set up in each database, as boot
+  does.
+- On `rebase dev`'s managed database, every `rebase db`, `doctor`, `console`,
+  `verify` and `schema` command binds `DATABASE_URL__<KEY>` for each declared
+  database, as `rebase dev` does, unless you set the variable yourself.
 
 ## What is gone
 

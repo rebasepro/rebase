@@ -30,6 +30,7 @@ import { LOCAL_CONNECT_TIMEOUT_MS, LOCAL_QUERY_TIMEOUT_MS } from "../dev-db/loca
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, type PreparedDatabase } from "../dev-db/prepare";
 import { type DevDatabase } from "../dev-db/resolve";
 import type { AtlasDevDatabase } from "../dev-db/atlas-dev-database";
+import { declaredAdditionalKeys } from "../dev-db/declared-databases";
 
 /**
  * The connection string a prepared database actually answers on.
@@ -627,7 +628,11 @@ export async function runDriverDbCommand(
     const prepared = await prepareDatabaseEnv(projectRoot, {
         flagUrl: readFlagValue(rawArgs, "--database-url"),
         flagDocker: switchOn(rawArgs, "--docker"),
-        onProgress: (message) => { if (!options.quiet) console.log(chalk.gray(`  ${message}`)); }
+        onProgress: (message) => { if (!options.quiet) console.log(chalk.gray(`  ${message}`)); },
+        // Every declared database, as `rebase dev` binds them: `db push
+        // --database analytics` on the managed database reads
+        // DATABASE_URL__ANALYTICS, which only this puts there.
+        additionalKeys: declaredAdditionalKeys(projectRoot)
     });
     Object.assign(env, prepared.env);
     // What named the database, for the driver's "Cannot connect" banner to
@@ -1736,9 +1741,14 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
 const DATABASE_FLAGS_HELP =
     "--database-url <url> names the database; --docker uses the compose one, starting it if needed.";
 
+/** How the schema commands pick one of several declared databases (`database("analytics")`). */
+const DATABASE_TARGET_HELP =
+    "--database <key> acts on that declared database instead of the default — its tables only, at DATABASE_URL__<KEY> "
+    + "(or --database-url), with its migrations in drizzle/migrations/<key>; --all-databases runs the default and then each declared one.";
+
 const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: string[] }> = {
     push: {
-        usage: "rebase db push [--schema-dir <dir>] [--dry-run] [--allow-destructive] [--prune-policies] [--yes]",
+        usage: "rebase db push [--schema-dir <dir>] [--database <key>] [--all-databases] [--dry-run] [--allow-destructive] [--prune-policies] [--yes]",
         summary: "Apply the schema straight to the database. Development only — it does not write a migration.",
         notes: [
             "--dry-run prints the SQL and applies nothing. Read it before you approve it.",
@@ -1748,20 +1758,22 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
             "--yes approves non-destructive pushes. It still approves destructive ones too in this release, with a "
                 + "deprecation warning; from the next release it will not — pass --allow-destructive for those.",
             `--schema-dir <dir>: ${SCHEMA_DIR_FLAG_HELP}.`,
+            DATABASE_TARGET_HELP,
             DATABASE_FLAGS_HELP
         ]
     },
     generate: {
-        usage: "rebase db generate [--schema-dir <dir>]",
+        usage: "rebase db generate [--schema-dir <dir>] [--database <key>] [--all-databases]",
         summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the tables in backend/schema.",
         notes: [
             "A migration that drops or narrows data is named when it is written. It is still written.",
             `--schema-dir <dir>: ${SCHEMA_DIR_FLAG_HELP}.`,
+            DATABASE_TARGET_HELP,
             DATABASE_FLAGS_HELP
         ]
     },
     migrate: {
-        usage: "rebase db migrate [--schema-dir <dir>] [--baseline <version>] [--refuse-destructive] [amount]",
+        usage: "rebase db migrate [--schema-dir <dir>] [--database <key>] [--all-databases] [--baseline <version>] [--refuse-destructive] [amount]",
         summary: "Run the pending migration files against the database.",
         notes: [
             "--refuse-destructive dry-runs the pending files and applies nothing when one drops or narrows data.",
@@ -1769,6 +1781,7 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
             "It is what a database Rebase has already booted against needs: boot ensures the schema, so the first migration would try to create tables that are already there.",
             "The version is the numeric prefix of a file in drizzle/migrations.",
             `--schema-dir <dir>: ${SCHEMA_DIR_FLAG_HELP} — read after applying, to stamp the policies the migration created.`,
+            DATABASE_TARGET_HELP,
             DATABASE_FLAGS_HELP
         ]
     },

@@ -44,6 +44,7 @@ import {
     type DeclaredDependency,
     type EnvironmentFinding
 } from "../doctor-environment";
+import { declaredAdditionalKeys } from "../dev-db/declared-databases";
 
 /**
  * Files that can hold a connection string the project actually runs on.
@@ -580,7 +581,8 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // which is the truth.
     try {
         const prepared = await prepareDatabaseEnv(projectRoot, {
-            onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+            onProgress: (message) => console.log(chalk.gray(`  ${message}`)),
+            additionalKeys: declaredAdditionalKeys(projectRoot)
         });
         Object.assign(env, prepared.env);
         // What named the database, as the `db` commands pass it: the driver's
