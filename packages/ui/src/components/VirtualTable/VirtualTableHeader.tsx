@@ -12,6 +12,8 @@ import { IconButton } from "../IconButton";
 import { Popover } from "../Popover";
 import { defaultBorderMixin } from "../../styles";
 import { cls } from "../../util/cls";
+import { columnWidth } from "./columnVars";
+
 interface FilterFormProps<T> {
     column: VirtualTableColumn<T>;
     onFilterUpdate: (filter?: [VirtualTableWhereFilterOp, unknown], newOpenFilterState?: boolean) => void;
@@ -118,8 +120,9 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                     )}
                     style={{
                         left: column.frozen ? 0 : undefined,
-                        minWidth: column.width,
-                        maxWidth: column.width
+                        // The live width while this column's edge is dragged.
+                        minWidth: columnWidth(columnIndex, column.width),
+                        maxWidth: columnWidth(columnIndex, column.width)
                     }}
                     onMouseEnter={() => setOnHover(true)}
                     onMouseMove={() => setOnHover(true)}
