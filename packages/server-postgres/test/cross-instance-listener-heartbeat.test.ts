@@ -271,12 +271,12 @@ describe("RealtimeService's cross-instance listener", () => {
 
         // Its own sid: already delivered locally when the write was made.
         const ownSid = Reflect.get(service, "instanceId") as string;
-        notify?.({ payload: JSON.stringify({ sid: ownSid, p: "posts", eid: "1", db: null }) });
+        notify?.({ channel: "rebase_entity_changes", payload: JSON.stringify({ sid: ownSid, p: "posts", eid: "1", db: null }) });
         jest.advanceTimersByTime(350);
         await flush();
         expect(ws.send).not.toHaveBeenCalled();
 
-        notify?.({ payload: JSON.stringify({ sid: "inst_other", p: "posts", eid: "1", db: null }) });
+        notify?.({ channel: "rebase_entity_changes", payload: JSON.stringify({ sid: "inst_other", p: "posts", eid: "1", db: null }) });
         await flush();
         jest.advanceTimersByTime(350);
         await flush();

@@ -226,8 +226,17 @@ export class PgNotifyListener {
                 }
             });
 
+            // Postgres folds the unquoted identifier `LISTEN` was given, and
+            // reports the folded name on every notification.
+            const listenedChannel = channel.toLowerCase();
             client.on("notification", (msg) => {
                 if (!msg.payload) return;
+                // Only this connection's channel. The managed development
+                // database (PGlite) multiplexes every connection onto one
+                // backend, so a LISTEN connection there is also handed every
+                // channel any other connection listens on — CDC read the DDL
+                // trigger's `rebase_schema_changed` payloads as row changes.
+                if (msg.channel !== listenedChannel) return;
                 // A handler rejection must never surface as an unhandled
                 // rejection inside the pg client's event emitter.
                 Promise.resolve(onPayload(msg.payload)).catch((err) =>
