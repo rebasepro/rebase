@@ -110,6 +110,7 @@ import { legacyCollectionsDir, legacyLayoutRefusal, MIGRATE_COMMAND } from "../.
 import { BUNDLE_FORMAT_VERSION } from "@rebasepro/types";
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
 import { withTempArchive } from "../../utils/temp-archive";
+import { missingDependenciesHint } from "../../utils/missing-dependencies";
 import { deriveOptionsFor, deriveResourceGraph } from "../../resources/derive";
 import type { RebaseAppConfig, RebaseBackendAppConfig, RebaseProjectManifest, RebaseStaticAppConfig } from "@rebasepro/types";
 
@@ -408,7 +409,7 @@ app: target.app as RebaseBackendAppConfig };
             fail(
                 `${resourceIssues.length} problem(s) in the declared resources:\n` +
                     resourceIssues.map(i => `  ${i.path}  ${i.message}`).join("\n"),
-                undefined,
+                missingDependenciesHint(resourceIssues.map(i => i.message), projectRoot),
                 "build_failed"
             );
         }
