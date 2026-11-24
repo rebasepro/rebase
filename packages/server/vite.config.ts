@@ -38,9 +38,31 @@ const CONSUMER_EXTERNALS = [
     // same object as the one it gets from `zod`.
     "zod"
 ];
+/**
+ * `@rebasepro/*` packages the runtime image supplies, imported by name rather
+ * than inlined — the same list, for the same reason, as the driver's
+ * `RUNTIME_PROVIDED_SCOPED` in packages/server-postgres/vite.config.ts.
+ *
+ * Inlined, every runtime held two copies of each: this package's, and the one
+ * in the package's own dist that the driver imports. That is about 440 KB of
+ * source V8 keeps for the life of the process, the bytecode compiled from it
+ * twice, and two sets of module state that only some code shares
+ * (`Symbol.for` registries) and the rest does not (warn-once sets, resource
+ * kind amendments, the classes `instanceof` compares against).
+ *
+ * Each is in this package's `dependencies` and in the CLI's RUNTIME_PROVIDED,
+ * so an npm consumer installs it, a linked consumer resolves it through the
+ * workspace, and a managed bundle gets the image's. `@rebasepro/client` stays
+ * inlined: nothing else in a runtime loads it, so there is no second copy.
+ */
+const RUNTIME_PROVIDED_SCOPED = [
+    "@rebasepro/types",
+    "@rebasepro/common",
+    "@rebasepro/utils"
+];
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
-    // Inline all @rebasepro/* packages
+    if (RUNTIME_PROVIDED_SCOPED.some(pkg => id === pkg || id.startsWith(pkg + "/"))) return true;
 
     // Externalize only deps the consumer app explicitly installs
     if (CONSUMER_EXTERNALS.some(ext => id === ext || id.startsWith(ext + "/"))) return true;
@@ -117,11 +139,7 @@ export default defineConfig(() => ({
     resolve: {
         // This is a Node-only library: resolve package exports with the "node"
         // condition (not "browser").
-        conditions: [...defaultServerConditions],
-        alias: {
-            "@rebasepro/common": path.resolve(__dirname, "../common/src"),
-            "@rebasepro/types": path.resolve(__dirname, "../types/src")
-        }
+        conditions: [...defaultServerConditions]
     },
     // See `oneByteSource`: a runtime holds this package's source in memory for
     // as long as it runs, so it is emitted without JSDoc (`comments` above) and

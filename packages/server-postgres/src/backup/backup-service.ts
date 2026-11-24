@@ -10,7 +10,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { execa } from "execa";
+import type { execa as Execa } from "execa";
 import type { StorageController } from "@rebasepro/server";
 import { pgToolVariable, resolvePgBinary } from "./pg-binary";
 import {
@@ -39,6 +39,21 @@ import {
 import { BackupObject, RetentionOptions, selectBackupsToPrune } from "./retention";
 import { applyGlobalsWith, discardPartialDumpWith, pruneWith } from "./backup-logic";
 import { splitPassword } from "../utils/connection-string";
+
+/**
+ * execa, loaded when a backup first runs a tool rather than when the driver is
+ * imported.
+ *
+ * Every runtime imports this module, because the driver's index re-exports the
+ * backup API, and most runtimes never take a backup. execa and its
+ * dependencies are about 200 KB of source that V8 holds for the life of the
+ * process once loaded, plus the `child_process`, `tty` and `v8` built-ins they
+ * import. A static import here also kept the CLI's small flag-parsing helpers
+ * in the same chunk, so every boot loaded all of it.
+ */
+function loadExeca(): Promise<typeof Execa> {
+    return import("execa").then(module => module.execa);
+}
 
 /**
  * How a libpq tool is invoked for a connection string: the URL its command
@@ -85,6 +100,7 @@ export { resolvePgBinary };
 
 /** Run `<bin> --version` and extract the major version. */
 export async function detectToolMajor(bin: string): Promise<number | null> {
+    const execa = await loadExeca();
     try {
         const { stdout } = await execa(bin, ["--version"]);
         return parsePgToolMajor(stdout);
@@ -227,6 +243,7 @@ export async function createDump(opts: {
             "Install the PostgreSQL client tools or set PG_DUMP_PATH."
         );
     }
+    const execa = await loadExeca();
 
     const fileName = opts.fileName ?? buildBackupFilename(opts.dbName);
     const outDir = opts.outDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "rebase-backup-"));
@@ -361,6 +378,7 @@ export async function validateDump(
         // pruning doesn't proceed on an unverified dump.
         return { ok: false, reason: "Could not find 'pg_restore' to verify the dump." };
     }
+    const execa = await loadExeca();
     try {
         await execa(bin, buildPgRestoreListArgs(localFile), {
             stdio: "pipe",
@@ -437,6 +455,7 @@ export async function restoreDump(opts: {
         noOwner: opts.noOwner,
         exitOnError: opts.exitOnError
     });
+    const execa = await loadExeca();
     try {
         await execa(bin, args, {
             stdio: opts.inheritStdio ? "inherit" : "pipe",
@@ -499,6 +518,7 @@ export async function restoreDumpReplacing(opts: {
         );
     }
     const tool = libpqInvocation(opts.connectionString, env);
+    const execa = await loadExeca();
 
     const script = execa(restoreBin, buildPgRestoreScriptArgs({ inputFile: opts.inputFile, noOwner: opts.noOwner }), {
         stdin: "ignore",
@@ -669,6 +689,7 @@ export async function readDumpObjects(
         Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined)
     );
     let listed: string;
+    const execa = await loadExeca();
     try {
         ({ stdout: listed } = await execa(bin, buildPgRestoreListArgs(inputFile), { stdio: "pipe", env: toolEnv }));
     } catch (err) {

@@ -44,16 +44,18 @@ function runtimeProvidedScoped() {
     return [...block[1].matchAll(/"(@rebasepro\/[^"]+)"/g)].map(m => m[1]);
 }
 
-/** Every built .js file in a package's dist. */
-function distFiles(pkg) {
+/** Every built .js file in a package's dist, minus the top-level directories in `skip`. */
+function distFiles(pkg, skip = []) {
     const dir = path.join(ROOT, "packages", pkg, "dist");
     if (!existsSync(dir)) return [];
     const out = [];
     const walk = d => {
         for (const entry of readdirSync(d, { withFileTypes: true })) {
             const full = path.join(d, entry.name);
-            if (entry.isDirectory()) walk(full);
-            else if (entry.name.endsWith(".js")) out.push(full);
+            if (entry.isDirectory()) {
+                if (d === dir && skip.includes(entry.name)) continue;
+                walk(full);
+            } else if (entry.name.endsWith(".js")) out.push(full);
         }
     };
     walk(dir);
@@ -70,10 +72,27 @@ const REGISTRY_MARKERS = [
     '"@rebasepro/types.resourceKinds'
 ];
 
-const DRIVERS = ["server-postgres"];
+/**
+ * The packages a runtime loads beside the image's copies, and what each may
+ * still embed.
+ *
+ * `server` is the runtime itself, and inlined all three until 2026-11-24: a pod
+ * then held the registry's code in the server's dist and again in
+ * `@rebasepro/types`', which the driver imports, along with a second copy of
+ * everything else in types, common and utils (about 440 KB of source kept for
+ * the life of the process). Its `functions/` and `schema/` entries come from
+ * `vite.config.functions.ts`, which inlines on purpose so the functions entry
+ * runs on an edge host with nothing installed; they are not this gate's
+ * subject. `@rebasepro/client` stays inlined in the server because nothing
+ * else in a runtime loads it, so there is no second copy to collapse onto.
+ */
+const DRIVERS = [
+    { pkg: "server-postgres", skipDirs: [], inlinedByDesign: [] },
+    { pkg: "server", skipDirs: ["functions", "schema"], inlinedByDesign: ["@rebasepro/client"] }
+];
 
-for (const driver of DRIVERS) {
-    const files = distFiles(driver);
+for (const { pkg: driver, skipDirs, inlinedByDesign } of DRIVERS) {
+    const files = distFiles(driver, skipDirs);
 
     test(`${driver}: dist is built (otherwise this gate proves nothing)`, () => {
         assert.ok(
@@ -109,7 +128,7 @@ for (const driver of DRIVERS) {
         );
         const declared = Object.keys(manifest.dependencies ?? {});
         for (const pkg of provided) {
-            if (!declared.includes(pkg)) continue;
+            if (!declared.includes(pkg) || inlinedByDesign.includes(pkg)) continue;
             const inlined = !text.includes(`"${pkg}"`) && !text.includes(`'${pkg}'`);
             assert.ok(
                 !inlined,

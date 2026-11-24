@@ -11,6 +11,10 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+### Changed
+
+- **A runtime at rest holds about 2 MB less heap.** `@rebasepro/server` inlined its own copies of `@rebasepro/types`, `@rebasepro/common` and `@rebasepro/utils`, and the database driver imports those packages by name, so every runtime loaded each twice: about 440 KB of source that V8 keeps for the life of the process, compiled twice, with two sets of module state. The server now imports them by name too, as the driver already did. The driver's backup code loads execa, about 200 KB with its dependencies, when a backup first runs a tool rather than at boot. A runtime that serves no backup never loads it. Measured on the runtime image's layout, the heap after boot and a GC goes from 36.7 to 34.3 MB committed (32.2 to 30.2 MB live), with no measurable difference in CPU time per request.
+
 ## [0.35.1] - 2026-11-23
 
 ### Changed
