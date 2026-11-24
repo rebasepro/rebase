@@ -1,5 +1,5 @@
 ---
-sourceHash: 8292c377d5271c6f
+sourceHash: f25a8ca7c4ed5faf
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist dasselbe Rebase, für Sie betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die Private Beta noch nicht enthält.
@@ -236,9 +236,8 @@ Hinweis im Rahmen des Live-Checks aus.
 
 ## Mehr als eine Datenbank
 
-Deklarieren Sie jede in Ihrem Code (`database("analytics")`) und deployen Sie: Sie wird auf dem
-Postgres-Server des Projekts als `DATABASE_URL__ANALYTICS` erstellt und teilt sich dessen CPU, Arbeitsspeicher,
-Festplatte, Backups und Rechnung ([Details](/docs/backend/multiple-sources/#on-rebase-cloud)).
+Deklarieren Sie jede (`database("analytics")`) und deployen Sie: Sie wird auf dem Server des Projekts als
+`DATABASE_URL__ANALYTICS` erstellt und teilt sich dessen Ressourcen und Rechnung ([Details](/docs/backend/multiple-sources/#on-rebase-cloud)).
 
 ## Dateispeicher
 
