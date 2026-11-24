@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import type { AuthChangeEvent } from "@rebasepro/types";
 import { createMemoryStorage, createRebaseClient, type AuthStorage } from "../src/index";
 
@@ -12,6 +12,12 @@ import { createMemoryStorage, createRebaseClient, type AuthStorage } from "../sr
  * has no session" to skip the question would miss a cookie set by a sign-in
  * somewhere else — another app on a shared `cookieAuth.domain`, which is what
  * that option is for — so it does not.
+ *
+ * Only that load-time question says it is one (`{ "probe": true }`), and a
+ * server that knows the probe answers it `204 No Content` when the browser
+ * presents no cookie at all: "nobody is signed in here" is the usual answer
+ * on a first visit, and a 401 put a red line in every new user's console. A
+ * server from before the probe answers `401 NO_SESSION`, which means the same.
  */
 
 const HOUR = 3_600_000;
@@ -40,8 +46,12 @@ function createBrowser() {
         /** A live cookie's session the server has since refused: revoked, or its account disabled. */
         refused: undefined as "SESSION_REVOKED" | "ACCOUNT_DISABLED" | undefined,
         refreshGate: undefined as Promise<void> | undefined,
+        /** Whether the server answers the load-time probe (`{ probe: true }`) with 204. */
+        knowsProbe: true,
         storage: createMemoryStorage() as AuthStorage,
-        paths: [] as string[]
+        paths: [] as string[],
+        /** The body of every `/auth/refresh`, in order. */
+        refreshBodies: [] as string[]
     };
     const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -55,8 +65,14 @@ function createBrowser() {
         if (path === "/auth/refresh") {
             // What the request carried was decided when it was sent.
             const carried = browser.cookie;
+            const sent = typeof init?.body === "string" ? init.body : "";
+            browser.refreshBodies.push(sent);
             await browser.refreshGate;
-            if (carried === "none") return json({ error: { code: "NO_SESSION", message: "No refresh token presented" } }, 401);
+            if (carried === "none") {
+                const probe = sent !== "" && (JSON.parse(sent) as { probe?: unknown }).probe === true;
+                if (probe && browser.knowsProbe) return new Response(null, { status: 204 });
+                return json({ error: { code: "NO_SESSION", message: "No refresh token presented" } }, 401);
+            }
             if (carried === "unknown-to-server") return json({ error: { code: "INVALID_TOKEN", message: "Invalid refresh token" } }, 401);
             if (browser.refused) {
                 // The server clears the cookie with a refusal like this one.
@@ -221,5 +237,81 @@ describe("a cookie-mode session", () => {
         await next.auth.isInitialized();
         expect(b.refreshes()).toBe(before + 1);
         expect(next.auth.restoreOutcome()).toBe("restored");
+    });
+});
+
+describe("the load-time probe", () => {
+    it("on a first visit asks once, as a probe, and is told nobody is signed in without an error", async () => {
+        const b = browser();
+        const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+        try {
+            const page = b.load();
+            await page.auth.isInitialized();
+
+            expect(b.browser.refreshBodies).toEqual([JSON.stringify({ probe: true })]);
+            expect(page.auth.restoreOutcome()).toBe("none");
+            expect(page.auth.getSession()).toBeNull();
+            expect(errors).not.toHaveBeenCalled();
+        } finally {
+            errors.mockRestore();
+        }
+    });
+
+    it("against a server from before the probe, a 401 NO_SESSION still restores nothing", async () => {
+        const b = browser();
+        b.browser.knowsProbe = false;
+
+        const page = b.load();
+        await page.auth.isInitialized();
+
+        expect(b.browser.refreshBodies).toEqual([JSON.stringify({ probe: true })]);
+        expect(page.auth.restoreOutcome()).toBe("none");
+        expect(page.auth.getSession()).toBeNull();
+    });
+
+    it("probes and restores the session a live cookie holds", async () => {
+        const b = browser();
+        b.browser.cookie = "live";
+
+        const page = b.load();
+        await page.auth.isInitialized();
+
+        expect(b.browser.refreshBodies).toEqual([JSON.stringify({ probe: true })]);
+        expect(page.auth.restoreOutcome()).toBe("restored");
+    });
+
+    it("is not what a refresh of a session in memory sends", async () => {
+        const b = browser();
+        b.browser.cookie = "live";
+        const page = b.load();
+        await page.auth.isInitialized();
+
+        await page.auth.refreshSession();
+
+        expect(b.browser.refreshBodies.slice(1)).toEqual([JSON.stringify({})]);
+    });
+
+    it("is not what an explicit refreshSession() sends with nobody signed in, which is refused as before", async () => {
+        const b = browser();
+        const page = b.load();
+        await page.auth.isInitialized();
+
+        await expect(page.auth.refreshSession()).rejects.toMatchObject({ status: 401, code: "NO_SESSION" });
+        expect(b.browser.refreshBodies.slice(1)).toEqual([JSON.stringify({})]);
+    });
+
+    it("tells a refreshSession() that shared it while it was asking that nobody is signed in", async () => {
+        const b = browser();
+        const gate = deferred();
+        b.browser.refreshGate = gate.promise;
+        const page = b.load();
+
+        const shared = page.auth.refreshSession();
+        gate.resolve();
+
+        await expect(shared).rejects.toMatchObject({ code: "NOT_SIGNED_IN" });
+        await page.auth.isInitialized();
+        expect(page.auth.restoreOutcome()).toBe("none");
+        expect(b.refreshes()).toBe(1);
     });
 });
