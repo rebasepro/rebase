@@ -14,6 +14,10 @@ jest.mock("@rebasepro/app", () => ({
     useAuthController: () => ({ getAuthToken: async () => "test-token" }),
     useSnackbarController: () => ({ open: snackbarOpen }),
     useTranslation: () => ({ t: (k: string) => k, i18n: { language: "en" } }),
+    useRebaseContext: () => ({ authController: { user: null } }),
+    useRebaseClient: () => undefined,
+    ConfirmationDialog: () => null,
+    UserSelectPopover: () => null,
     useTableDescriptors: () => ({
         status: "ready",
         tables: [
@@ -124,8 +128,8 @@ describe("Zero-code Studio console views", () => {
         });
     });
 
-    it("TableEditorView loads PostgreSQL tables and rows over /api/admin/db/tables and /api/data", async () => {
-        installFetch((url) => {
+    it("TableEditorView loads PostgreSQL tables over /api/admin/db/tables and their rows over the admin rows route", async () => {
+        const calls = installFetch((url) => {
             if (url.endsWith("/api/admin/db/tables")) {
                 return fakeResponse({
                     tables: [
@@ -148,9 +152,17 @@ describe("Zero-code Studio console views", () => {
                     ]
                 });
             }
-            if (url.includes("/api/data/tasks")) {
+            if (url.includes("/api/admin/db/tables/tasks/rows")) {
                 return fakeResponse({
-                    data: [{ id: "row-1", title: "Ship zero-code BaaS" }]
+                    columns: [
+                        { name: "id", type: "uuid", udt: "uuid", category: "U", notNull: true, default: "gen_random_uuid()", identity: null, generated: null, primaryKey: true, comment: null },
+                        { name: "title", type: "text", udt: "text", category: "S", notNull: true, default: null, identity: null, generated: null, primaryKey: false, comment: null }
+                    ],
+                    rows: [{ id: "row-1", title: "Ship zero-code BaaS" }],
+                    count: { value: 1, exact: true },
+                    primaryKey: ["id"],
+                    readOnly: false,
+                    readOnlyReason: null
                 });
             }
             return fakeResponse({});
@@ -160,6 +172,9 @@ describe("Zero-code Studio console views", () => {
 
         expect(await screen.findByText("public.tasks")).toBeTruthy();
         expect(await screen.findByText("Ship zero-code BaaS")).toBeTruthy();
+        // Read as the database owner through the admin API, not the data API.
+        expect(calls.some(call => call.url.includes("/api/admin/db/tables/tasks/rows?schema=public"))).toBe(true);
+        expect(calls.some(call => call.url.includes("/api/data/"))).toBe(false);
     });
 
     it("WebhooksView renders database webhooks from /api/admin/webhooks", async () => {

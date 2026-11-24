@@ -52,6 +52,7 @@ jest.mock("@xyflow/react", () => {
         EdgeLabelRenderer: () => null,
         getSmoothStepPath: () => ["", 0, 0],
         useReactFlow: () => ({ fitView: mockFitView, setCenter: jest.fn() }),
+        useNodesInitialized: () => true,
         applyNodeChanges: (_changes: unknown, nodes: unknown) => nodes,
         applyEdgeChanges: (_changes: unknown, edges: unknown) => edges
     };
@@ -88,7 +89,8 @@ jest.mock(
     { virtual: true }
 );
 
-import { SchemaVisualizer } from "../src/components/SchemaVisualizer/SchemaVisualizer";
+import { TablesDiagram } from "../src/components/SchemaVisualizer/TablesDiagram";
+import type { CatalogGraphTable } from "../src/components/SchemaVisualizer/useSchemaGraph";
 
 /** A chain of tables `c<i>`, each belonging to the one before; `c5` also has `c100` and `c200` pointing at it. */
 const chain = (count: number) => readyTables(chainSchema("", count, false));
@@ -104,19 +106,17 @@ afterEach(() => {
     delete (globalThis as { Worker?: unknown }).Worker;
 });
 
-describe("the schema visualizer's canvas", () => {
+describe("the schema diagram's canvas", () => {
     it("says it is laying out while the worker runs, then draws the result", async () => {
         Object.assign(globalThis, { Worker: class {} });
         const realCreateObjectURL = URL.createObjectURL;
         URL.createObjectURL = () => "blob:layout";
         try {
             tables = chain(3);
-            render(<SchemaVisualizer/>);
+            render(<TablesDiagram catalog={[]}/>);
 
             expect(screen.getByRole("status").textContent).toBe("Laying out the diagram…");
             expect(drawn()).toBe("");
-            // The list does not wait for the layout.
-            expect(screen.getByText("c2")).toBeTruthy();
 
             await waitFor(() => expect(mockWorkers).toHaveLength(1));
             await act(() => mockWorkers[0].run());
@@ -129,16 +129,16 @@ describe("the schema visualizer's canvas", () => {
         }
     });
 
-    it("draws a large schema one neighbourhood at a time, moved from the list", async () => {
+    it("draws a large schema one neighbourhood at a time, moved by the table list's selection", async () => {
         tables = chain(320);
-        render(<SchemaVisualizer/>);
+        const { rerender } = render(<TablesDiagram catalog={[]}/>);
 
         expect(screen.getByText(/Showing 5 of 320 tables: c5 and the tables around it/)).toBeTruthy();
         expect(drawn()).toBe("table-c4table-c5table-c6table-c100table-c200");
         await waitFor(() => expect(mockFitView).toHaveBeenCalledTimes(1));
 
-        // Every table is still listed, drawn or not.
-        fireEvent.click(screen.getByText("c250"));
+        // The Tables view's list selects a table the drawing does not show.
+        rerender(<TablesDiagram catalog={[]} highlightTable="c250"/>);
 
         await waitFor(() => expect(drawn()).toBe("table-c249table-c250table-c251"));
         expect(screen.getByText(/Showing 3 of 320 tables: c250/)).toBeTruthy();
@@ -152,9 +152,30 @@ describe("the schema visualizer's canvas", () => {
 
     it("draws a schema of 300 tables whole", () => {
         tables = chain(300);
-        render(<SchemaVisualizer/>);
+        render(<TablesDiagram catalog={[]}/>);
 
         expect(screen.queryByText(/Showing/)).toBeNull();
         expect(screen.getByRole("list", { name: "canvas" }).children).toHaveLength(300);
+    });
+
+    it("draws the catalog's undeclared tables beside the declared ones, and always a focused table's neighbourhood when asked", () => {
+        tables = chain(3);
+        const catalog: CatalogGraphTable[] = [{
+            schema: "public",
+            name: "audit_log",
+            kind: "table",
+            rlsEnabled: false,
+            columns: [
+                { name: "id", dataType: "bigint", nullable: false, primaryKey: true, unique: true },
+                { name: "c0_id", dataType: "uuid", nullable: true, primaryKey: false, unique: false }
+            ],
+            foreignKeys: [{ name: "audit_log_c0_id_fkey", fromColumns: ["c0_id"], toSchema: "public", toTable: "c0", toColumns: ["id"] }]
+        }];
+        const { rerender } = render(<TablesDiagram catalog={catalog}/>);
+        expect(drawn()).toBe("table-c0table-c1table-c2table-audit_log");
+
+        rerender(<TablesDiagram catalog={catalog} focusTable="audit_log" alwaysFocus compact/>);
+        expect(drawn()).toBe("table-c0table-audit_log");
+        expect(screen.getByText("audit_log and the tables around it: 2 of 4")).toBeTruthy();
     });
 });

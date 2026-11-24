@@ -14,6 +14,8 @@ module.exports = {
         // "\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$":
         //     "<rootDir>/__mocks__/fileMock.js",
         "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
+        // react-router's ESM build does not load here; every suite gets the stub.
+        "^react-router$": "<rootDir>/test/__mocks__/react-router.js",
         // Before the generic rule below, which would otherwise pull in the real
         // component library: first match wins.
         "^@rebasepro/ui$": "<rootDir>/test/__mocks__/rebasepro-ui.js",

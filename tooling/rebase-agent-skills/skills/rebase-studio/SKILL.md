@@ -88,13 +88,13 @@ The Studio ships 14 built-in dev tools, all **lazy-loaded** (code-split) so they
 
 | Tool Key | Component | Name | Group | Icon | Description |
 |----------|-----------|------|-------|------|-------------|
-| `"tables"` | `TableEditorView` | Tables | Database | `Table` | Create tables, edit rows, columns, indexes, and zero-code table metadata |
+| `"tables"` | `TableEditorView` | Tables | Database | `Table` | Per table: Data (owner reads with paging, filters, FK links, CSV import/export, "Read as" an API user), Structure (columns, indexes, constraints, triggers), Policies, Relations, Stats, Settings, and View SQL; the list switches to a Diagram of the whole schema. Deep links: `/tables?table=schema.name&tableTab=policies`, `/tables?tablesView=diagram` |
 | `"sql"` | `SQLEditor` | SQL Console | Database | `terminal` | Execute raw SQL queries against the database |
 | `"js"` | `JSEditor` | JS Console | Compute | `code` | Run JavaScript with the Rebase SDK in a live sandbox |
 | `"rls"` | `RLSEditor` | RLS Policies | Database | `ShieldCheck` | Configure Row Level Security for fine-grained data access |
 | `"storage"` | `StorageView` | Storage | Storage | `HardDrive` | Browse, upload, and manage files and declarative storage policies |
 | `"cron"` | `CronJobsView` | Cron Jobs | Compute | `Clock` | Monitor and manage scheduled background tasks |
-| `"schema-visualizer"` | `SchemaVisualizer` | Schema Visualizer | Database | `Network` | Interactive ERD showing tables, columns, and relationships |
+| `"schema-visualizer"` | `SchemaDiagramView` | Schema Visualizer | Database | `Network` | ERD of the declared tables plus, where `/api/admin/db` is served, the catalog's other tables and foreign keys. With `"tables"` registered it is hidden from navigation (the diagram is a mode of the Tables view); its route still works |
 | `"branches"` | `BranchesView` | Branches | Database | `GitBranch` | Create and manage isolated database copies for development |
 | `"backups"` | `BackupsView` | Backups | Database | `Database` | Browse and download database backups |
 | `"api"` | `ApiExplorer` | API Explorer | API | `BookOpen` | Interactive API documentation with live request testing |

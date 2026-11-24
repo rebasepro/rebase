@@ -78,7 +78,7 @@
   "packages/studio/src/components/ApiExplorer/EndpointDetail.tsx::description": 1,
   "packages/studio/src/components/JSEditor/JSEditorSidebar.tsx::find_by_id": 1,
   "packages/studio/src/components/JSEditor/JSEditorSidebar.tsx::studio_sql_sidebar_snippets": 2,
-  "packages/studio/src/components/RLSEditor/RLSEditor.tsx::studio_rls_no_policies": 1,
+  "packages/studio/src/components/RLSEditor/RLSEditor.tsx::studio_tables_diagram_not_served": 1,
   "packages/studio/src/components/SchemaVisualizer/TableNode.tsx::required": 1,
   "packages/studio/src/components/SchemaVisualizer/TableNode.tsx::studio_schema_primary_key": 1,
   "packages/studio/src/components/SQLEditor/MonacoEditor.tsx::studio_schema_delete_from": 1,

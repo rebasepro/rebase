@@ -151,6 +151,9 @@ describe("per-table /api/admin/db routes (PGlite)", () => {
         expect(ddl).toContain("CREATE TRIGGER books_touch BEFORE UPDATE ON books");
         expect(ddl).toContain(`COMMENT ON TABLE "public"."books" IS 'Every book we''ve got';`);
         expect(ddl).not.toContain('"books_pkey" PRIMARY KEY (id);\nCREATE UNIQUE INDEX books_pkey');
+        // NOT NULL is said once, on the column — not again as a Postgres 18 not-null constraint.
+        expect(ddl).not.toMatch(/CONSTRAINT "books_\w+_not_null"/);
+        expect(constraints.some(c => c.kind === "other")).toBe(false);
 
         const view = await call("GET", "/tables/book_counts/details");
         expect(String(view.json.ddl)).toContain('CREATE MATERIALIZED VIEW "public"."book_counts" AS');

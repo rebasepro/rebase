@@ -21,6 +21,7 @@ const TableNodeInner = ({ data, selected }: NodeProps) => {
         isJunction,
         rlsEnabled,
         historyEnabled,
+        isUnmanaged,
         icon
     } = data as TableNodeData;
 
@@ -159,6 +160,11 @@ icon }}
 
                 {/* Badges */}
                 <div className="ml-auto flex items-center gap-1 shrink-0">
+                    {isUnmanaged && (
+                        <Tooltip title={t("studio_tables_diagram_not_served_tooltip")}>
+                            <div aria-label={t("studio_tables_diagram_not_served")} className="w-1.5 h-1.5 rounded-full bg-text-disabled dark:bg-text-disabled-dark"/>
+                        </Tooltip>
+                    )}
                     {rlsEnabled && (
                         <Tooltip title={t("studio_rls_enabled")}>
                             <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>

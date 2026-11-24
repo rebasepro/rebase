@@ -3,7 +3,7 @@
  */
 import { en } from "../../app/src/locales/en";
 import React from "react";
-import { describe, expect, it, jest, beforeEach } from "@jest/globals";
+import { afterEach, describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 import type { TableDescriptorsState } from "@rebasepro/app";
 import { failedTables, LOADING_TABLES, NO_TABLES, unavailableTables } from "./helpers/tableDescriptors";
@@ -37,6 +37,7 @@ jest.mock("@rebasepro/app", () => ({
     useStudioCapabilities: () => ({ codebase: false }),
     useApiBase: () => "http://api.test/api",
     useApiConfig: () => ({ apiUrl: "http://api.test", apiPath: "/api", getAuthToken: async () => null }),
+    useAuthController: () => ({ getAuthToken: async () => null }),
     useSnackbarController: () => ({ open: jest.fn() }),
     useRebaseContext: () => ({}),
     useRebaseClient: () => ({}),
@@ -49,10 +50,24 @@ jest.mock("@rebasepro/app", () => ({
     )
 }));
 
-import { SchemaVisualizer } from "../src/components/SchemaVisualizer/SchemaVisualizer";
+import { SchemaDiagramView } from "../src/components/SchemaVisualizer/SchemaDiagramView";
+
+/** The diagram's own page, on a backend without the catalog route: what every tenant runtime today is. */
+const SchemaVisualizer = () => <SchemaDiagramView linksToTables={false}/>;
+
+const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
     tables = LOADING_TABLES;
+    Object.defineProperty(globalThis, "fetch", {
+        configurable: true,
+        writable: true,
+        value: async () => ({ ok: false, status: 404, statusText: "Not Found", text: async () => "{}" })
+    });
+});
+
+afterEach(() => {
+    Object.defineProperty(globalThis, "fetch", { configurable: true, writable: true, value: originalFetch });
 });
 
 describe("SchemaVisualizer with nothing to draw", () => {
@@ -62,47 +77,47 @@ describe("SchemaVisualizer with nothing to draw", () => {
         expect(screen.getByText(/Loading schema/i)).toBeTruthy();
     });
 
-    it("says nothing is declared once the server answers with no tables", () => {
+    it("says nothing is declared once the server answers with no tables", async () => {
         tables = NO_TABLES;
         render(<SchemaVisualizer/>);
 
-        expect(screen.getByText(english("studio_schema_no_tables_declared"))).toBeTruthy();
+        expect(await screen.findByText(english("studio_schema_no_tables_declared"))).toBeTruthy();
         expect(screen.queryByText(/Loading schema/i)).toBeNull();
     });
 
-    it("names where a table is declared, and a command that exists", () => {
+    it("names where a table is declared, and a command that exists", async () => {
         tables = NO_TABLES;
         render(<SchemaVisualizer/>);
 
-        expect(screen.getByText(/rebase schema introspect/)).toBeTruthy();
+        expect(await screen.findByText(/rebase schema introspect/)).toBeTruthy();
         expect(screen.getByText(/backend\/schema/)).toBeTruthy();
     });
 });
 
 describe("SchemaVisualizer when the server serves no schema", () => {
 
-    it("tells a console user to upgrade a runtime that predates the route — and does not crash", () => {
+    it("tells a console user to upgrade a runtime that predates the route — and does not crash", async () => {
         tables = unavailableTables("predates-route");
         render(<SchemaVisualizer/>);
 
-        expect(screen.getByText(english("studio_schema_outdated_title"))).toBeTruthy();
+        expect(await screen.findByText(english("studio_schema_outdated_title"))).toBeTruthy();
         expect(screen.getByText(english("studio_schema_outdated_body"))).toBeTruthy();
         expect(screen.queryByText(english("studio_schema_no_tables_declared"))).toBeNull();
     });
 
-    it("says so when the backend has no auth to describe its tables to", () => {
+    it("says so when the backend has no auth to describe its tables to", async () => {
         tables = unavailableTables("no-auth");
         render(<SchemaVisualizer/>);
 
-        expect(screen.getByText(english("studio_schema_no_auth_title"))).toBeTruthy();
+        expect(await screen.findByText(english("studio_schema_no_auth_title"))).toBeTruthy();
     });
 
-    it("reports a failed request with a retry", () => {
+    it("reports a failed request with a retry", async () => {
         const retry = jest.fn();
         tables = failedTables(new Error("Bad gateway"), retry);
         render(<SchemaVisualizer/>);
 
-        expect(screen.getByRole("alert").textContent).toContain("Bad gateway");
+        expect((await screen.findByRole("alert")).textContent).toContain("Bad gateway");
         screen.getByRole("button", { name: "Retry" }).click();
         expect(retry).toHaveBeenCalled();
     });

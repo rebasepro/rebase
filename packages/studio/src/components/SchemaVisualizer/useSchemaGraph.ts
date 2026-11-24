@@ -56,6 +56,29 @@ export interface TableNodeData {
     [key: string]: unknown;
 }
 
+// ─── The live catalog, drawn beside the declared tables ───────────────
+
+/**
+ * A table as the database's catalog reports it (`GET /api/admin/db/tables`):
+ * what the diagram draws for a table the server does not serve, and the
+ * foreign keys the code never declared.
+ */
+export interface CatalogGraphTable {
+    schema: string;
+    name: string;
+    kind: "table" | "view";
+    rlsEnabled: boolean;
+    columns: readonly { name: string; dataType: string; nullable: boolean; primaryKey: boolean; unique: boolean }[];
+    foreignKeys: readonly { name: string; fromColumns: readonly string[]; toSchema: string; toTable: string; toColumns: readonly string[] }[];
+}
+
+export interface SchemaGraphOptions {
+    /** The live catalog: its undeclared tables are drawn as unmanaged nodes and its foreign keys as relations. */
+    catalog?: readonly CatalogGraphTable[];
+    /** Draw `focus`'s neighbourhood whatever the schema's size (the table inspector's Relations tab). */
+    alwaysFocus?: boolean;
+}
+
 // ─── Columns of a table descriptor ────────────────────────────────────
 
 function enumValuesOf(column: ColumnDescriptor): string[] | undefined {
@@ -128,6 +151,10 @@ function keyTypeLabel(table: TableDescriptor | undefined): string {
 
 // ─── Build graph from the tables ──────────────────────────────────────
 
+function isJunctionNode(node: Node): boolean {
+    return Boolean((node.data as TableNodeData).isJunction);
+}
+
 /**
  * Every table and relation the server declares, not yet placed. Edges carry
  * their column handles without a side; {@link placeGraph} picks the side once
@@ -140,7 +167,8 @@ interface SchemaGraph {
 
 const buildGraph = (
     tables: readonly TableDescriptor[],
-    liveRls: Set<string> | null
+    liveRls: Set<string> | null,
+    catalog: readonly CatalogGraphTable[] = []
 ): SchemaGraph => {
     /**
      * Is RLS on for this table?
@@ -342,6 +370,74 @@ height: 16 }
         });
     }
 
+    // 3. The live catalog: a table the server does not serve is still a
+    //    table, and a foreign key the code never declared still constrains.
+    const junctionTables = new Set(nodes.filter(isJunctionNode).map((node) => (node.data as TableNodeData).tableName));
+    for (const table of catalog) {
+        if (table.kind !== "table") continue;
+        const nodeId = `table-${table.name}`;
+        if (nodeColumns.has(nodeId) || junctionTables.has(table.name)) continue;
+        const fkColumns = new Set(table.foreignKeys.flatMap((fk) => fk.fromColumns));
+        const columns: ColumnInfo[] = table.columns.map((column) => ({
+            name: column.name,
+            key: column.name,
+            type: column.dataType,
+            typeLabel: column.dataType,
+            isPrimaryKey: column.primaryKey,
+            isForeignKey: fkColumns.has(column.name),
+            isRequired: !column.nullable,
+            isUnique: column.unique,
+            isEnum: false
+        }));
+        nodeColumns.set(nodeId, columns);
+        nodes.push({
+            id: nodeId,
+            type: "tableNode",
+            position: { x: 0, y: 0 },
+            data: {
+                tableName: table.name,
+                collectionName: table.name,
+                slug: table.name,
+                columns,
+                isJunction: false,
+                isUnmanaged: true,
+                rlsEnabled: isRlsEnabled(table.schema, table.name, table.rlsEnabled),
+                historyEnabled: false
+            } satisfies TableNodeData
+        });
+    }
+    const drawnEdge = new Set(edges.map((edge) => `${edge.source}|${edge.sourceHandle}|${edge.target}`));
+    for (const table of catalog) {
+        if (table.kind !== "table" || junctionTables.has(table.name)) continue;
+        const sourceNodeId = `table-${table.name}`;
+        if (!nodeColumns.has(sourceNodeId)) continue;
+        for (const fk of table.foreignKeys) {
+            const targetNodeId = junctionTables.has(fk.toTable) ? `junction-${fk.toTable}` : `table-${fk.toTable}`;
+            if (!nodeColumns.has(targetNodeId)) continue;
+            const sourceHandle = fk.fromColumns.length === 1 ? getFkHandle(sourceNodeId, fk.fromColumns[0]) : "source-default";
+            if (drawnEdge.has(`${sourceNodeId}|${sourceHandle}|${targetNodeId}`)) continue;
+            drawnEdge.add(`${sourceNodeId}|${sourceHandle}|${targetNodeId}`);
+            const targetColumn = fk.toColumns.length === 1 ? nodeColumns.get(targetNodeId)?.find((c) => c.name === fk.toColumns[0]) : undefined;
+            edges.push({
+                id: `edge-fk-${sourceNodeId}-${fk.name}`,
+                source: sourceNodeId,
+                target: targetNodeId,
+                sourceHandle,
+                targetHandle: targetColumn ? `target-${targetColumn.name}` : getPkHandle(targetNodeId),
+                type: "relationEdge",
+                data: {
+                    cardinality: "one",
+                    direction: "owning",
+                    relationName: fk.name,
+                    hasJunction: false,
+                    hasJoinPath: false,
+                    label: getCardinalityLabel("one", "owning")
+                } satisfies RelationEdgeData as Record<string, unknown>,
+                markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 }
+            });
+        }
+    }
+
     return {
         nodes,
         edges
@@ -393,7 +489,6 @@ export const LARGE_SCHEMA_TABLES = 300;
 /** How far from the focused table the drawn neighbourhood reaches. */
 export type NeighbourhoodDepth = 1 | 2;
 
-const isJunctionNode = (node: Node): boolean => Boolean((node.data as TableNodeData).isJunction);
 
 /**
  * The tables within `depth` relations of `focus`, and every relation between
@@ -493,22 +588,29 @@ export const useSchemaGraph = (
      * is drawn whole.
      */
     focus: string | null = null,
-    depth: NeighbourhoodDepth = 1
+    depth: NeighbourhoodDepth = 1,
+    options: SchemaGraphOptions = {}
 ): UseSchemaGraphResult => {
     const [version, setVersion] = useState(0);
 
     const relayout = useCallback(() => setVersion((v) => v + 1), []);
 
+    const { catalog, alwaysFocus = false } = options;
     const graph = useMemo(
-        () => (descriptors && descriptors.length > 0 ? buildGraph(descriptors, liveRls) : EMPTY_GRAPH),
-        [descriptors, liveRls]
+        () => ((descriptors && descriptors.length > 0) || (catalog && catalog.length > 0)
+            ? buildGraph(descriptors ?? [], liveRls, catalog)
+            : EMPTY_GRAPH),
+        [descriptors, liveRls, catalog]
     );
 
     const tables = graph.nodes.filter((node) => !isJunctionNode(node)).length;
     const large = tables > LARGE_SCHEMA_TABLES;
-    const focused = large
-        ? (focus && graph.nodes.some((node) => node.id === focus) ? focus : mostConnectedTable(graph)) ?? null
-        : null;
+    const focusIsTable = focus !== null && graph.nodes.some((node) => node.id === focus);
+    const focused = alwaysFocus
+        ? (focusIsTable ? focus : null)
+        : large
+            ? (focusIsTable ? focus : mostConnectedTable(graph)) ?? null
+            : null;
 
     const drawn = useMemo(
         () => (focused ? neighbourhoodOf(graph, focused, depth) : graph),

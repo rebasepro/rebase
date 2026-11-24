@@ -146,6 +146,8 @@ large: 32 },
     lazyChunk: (loader) => React.lazy(loader)
 };
 
+const stubs = new Map();
+
 module.exports = new Proxy(explicit, {
     get: (target, key) => {
         if (key in target) return target[key];
@@ -161,9 +163,15 @@ module.exports = new Proxy(explicit, {
         // Undefined makes the missing entry a "not a function" error that
         // names it; add it to `explicit` above.
         if (!/^[A-Z]/.test(key)) return undefined;
-        const Stub = ({ children }) => React.createElement("div", null, children);
-        Stub.displayName = key;
-        return Stub;
+        // One stub per name, made once: a new function on every access is a new
+        // component type on every render, and React remounts its whole subtree —
+        // a button found in one render is detached by the next.
+        if (!stubs.has(key)) {
+            const Stub = ({ children }) => React.createElement("div", null, children);
+            Stub.displayName = key;
+            stubs.set(key, Stub);
+        }
+        return stubs.get(key);
     },
     has: () => true
 });
