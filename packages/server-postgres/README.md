@@ -1,6 +1,6 @@
 # @rebasepro/server-postgres
 
-PostgreSQL database driver for Rebase, built on Drizzle ORM.
+PostgreSQL driver for [Rebase](https://rebase.pro), the open-source Postgres BaaS, built on Drizzle ORM.
 
 ## Installation
 

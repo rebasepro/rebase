@@ -32,7 +32,7 @@ export default defineConfig({
             experimentalReactChildren: true
         }),
         starlight({
-            title: "Rebase Docs",
+            title: "Rebase Postgres BaaS Docs",
             // The site's 404 is src/pages/404.astro. Starlight's own sent every
             // mistyped rebase.pro URL to a docs-shell page whose way out was
             // "Back to rebase.pro ↗" — an external-link icon, on rebase.pro.

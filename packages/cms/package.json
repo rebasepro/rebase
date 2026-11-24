@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/cms",
   "version": "0.35.1",
-  "description": "Rebase CMS — content management views, forms, and routing",
+  "description": "Admin panel views, forms and routing for Rebase, the open-source Postgres BaaS",
   "keywords": [
     "rebase",
     "cms",
@@ -11,7 +11,9 @@
     "typescript",
     "headless",
     "headless cms",
-    "content manager"
+    "content manager",
+    "baas",
+    "backend-as-a-service"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {

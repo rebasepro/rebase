@@ -1,13 +1,16 @@
 {
   "name": "@rebasepro/firebase",
   "version": "0.35.1",
-  "description": "Firebase data source for Rebase — run the Rebase admin panel and SDK against Firestore.",
+  "description": "Firebase data source for Rebase (open-source Postgres BaaS) — run the Rebase admin panel and SDK against Firestore.",
   "keywords": [
     "rebase",
     "firebase",
     "firestore",
     "cms",
-    "admin-panel"
+    "admin-panel",
+    "baas",
+    "backend-as-a-service",
+    "postgres"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {

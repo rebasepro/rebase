@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/types",
   "version": "0.35.1",
-  "description": "Rebase type definitions — shared interfaces and controller types",
+  "description": "Shared type definitions for Rebase, the open-source Postgres BaaS",
   "keywords": [
     "rebase",
     "cms",
@@ -9,7 +9,10 @@
     "typescript",
     "headless",
     "headless cms",
-    "content manager"
+    "content manager",
+    "baas",
+    "backend-as-a-service",
+    "postgres"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {

@@ -130,7 +130,7 @@ async function buildSlugMap(directoryPath, slugMap) {
     }
 })();
 
-const intro = `# Rebase Documentation
+const intro = `# Rebase — the open-source Postgres BaaS
 
 > Rebase is an open-source TypeScript backend built on Postgres: a REST API, authentication,
 > row-level security, realtime subscriptions, storage, cron jobs, and an MCP server for AI agents —

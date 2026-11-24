@@ -202,7 +202,7 @@ for (const [route, file] of pages) {
     for (const [check, re] of META) {
         const read = (f) => readFileSync(f, "utf8").match(re)?.[1]?.trim();
         const got = read(file);
-        if (got && got === read(en) && got.replace("— Rebase", "").trim().split(/\s+/).length > 2)
+        if (got && got === read(en) && got.replace(/— Rebase( Postgres BaaS)?$/, "").trim().split(/\s+/).length > 2)
             fail(route, check, got);
     }
 }

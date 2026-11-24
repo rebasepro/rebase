@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/server",
   "version": "0.35.1",
-  "description": "Database-Agnostic Backend Core for Rebase",
+  "description": "Backend core of Rebase, the open-source Postgres BaaS — REST, auth, RLS, realtime, storage, functions and cron over your Postgres",
   "keywords": [
     "rebase",
     "cms",
@@ -10,7 +10,9 @@
     "postgresql",
     "drizzle",
     "backend",
-    "database"
+    "database",
+    "baas",
+    "backend-as-a-service"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {
