@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **The Rebase connector reads a project's files.** Three read-only tools on the platform's MCP endpoint (`POST /api/admin/mcp`): `storage_list` lists one folder of a storage source a page at a time and names the project's sources and the bucket each serves, `storage_head` says whether one object is there with its size, type and last change, and `storage_get` adds its content when it is text, at most 512 KB, or a size-and-type note when it is binary. Each takes the key or the value a row stores (`s3://bucket/key`, `gs://`, `local://`, `rebase-storage:`), resolves its bucket to the source that serves it, and refuses a bucket no source serves, so a stored URL never reaches a bucket the project did not configure. They read through the app's own storage sources, Rebase storage or its own `S3_*` bucket, under its storage policies or `storageAuthorize` hook, with the caller as the user. Platform tokens may now carry `storage:read` (per source, `storage:read:<source>`) on that endpoint only, and never `storage:write` or `storage:delete`. The public `/mcp` does not offer the tools. Content comes back fenced as untrusted data, like rows.
+
 ## [0.36.0] - 2026-11-24
 
 ### Added

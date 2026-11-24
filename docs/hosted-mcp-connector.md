@@ -80,7 +80,7 @@ replaced:
   The control plane must not expose its own database (projects, deployments,
   billing rows) through the default tools, so it replaces them, not adds to
   them.
-- **The control plane** registers the twelve tools below, and `REBASE_MCP_ENABLED`
+- **The control plane** registers the tools below, and `REBASE_MCP_ENABLED`
   plus `REBASE_PUBLIC_URL` turn the endpoint on.
 
 A separate service was considered and rejected. It would need its own OAuth
@@ -125,7 +125,8 @@ verifies it with a public key.
   customer's "Studio access off" switch turns both off.
 - The token: `rpt_<ES256 JWS>`, `aud` = the project, `sub` = the account,
   `scope` = the data scopes the call needs (`data:read`, or `data:write` /
-  `data:delete` for a confirmed write, `cron:read` / `cron:write` for cron),
+  `data:delete` for a confirmed write, `storage:read` for a file read,
+  `cron:read` / `cron:write` for cron),
   `exp - iat` = 300 s, a `jti` logged at both ends.
 - The tenant runs the call through its own `mcp-tools.ts`, under row-level
   security, as `platform:<uid>` with the role `admin`. That is the reach of the
@@ -178,7 +179,7 @@ The control plane's grant uses its own vocabulary, not the data plane's:
 | `project:logs` | read runtime, build and cron logs |
 | `project:env` | list env var names; set and unset (confirmed) |
 | `project:deploy` | deploy, roll back, cancel (confirmed) |
-| `project:studio` | read data and schemas, the table view; write data and run cron jobs (confirmed) |
+| `project:studio` | read data, files and schemas, the table view; write data and run cron jobs (confirmed) |
 
 The consent screen lists them in plain words. `project:backups`,
 `project:restore`, `project:database` and `project:configure` are not offered:
@@ -186,7 +187,7 @@ no tool needs them.
 
 ## The tools
 
-Twelve tools, down from 55 local plus 11 per app. Each takes `project` (an id or a
+Sixteen tools, down from 55 local plus 11 per app. Each takes `project` (an id or a
 name; ambiguity is an error that lists the matches) except `projects`.
 
 | # | Tool | Arguments | Annotations | Needs | Runs |
@@ -196,6 +197,9 @@ name; ambiguity is an error that lists the matches) except `projects`.
 | 3 | `logs` | `project`, `source: "runtime" \| "build" \| "cron"`, `deployment?`, `job?`, `tail?` (200), `since?` | read-only | `project:logs` (+ `project:studio` for cron) | runtime-logs, a deployment's build log, cron run history |
 | 4 | `schema` | `project`, `table?` | read-only | `project:studio` | tenant `list_tables`, or `describe_table` when `table` is given |
 | 5 | `query` | `project`, `table`, `id?`, `where?`, `orderBy?`, `limit?`, `offset?`, `searchString?`, `count?` | read-only | `project:studio` | tenant `get_row` / `query_table` / `count_rows` |
+| 5b | `storage_list` | `project`, `source?`, `prefix?`, `limit?` (100, ≤ 1000), `cursor?` | read-only | `project:studio` | tenant `storage_list` (platform token `storage:read`) |
+| 5c | `storage_head` | `project`, `source?`, `path` (a key, or an `s3://` / `gs://` / `local://` / `rebase-storage:` value) | read-only | `project:studio` | tenant `storage_head`; a missing object is `exists: false` |
+| 5d | `storage_get` | `project`, `source?`, `path`, `maxBytes?` (64 KB, ≤ 512 KB) | read-only | `project:studio` | tenant `storage_get`: text content, or size, type and a note for a binary |
 | 6 | `show_table` | as `query`, without `id` and `count`, plus `view?` | read-only, opens a view | `project:studio` | tenant `show_table`; the view is served by the connector |
 | 6b | `show_record` | `project`, `table`, `id?`, `values?` | read-only, opens a view | `project:studio` | tenant `show_record` |
 | 6c | `show_app` | `project`, `title?`, `tables`, `code` (a React component) | read-only, opens a view | `project:studio` | tenant `show_app`, which compiles the code |
@@ -224,14 +228,45 @@ Not offered, on purpose:
 - **Creating or deleting projects, billing, backups and restores.** Each costs
   money or destroys data on a scale where the console is the right place.
   Easy to add later as actions of the tools above.
-- **Storage objects** and **invoking functions.** Possible follow-ups; neither
-  was in the brief.
+- **Changing storage objects** and **invoking functions.** Files are read-only
+  (`storage_list`, `storage_head`, `storage_get`, below); uploading or deleting
+  one, and calling a function, are possible follow-ups.
 
 Tool descriptions are written for the model: one sentence on what it is for,
 one on when to use it rather than its neighbour (`query` vs `show_table`:
 "use show_table when the person wants to look at rows; use query when you
 need the rows yourself"), and, on the four mutating tools, the confirmation
 contract.
+
+### The storage tools
+
+Added after v1 (2026-11), when an agent debugging a project's 502s could see
+rows pointing at `s3://…/…` and had no way to tell whether the objects were in
+the bucket. They are read-only and gated exactly as `query` is: the grant's
+`project:studio`, the project's developer or admin role, Studio switched on.
+The connector holds no storage credential. It relays each call to the tenant's
+`/api/admin/mcp` with a platform token for `storage:read` alone, and the tenant
+(`packages/server/src/mcp/storage-tools.ts`, served only on the platform
+endpoint, never the public `/mcp`):
+
+- reads through its own registered storage sources — Rebase storage, an
+  `S3_*` bucket, GCS or local disk, whichever the project configured;
+- accepts the value a row stores (`s3://bucket/key` and the like) and resolves
+  its bucket to the source that serves it, refusing a bucket no source serves.
+  The URL is never handed to a controller, which would read any bucket its
+  credentials reach;
+- canonicalizes the key as every storage route does, so `..` is refused;
+- checks `storage:read` on the source, then asks the app's storage rule (its
+  policies or `storageAuthorize` hook) about the object, as `GET /storage/list`
+  and `GET /storage/metadata/*` do, with `platform:<uid>` and the `admin` role
+  as the user;
+- returns at most 512 KB of an object's content, and only when the bytes are
+  text. A binary object answers its size and type and a note. Everything comes
+  back fenced as untrusted data, like a row.
+
+A runtime from before them answers either an unknown tool or a token it grants
+no scope of; the connector says, in both cases, that the project's runtime
+predates the storage tools.
 
 ## The confirmation protocol
 

@@ -50,6 +50,7 @@ import {
 import { logger } from "../utils/logger.js";
 import type { McpScope } from "./oauth-metadata.js";
 import type { McpConfirmationPlan } from "./confirmation.js";
+import type { McpStorageAccess } from "./storage-tools.js";
 import {
     MCP_VIEW_PAYLOAD_VERSION,
     VIEW_MODES,
@@ -107,6 +108,11 @@ export interface McpToolContext {
      * Absent, the tables are presented with the panel's defaults.
      */
     uiPreferences?: () => Promise<McpViewPreferences>;
+    /**
+     * The deployment's file storage, for the storage tools
+     * (`storage-tools.ts`). Present only where an endpoint serves them.
+     */
+    storage?: McpStorageAccess;
 }
 
 /**

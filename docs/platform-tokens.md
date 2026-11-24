@@ -80,9 +80,13 @@ plane, a platform token is an invalid session (401).
 **The platform's MCP endpoint.** `POST /api/admin/mcp` is mounted with the
 variables, and takes platform tokens and nothing else. There, and only there,
 a token may hold `PLATFORM_MCP_SCOPES` (`data:read`, `data:write`,
-`data:delete`), and the call runs the app's own MCP data tools under RLS as
+`data:delete`, `storage:read`), and the call runs the app's own MCP data tools under RLS as
 `platform:<sub>` with the `admin` role. The hosted connector forwards a
-project's data calls to it (`src/mcp/platform-mcp.ts`). Each accepted request
+project's data calls to it (`src/mcp/platform-mcp.ts`). `storage:read` (per
+source, `storage:read:<source>`) reaches the read-only storage tools
+(`storage_list`, `storage_head`, `storage_get`, `src/mcp/storage-tools.ts`),
+which read the app's registered storage sources under its storage rules. No
+platform token is ever granted `storage:write` or `storage:delete`. Each accepted request
 logs `[Auth] Platform token accepted` with `subject`, `jti`, `scopes`,
 `method` and `path`.
 
