@@ -102,16 +102,18 @@ One that writes needs `write: true`.
 
 Keep the Supabase user ids, so every `owner_id` still points at its user:
 import the users first, with their ids, then the application tables.
-`rebase users import` creates the accounts under the ids they had, with no
-password and no email sent, and skips one whose id or email is already there,
-so it can be run again. It reaches Rebase Cloud like every other `rebase users`
+`rebase users import` creates the accounts under the ids they had, with their
+Supabase password hashes when you pass `--password-hashes bcrypt`, sends no
+email, and skips one whose id or email is already there, so it can be run
+again. It reaches Rebase Cloud like every other `rebase users`
 command (`--project <slug>`, or `--cloud` in a linked directory).
 
 ```bash
 SUPABASE_DB_URL="postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
-psql "$SUPABASE_DB_URL" -c "\copy (select id, email, created_at, email_confirmed_at is not null as email_verified from auth.users) to users.csv csv header"
-rebase users import users.csv --dry-run
-rebase users import users.csv
+psql "$SUPABASE_DB_URL" -c "\copy (select id, email, created_at, email_confirmed_at is not null as email_verified, encrypted_password from auth.users) to users.csv csv header"
+rebase users import users.csv --password-hashes bcrypt --dry-run
+rebase users import users.csv --password-hashes bcrypt
+rm users.csv
 ```
 
 It reports each account as created, skipped or failed with the reason, and
@@ -130,8 +132,13 @@ pg_dump "$SUPABASE_DB_URL" --data-only --schema=public --no-owner > data.sql
 psql "$TARGET_URL" -f data.sql
 ```
 
-Passwords do not move. An imported user signs in with a magic link, an email
-code or a password reset, under the same id as before.
+Passwords move as their hashes. Supabase stores bcrypt in
+`auth.users.encrypted_password`, so each user signs in with the password they
+already have, under the same id as before, and their first sign-in replaces the
+hash with Rebase's own. An account that had no password (magic link, a
+provider) has an empty `encrypted_password` and signs in the way it did. Leave
+the column and the flag out to import without passwords: those users sign in
+with a magic link, an email code or a password reset.
 
 ## 5. Storage
 

@@ -108,17 +108,20 @@ rebase users guests prune --older-than 30d --yes
 | `created_at` / `createdAt` | When the account was created there. Optional: now |
 | `email_verified` / `emailVerified` | `true`/`t`/`1` or `false`/`f`/`0`. Optional: `false`, and the first magic link or reset the account follows confirms it |
 | `roles` | `editor;viewer`, a quoted `"editor,viewer"`, or a Postgres array `{editor,viewer}` |
+| `password_hash` / `encrypted_password` | The hash the other system stored. Read only with `--password-hashes bcrypt`; without the flag a file that has this column is refused before anything is sent |
 
-No password and no hash is imported, and no email is sent: an imported account signs in by magic link, an email code, a provider, or a password reset. An account whose id or email is already taken is reported as skipped and left as it is, never updated, so a file can be run again. Each account is reported as created, skipped or failed with the reason; the command exits 1 when any failed. `--dry-run` checks every account and writes nothing. The CLI sends 100 accounts per request (`POST /api/admin/users/import`), on `rebase dev`, a server or a Rebase Cloud project alike.
+No email is sent. With `--password-hashes bcrypt`, an account whose row has a hash signs in with the password it had, and its first sign-in replaces the hash with Rebase's own. Any other imported account signs in by magic link, an email code, a provider, or a password reset. A plain password is never imported. An account whose id or email is already taken is reported as skipped and left as it is, never updated, so a file can be run again. Each account is reported as created, skipped or failed with the reason; the command exits 1 when any failed. `--dry-run` checks every account and writes nothing. The CLI sends 100 accounts per request (`POST /api/admin/users/import`), on `rebase dev`, a server or a Rebase Cloud project alike.
 
 From Supabase:
 
 ```bash
 SUPABASE_DB_URL="postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
-psql "$SUPABASE_DB_URL" -c "\copy (select id, email, created_at, email_confirmed_at is not null as email_verified from auth.users) to users.csv csv header"
-rebase users import users.csv --dry-run
-rebase users import users.csv --project my-app
+psql "$SUPABASE_DB_URL" -c "\copy (select id, email, created_at, email_confirmed_at is not null as email_verified, encrypted_password from auth.users) to users.csv csv header"
+rebase users import users.csv --password-hashes bcrypt --dry-run
+rebase users import users.csv --password-hashes bcrypt --project my-app
 ```
+
+`users.csv` then holds every account's password hash: delete it once the import is done.
 
 ## `rebase cron`
 

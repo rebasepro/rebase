@@ -11,8 +11,14 @@
  * So an import:
  * - keeps `id` when given (checked by `importedUserIdProblem`), and the
  *   `createdAt` the source system recorded;
- * - carries no password and no hash, and sends nothing: an imported account
- *   signs in by magic link, an email code, a provider, or a password reset;
+ * - sends nothing, and carries no password: an imported account signs in by
+ *   magic link, an email code, a provider, or a password reset;
+ * - except the hash the other system stored, when the request names its
+ *   format (`passwordHashAlgorithm: "bcrypt"`, Supabase's
+ *   `encrypted_password`). The account then signs in with the password it
+ *   had, and the login route replaces the hash with Rebase's own scrypt the
+ *   first time it does. A hash with no declared format is refused, never
+ *   guessed at, and so is a plain password under any spelling;
  * - never updates an account. A row whose id or email is already taken is
  *   reported `skipped` and left alone, so running the same file twice is safe;
  * - answers one outcome per account, so one bad row does not stop the rest.
@@ -23,8 +29,11 @@
 import type { Context } from "hono";
 import { normalizeEmail } from "@rebasepro/common";
 import {
+    IMPORTED_PASSWORD_HASH_ALGORITHMS,
+    importedPasswordHashProblem,
     importedUserIdProblem,
     MAX_USERS_PER_IMPORT,
+    type ImportedPasswordHashAlgorithm,
     type ImportUserOutcome,
     type ImportUsersResult
 } from "@rebasepro/types";
@@ -37,10 +46,14 @@ import { logger } from "../utils/logger";
 import { getUserId } from "../functions/context";
 
 /** The fields an imported account takes, in the order a refusal lists them. */
-const IMPORT_FIELDS = ["id", "email", "displayName", "photoUrl", "createdAt", "emailVerified", "roles"] as const;
+const IMPORT_FIELDS = ["id", "email", "displayName", "photoUrl", "createdAt", "emailVerified", "roles", "passwordHash"] as const;
 
-/** Spellings of a password or its hash, which an import refuses rather than drops. */
-const PASSWORD_FIELDS = new Set(["password", "passwordHash", "password_hash", "encryptedPassword", "encrypted_password"]);
+/**
+ * Other spellings of a password or its hash, which an import refuses rather
+ * than drops: a password dropped silently is an account nobody can sign into.
+ * The hash goes in `passwordHash`, with `passwordHashAlgorithm` on the request.
+ */
+const PASSWORD_FIELDS = new Set(["password", "password_hash", "encryptedPassword", "encrypted_password"]);
 
 /** RFC 5321's bound on an address, the one the users table's CHECK holds to. */
 const MAX_EMAIL_LENGTH = 320;
@@ -54,6 +67,7 @@ interface ImportRow {
     createdAt?: Date;
     emailVerified: boolean;
     roles?: string[];
+    passwordHash?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -76,7 +90,7 @@ function optionalText(row: Record<string, unknown>, field: "displayName" | "phot
  * The body of `POST /admin/users/import`, or a 400 saying what is wrong with
  * it as a whole. The accounts in it are checked one at a time, later.
  */
-export function readImportRequest(body: unknown): { users: unknown[]; dryRun: boolean } {
+export function readImportRequest(body: unknown): { users: unknown[]; dryRun: boolean; passwordHashAlgorithm?: ImportedPasswordHashAlgorithm } {
     if (!isRecord(body) || !Array.isArray(body.users)) {
         throw invalid("The body is `{ \"users\": [ { \"email\": … }, … ] }`.");
     }
@@ -87,19 +101,30 @@ export function readImportRequest(body: unknown): { users: unknown[]; dryRun: bo
             { max: MAX_USERS_PER_IMPORT });
     }
     if (body.dryRun !== undefined && typeof body.dryRun !== "boolean") throw invalid("`dryRun` is true or false.");
-    return { users: body.users, dryRun: body.dryRun === true };
+    const algorithm = body.passwordHashAlgorithm;
+    if (algorithm !== undefined && !isImportedHashAlgorithm(algorithm)) {
+        throw invalid(`\`passwordHashAlgorithm\` is one of ${IMPORTED_PASSWORD_HASH_ALGORITHMS.join(", ")} (got ${JSON.stringify(algorithm)}).`);
+    }
+    return { users: body.users, dryRun: body.dryRun === true, ...(algorithm !== undefined ? { passwordHashAlgorithm: algorithm } : {}) };
+}
+
+function isImportedHashAlgorithm(value: unknown): value is ImportedPasswordHashAlgorithm {
+    return IMPORTED_PASSWORD_HASH_ALGORITHMS.some(algorithm => algorithm === value);
 }
 
 /**
  * One account out of the request, checked, or the refusal that says why not.
  * Roles are judged against the caller here, before anything is written.
  */
-function readImportRow(c: Context<HonoEnv>, value: unknown): ImportRow {
+function readImportRow(c: Context<HonoEnv>, value: unknown, algorithm: ImportedPasswordHashAlgorithm | undefined): ImportRow {
     if (!isRecord(value)) throw invalid("An account is an object: `{ \"email\": … }`.");
     const keys = Object.keys(value);
     const password = keys.find(key => PASSWORD_FIELDS.has(key));
+    if (password === "password") {
+        throw invalid("`password` is not imported: an imported account has no password. It signs in by magic link, an email code, a provider, or a password reset, or with its old password when the hash the other system stored is sent as `passwordHash`.");
+    }
     if (password) {
-        throw invalid(`\`${password}\` is not imported: an imported account has no password. It signs in by magic link, an email code, a provider, or a password reset.`);
+        throw invalid(`\`${password}\` is not a field an import takes. Send the hash as \`passwordHash\`, and name its format in the request's \`passwordHashAlgorithm\` (${IMPORTED_PASSWORD_HASH_ALGORITHMS.join(", ")}).`);
     }
     const unknown = keys.filter(key => !(IMPORT_FIELDS as readonly string[]).includes(key));
     if (unknown.length > 0) {
@@ -136,6 +161,17 @@ function readImportRow(c: Context<HonoEnv>, value: unknown): ImportRow {
         assertMayGrantRoles(c, roles);
     }
 
+    let passwordHash: string | undefined;
+    const rawHash = value.passwordHash;
+    if (rawHash !== undefined && rawHash !== null && rawHash !== "") {
+        if (!algorithm) {
+            throw invalid(`\`passwordHash\` needs the request to name its format: \`passwordHashAlgorithm\` (${IMPORTED_PASSWORD_HASH_ALGORITHMS.join(", ")}), or \`rebase users import --password-hashes bcrypt\`.`);
+        }
+        const problem = importedPasswordHashProblem(rawHash, algorithm);
+        if (problem || typeof rawHash !== "string") throw ApiError.badRequest(`\`passwordHash\` ${problem ?? "is not a string"}.`, "INVALID_PASSWORD_HASH");
+        passwordHash = rawHash;
+    }
+
     return {
         ...(id !== undefined ? { id } : {}),
         email,
@@ -143,7 +179,8 @@ function readImportRow(c: Context<HonoEnv>, value: unknown): ImportRow {
         photoUrl: optionalText(value, "photoUrl"),
         ...(createdAt ? { createdAt } : {}),
         emailVerified: value.emailVerified === true,
-        ...(roles ? { roles } : {})
+        ...(roles ? { roles } : {}),
+        ...(passwordHash ? { passwordHash } : {})
     };
 }
 
@@ -162,9 +199,16 @@ function refusalOf(error: unknown): { code: string; message: string } {
 export async function importUsers(
     c: Context<HonoEnv>,
     rows: readonly unknown[],
-    options: { dryRun: boolean; authRepo: AuthRepository; hooks: Pick<ResolvedAuthHooks, "beforeUserCreate"> }
+    options: {
+        dryRun: boolean;
+        authRepo: AuthRepository;
+        hooks: Pick<ResolvedAuthHooks, "beforeUserCreate">;
+        /** The format of every `passwordHash` in `rows`; absent, a row carrying one fails. */
+        passwordHashAlgorithm?: ImportedPasswordHashAlgorithm;
+    }
 ): Promise<ImportUsersResult> {
-    const { dryRun, authRepo, hooks } = options;
+    const { dryRun, authRepo, hooks, passwordHashAlgorithm } = options;
+    let withPassword = 0;
     const results: ImportUserOutcome[] = [];
     // The accounts this request has already created (or, dry, would have), so
     // a file that names one twice reports the second as taken in both modes.
@@ -176,7 +220,7 @@ export async function importUsers(
         const sentId = isRecord(value) && typeof value.id === "string" ? value.id : undefined;
         let row: ImportRow | undefined;
         try {
-            row = readImportRow(c, value);
+            row = readImportRow(c, value, passwordHashAlgorithm);
             const { id, email } = row;
             if (id !== undefined && (takenIds.has(id) || await authRepo.getUserById(id))) {
                 results.push({ index, status: "skipped", uid: id, email, code: "ID_EXISTS", message: "An account already has this id. It is left as it is." });
@@ -199,13 +243,20 @@ export async function importUsers(
                 emailVerified: row.emailVerified,
                 ...(row.displayName !== undefined ? { displayName: row.displayName } : {}),
                 ...(row.photoUrl !== undefined ? { photoUrl: row.photoUrl } : {}),
-                ...(row.createdAt ? { createdAt: row.createdAt } : {})
+                ...(row.createdAt ? { createdAt: row.createdAt } : {}),
+                ...(row.passwordHash ? { passwordHash: row.passwordHash } : {})
             };
             if (hooks.beforeUserCreate) {
                 const hooked = await hooks.beforeUserCreate(data);
                 // The id is what the import is for: a hook written before
                 // accounts could keep one rebuilds the object without it.
-                data = id !== undefined ? { ...hooked, id } : hooked;
+                // The same for the hash: dropped, the account would sign in
+                // with nothing, and nothing would say so.
+                data = {
+                    ...hooked,
+                    ...(id !== undefined ? { id } : {}),
+                    ...(row.passwordHash ? { passwordHash: row.passwordHash } : {})
+                };
             }
             const user = await authRepo.createUser(data);
             if (row.roles) {
@@ -222,6 +273,7 @@ export async function importUsers(
             }
             takenIds.add(user.id);
             takenEmails.add(email);
+            if (row.passwordHash) withPassword++;
             results.push({ index, status: "created", uid: user.id, email });
         } catch (error) {
             const { code, message } = refusalOf(error);
@@ -244,7 +296,11 @@ export async function importUsers(
             by: getUserId(c),
             created: result.created,
             skipped: result.skipped,
-            failed: result.failed
+            failed: result.failed,
+            // How many came with the other system's password hash, so the
+            // log says when an import put sign-in-able passwords in place.
+            withPasswordHash: withPassword,
+            ...(withPassword > 0 ? { passwordHashAlgorithm } : {})
         });
     }
     return result;

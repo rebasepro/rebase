@@ -13,7 +13,7 @@
 import fs from "fs";
 import type arg from "arg";
 import chalk from "chalk";
-import { MAX_USERS_PER_IMPORT, type ImportUserOutcome, type ImportUsersResult } from "@rebasepro/types";
+import { IMPORTED_PASSWORD_HASH_ALGORITHMS, MAX_USERS_PER_IMPORT, type ImportedPasswordHashAlgorithm, type ImportUserOutcome, type ImportUsersResult } from "@rebasepro/types";
 
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
@@ -258,7 +258,8 @@ async function createUser(rawArgs: string[]): Promise<void> {
 export const IMPORT_USERS_FLAGS = {
     ...PROJECT_TARGET_FLAGS,
     "--format": String,
-    "--dry-run": Boolean
+    "--dry-run": Boolean,
+    "--password-hashes": String
 } satisfies arg.Spec;
 
 /** A CSV header or JSON key, as `POST /admin/users/import` names the field: `display_name` → `displayName`. */
@@ -266,7 +267,11 @@ const IMPORT_FIELD_ALIASES: Record<string, string> = {
     display_name: "displayName",
     photo_url: "photoUrl",
     created_at: "createdAt",
-    email_verified: "emailVerified"
+    email_verified: "emailVerified",
+    // Supabase's `auth.users` column, and the generic spelling: both are the
+    // hash `--password-hashes` names the format of.
+    password_hash: "passwordHash",
+    encrypted_password: "passwordHash"
 };
 
 const TRUE_WORDS = new Set(["true", "t", "1", "yes", "y"]);
@@ -330,6 +335,7 @@ async function importUsers(rawArgs: string[]): Promise<void> {
         return { file: path, rows: readImportRows(text, format).map(importUserOf) };
     });
     const dryRun = flags["--dry-run"] === true;
+    const passwordHashAlgorithm = parsedLine(() => importHashAlgorithmOf(flags["--password-hashes"], rows));
     if (rows.length === 0) {
         emit(() => note(`${file} holds no accounts; nothing was imported.`), { dryRun, created: 0, skipped: 0, failed: 0, results: [] });
         return;
@@ -341,7 +347,7 @@ async function importUsers(rawArgs: string[]): Promise<void> {
         const slice = rows.slice(start, start + MAX_USERS_PER_IMPORT);
         const body = await requestJson(target, `${ADMIN}/users/import`, `Accounts ${start + 1}–${start + slice.length} of ${file} were refused (${results.length} handled before them)`, {
             method: "POST",
-            json: { users: slice, ...(dryRun ? { dryRun: true } : {}) },
+            json: { users: slice, ...(dryRun ? { dryRun: true } : {}), ...(passwordHashAlgorithm ? { passwordHashAlgorithm } : {}) },
             timeoutMs: 120_000
         });
         // Each request numbers its accounts from 0; the file numbers them from its first line.
@@ -363,9 +369,27 @@ async function importUsers(rawArgs: string[]): Promise<void> {
         if (summary.failed > 0) warn(`${verb} ${tally} on ${target.label}.`);
         else success(`${verb} ${tally} on ${target.label}.`);
         if (dryRun) note("Nothing was written. Run it again without --dry-run to import.");
+        else if (summary.created > 0 && passwordHashAlgorithm) note("No email was sent. An account with a password hash signs in with the password it had; the others by magic link, an email code, a provider, or a password reset.");
         else if (summary.created > 0) note("No email was sent. They sign in by magic link, an email code, a provider, or a password reset.");
     }, summary);
     if (summary.failed > 0) process.exitCode = 1;
+}
+
+/**
+ * The format `--password-hashes` names, checked against the file: a file with
+ * a hash column and no flag is refused here, before a request, rather than
+ * account by account by the server. Exported for tests.
+ */
+export function importHashAlgorithmOf(flag: string | undefined, rows: readonly Record<string, unknown>[]): ImportedPasswordHashAlgorithm | undefined {
+    if (flag === undefined) {
+        if (rows.some(row => row.passwordHash !== undefined)) {
+            throw new UsageError("The file has password hashes (a password_hash or encrypted_password column). Name their format with --password-hashes bcrypt, or leave the column out to import the accounts without passwords.");
+        }
+        return undefined;
+    }
+    const algorithm = IMPORTED_PASSWORD_HASH_ALGORITHMS.find(name => name === flag);
+    if (!algorithm) throw new UsageError(`--password-hashes takes ${IMPORTED_PASSWORD_HASH_ALGORITHMS.join(", ")} (got "${flag}").`);
+    return algorithm;
 }
 
 /** The outcomes of one import answer, read without trusting its shape. */
@@ -685,8 +709,8 @@ export const USERS_ACTIONS: HelpAction[] = [
     {
         action: "import",
         args: "<file>",
-        description: "Accounts from another system, keeping their ids: no password, no email; a taken id or email is skipped",
-        flags: [["--format <csv|json|ndjson>", "The file's format (else from its extension)"], ["--dry-run", "Check every account and write nothing"]]
+        description: "Accounts from another system, keeping their ids, no email; a taken id or email is skipped",
+        flags: [["--format <csv|json|ndjson>", "The file's format (else from its extension)"], ["--dry-run", "Check every account and write nothing"], ["--password-hashes bcrypt", "Bring the password_hash column over, so each signs in with its old password"]]
     },
     {
         action: "update",
@@ -714,7 +738,7 @@ function printUsersHelp(): void {
         notes: [
             "Examples:",
             "  rebase users create ada@example.com --role admin",
-            "  rebase users import users.csv --dry-run   (columns: id, email, display_name, created_at, email_verified, roles)",
+            "  rebase users import users.csv --dry-run   (columns: id, email, display_name, created_at, email_verified, roles, password_hash)",
             "  rebase users update bob@example.com --add-role editor",
             "  rebase users guests prune --older-than 30d --yes",
             "No caller may grant a role above its own, or act on an account that outranks it — the server refuses both."

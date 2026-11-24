@@ -131,7 +131,7 @@ a table reaches none of this. See [Roles and scopes](/docs/backend/roles-and-sco
 | `POST` | `/api/admin/bootstrap` | none, and only while no admin exists | Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 | `GET` | `/api/admin/users` | `users:read` | User management |
 | `POST` | `/api/admin/users` | `users:write` | User management. Roles beyond the caller's own are refused |
-| `POST` | `/api/admin/users/import` | `users:write` | [Imports accounts](/docs/backend/auth-endpoints/#importing-accounts) keeping their ids: no password, no email, a taken id or email skipped. At most 100 per request. Roles beyond the caller's own are refused |
+| `POST` | `/api/admin/users/import` | `users:write` | [Imports accounts](/docs/backend/auth-endpoints/#importing-accounts) keeping their ids: no email, no password unless its bcrypt hash comes with it, a taken id or email skipped. At most 100 per request. Roles beyond the caller's own are refused |
 | `GET` | `/api/admin/users/pick` | `users:read`, or write access to a table with a `.userId()` column | The [user picker's read](/docs/backend/auth-endpoints/): id, name, email and avatar only. A table whose write rules are raw SQL does not count |
 | `GET` | `/api/admin/users/:uid` | `users:read` | User management |
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |

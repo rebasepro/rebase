@@ -90,6 +90,18 @@ still names the same account. It needs `users:write`, like `POST /api/admin/user
 }
 ```
 
+With password hashes:
+
+```json
+{
+  "passwordHashAlgorithm": "bcrypt",
+  "users": [
+    { "id": "5b0a3c9e-21f4-4d3b-8a6e-7c1d2e3f4a5b", "email": "ada@example.com", "emailVerified": true,
+      "passwordHash": "$2a$10$…" }
+  ]
+}
+```
+
 - **`id`** is kept, and is optional. A uuid is the common case; any id of
   letters, digits and `_ - . : |`, starting with a letter or digit, up to 128
   characters, fits too (Firebase, Auth0, Clerk ids). `service`, `anonymous`,
@@ -99,9 +111,20 @@ still names the same account. It needs `users:write`, like `POST /api/admin/user
   `roles` are optional; `emailVerified` is `false` unless given. An unverified
   account is confirmed by the first magic link or reset it follows, and cannot
   be signed into by a provider until then.
-- **No password, no email.** A `password` or `passwordHash` field fails that
-  account, and nothing is mailed. The account signs in by magic link, an email
-  code, a provider, or a password reset.
+- **No email, and no password unless you bring the hash.** Nothing is mailed.
+  A `password` field fails that account. An account with no `passwordHash`
+  signs in by magic link, an email code, a provider, or a password reset.
+- **`passwordHash`** is the hash the other system stored, taken only when the
+  request names its format in `passwordHashAlgorithm`. Today that is
+  `"bcrypt"` (`$2a$`, `$2b$` or `$2y$`): what Supabase keeps in
+  `auth.users.encrypted_password`, and what Auth0, Clerk and most Rails,
+  Laravel and Django-bcrypt apps store. The account then signs in with the
+  password it had, and its first sign-in replaces the hash with Rebase's own
+  scrypt, without ending other sessions. A hash with no `passwordHashAlgorithm`,
+  or one that is not that format, fails that account (`INVALID_INPUT`,
+  `INVALID_PASSWORD_HASH`); the hash is never echoed back. A project with its
+  own `hashPassword` or `verifyPassword` hooks keeps the hash as imported, and
+  its `verifyPassword` decides what it accepts.
 - **Nothing is updated.** An account whose id is taken is `skipped` with
   `ID_EXISTS`, one whose email is taken with `EMAIL_EXISTS` (an earlier account
   in the same request included). Running the same import twice is safe.

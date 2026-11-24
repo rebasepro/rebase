@@ -71,10 +71,29 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 /**
- * Verify a password against a scrypt hash
- * Expects format: salt:hash (both hex encoded)
+ * Whether `storedHash` is a bcrypt hash: what `POST /admin/users/import`
+ * writes for an account brought over with the hash another system stored
+ * (Supabase's `encrypted_password`). Never what {@link hashPassword} writes,
+ * which has no `$`, so the two cannot be mistaken for each other.
+ */
+export function isBcryptHash(storedHash: string): boolean {
+    return /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(storedHash);
+}
+
+/**
+ * Verify a password against a stored hash: scrypt as {@link hashPassword}
+ * writes it (`salt:hash`, both hex), or an imported bcrypt hash.
+ *
+ * bcryptjs is loaded the first time a bcrypt hash is checked, so a server
+ * whose accounts were never imported with one never loads it. A server that
+ * has them upgrades each to scrypt at its first sign-in (the login route), so
+ * the bcrypt path is one each account takes once.
  */
 export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+    if (isBcryptHash(storedHash)) {
+        const { compare } = await import("bcryptjs");
+        return compare(password, storedHash);
+    }
     const [saltHex, hashHex] = storedHash.split(":");
     if (!saltHex || !hashHex) {
         return false;
