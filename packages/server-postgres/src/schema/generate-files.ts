@@ -1,9 +1,10 @@
 import { promises as fsPromises } from "fs";
 import * as fs from "fs";
 import path from "path";
-import { pathToFileURL } from "url";
 import { declaredDatabaseExtensions, parseEnvBoolean } from "@rebasepro/types";
 import { loadTables } from "./load-tables";
+import { loadDeclaredResources } from "./declared-resources";
+import { tablesStoredByDatabase } from "../database-target";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
     generatePostgresDdl,
@@ -55,14 +56,22 @@ export interface GenerateFileOptions {
      * `db generate`, and inside `db generate` to run itself.
      */
     nextStep?: boolean;
+    /**
+     * Only the tables this database stores (`database` on `defineTable`; the
+     * default's are those naming none). Absent: every table, or — inside a
+     * `db` command — the tables of the database it acts on.
+     */
+    database?: string;
 }
 
 /** `src/schema.generated.ts`, from the tables. */
 export async function writeDrizzleSchema(options: GenerateFileOptions): Promise<void> {
     try {
         // Shared with the runtime and the doctor (`loadTables`), in slug order so
-        // the output does not depend on the index's export order.
-        const tables = await loadTables(options.schemaDir);
+        // the output does not depend on the index's export order. Every table,
+        // whatever database stores it, even inside a `db push --database x`:
+        // the server reads this one file for all of its databases.
+        const tables = await loadTables(options.schemaDir, { allDatabases: true });
         const schemaContent = generateSchema(tables);
 
         if (options.outputPath) {
@@ -82,36 +91,6 @@ export async function writeDrizzleSchema(options: GenerateFileOptions): Promise<
         // applied whatever `src/schema.generated.ts` was already there.
         throw new GenerationFailed("Drizzle schema generation failed", { cause: error });
     }
-}
-
-/** Where a project declares its resources, relative to `backend/` (the schema directory's parent). */
-const RESOURCE_ENTRIES = ["resources.ts", "resources.js", "resources/index.ts", "resources/index.js"];
-
-/**
- * Evaluate the project's `resources.ts`, so `declaredDatabaseExtensions()` can
- * answer.
- *
- * The DDL generator loads only the schema directory, so nothing else in it
- * would ever import the resources module — and a permission that reads as
- * absent because nobody loaded it is the worst shape this could take: the push
- * succeeds, `vector.sql` quietly omits the `CREATE EXTENSION`, and the failure
- * lands one statement later looking like a database problem.
- *
- * Imported directly rather than through the config index, for the reason
- * `boot/resource-loading.ts` gives: re-exporting from the index would work only
- * for projects that remember to.
- *
- * A project with no resources module is the normal case and declares nothing.
- * An import that *throws* is not swallowed — a resources module that does not
- * evaluate is a configuration error, and treating it as "declared nothing"
- * would turn it into a silently missing extension.
- */
-async function loadDeclaredResources(backendDir: string): Promise<void> {
-    const entry = RESOURCE_ENTRIES
-        .map(name => path.join(backendDir, name))
-        .find(candidate => fs.existsSync(candidate));
-    if (!entry) return;
-    await import(pathToFileURL(entry).href);
 }
 
 /** A column whose DEFAULT calls one of Rebase's own `rebase.*` functions. */
@@ -177,7 +156,10 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
         // `rebase resources` and the boot loader assume.
         await loadDeclaredResources(path.dirname(resolvedPath));
 
-        const tables = await loadTables(resolvedPath);
+        const loaded = await loadTables(resolvedPath);
+        // One database's DDL: a push applies `schema.sql` to one connection,
+        // and the tables another database stores have no place in it.
+        const tables = options.database ? tablesStoredByDatabase(loaded, options.database) : loaded;
 
         // `schema.sql` is Atlas's desired state, and it carries neither the RLS
         // policies, nor the search apparatus, nor the vector columns: Atlas

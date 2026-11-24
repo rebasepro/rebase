@@ -73,6 +73,7 @@ import {
 } from "../boot/provision";
 import { enforceSchemaStamp, resolveSchemaMismatchPolicy } from "../boot/schema-stamp";
 import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "../services/driver-registry";
+import { createRequestDriverResolver } from "../services/request-driver";
 import { createRoutedRealtimeService } from "../services/routed-realtime-service";
 
 import { RestApiGenerator } from "../api/rest/api-generator";
@@ -998,7 +999,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         tableRegistry.replaceAll(introspectedTables);
     }
 
-    const defaultDriver = driverRegistry.getOrDefault(defaultDriverId);
+    // `get`, not `getOrDefault`: a default adapter that produced no driver is
+    // reported below by name, rather than as an unknown database.
+    const defaultDriver = driverRegistry.get(defaultDriverId);
     if (!defaultDriver || !defaultDriverResult) {
         // Named, because the reader's next question is "which one" and the
         // answer is not obvious from a multi-source configuration: the default
@@ -1032,10 +1035,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     };
 
     // ── Data-source misconfiguration check ────────────────────────────────
-    // A server-transport collection whose resolved data-source key has no
-    // registered driver delegate would silently fall back to the default
-    // driver — i.e. land in the wrong database. Warn loudly so this surfaces
-    // at boot rather than as mysterious data going to the wrong database.
+    // A table whose database has no registered driver is never served by the
+    // default driver in its place — that would put its rows in the wrong
+    // database — so its requests are answered 503 NOT_CONFIGURED, naming the
+    // database (`services/request-driver.ts`). Said at boot, by name, so the first
+    // sign is not a failing request.
     {
         const unresolved = new Map<string, string[]>();
         for (const table of tableRegistry.list()) {
@@ -1050,9 +1054,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         for (const [key, slugs] of unresolved) {
             logger.warn(
                 `[DataSource] No driver registered for database "${key}" ` +
-                `(used by: ${slugs.join(", ")}). These tables will fall back to the ` +
-                `default driver "${defaultDriverId}" — declare the database in backend/resources.ts ` +
-                `so a bootstrapper with this id is opened.`
+                `(used by: ${slugs.join(", ")}). Requests to these tables are answered ` +
+                "503 NOT_CONFIGURED — declare the database in backend/resources.ts " +
+                `(database("${key}")) and bind its connection string, so a bootstrapper with this id is opened.`
             );
         }
     }
@@ -2970,26 +2974,19 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // entirely on Postgres RLS) must explicitly set `auth.requireAuth: false`.
         const dataRequireAuth = resolveRequireAuth(config.auth);
 
-        // Multi-data-source routing: when more than one Postgres database is
-        // registered (`database("analytics")` beside the default), resolve the
-        // delegate per request from the request's collection data source. The
-        // auth middleware then scopes that delegate under RLS into the request
-        // context. For a single-database backend this is omitted — behaviour
-        // is unchanged.
-        //
-        // The collection path is what follows the group's mount — wherever the
-        // application mounted it, which the group recorded on the request.
-        const resolveRequestDriver = (c: Context<HonoEnv>): DataDriver => {
-            const mountPath = c.get("mountPath") ?? "";
-            const collectionPath = c.req.path.startsWith(mountPath) ? c.req.path.slice(mountPath.length) : c.req.path;
-            const key = keyForCollectionPath(collectionPath);
-            // Use the authoritative default for the default key; otherwise the
-            // named delegate, falling back to default if it isn't registered.
-            if (!key || key === DEFAULT_DRIVER_ID) return defaultDriver;
-            return driverRegistry.get(key) ?? defaultDriver;
-        };
-        const multiDatabase = bootstrappers.length > 1;
-        const resolveDriver = multiDatabase ? resolveRequestDriver : undefined;
+        // Per-request routing: the delegate of the database the request's
+        // table is stored in (`database("analytics")` beside the default),
+        // which the auth middleware then scopes under RLS into the request
+        // context. A table on the default database gets the default driver,
+        // as it always did; one whose database has no driver here is answered
+        // 503 NOT_CONFIGURED instead of being served by the default
+        // driver. Resolved on a single-database backend too, which is where a
+        // table naming an undeclared database is likeliest.
+        const resolveDriver = createRequestDriverResolver({
+            registry: driverRegistry,
+            defaultDriver,
+            keyForCollectionPath
+        });
 
         // Use adapter middleware when an AuthAdapter is available,
         // falling back to the built-in JWT middleware otherwise.

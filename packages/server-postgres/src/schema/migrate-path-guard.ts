@@ -94,6 +94,8 @@ export function provisionedWithoutHistoryProblem(state: {
     latestRecorded: string | null;
     existing: readonly CreatedTable[];
     newestVersion: string | null;
+    /** What the printed command needs to reach the same database: `""`, or ` --database analytics`. */
+    commandSuffix?: string;
 }): string | null {
     if (state.latestRecorded !== null || state.existing.length === 0 || state.newestVersion === null) return null;
     const names = state.existing.slice(0, TABLES_NAMED).map(t => `"${displayTableName(t)}"`);
@@ -107,7 +109,7 @@ export function provisionedWithoutHistoryProblem(state: {
         `A Rebase boot or \`rebase db push\` set it up without migrations: ${listed} ${state.existing.length === 1 ? "is" : "are"} there, so the first migration would stop on "already exists".`,
         "Record once that it already holds the migrations, and migrate from the next one:",
         "",
-        `  rebase db migrate --baseline ${version}`,
+        `  rebase db migrate${state.commandSuffix ?? ""} --baseline ${version}`,
         "",
         `That marks ${version} and every migration before it as applied; every later \`rebase db migrate\` is an ordinary one.`,
         "Boot never drops or renames: if one of those migrations does, baseline at the version before it instead."

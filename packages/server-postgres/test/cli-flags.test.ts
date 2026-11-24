@@ -78,7 +78,7 @@ describe("assertKnownFlags", () => {
     // mean --y?) — run …`.
     it("says it in the words every other command does, and lists the options when nothing is near", () => {
         expect(() => assertKnownFlags("db", "migrate", line("db", "migrate", "--zzz")))
-            .toThrow("`rebase db migrate` has no option --zzz — it takes --schema-dir, --baseline, --refuse-destructive. Nothing was run. See `rebase db --help`.");
+            .toThrow("`rebase db migrate` has no option --zzz — it takes --schema-dir, --database, --all-databases, --baseline, --refuse-destructive. Nothing was run. See `rebase db --help`.");
     });
 
     it("points at the help for the command that was named", () => {
@@ -99,8 +99,19 @@ describe("assertKnownFlags", () => {
         // in step; this asserts the line a reader would actually type.
         const documented = flagsInUsage(usageStrings()["db push"]);
         expect(documented).toContain("--dry-run");
-        const typed = documented.flatMap(flag => (flag === "--schema-dir" ? [flag, "./schema"] : [flag]));
+        // A flag that takes a value is typed with one.
+        const typed = documented.flatMap(flag => (DRIVER_FLAG_SPECS["db push"][flag] === String ? [flag, "x"] : [flag]));
         expect(() => assertKnownFlags("db", "push", line("db", "push", ...typed))).not.toThrow();
+    });
+
+    // Several databases: `database-target.ts`.
+    it("takes --database <key> and --all-databases on push, generate and migrate", () => {
+        for (const subcommand of ["push", "generate", "migrate"]) {
+            expect(() => assertKnownFlags("db", subcommand, line("db", subcommand, "--database", "analytics"))).not.toThrow();
+            expect(() => assertKnownFlags("db", subcommand, line("db", subcommand, "--all-databases"))).not.toThrow();
+        }
+        expect(() => assertKnownFlags("db", "push", line("db", "push", "--databse", "analytics")))
+            .toThrow(/has no option --databse — did you mean --database\?/);
     });
 
     it("accepts the short forms", () => {

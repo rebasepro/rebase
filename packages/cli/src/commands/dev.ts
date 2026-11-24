@@ -16,7 +16,6 @@
  */
 import chalk from "chalk";
 import {
-    DEFAULT_RESOURCE_KEY,
     parseEnvBoolean,
     type AppAddress,
     type RebaseProjectManifest,
@@ -35,6 +34,7 @@ import {
 import { MANAGED_IDLE_TIMEOUT_MS } from "../dev-db/constraints";
 import { resolveCliEntry, resolveSpawn } from "../dev-db/daemon";
 import { lastDevDatabaseNotice, recordLastDevDatabase } from "../dev-db/last-dev-database";
+import { declaredAdditionalKeys } from "../dev-db/declared-databases";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -469,38 +469,6 @@ export function devWatchArgs(
 export function envFileHiddenFromTsx(envFile: string, backendDir: string): boolean {
     const relative = path.relative(backendDir, envFile);
     return !relative.startsWith("..") && !path.isAbsolute(relative);
-}
-
-/**
- * The databases the project declares beyond the default, by key.
- *
- * Read from the graph, so `database("analytics")` in `backend/resources.ts`
- * is enough for `rebase dev` to serve a second database — the declaration is
- * the request. A config that does not evaluate is the backend's problem to
- * report, in the terms it already uses; here it means "no additional
- * databases", not a refusal to start.
- */
-async function declaredAdditionalDatabases(projectRoot: string): Promise<string[]> {
-    try {
-        const loaded = loadManifest(projectRoot);
-        const backend = findBackendApp(loaded.manifest);
-        if (!backend) return [];
-        const { deriveResourceGraph, deriveOptionsFor } = await import("../resources/derive");
-        // The declarations alone: databases are declared in `backend/resources.ts`,
-        // and importing the tables (and the server's loader with them) would put
-        // seconds in front of the database start for nothing this asks.
-        const { graph } = await deriveResourceGraph({
-            ...deriveOptionsFor(projectRoot, backend.app),
-            schemaDir: undefined,
-            cronsDir: undefined,
-            functionsDir: undefined
-        });
-        return graph.resources
-            .filter(r => r.kind === "database" && r.transport === "server" && r.key !== DEFAULT_RESOURCE_KEY)
-            .map(r => r.key);
-    } catch {
-        return [];
-    }
 }
 
 /** Well-known filename the backend writes its actual port to. */
@@ -1591,7 +1559,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     // what the other commands follow.
                     followLastDev: false,
                     onProgress: (message) => console.log(chalk.gray(`  ${message}`)),
-                    additionalKeys: await declaredAdditionalDatabases(projectRoot)
+                    additionalKeys: declaredAdditionalKeys(projectRoot)
                 })
                 : null
         }));

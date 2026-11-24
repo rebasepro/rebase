@@ -20,6 +20,7 @@
  * Nothing here touches a database or the filesystem, so the whole matrix is
  * unit-tested in `atlas-argv.test.ts`.
  */
+import { DEFAULT_MIGRATIONS_DIR, migrationsDirUrl } from "../database-target";
 
 export interface AtlasInvocation {
     /** `schema` or `migrate`. */
@@ -171,11 +172,14 @@ function withSearchPath(url: string, schema: string): string {
  * `positionals` are what is left of the user's line once every flag the
  * driver knows has been consumed — at most the optional amount Atlas takes. A
  * flag reaching here is a flag Atlas rejects before doing any work.
+ *
+ * `dir` is the migration directory as Atlas's `--dir` takes it: the default
+ * database's, or the one a named database keeps (`database-target.ts`).
  */
-export function migrateApplyArgs(positionals: string[], baseline: string | undefined): string[] {
+export function migrateApplyArgs(positionals: string[], baseline: string | undefined, dir = migrationsDirUrl(DEFAULT_MIGRATIONS_DIR)): string[] {
     return [
         "apply",
-        "--dir", "file://drizzle/migrations",
+        "--dir", dir,
         ...(baseline ? ["--baseline", baseline] : []),
         ...positionals.filter(positional => positional !== "migrate")
     ];
