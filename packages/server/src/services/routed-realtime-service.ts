@@ -95,7 +95,19 @@ export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsReal
     const forPath = (path?: string): WsRealtimeService => {
         if (!path) return fallback();
         const key = resolveKey(path);
-        return asWs(providers[key] ?? providers[defaultKey] ?? Object.values(providers)[0]);
+        const owner = providers[key];
+        if (owner) return asWs(owner);
+        // A table on a database this server has not opened. Handing it to the
+        // default provider subscribed it to another database's changes — the
+        // realtime half of the fallback the data routes no longer make
+        // (`services/request-driver.ts` answers those 503 NOT_CONFIGURED).
+        if (key && key !== defaultKey) {
+            throw new Error(
+                `Realtime for "${path}" is not available: its table is on database "${key}", which this server has not opened. ` +
+                `Declare database("${key}") in backend/resources.ts and bind DATABASE_URL__<KEY>.`
+            );
+        }
+        return fallback();
     };
 
     /**
