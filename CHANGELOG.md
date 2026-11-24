@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Studio has a Database view: advice, slow queries, live sessions and the objects besides tables.** **Advisors** lists security findings from `rls-check` beside performance ones — unused and duplicate indexes, foreign keys without an index, tables without a primary key, large tables read by full scans, tables heavy with dead rows, and searches that read a whole large table — each with the SQL that fixes it, to open in the SQL editor. **Query performance** shows the top statements from `pg_stat_statements` and installs the extension where the server ships it. **Activity** lists the database's working sessions every five seconds, with what each waits on and which session blocks it, and cancels a query or terminates a session after showing the SQL. **Functions**, **Triggers**, **Types** and **Extensions** list those objects; a function can be dropped, an enum value added and an extension installed or dropped, each previewed first. A backend serving several databases (`database("…")`) gets a picker for which one. The API is `/api/admin/db/insights/*` and `/api/admin/db/catalog/*`, under the `database:read` / `database:write` scopes, with `?source=<key>` for a declared database.
+
 ### Changed
 
 - **A runtime at rest holds about 2 MB less heap.** `@rebasepro/server` inlined its own copies of `@rebasepro/types`, `@rebasepro/common` and `@rebasepro/utils`, and the database driver imports those packages by name, so every runtime loaded each twice: about 440 KB of source that V8 keeps for the life of the process, compiled twice, with two sets of module state. The server now imports them by name too, as the driver already did. The driver's backup code loads execa, about 200 KB with its dependencies, when a backup first runs a tool rather than at boot. A runtime that serves no backup never loads it. Measured on the runtime image's layout, the heap after boot and a GC goes from 36.7 to 34.3 MB committed (32.2 to 30.2 MB live), with no measurable difference in CPU time per request.

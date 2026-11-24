@@ -20,8 +20,7 @@
  *   - Every optional query is guarded: a server that lacks a catalog degrades
  *     that one fact, not the whole scan.
  */
-import { Client } from "pg";
-import type { ClientConfig } from "pg";
+import type { Client, ClientConfig } from "pg";
 
 import { parseKeywordConnectionString } from "./redact";
 import type {
@@ -266,7 +265,7 @@ export async function introspectWithDiagnostics(opts: ConnectOptions): Promise<I
         await begin();
 
         try {
-            const snapshot = await readSnapshot(client, opts, diagnostics, begin);
+            const snapshot = await readSnapshot(reader(client, diagnostics, begin), opts, diagnostics);
             await client.query("COMMIT");
             return { snapshot, diagnostics };
         } catch (error) {
@@ -406,10 +405,14 @@ async function connect(connectionString: string): Promise<{ client: Client; tlsV
         : { connectionString: stripParam(connectionString, "sslmode") };
 
     const attempts = connectionAttempts(sslmode);
+    // Loaded here rather than at the top of the module, so a caller that reads
+    // the catalog through its own connection ({@link introspectWith}) can import
+    // the checks without a Postgres client installed beside them.
+    const { Client: PgClient } = await import("pg");
 
     let lastError: unknown;
     for (const attempt of attempts) {
-        const client = new Client({ ...base, ssl: attempt.ssl });
+        const client = new PgClient({ ...base, ssl: attempt.ssl });
         try {
             await client.connect();
             return { client, tlsVerificationDisabled: attempt.downgraded };
@@ -508,14 +511,49 @@ function reader(client: Client, diagnostics: IntrospectDiagnostics, begin: () =>
     };
 }
 
-async function readSnapshot(
-    client: Client,
-    opts: ConnectOptions,
-    diagnostics: IntrospectDiagnostics,
-    begin: () => Promise<void>
-): Promise<DbSnapshot> {
-    const db = reader(client, diagnostics, begin);
+/** Run one catalog query, returning its rows. What {@link introspectWith} reads through. */
+export type SnapshotQuery = (text: string, values?: unknown[]) => Promise<Record<string, unknown>[]>;
 
+/**
+ * Read the snapshot through a connection the caller already holds — a server's
+ * own pool, an in-process database — rather than one this tool opens.
+ *
+ * The caller's connection is the caller's: no transaction is opened and
+ * nothing is set on it, so read-only-ness and the statement timeout are its
+ * concern. A catalog query that fails degrades that one fact, as it does for
+ * {@link introspect}.
+ */
+export async function introspectWith(
+    query: SnapshotQuery,
+    opts: Omit<ConnectOptions, "connectionString" | "statementTimeoutMs"> = {}
+): Promise<IntrospectResult> {
+    const diagnostics: IntrospectDiagnostics = {
+        tlsVerificationDisabled: false,
+        excludedSchemas: [],
+        degraded: [],
+        unrecognizedGrantees: []
+    };
+    const db: Reader = {
+        async query<R extends Record<string, unknown>>(what: string, text: string, values?: unknown[]): Promise<R[]> {
+            try {
+                // The rows are the catalog's, read by the queries this module
+                // writes; `R` names the columns each of those selects.
+                return (await query(text, values)) as R[];
+            } catch (error) {
+                diagnostics.degraded.push({ what, error: error instanceof Error ? error.message : String(error) });
+                return [];
+            }
+        }
+    };
+    const snapshot = await readSnapshot(db, { connectionString: "", ...opts }, diagnostics);
+    return { snapshot, diagnostics };
+}
+
+async function readSnapshot(
+    db: Reader,
+    opts: ConnectOptions,
+    diagnostics: IntrospectDiagnostics
+): Promise<DbSnapshot> {
     const [server] = await db.query<{
         version_num: string | number;
         version: string;

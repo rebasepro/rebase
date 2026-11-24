@@ -38,3 +38,21 @@ export {
     createDbAdminRoutes,
     type DbAdminRoutesOptions
 } from "./db-admin-routes";
+export {
+    createDbInsightsRoutes,
+    UNINDEXED_SEARCH_ROWS,
+    type AdvisorFinding,
+    type AdvisorSeverity,
+    type DbInsightsRoutesOptions,
+    type QueryStatsStatus,
+    type RlsCheckModule
+} from "./db-insights-routes";
+export {
+    createDbCatalogRoutes,
+    type DbCatalogRoutesOptions
+} from "./db-catalog-routes";
+export {
+    createSourceResolver,
+    DEFAULT_SOURCE_KEY,
+    type DbSqlSource
+} from "./db-sources";

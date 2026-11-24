@@ -110,6 +110,9 @@ import {
     createCronJobsStore,
     createCronJobsAdminRoutes,
     createDbAdminRoutes,
+    createDbCatalogRoutes,
+    createDbInsightsRoutes,
+    type DbSqlSource,
     type StoragePoliciesStore,
     type WebhooksStore,
     type RolesStore,
@@ -3314,6 +3317,25 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             dbRouter.route("/", createDbAdminRoutes({
                 admin: defaultSqlAdmin,
                 getServedTables: () => tableRegistry.list(),
+                reloadSchema
+            }));
+            // The Database view's health, advice and catalog, under the same
+            // gate, for the default database and every declared SQL one
+            // (`database("analytics")`), keyed as `rebase.sql({ database })` keys them.
+            const dbSqlSources = (): DbSqlSource[] => bootstrappers.flatMap(bootstrapper => {
+                if (bootstrapper === defaultBootstrapper) return [];
+                const result = driverResults.get(bootstrapper);
+                const admin = result ? bootstrapper.getAdmin?.(result) : undefined;
+                return isSQLAdmin(admin) ? [{ key: bootstrapper.id || bootstrapper.type, admin }] : [];
+            });
+            dbRouter.route("/insights", createDbInsightsRoutes({
+                admin: defaultSqlAdmin,
+                sources: dbSqlSources,
+                getServedTables: () => tableRegistry.list()
+            }));
+            dbRouter.route("/catalog", createDbCatalogRoutes({
+                admin: defaultSqlAdmin,
+                sources: dbSqlSources,
                 reloadSchema
             }));
             dbAdminSurface = dbRouter;

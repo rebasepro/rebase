@@ -40,6 +40,7 @@ export { icons as lucideIcons } from "lucide-react";
 // Sub-packages import these from @rebasepro/ui instead of declaring a direct
 // lucide-react dependency.  When a new icon is needed, add it here.
 export {
+    ActivityIcon,
     AlertCircleIcon,
     AlertTriangleIcon,
     AlignLeftIcon,
@@ -92,6 +93,7 @@ export {
     FolderPlusIcon,
     FolderUpIcon,
     FunctionSquareIcon,
+    GaugeIcon,
     GitBranchIcon,
     GitMergeIcon,
     GlobeIcon,
@@ -141,6 +143,8 @@ export {
     PinIcon,
     PlayIcon,
     PlusIcon,
+    PowerIcon,
+    PuzzleIcon,
     QuoteIcon,
     RefreshCcwIcon,
     RefreshCwIcon,
@@ -149,7 +153,10 @@ export {
     SaveIcon,
     SearchIcon,
     SendIcon,
+    ServerCogIcon,
     SettingsIcon,
+    ShapesIcon,
+    ShieldAlertIcon,
     ShieldIcon,
     ShoppingCartIcon,
     SlidersHorizontalIcon,
@@ -180,5 +187,6 @@ export {
     WebhookIcon,
     WrenchIcon,
     XCircleIcon,
-    XIcon
+    XIcon,
+    ZapIcon
 } from "lucide-react";

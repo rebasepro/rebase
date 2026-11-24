@@ -1686,6 +1686,9 @@ importers:
       '@rebasepro/mcp-apps':
         specifier: workspace:*
         version: link:../mcp-apps
+      '@rebasepro/rls-check':
+        specifier: workspace:*
+        version: link:../rls-check
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0

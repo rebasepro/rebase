@@ -26,7 +26,7 @@ const ALREADY_EXISTS_CODES = new Set(["42P07", "42710", "42701", "42P06"]);
  * and the client reads "An unexpected error occurred", with the reason only in
  * the server log.
  */
-function ddlRefusal(error: unknown): unknown {
+export function ddlRefusal(error: unknown): unknown {
     const pg = extractDbError(error);
     if (!pg?.message) return error;
     const message = [
@@ -39,7 +39,7 @@ function ddlRefusal(error: unknown): unknown {
 }
 
 const IDENTIFIER_RE = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/;
-const PROTECTED_SCHEMAS = new Set(["pg_catalog", "information_schema", "pg_toast", "rebase", "auth"]);
+export const PROTECTED_SCHEMAS = new Set(["pg_catalog", "information_schema", "pg_toast", "rebase", "auth"]);
 
 const ALLOWED_SQL_TYPES_RE = /^(?:text|boolean|bool|smallint|int2|integer|int|int4|bigint|int8|real|float4|double precision|float8|uuid|date|time|timetz|timestamp|timestamptz|timestamp with time zone|timestamp without time zone|json|jsonb|bytea|inet|cidr|macaddr|tsvector|serial|bigserial|smallserial|varchar(?:\(\d{1,5}\))?|character varying(?:\(\d{1,5}\))?|char(?:\(\d{1,5}\))?|numeric(?:\(\d{1,3}(?:,\s*\d{1,3})?\))?|decimal(?:\(\d{1,3}(?:,\s*\d{1,3})?\))?|vector\(\d{1,5}\))(?:\[\])?$/i;
 
@@ -49,11 +49,11 @@ const POLICY_OPS = new Set(["ALL", "SELECT", "INSERT", "UPDATE", "DELETE"]);
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null && !Array.isArray(value);
 
-function quoteIdent(name: string): string {
+export function quoteIdent(name: string): string {
     return `"${name.replace(/"/g, '""')}"`;
 }
 
-function assertIdent(value: unknown, label: string): string {
+export function assertIdent(value: unknown, label: string): string {
     if (typeof value !== "string" || !IDENTIFIER_RE.test(value.trim())) {
         throw ApiError.badRequest(
             `${label} "${String(value ?? "")}" must be a valid PostgreSQL identifier (${IDENTIFIER_RE.source}).`,
@@ -63,7 +63,7 @@ function assertIdent(value: unknown, label: string): string {
     return value.trim();
 }
 
-function assertSchema(value: unknown): string {
+export function assertSchema(value: unknown): string {
     const schema = value === undefined || value === "" ? "public" : assertIdent(value, "Schema name");
     if (PROTECTED_SCHEMAS.has(schema.toLowerCase()) || schema.toLowerCase().startsWith("pg_")) {
         throw ApiError.badRequest(`Schema "${schema}" is protected and cannot be modified through /api/admin/db.`, "INVALID_INPUT");

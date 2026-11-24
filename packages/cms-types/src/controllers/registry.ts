@@ -156,7 +156,7 @@ export interface RebaseStudioConfig {
      * Which built-in tools to register. Omit for all of them; pass a shorter
      * list to hide the rest.
      */
-    tools?: ("tables" | "sql" | "js" | "rls" | "storage" | "cron" | "schema-visualizer" | "branches" | "backups" | "api" | "webhooks" | "logs" | "users" | "api-keys")[];
+    tools?: ("tables" | "sql" | "js" | "rls" | "storage" | "cron" | "schema-visualizer" | "branches" | "backups" | "database" | "api" | "webhooks" | "logs" | "users" | "api-keys")[];
 
     /** Replaces the Studio landing page. */
     homePage?: ReactNode;

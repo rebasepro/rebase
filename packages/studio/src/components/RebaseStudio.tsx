@@ -18,6 +18,7 @@ const WebhooksView = lazyChunk(() => import("./Webhooks/WebhooksView").then(m =>
 const LogsExplorer = lazyChunk(() => import("./LogsExplorer/LogsExplorer").then(m => ({ default: m.LogsExplorer })));
 const UsersAndRolesView = lazyChunk(() => import("./UsersAndRoles/UsersAndRolesView").then(m => ({ default: m.UsersAndRolesView })));
 const ApiKeysView = lazyChunk(() => import("./ApiKeys/ApiKeysView").then(m => ({ default: m.ApiKeysView })));
+const DatabaseView = lazyChunk(() => import("./Database/DatabaseView").then(m => ({ default: m.DatabaseView })));
 
 import { StudioHomePage } from "./StudioHomePage";
 
@@ -62,7 +63,7 @@ function RebaseStudioRegistration({ tools, homePage, devViews: extraViews }: Reb
 
     const devViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
-        const activeTools = tools ?? ["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "backups", "api", "webhooks", "logs", "users", "api-keys"];
+        const activeTools = tools ?? ["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "backups", "database", "api", "webhooks", "logs", "users", "api-keys"];
         const suspense = (el: React.ReactNode) => <Suspense fallback={<CircularProgressCenter/>}>{el}</Suspense>;
 
         if (activeTools.includes("tables")) {
@@ -136,6 +137,14 @@ group: "Database",
 icon: "Database",
 description: t("studio_tool_backups_description"),
 view: suspense(<BackupsView/>) });
+        }
+        if (activeTools.includes("database")) {
+            views.push({ slug: "database",
+name: t("studio_tool_database"),
+group: "Database",
+icon: "ServerCog",
+description: t("studio_tool_database_description"),
+view: suspense(<DatabaseView/>) });
         }
         if (activeTools.includes("api")) {
             views.push({ slug: "api",
