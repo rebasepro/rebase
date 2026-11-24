@@ -183,3 +183,51 @@ test("the bundle corpus stitches exactly what the entrypoint collapses", () => {
         "verify-bundle-corpus.mts RUNTIME_PROVIDED must equal infra/docker/entrypoint.mjs RUNTIME_PROVIDED"
     );
 });
+
+// ── Shared only when compatible ──────────────────────────────────────────────
+//
+// `packages/server/src/boot/shared-packages.ts` lets a bundle's imports of
+// drizzle-orm and pg load the image's copies, but only when each satisfies
+// `^<the bundle's version>`: the driver comes from the bundle and the image is
+// released separately, and drizzle breaks its API between minors. Putting such
+// a package on any list above would link it unconditionally (or strip the
+// bundle's copy, which is the fallback when the versions differ), so an old
+// driver would run on whatever drizzle the next image ships.
+
+function sharedWhenCompatible() {
+    const source = fs.readFileSync(path.join(ROOT, "packages/server/src/boot/shared-packages.ts"), "utf8");
+    const match = source.match(/SHARED_WHEN_COMPATIBLE\s*=\s*\[([\s\S]*?)\]/);
+    assert.ok(match, "packages/server/src/boot/shared-packages.ts declares no SHARED_WHEN_COMPATIBLE array");
+    return [...match[1].matchAll(/["']([^"']+)["']/g)].map(m => m[1]);
+}
+
+const fromShared = sharedWhenCompatible();
+
+test("a package shared only when compatible is on no list that links or strips it unconditionally", () => {
+    assert.ok(fromShared.length > 0, "parsed nothing out of shared-packages.ts");
+    for (const [name, list] of [
+        ["packages/cli/src/bundle.ts", fromBundler],
+        ["infra/docker/entrypoint.mjs", fromEntrypoint],
+        ["packages/server/src/boot/fetch-bundle.ts", fromFetchPath],
+        ["tooling/scripts/verify-bundle-corpus.mts", fromCorpus]
+    ]) {
+        const unconditional = fromShared.filter(pkg => list.includes(pkg));
+        assert.deepEqual(
+            unconditional,
+            [],
+            `${name} names ${unconditional.join(", ")}, which shared-packages.ts shares only when the image's `
+            + "version satisfies the bundle's. On that list it is linked (or stripped) whatever the versions."
+        );
+    }
+});
+
+test("the image ships every package a bundle may share with it", () => {
+    const dockerfile = fs.readFileSync(path.join(ROOT, "infra", "docker", "server.Dockerfile"), "utf8");
+    for (const name of fromShared) {
+        assert.ok(
+            new RegExp(`"${name}@`).test(dockerfile),
+            `${name} is shared with the image's copy by shared-packages.ts, but server.Dockerfile never `
+            + "installs it, so every bundle would keep its own."
+        );
+    }
+});

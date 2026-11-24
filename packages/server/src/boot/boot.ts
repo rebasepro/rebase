@@ -36,7 +36,8 @@ import { runtimeCors } from "./runtime-cors";
 import { numericEnvVar } from "../env";
 import { resolveRole, RoleConfigurationError } from "./role";
 import { resolveProvisionOnly } from "./provision-only";
-import { installEsmResolveCache } from "./esm-resolve-cache";
+import { installEsmResolveCache, preservesSymlinks } from "./esm-resolve-cache";
+import { shareCompatiblePackages } from "./shared-packages";
 
 // Where it has always been importable from. It has a module of its own now, so
 // `check:chart` can ask it about a rendered unit without loading the boot.
@@ -242,6 +243,14 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // collapse, and a no-op on a bundle the entrypoint already stitched.
     if (!useZeroCode) {
         dedupeRuntimePackages(bundleDir, imageModulesDir());
+        // drizzle-orm: the bundle's imports load the image's copy when it is a
+        // version the bundle could have installed, so a pod holds one copy.
+        // Before the bundle is loaded for the same reason as the line above.
+        for (const decision of shareCompatiblePackages(bundleDir, imageModulesDir(), preservesSymlinks(process.execArgv, process.env.NODE_OPTIONS))) {
+            logger.info(decision.shared
+                ? "The bundle uses the runtime's copy of a package it also installed"
+                : "The bundle keeps its own copy of a package: the runtime's copy is not a version the bundle could have installed", { ...decision });
+        }
     }
 
     // The bundle is located before the environment is validated, because
