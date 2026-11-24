@@ -1,6 +1,6 @@
 # @rebasepro/client
 
-HTTP SDK client for the Rebase backend — typed CRUD, auth, storage, realtime WebSockets, offline / local-first sync, admin, cron, and custom functions.
+Typed HTTP SDK for [Rebase](https://rebase.pro), the open-source Postgres BaaS — CRUD, auth, storage, realtime WebSockets, offline / local-first sync, admin, cron, and custom functions.
 
 ## Installation
 

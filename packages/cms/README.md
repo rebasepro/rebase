@@ -1,6 +1,6 @@
 # @rebasepro/cms
 
-CMS frontend — content management views, forms, routing, and data import/export for Rebase.
+CMS frontend — content management views, forms, routing, and data import/export for [Rebase](https://rebase.pro), the open-source Postgres BaaS.
 
 ## Installation
 

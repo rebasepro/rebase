@@ -1,13 +1,16 @@
 {
   "name": "@rebasepro/mcp",
   "version": "0.35.1",
-  "description": "Model Context Protocol Server for Rebase — exposes schema, DB, document, and user management tools to AI assistants.",
+  "description": "Model Context Protocol server for Rebase, the open-source Postgres BaaS — schema, database, document and user tools for AI agents.",
   "keywords": [
     "rebase",
     "mcp",
     "model-context-protocol",
     "ai",
-    "agents"
+    "agents",
+    "baas",
+    "backend-as-a-service",
+    "postgres"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {

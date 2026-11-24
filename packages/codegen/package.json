@@ -1,12 +1,15 @@
 {
   "name": "@rebasepro/codegen",
   "version": "0.35.1",
-  "description": "Generate a typed JS SDK from Rebase table descriptors",
+  "description": "Generate a typed JS SDK from the table definitions of Rebase, the open-source Postgres BaaS",
   "keywords": [
     "sdk",
     "codegen",
     "rebase",
-    "rest-api"
+    "rest-api",
+    "baas",
+    "backend-as-a-service",
+    "postgres"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {

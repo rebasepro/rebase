@@ -580,7 +580,7 @@ there once. Do not re-implement any of them inline on a page.
   headline, on the ground, weight 600, one colour. When the hero changes, run it
   again. Before 2026-09-02 the card said "Ship Faster with Postgres Superpowers",
   a line the site had never said, in bold with the retired split line.
-- **Meta titles are `<Page> — Rebase`**, em dash. `Layout.astro`'s default
+- **Meta titles are `<Page> — Rebase Postgres BaaS`**, em dash: "Rebase" alone loses to git rebase in search and in model answers, so the suffix carries the category (2026-11-24). `Layout.astro`'s default
   title, description and the Organization JSON-LD read `index.meta.*`; a page
   that sets no meta gets the home page's, never a stale string of its own.
 - **Only the GitHub org is a real social handle.** `@rebasepro` on X is an

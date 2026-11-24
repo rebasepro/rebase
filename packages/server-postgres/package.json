@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/server-postgres",
   "version": "0.35.1",
-  "description": "PostgreSQL data source backend implementation for Rebase with Drizzle ORM",
+  "description": "PostgreSQL driver for Rebase, the open-source Postgres BaaS, built on Drizzle ORM",
   "keywords": [
     "cms",
     "admin",
@@ -9,7 +9,9 @@
     "database",
     "drizzle",
     "backend",
-    "rebase"
+    "rebase",
+    "baas",
+    "backend-as-a-service"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {

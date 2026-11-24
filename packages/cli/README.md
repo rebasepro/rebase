@@ -1,6 +1,6 @@
 # @rebasepro/cli
 
-Developer CLI for scaffolding, running, and managing Rebase projects.
+Developer CLI for [Rebase](https://rebase.pro), the open-source Postgres BaaS — scaffold, run, migrate and deploy Rebase projects.
 
 ## Installation
 

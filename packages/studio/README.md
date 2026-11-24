@@ -1,6 +1,6 @@
 # @rebasepro/studio
 
-Developer tools layer for Rebase — provides 11 lazy-loaded tools (SQL Console, JS Console, RLS Editor, Storage, Cron Jobs, Schema Visualizer, Branches, Backups, API Explorer, Logs Explorer, API Keys) plus a customizable home page.
+Developer tools layer for [Rebase](https://rebase.pro), the open-source Postgres BaaS — provides 11 lazy-loaded tools (SQL Console, JS Console, RLS Editor, Storage, Cron Jobs, Schema Visualizer, Branches, Backups, API Explorer, Logs Explorer, API Keys) plus a customizable home page.
 
 ## Installation
 

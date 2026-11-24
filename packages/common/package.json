@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/common",
   "version": "0.35.1",
-  "description": "Rebase shared core — collection registry, data driver adapter and fluent query builder. No React dependency.",
+  "description": "Shared core of Rebase, the open-source Postgres BaaS — collection registry, data driver adapter and fluent query builder. No React dependency.",
   "keywords": [
     "rebase",
     "cms",
@@ -9,7 +9,10 @@
     "typescript",
     "headless",
     "headless cms",
-    "content manager"
+    "content manager",
+    "baas",
+    "backend-as-a-service",
+    "postgres"
   ],
   "homepage": "https://rebase.pro",
   "bugs": {
