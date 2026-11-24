@@ -26,6 +26,7 @@ class StoragePolicyError
 class TableRegistry { authTable, get, list, named, replaceAll, revision, setHooks, table, tables }
 class TransformCache { buildKey, get, set }
 class TusHandler { create, delete, head, options, patch, startCleanup }
+class UnknownDatabaseError { databaseKey, knownKeys }
 class UnknownStorageSourceError { knownKeys, storageId }
 class WebhookDispatcher { deliverQueuedJob, enqueueEntityChange, flush, onEntityChange, sendTest, setWebhooks, watchesTable }
 const ACCOUNT_SCOPED_STORAGE_BASES
@@ -645,6 +646,7 @@ const FIELDLESS_AGGREGATES
 const FIELD_OPERATORS
 const FIREBASE_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 const IMPERSONATE_HEADER
+const IMPORTED_PASSWORD_HASH_ALGORITHMS
 const INCLUDE_COUNT_KEY
 const JSON_FIELD_BRAND
 const JUNCTION_PIVOT_KEY
@@ -738,6 +740,7 @@ function getDataSourceCapabilities
 function hasAdminRole
 function hasFieldOperation
 function holdsAdminRole
+function importedPasswordHashProblem
 function importedUserIdProblem
 function intersectScopes
 function isAdminScope
@@ -1026,8 +1029,8 @@ interface HasOneDef { access, brand, foreignKey, kind, private, sourceKey, targe
 interface HasOptions { access, foreignKey, private, sourceKey }
 interface HealthCheckResult { details, healthy, latencyMs }
 interface HistoryRetentionConfig { maxEntries, ttlDays }
-interface ImportUserInput { createdAt, displayName, email, emailVerified, id, photoUrl, roles }
-interface ImportUsersRequest { dryRun, users }
+interface ImportUserInput { createdAt, displayName, email, emailVerified, id, passwordHash, photoUrl, roles }
+interface ImportUsersRequest { dryRun, passwordHashAlgorithm, users }
 interface ImportUsersResult { created, dryRun, failed, results, skipped }
 interface IncludeOptions { count, fields, include, limit, logical, orderBy, where }
 interface IncludeOptionsFor { count, fields, include, limit, logical, orderBy, where }
@@ -1176,8 +1179,9 @@ interface SqlFilesOutcome { applied, dir, removed, unchanged }
 interface SqlScriptColumn { name, source, type }
 interface SqlScriptColumnSource { column, schema, table }
 interface SqlScriptNotice { message, severity }
-interface SqlScriptResult { columns, command, effectiveRole, notices, rowCount, rows, tables, truncated }
+interface SqlScriptResult { columns, command, effectiveRole, notices, rowCount, rows, statements, tables, truncated }
 interface SqlScriptTable { hasInheritors, kind, primaryKey, schema, table }
+interface SqlStatementResult { columns, command, rowCount, rows, tables, truncated }
 interface SqlTemplate { brand, text }
 interface StaticRedirectMatch { location, status }
 interface StaticRedirectRequest { host, path, search }
@@ -1328,6 +1332,7 @@ type GeneratedDatabase
 type HistoryConfig
 type IdOf
 type ImportUserOutcome
+type ImportedPasswordHashAlgorithm
 type IncludeArgOf
 type IncludeOf
 type IncludeSpec
