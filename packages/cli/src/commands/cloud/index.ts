@@ -104,6 +104,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--connection-string": String,
     "--cpu": String,
     "--day": String,
+    "--database": String,
     "--db": String,
     "--db-autoscale-max-cpu": String,
     "--db-autoscale-max-memory": String,
