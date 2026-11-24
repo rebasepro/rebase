@@ -1,1 +1,1 @@
-{"open":{"ci:rebase:main":{"title":"CI on main failing: verify / static -> pnpm run verify:docs:strict (run 45389635358, 2026-11-24T12:02Z). Cause not yet diagnosed; not paged.","firstSeen":"2026-11-24T12:12:44Z","lastSeen":"2026-11-24T13:00:00Z","pagedAt":null,"pr":null}}}
+{"open":{}}
