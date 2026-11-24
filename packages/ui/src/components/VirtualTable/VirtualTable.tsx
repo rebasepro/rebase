@@ -35,7 +35,8 @@ import {
     useSensor,
     useSensors
 } from "@dnd-kit/core";
-import { arrayMove, horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
+import { arrayMove, horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { columnClipVar, columnShiftVar, columnTransitionVar, columnWidth } from "./columnVars";
 
 
 /** The body a table with no rows keeps, for its empty, loading or error view. */
@@ -84,7 +85,19 @@ const innerElementType = forwardRef<HTMLDivElement, InnerElementProps>(({
                                 <div style={{ position: "sticky",
 top: 0,
 zIndex: 20 }}>
-                                    <VirtualTableHeaderRow {...virtualTableProps}/>
+                                    <VirtualTableHeaderRow
+                                        columns={virtualTableProps.columns}
+                                        sortIndex={virtualTableProps.sortIndex}
+                                        onColumnSort={virtualTableProps.onColumnSort}
+                                        onFilterUpdate={virtualTableProps.onFilterUpdate}
+                                        filter={virtualTableProps.filter}
+                                        onColumnResizeEnd={virtualTableProps.onColumnResizeEnd}
+                                        createFilterField={virtualTableProps.createFilterField}
+                                        AddColumnComponent={virtualTableProps.AddColumnComponent}
+                                        columnsReorderable={Boolean(virtualTableProps.onColumnsOrderChange)}
+                                        draggingColumnId={virtualTableProps.draggingColumnId}
+                                        headerHeight={headerHeight}
+                                        rootRef={virtualTableProps.rootRef}/>
                                 </div>
                                 {!customView && children}
                             </div>
@@ -242,20 +255,23 @@ position });
 
     // Removed redundant ResizeObserver to prevent performance issues and UI flickering.
 
+        // Width and height only. `scroll: true` listened to every scroll on
+        // the page to keep the box's position current, which the table never
+        // reads: a page scrolling around a table re-rendered all of it on
+        // every frame, and its own scroll read its box on every event.
         const [measureRef, bounds] = useMeasure({
             polyfill: ResizeObserver,
-            scroll: true,
             // This is important for handling zooming in react-flow
             offsetSize: true
         });
 
-        const onColumnResizeInternal = useCallback((params: OnVirtualTableColumnResizeParams) => {
-            setColumns(prevColumns =>
-                prevColumns.map((column) =>
-                    column.key === params.column.key ? params.column : column
-                )
-            );
-        }, []);
+        // Where the header writes the column custom properties the body reads
+        // during a resize or a column drag (see `columnVars`).
+        const rootRef = useRef<HTMLDivElement | null>(null);
+        const setRootRef = useCallback((element: HTMLDivElement | null) => {
+            rootRef.current = element;
+            measureRef(element);
+        }, [measureRef]);
 
         const onColumnResizeEndInternal = useCallback((params: OnVirtualTableColumnResizeParams) => {
             setColumns(columns.map((column) => column.key === params.column.key ? params.column : column));
@@ -434,8 +450,8 @@ position });
             columns,
             onRowClick,
             customView,
-            onColumnResize: onColumnResizeInternal,
             onColumnResizeEnd: onColumnResizeEndInternal,
+            rootRef,
             // The prop, not `filterRef`: the ref is brought up to date by an
             // effect, after this render has read it, so the header showed the
             // filter from before — until something else redrew it.
@@ -454,7 +470,7 @@ position });
             } : undefined,
             draggingColumnId,
             extraData
-        }), [data, rowHeight, cellRenderer, columns, onRowClick, customView, onColumnResizeInternal, onColumnResizeEndInternal, filterInput, onColumnSort, onFilterUpdateInternal, sortIndex, hoverRow, createFilterField, rowClassName, endAdornment, AddColumnComponent, onColumnsOrderChange, draggingColumnId, extraData]);
+        }), [data, rowHeight, cellRenderer, columns, onRowClick, customView, onColumnResizeEndInternal, filterInput, onColumnSort, onFilterUpdateInternal, sortIndex, hoverRow, createFilterField, rowClassName, endAdornment, AddColumnComponent, onColumnsOrderChange, draggingColumnId, extraData]);
 
         // The height the table takes when nothing gives it one: its header and
         // every row — or room for the empty, loading or error view — plus a
@@ -478,7 +494,7 @@ position });
 
         const tableContent = (
             <div
-                ref={measureRef}
+                ref={setRootRef}
                 style={{
                     height: contentHeight,
                     maxHeight: "100%",
@@ -567,60 +583,6 @@ function areVirtualTablePropsEqual(
 export const VirtualTable = VirtualTableInner as <T extends object>(
     props: VirtualTableProps<T>
 ) => React.ReactElement | null;
-// Wrapper that applies sortable transforms to cells
-const SortableCellWrapper = ({
-    columnKey,
-    width,
-    isDragging,
-    isDraggable,
-    frozen,
-    children
-}: {
-    columnKey: string;
-    width: number;
-    isDragging: boolean;
-    isDraggable: boolean;
-    frozen?: boolean;
-    children: React.ReactNode;
-}) => {
-    // Only the movement: a body cell follows its column while the header is
-    // dragged, and is not a handle itself. dnd-kit's `attributes` describe a
-    // handle — `role="button"`, `aria-disabled` on a frozen column — and spread
-    // here they made every first cell a disabled button, so the row's checkbox,
-    // its Edit button and its actions read as disabled to assistive tech.
-    const {
-        setNodeRef,
-        transform,
-        transition
-    } = useSortable({
-        id: columnKey,
-        disabled: !isDraggable || frozen
-    });
-
-    const style = {
-        // Only use translate, ignore any scale transforms
-        transform: transform ? `translateX(${transform.x}px)` : undefined,
-        // Don't transition the dragged item - only other items should animate
-        transition: isDragging ? undefined : transition,
-        minWidth: width,
-        maxWidth: width,
-        width: width
-    };
-
-    return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            className={cls(
-                "flex-shrink-0",
-                frozen && "sticky left-0 z-10 bg-surface-card"
-            )}
-        >
-            {children}
-        </div>
-    );
-};
-
 type VirtualTableRowRendererProps = {
     rowData: Record<string, unknown> | undefined;
     index: number;
@@ -632,8 +594,8 @@ type VirtualTableRowRendererProps = {
     rowHeight: number;
     headerHeight: number;
     cellRenderer: VirtualTableContextProps<Record<string, unknown>>["cellRenderer"];
-    draggingColumnId?: string | null;
-    columnsReorderable: boolean;
+    /** A column is being dragged: every unfrozen cell follows its header's offset. */
+    dragActive: boolean;
     includeAddColumn: boolean;
     extraData?: unknown;
 };
@@ -663,8 +625,7 @@ const VirtualTableRowRenderer = React.memo(function VirtualTableRowRenderer({
     rowHeight,
     headerHeight,
     cellRenderer,
-    draggingColumnId,
-    columnsReorderable,
+    dragActive,
     includeAddColumn,
     extraData
 }: VirtualTableRowRendererProps) {
@@ -695,8 +656,10 @@ const VirtualTableRowRenderer = React.memo(function VirtualTableRowRenderer({
                 // coming back out, which is four of them in
                 // `SelectableTable` alone.
                 const cellData = rowData && (rowData as Record<string, unknown>)[column.key];
-                const isDragging = draggingColumnId === column.key;
-                const isDraggable = !column.frozen && columnsReorderable;
+                const width = columnWidth(columnIndex, column.width);
+                // While a column is dragged, each cell moves with its header,
+                // through the offset the header writes on the table root.
+                const followsDrag = dragActive && !column.frozen;
 
                 const cell = <VirtualTableCell
                     dataKey={column.key}
@@ -710,28 +673,21 @@ const VirtualTableRowRenderer = React.memo(function VirtualTableRowRenderer({
                     columnIndex={columnIndex}
                     extraData={extraData}/>;
 
-                return columnsReorderable ? (
-                    <SortableCellWrapper
-                        key={`cell_wrapper_${column.key}`}
-                        columnKey={column.key}
-                        width={column.width}
-                        isDragging={isDragging}
-                        isDraggable={isDraggable}
-                        frozen={column.frozen}
-                    >
-                        {cell}
-                    </SortableCellWrapper>
-                ) : (
+                return (
                     <div
                         key={`cell_wrapper_${column.key}`}
+                        data-vt-col={column.key}
                         className={cls(
                             "flex-shrink-0 relative",
                             column.frozen && "sticky left-0 z-10 bg-surface-card"
                         )}
                         style={{
-                            minWidth: column.width,
-                            maxWidth: column.width,
-                            width: column.width
+                            minWidth: width,
+                            maxWidth: width,
+                            width,
+                            overflow: `var(${columnClipVar(columnIndex)}, visible)`,
+                            transform: followsDrag ? `translateX(var(${columnShiftVar(columnIndex)}, 0px))` : undefined,
+                            transition: followsDrag ? `var(${columnTransitionVar(columnIndex)}, none)` : undefined
                         }}
                     >
                         {cell}
@@ -754,8 +710,7 @@ function areRowRendererPropsEqual(a: VirtualTableRowRendererProps, b: VirtualTab
         a.hoverRow === b.hoverRow &&
         a.rowHeight === b.rowHeight &&
         a.headerHeight === b.headerHeight &&
-        a.draggingColumnId === b.draggingColumnId &&
-        a.columnsReorderable === b.columnsReorderable &&
+        a.dragActive === b.dragActive &&
         a.includeAddColumn === b.includeAddColumn &&
         shallowEqual(a.style, b.style) &&
         equal(a.extraData, b.extraData) &&
@@ -800,7 +755,6 @@ function MemoizedList({
                 rowClassName,
                 endAdornment,
                 draggingColumnId,
-                onColumnsOrderChange,
                 AddColumnComponent,
                 extraData
             }) => {
@@ -828,8 +782,7 @@ function MemoizedList({
                     rowHeight={rowHeight}
                     headerHeight={headerHeight}
                     cellRenderer={cellRenderer}
-                    draggingColumnId={draggingColumnId}
-                    columnsReorderable={Boolean(onColumnsOrderChange)}
+                    dragActive={Boolean(draggingColumnId)}
                     // Read here rather than from this function's closure: the
                     // component is created once, and a closure would keep the
                     // first value for the life of the list.
