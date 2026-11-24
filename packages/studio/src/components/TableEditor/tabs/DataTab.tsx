@@ -58,6 +58,10 @@ import {
 } from "../tableModel";
 
 const PAGE_SIZES = [50, 100, 500] as const;
+/** One empty list each, so a page not loaded yet hands the memos the same arrays every render. */
+const NO_COLUMNS: CatalogColumn[] = [];
+const NO_ROWS: TableRow[] = [];
+const NO_KEY: string[] = [];
 const SELECT_COLUMN = "__select__";
 const ACTIONS_COLUMN = "__actions__";
 const IMPORT_CHUNK = 500;
@@ -223,17 +227,16 @@ export function DataTab({ table }: DataTabProps) {
         } finally {
             if (request === loadRequest.current) setLoading(false);
         }
-        // `page` is read only for the column list a data-API page borrows.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `page` is read only for the column list a data-API page borrows; `filterKey` stands for `filters`
     }, [throughApi, viewAsUser, runAs.currentUser?.uid, requestJson, table, pageSize, offset, sort, filterKey, t]);
 
     useEffect(() => {
         void load();
     }, [load]);
 
-    const columns = page?.columns ?? [];
-    const rows = page?.rows ?? [];
-    const primaryKey = page?.primaryKey ?? [];
+    const columns = page?.columns ?? NO_COLUMNS;
+    const rows = page?.rows ?? NO_ROWS;
+    const primaryKey = page?.primaryKey ?? NO_KEY;
     const writable = !throughApi && page !== null && !page.readOnly;
     const columnByName = useMemo(() => new Map(columns.map(column => [column.name, column])), [columns]);
 

@@ -5,11 +5,11 @@ description: Guide for using and customizing the Rebase Studio developer tools l
 
 # Rebase Studio
 
-Rebase Studio (`@rebasepro/studio`) is the developer tools layer for Rebase. It provides 14 built-in tools — Tables, SQL Console, JS Console, RLS Editor, Storage browser, Cron Jobs manager, Schema Visualizer, Branches manager, Backups, API Explorer, Webhooks, Logs Explorer, Users & Roles, and API Keys — accessible via the "Studio" mode toggle in the sidebar or standalone via `<RebaseStudioApp />`.
+Rebase Studio (`@rebasepro/studio`) is the developer tools layer for Rebase. It provides 15 built-in tools — Tables, SQL Console, JS Console, RLS Editor, Storage browser, Cron Jobs manager, Schema Visualizer, Branches manager, Backups, Database, API Explorer, Webhooks, Logs Explorer, Users & Roles, and API Keys — accessible via the "Studio" mode toggle in the sidebar or standalone via `<RebaseStudioApp />`.
 
 ## Overview
 
-- **14 built-in dev tools** — all lazy-loaded and code-split so they don't impact initial bundle size
+- **15 built-in dev tools** — all lazy-loaded and code-split so they don't impact initial bundle size
 - **StudioHomePage** — customizable landing page with tool cards grouped by section
 - **Studio Bridge** — hooks that connect Studio tools to CMS data (collections, navigation, side panels)
 
@@ -82,7 +82,7 @@ function RoleSimulator() {
 
 ## Studio Dev Tools
 
-The Studio ships 14 built-in dev tools, all **lazy-loaded** (code-split) so they don't impact the initial bundle. Heavy dependencies (Monaco, `@xyflow/react`, `dagre`, `pgsql-ast-parser`) are only loaded when a tool is visited.
+The Studio ships 15 built-in dev tools, all **lazy-loaded** (code-split) so they don't impact the initial bundle. Heavy dependencies (Monaco, `@xyflow/react`, `dagre`, `pgsql-ast-parser`) are only loaded when a tool is visited.
 
 ### Tool Reference
 

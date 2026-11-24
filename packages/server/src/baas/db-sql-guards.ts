@@ -25,8 +25,10 @@ export function ddlRefusal(error: unknown): unknown {
         pg.detail,
         pg.hint ? `Hint: ${pg.hint}` : undefined
     ].filter(Boolean).join(" ");
-    const status = pg.code && ALREADY_EXISTS_CODES.has(pg.code) ? 409 : 400;
-    return new ApiError(status, "DDL_REJECTED", message, { dbCode: pg.code }, true);
+    const details = { dbCode: pg.code };
+    return pg.code && ALREADY_EXISTS_CODES.has(pg.code)
+        ? new ApiError(409, "DDL_REJECTED", message, details, true)
+        : new ApiError(400, "DDL_REJECTED", message, details, true);
 }
 
 const IDENTIFIER_RE = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/;

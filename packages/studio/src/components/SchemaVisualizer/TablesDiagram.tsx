@@ -114,8 +114,7 @@ function DiagramCanvas({ catalog, focusTable = null, alwaysFocus = false, highli
         }
         const node = nodes.find((candidate) => candidate.id === nodeId);
         if (node) void reactFlowInstance.setCenter(node.position.x + 140, node.position.y + 60, { zoom: 1.1, duration: 400 });
-        // Centres on a change of selection, not on every node move.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- centres on a change of selection, not on every node move
     }, [highlightTable]);
 
     const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {

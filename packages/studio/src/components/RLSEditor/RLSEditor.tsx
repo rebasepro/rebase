@@ -1,5 +1,5 @@
 import { useTableDescriptors } from "@rebasepro/app";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router";
 import {
     AlertTriangleIcon,
@@ -164,6 +164,11 @@ const RLSEditorInspector = ({ apiUrl: _apiUrl = "" }: { apiUrl?: string }) => {
         }, { replace: true });
     }, [setSearchParams]);
     const [junctionTableNames, setJunctionTableNames] = useState<Set<string>>(new Set());
+    // Read by the catalogue fetch through a ref: react-router hands out a new
+    // `setSearchParams` whenever the query changes, and the fetch must not run
+    // again because a table was picked.
+    const setSelectedTableRef = useRef(setSelectedTable);
+    setSelectedTableRef.current = setSelectedTable;
 
     const [sidebarSize, setSidebarSize] = useState(() => {
         try {
@@ -297,7 +302,7 @@ const RLSEditorInspector = ({ apiUrl: _apiUrl = "" }: { apiUrl?: string }) => {
                 // table re-read the whole catalogue, and the first load (which
                 // picks one) run twice.
                 const firstUserTable = sortedTables.find(t => !REBASE_INTERNAL_SCHEMAS.includes(t.schemaName)) ?? sortedTables[0];
-                setSelectedTable(previous => previous ?? `${firstUserTable.schemaName}.${firstUserTable.tableName}`);
+                setSelectedTableRef.current(previous => previous ?? `${firstUserTable.schemaName}.${firstUserTable.tableName}`);
             }
 
         } catch (e: unknown) {
@@ -306,7 +311,7 @@ const RLSEditorInspector = ({ apiUrl: _apiUrl = "" }: { apiUrl?: string }) => {
         } finally {
             setIsLoading(false);
         }
-    }, [databaseAdmin]);
+    }, [databaseAdmin, t]);
 
     useEffect(() => {
         fetchRLSData();

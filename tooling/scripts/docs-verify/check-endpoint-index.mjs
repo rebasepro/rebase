@@ -157,6 +157,10 @@ const MOUNTS = new Map([
 
     // Zero-code BaaS admin surfaces (`packages/server/src/baas/*`).
     ["packages/server/src/baas/db-admin-routes.ts#router", "/api/admin/db"],
+    // `mountTableRoutes` adds the per-table routes to the db admin router itself.
+    ["packages/server/src/baas/db-table-routes.ts#router", "/api/admin/db"],
+    ["packages/server/src/baas/db-insights-routes.ts#router", "/api/admin/db/insights"],
+    ["packages/server/src/baas/db-catalog-routes.ts#router", "/api/admin/db/catalog"],
     ["packages/server/src/baas/roles-and-crons-store.ts#rolesRouter", "/api/admin/roles"],
     ["packages/server/src/baas/roles-and-crons-store.ts#cronJobsRouter", "/api/admin/cron/jobs"],
     ["packages/server/src/baas/storage-policies-store.ts#router", "/api/admin/storage/policies"],

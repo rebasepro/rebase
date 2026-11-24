@@ -150,7 +150,7 @@ export function TableEditorView() {
             current = false;
         };
         // Read again when the table, a detail tab or a change asks for it.
-    }, [needsDetails, selectedTable?.key, detailsVersion, requestJson]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [needsDetails, selectedTable?.key, detailsVersion, requestJson]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed by the table's identity, not the object a list reload replaces
 
     const currentDetails = details && selectedTable && details.key === selectedTable.key ? details.value : null;
 

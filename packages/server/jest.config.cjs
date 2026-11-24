@@ -22,6 +22,8 @@ module.exports = {
         "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
         "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
         "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts",
+        // The Database view's security advisor runs rls-check's checks.
+        "^@rebasepro/rls-check$": "<rootDir>/../rls-check/src/index.ts",
         // Schema fixtures written as a project writes them import this
         // subpath; mapped so they never run against a stale `dist`.
         "^@rebasepro/server/schema$": "<rootDir>/src/schema/index.ts",

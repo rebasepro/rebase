@@ -98,6 +98,13 @@ the ID you got. Read the response header.
 | `CHALLENGE_EXHAUSTED` | 401 | Too many wrong codes against one MFA challenge. | Start a new challenge. |
 | `CONFIRMATION_REQUIRED` | 400 | A destructive DDL operation (`DELETE /api/admin/db/tables/:table` or `DELETE …/columns/:column`) was called without `{ confirm: "<name>" }`. | Re-send with the exact target name in `confirm`, or pass `dryRun: true` to preview SQL. |
 | `DDL_REJECTED` | 400, or 409 when the object already exists | PostgreSQL refused a statement `/api/admin/db/*` ran for you — a type, a default, a policy condition, a name already taken. The message is Postgres's own, and `details.dbCode` its SQLSTATE. | Change what the message names and send the request again; `dryRun: true` shows the SQL first. |
+| `EXTENSION_NOT_FOUND` | 404 | Removing an extension that is not installed (`DELETE /api/admin/db/catalog/extensions/:name`). | List the installed extensions with `GET /api/admin/db/catalog/extensions`. |
+| `NOT_INSTALLED` | 400 | `POST /api/admin/db/insights/queries/reset` on a database without the `pg_stat_statements` extension. | Install it from the Database view's Extensions, or with `CREATE EXTENSION pg_stat_statements`. |
+| `NOT_PRELOADED` | 400 | `pg_stat_statements` is installed but the server did not load it, so its statistics cannot be reset. | Add it to `shared_preload_libraries` and restart Postgres. |
+| `SESSION_NOT_FOUND` | 404 | No session of the database has that process id (`POST /api/admin/db/insights/activity/:pid/cancel` or `/terminate`). It may already have ended. | Read `GET /api/admin/db/insights/activity` again. |
+| `SOURCE_NOT_FOUND` | 404 | `?source=` on a `/api/admin/db/insights` or `/api/admin/db/catalog` route names no SQL database this backend serves. | Pick one from `GET /api/admin/db/insights/sources`. |
+| `TYPE_NOT_FOUND` | 404 | No enum type has that schema and name (`POST /api/admin/db/catalog/types/:schema/:name/values`). | List the types with `GET /api/admin/db/catalog/types`. |
+| `UNAVAILABLE` | 400 | Query statistics were asked of the in-process development database, which does not collect them. | Run against a Postgres server of your own. |
 | `DEVICE_LOGIN_DECIDED` | 409 | The device sign-in was already approved or denied. A sign-in is decided once. | Start a new one on the device. |
 | `DEVICE_LOGIN_EXPIRED` | 410 | The device sign-in passed its ten minutes before it was decided. | Start a new one on the device. |
 | `DEVICE_LOGIN_NOT_FOUND` | 404 | No device sign-in has that user code. The device's poll itself answers RFC 8628's lowercase codes instead: `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, `invalid_grant`. | Check the code against the one the device shows. |
