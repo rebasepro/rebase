@@ -215,6 +215,7 @@
     // unclassifiable relation kind the resolver must refuse (relations).
     // Unread, a directive is a comment: the day the model types `reference`
     // or the resolver's input widens, nothing would notice.
+    "packages/server-postgres/test/db-table-routes.test.ts",
     "packages/server-postgres/test/foreign-key-target.test.ts",
     "packages/server-postgres/test/generate-postgres-ddl.test.ts",
     "packages/server-postgres/test/historyService.test.ts",
