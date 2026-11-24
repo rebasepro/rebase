@@ -11,15 +11,18 @@ and beat table, §6 additions, and §7, which is new.
 
 ## 1. What Rebase is, in one sentence
 
-> Rebase turns a Postgres database into a product backend — REST, a typed SDK,
-> realtime, auth, storage, functions and cron — with access control enforced by
-> Postgres itself. When a human needs to touch the data, the same definition
-> renders a full admin panel.
+> Rebase is an open-source Postgres BaaS — REST, a typed SDK, realtime, auth,
+> storage, functions, cron, vector search and MCP — with access control enforced
+> by Postgres itself, runnable on Rebase Cloud in Europe or self-hosted. When a
+> human needs to touch the data, the same definition renders an admin panel.
 
-**What we lead with is the consequence of that, not the sentence itself: the
-back office stops being a project.** Twenty-three collections, zero admin
-screens written — those are Edith's real numbers, and they are the shape of
-every project on the showcase.
+> Revised 2026-11-24: BaaS-first positioning. The site previously led with "the
+> back office stops being a project" and banned "BaaS" in copy, which anchored
+> visitors on CMS/admin tooling. Rebase's focus is the Postgres BaaS (backend
+> services + Rebase Cloud on Hetzner in Europe), with the admin panel (CMS +
+> Studio) as a built-in layer over the same API. Primary CTAs across the header,
+> hero and `ClosingCta` lead to Rebase Cloud (`/cloud`) and the CLI; the hosted
+> panel demo (`demo.rebase.pro`) stays secondary.
 
 > Revised 2026-09-12. This section used to end "Two products, one definition.
 > That is the whole story, and every page is a view onto it", and the home page
@@ -168,9 +171,8 @@ routes", which is what happens when only the middle product is described.
   and Studio are the panel's two sides (the team's, the developers'), not a
   third layer. (Revised 2026-09-23: the site said "panel", "admin panel",
   "back office", "surface" and "three layers" for the same thing.)
-- **backend** is the category noun: "the open-source backend for Postgres".
-  Not "framework", "platform", "BaaS" or "backend-as-a-service" — those name a
-  competitor's category on /compare, never Rebase.
+- **backend** or **Postgres BaaS** is the category noun: "the open-source
+  Postgres BaaS" / "the open-source backend for Postgres". Not "framework".
 - **back office** names only the thing a customer would otherwise build ("the
   back office stops being a project"), never what Rebase generates.
 - **access rules** in prose, for what a table declares; `rls` is the key.

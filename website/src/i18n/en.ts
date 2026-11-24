@@ -34,7 +34,7 @@ export const en = {
   "rlscheck.cta": "See all 15 checks",
   "copy.command": "Copy",
   "copy.command.done": "Copied",
-  "social.title": "From the makers of FireCMS, the open-source CMS in 10,000+ projects.",
+  "social.title": "Built by the team behind FireCMS (10,000+ production apps). Running production backends in Europe today.",
   "trust.europe":
     "Made in Madrid by a company under European law. Run Rebase on your own servers — Hetzner, OVHcloud, Scaleway or bare metal — or have us operate it in Europe.",
   "trust.europe.link": "Sovereignty in Europe",
@@ -145,7 +145,8 @@ export const en = {
   "showcase.case6.title": "Edith",
   "showcase.case6.desc":
     "A CRM the team can rebuild without a deploy: pipelines, tags, tasks and an automation canvas whose triggers, branches and actions are all rows in Postgres. Twenty-three tables generated the entire back office — no admin screens were written.",
-  "cta.title": "Point it at your database.",
+  "cta.title": "Deploy on Rebase Cloud, or run on your own Postgres.",
+  "cta.closing.blurb": "Start with managed Postgres and S3 storage in Europe, or scaffold locally with one command.",
   // The close is a fork, not a fourth copy of the hero's install command. The
   // cloud lane offers access rather than a deploy button, because Rebase Cloud
   // opens in batches — see `cloud.status`, the one key every surface quotes.
@@ -182,6 +183,8 @@ export const en = {
   "cloud.home.link.pricing": "Pricing & resources",
   "cloud.home.statusNote": "Running production tenants today · opening in batches",
   "nav.cloud": "Rebase Cloud",
+  "nav.cloudShort": "Cloud",
+  "nav.startCloud": "Start on Cloud",
   "nav.cloud.desc": "Managed in Europe on Hetzner, with dedicated Postgres & S3 storage",
   "cloud.meta.title": "Rebase Cloud — managed Postgres BaaS hosting in Europe",
   "cloud.meta.description": "Rebase Cloud runs your app, a PostgreSQL database of its own and your file storage. Pick a size for the app and the database, change it any time, and pay by the hour for what you reserve.",
@@ -262,6 +265,7 @@ export const en = {
   "cta.lane.cloud.link": "Request access",
   "cta.lane.cloud.link.open": "See the prices",
   "cta.eyebrow": "Get started",
+  "cta.button.cloud": "Start on Cloud",
   "cta.button.demo": "Try the demo",
   "cta.button.docs": "Read the docs",
   "engine.plus": "And the rest of the backend, in the same server. None of it is a separate service to sign up for and wire together.",
@@ -665,8 +669,8 @@ export const en = {
   "about.join.desc": "The code, the issues and the arguments are all in the open. Come and disagree with us.",
   "about.join.github": "Contribute on GitHub",
   "about.join.discord": "Join our Discord",
-  "index.meta.title": "Rebase — Open-Source Postgres Backend with an Admin Panel",
-  "index.meta.description": "The open-source backend for Postgres: REST, a typed SDK, realtime, auth and storage, and an admin panel you don't have to build. Access rules run in Postgres.",
+  "index.meta.title": "Rebase — Open-Source Postgres BaaS",
+  "index.meta.description": "The open-source Postgres BaaS: REST, typed SDK, realtime, auth, S3 storage, functions, cron and RLS in Postgres — hosted on Hetzner in Europe or self-hosted, with an admin panel built in.",
   "cms.meta.title": "Rebase CMS — the admin panel of your Rebase backend",
   "cms.meta.description": "The admin panel on every Rebase backend: spreadsheet editing, media, roles and history, extensible with your own React, under your app's policies.",
   "backend.meta.title": "Rebase Backend — REST, typed SDK, realtime and RLS over your Postgres",
@@ -703,8 +707,8 @@ export const en = {
   // without this step would have downgraded the English to match the drift.
   "product.meta.title": "Product overview: a backend and its admin panel — Rebase Postgres BaaS",
   "product.meta.description": "REST, a typed SDK, realtime, auth and storage over your Postgres, with access rules enforced by the database, and an admin panel from the same definition.",
-  "rebase-vs-supabase.meta.title": "Rebase vs Supabase — RLS and Local DX Comparison",
-  "rebase-vs-supabase.meta.description": "An admin dashboard generated from the same definition as the API, and row-level security written beside the table rather than in a separate editor.",
+  "rebase-vs-supabase.meta.title": "Rebase vs Supabase — Open-Source Postgres BaaS Comparison",
+  "rebase-vs-supabase.meta.description": "Compare two open-source Postgres BaaS platforms: schema-first row-level security, built-in S3 storage, single-container self-hosting, European Hetzner Cloud, and a generated admin panel.",
   "rebase-vs-payload.meta.title": "Rebase vs Payload CMS — Headless Postgres Comparison",
   "rebase-vs-payload.meta.description": "Compare code-first database models, React integrations, and deployment models between Rebase and Payload.",
   "rebase-vs-directus.meta.title": "Rebase vs Directus — Code-First Schema Comparison",

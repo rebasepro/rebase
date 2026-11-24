@@ -18,7 +18,7 @@ export const de = {
   "rlscheck.cta": "Alle 15 Prüfungen ansehen",
   "copy.command": "Kopieren",
   "copy.command.done": "Kopiert",
-  "social.title": "Von den Machern von FireCMS, dem Open-Source-CMS in über 10.000 Firebase-Projekten.",
+  "social.title": "Gebaut vom Team hinter FireCMS (über 10.000 Produktiv-Apps). Heute im Produktivbetrieb für Backends in Europa.",
   "trust.europe":
     "Gebaut in Madrid, von einem Unternehmen unter europäischem Recht. Betreibe Rebase auf deinen eigenen Servern — Hetzner, OVHcloud, Scaleway oder Bare Metal — oder lass es uns in Europa für dich betreiben.",
   "trust.europe.link": "Souveränität in Europa",
@@ -111,7 +111,8 @@ export const de = {
   "showcase.case6.badge": "Internes Tool · CRM und Workflow-Automatisierung",
   "showcase.case6.title": "Edith",
   "showcase.case6.desc": "Ein CRM, das das Team ohne Deploy umbauen kann: Pipelines, Tags, Aufgaben und ein Automatisierungs-Canvas, dessen Trigger, Verzweigungen und Aktionen allesamt Zeilen in Postgres sind. Dreiundzwanzig Tabellen erzeugten das komplette Back Office; keine einzige Admin-Oberfläche wurde geschrieben.",
-  "cta.title": "Verbinde es mit deiner Datenbank.",
+  "cta.title": "Auf Rebase Cloud deployen oder auf eigenem Postgres betreiben.",
+  "cta.closing.blurb": "Starte mit dediziertem Postgres und S3-Storage in Europa, oder starte lokal mit einem Befehl.",
   "cta.lane.local.title": "Lokal ausführen",
   "cta.lane.local.desc":
     "Ein Befehl, und es läuft. Kein Account, kein Container-Pull, keine Registrierung.",
@@ -144,6 +145,8 @@ export const de = {
   "cloud.home.link.pricing": "Preise & Ressourcen",
   "cloud.home.statusNote": "Heute im Produktivbetrieb · Öffnung in Wellen",
   "nav.cloud": "Rebase Cloud",
+  "nav.cloudShort": "Cloud",
+  "nav.startCloud": "In der Cloud starten",
   "nav.cloud.desc": "In Europa auf Hetzner verwaltet, mit dediziertem Postgres & S3-Storage",
   "cloud.meta.title": "Rebase Cloud — gemanagtes Postgres-BaaS-Hosting in Europa",
   "cloud.meta.description": "Rebase Cloud betreibt deine App, eine eigene PostgreSQL-Datenbank und deinen Dateispeicher. Wähle eine Größe für die App und eine für die Datenbank, ändere sie jederzeit und zahle stundenweise für das, was du reservierst.",
@@ -152,6 +155,7 @@ export const de = {
   "cta.lane.cloud.badge": "Private Beta",
   "cta.lane.cloud.link": "Zugang anfragen",
   "cta.eyebrow": "Loslegen",
+  "cta.button.cloud": "In der Cloud starten",
   "cta.button.demo": "Demo testen",
   "cta.button.docs": "Docs lesen",
   "engine.plus":
@@ -521,8 +525,8 @@ export const de = {
   "about.join.desc": "Der Code, die Issues und die Diskussionen sind alle offen. Komm und widersprich uns.",
   "about.join.github": "Auf GitHub beitragen",
   "about.join.discord": "Unserem Discord beitreten",
-  "index.meta.title": "Rebase — Open-Source-Postgres-Backend mit Admin-Panel",
-  "index.meta.description": "Open-Source-Backend für Postgres: REST, typisiertes SDK, Realtime, Auth, Storage & Admin-Panel. Zugriffsregeln laufen direkt in Postgres.",
+  "index.meta.title": "Rebase — Open-Source-Postgres-BaaS",
+  "index.meta.description": "Das Open-Source-Postgres-BaaS: REST, typisiertes SDK, Realtime, Auth, S3-Storage, Funktionen, Cron und RLS in Postgres — auf Hetzner in Europa oder selbst gehostet, inklusive Admin-Panel.",
   "cms.meta.title": "Rebase CMS — das Admin-Panel deines Rebase-Backends",
   "cms.meta.description":
     "Das Admin-Panel auf jedem Rebase-Backend: Tabellenbearbeitung, Medien, Rollen und Historie, erweiterbar mit eigenem React, unter den Policies deiner App.",
@@ -555,8 +559,8 @@ export const de = {
   "product.meta.title":
     "Produktübersicht: ein Backend und sein Admin-Panel — Rebase",
   "product.meta.description": "REST, typisiertes SDK, Realtime, Auth & Storage über Postgres – mit DB-basierten Zugriffsregeln und Admin-Panel aus derselben Definition.",
-  "rebase-vs-supabase.meta.title": "Rebase vs Supabase — RLS und lokale DX im Vergleich",
-  "rebase-vs-supabase.meta.description": "Ein Admin-Dashboard, das aus derselben Definition wie die API entsteht, und Row-Level Security, die neben der Tabelle steht statt in einem separaten Editor.",
+  "rebase-vs-supabase.meta.title": "Rebase vs Supabase — Open-Source-Postgres-BaaS im Vergleich",
+  "rebase-vs-supabase.meta.description": "Vergleiche zwei Open-Source-Postgres-BaaS-Plattformen: Schema-first Row-Level Security, integrierter S3-Storage, Single-Container-Self-Hosting, europäische Hetzner-Cloud und generiertes Admin-Panel.",
   "rebase-vs-payload.meta.title": "Rebase vs Payload CMS — Headless Postgres im Vergleich",
   "rebase-vs-payload.meta.description": "Vergleiche Code-First-Datenbankmodelle, React-Integrationen und Deployment-Modelle zwischen Rebase und Payload.",
   "rebase-vs-directus.meta.title": "Rebase vs Directus — Code-First-Schema im Vergleich",

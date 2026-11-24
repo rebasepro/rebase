@@ -39,11 +39,11 @@ import ChapterRule from "../ChapterRule.astro";
             <div class="hero-badge mb-8"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t("productpage.00")}</span></div>
             <h1 class="mb-6 text-display-2 text-tone-max" set:html={t("productpage.01")}></h1>
             <p class="mb-10 text-lg leading-8 text-tone-300 lg:text-xl">{t("productpage.02")}</p>
-            <div class="flex items-center justify-start gap-x-4">
-                <a href={DEMO_URL} target="_blank" rel="noopener noreferrer"
+            <div class="flex flex-wrap items-center justify-start gap-x-4 gap-y-3">
+                <a href={translatePath("/cloud")}
                    class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
-                   data-track id="product-hero-demo">
-                    {t("cta.button.demo")}
+                   data-track id="product-hero-cloud">
+                    {t("cta.button.cloud")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -63,13 +63,7 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
     </section>
 
-    <!-- ═══════════════════════ THE PRODUCT, WORKING ═══════════════════════ -->
-    <ScrollSyncShowcase/>
-
-    <!-- ═══════════════════════ ONE FILE, TWO LAYERS ═══════════════════════ -->
-    <CollectionLayersSection />
-
-    <!-- ═══════════════════════ THE BACKEND ═══════════════════════ -->
+    <!-- ═══════════════════════ 01 / 04 — THE BACKEND (LEADS) ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
         <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
             <ChapterRule label={t("productpage.17")} index="01 / 04" dot="text-cyan-300" />
@@ -94,6 +88,16 @@ import ChapterRule from "../ChapterRule.astro";
                         <a href={translatePath("/security")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary-light hover:text-primary/80 transition-colors">
                             {t("productpage.link.security")}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <path d="M5 12h14"/>
+                                <path d="m12 5 7 7-7 7"/>
+                            </svg>
+                        </a>
+                        <a href={translatePath("/cloud")}
+                           class="inline-flex items-center gap-2 text-sm font-medium text-primary-light hover:text-primary/80 transition-colors">
+                            {t("cloud.home.link.explore")}
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                  stroke-linejoin="round">
@@ -126,32 +130,13 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
     </section>
 
-    <!-- ═══════════════════════ EVERYTHING AT ONCE ═══════════════════════ -->
-    <section id="s-mosaic-showcase" class="relative z-0 py-chapter overflow-hidden">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
-            <ChapterRule label={t("mosaic.badge")} index="02 / 04" dot="text-primary-light" />
-        </div>
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
-                <h2 class="mt-4 text-display-2 text-tone-max">
-                    {t("mosaic.title")}
-                </h2>
-                <p class="mt-lead text-tone-400 text-base sm:text-lg leading-relaxed">
-                    {t("mosaic.subtitle")}
-                </p>
-            </div>
+    <!-- ═══════════════════════ ONE FILE, TWO LAYERS ═══════════════════════ -->
+    <CollectionLayersSection />
 
-            <div class="max-w-6xl mx-auto animate-on-scroll fade-in-up delay-100" style="min-height: 760px;" inert
-                 aria-hidden="true">
-                <RebaseMosaicDemo client:visible/>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══════════════════════ AGENTS & OPS ═══════════════════════ -->
+    <!-- ═══════════════════════ 02 / 04 — AGENTS & OPS ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
         <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
-            <ChapterRule label={t("productpage.18")} index="03 / 04" dot="text-emerald-400" />
+            <ChapterRule label={t("productpage.18")} index="02 / 04" dot="text-emerald-400" />
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
@@ -206,10 +191,10 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
     </section>
 
-    <!-- ═══════════════════════ THE MAP ═══════════════════════ -->
+    <!-- ═══════════════════════ 03 / 04 — THE MAP ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
         <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
-            <ChapterRule label={t("productpage.13")} index="04 / 04" dot="text-amber-300" />
+            <ChapterRule label={t("productpage.13")} index="03 / 04" dot="text-amber-300" />
         </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
@@ -295,6 +280,31 @@ import ChapterRule from "../ChapterRule.astro";
     </section>
 
 
+
+    <!-- ═══════════════════════ THE PANEL, WORKING ═══════════════════════ -->
+    <ScrollSyncShowcase/>
+
+    <!-- ═══════════════════════ 04 / 04 — EVERYTHING AT ONCE ═══════════════════════ -->
+    <section id="s-mosaic-showcase" class="relative z-0 py-chapter overflow-hidden">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("mosaic.badge")} index="04 / 04" dot="text-primary-light" />
+        </div>
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
+                <h2 class="mt-4 text-display-2 text-tone-max">
+                    {t("mosaic.title")}
+                </h2>
+                <p class="mt-lead text-tone-400 text-base sm:text-lg leading-relaxed">
+                    {t("mosaic.subtitle")}
+                </p>
+            </div>
+
+            <div class="max-w-6xl mx-auto animate-on-scroll fade-in-up delay-100" style="min-height: 760px;" inert
+                 aria-hidden="true">
+                <RebaseMosaicDemo client:visible/>
+            </div>
+        </div>
+    </section>
 
     <ClosingCta title={t("close.product.title")} blurb={t("close.product.blurb")} trackId="product" />
 

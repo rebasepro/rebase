@@ -4,6 +4,9 @@ const { lang, t } = Astro.props;
 import { useTranslatedPath } from '../../i18n/ui';
 import HeroConnectionWidget from '../demos/HeroConnectionWidget';
 import { SplitLayerDemo } from '../demos/SplitLayerDemo';
+import { ApiMiniDemo } from '../demos/ApiMiniDemo';
+import { SdkMiniDemo } from '../demos/SdkMiniDemo';
+import { StorageViewDemo } from '../demos/StorageViewDemo';
 
 const translatePath = useTranslatedPath(lang);
 
@@ -169,6 +172,12 @@ import ChapterRule from "../ChapterRule.astro";
                         </div>
                         <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-tone-300"><code set:html={restCode}></code></pre>
                     </div>
+                    <div class="frame overflow-hidden">
+                        <div class="frame-head"><span>{t("index.diag.rest")}</span><span class="ml-auto">live · click an endpoint</span></div>
+                        <div class="h-[340px] overflow-hidden flex items-center justify-center">
+                            <ApiMiniDemo client:visible />
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -201,6 +210,12 @@ import ChapterRule from "../ChapterRule.astro";
                             <span class="font-mono text-xs text-tone-400">{t("backendpage.04")}</span>
                         </div>
                         <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-tone-300"><code set:html={sdkCode}></code></pre>
+                    </div>
+                    <div class="frame overflow-hidden">
+                        <div class="frame-head"><span>{t("index.diag.app")}</span><span class="ml-auto">live · generated types</span></div>
+                        <div class="h-[330px] overflow-hidden flex items-center justify-center">
+                            <SdkMiniDemo client:visible />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -342,6 +357,9 @@ import ChapterRule from "../ChapterRule.astro";
                                     </li>
                             ))}
                         </ul>
+                    </div>
+                    <div class="mt-6 frame overflow-hidden">
+                        <StorageViewDemo client:visible />
                     </div>
                 </div>
             </div>

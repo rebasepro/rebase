@@ -75,18 +75,17 @@ const CLOUD_PILLARS = [
     {/* ============================================================
         HOME PAGE SPINE — six numbered chapters, one close.
 
-          hero      the AI-era backend for your Postgres — built for your team,
+          hero      the AI-era Postgres BaaS — built for your team,
                     safe for your agents
           —         SERVICES — every service in the box, one line each, unnumbered
           01        WHAT YOU GET — the engine (typed SDK, REST API, realtime)
           02        SECURITY — the structural Postgres RLS claim on the brand
                     blue slab, then the free `rls-check` audit band
-          03        THE PANEL — Rebase CMS and Studio over the same backend
-          04        AGENT ERA — MCP + CLI under the same access rules (the 0.29
-                    Claude-apps section moved off the home page to /ai, 2026-11-23)
-          05        CUSTOMERS — case studies
-          06        REBASE CLOUD — managed hosting on Hetzner in Europe,
+          03        REBASE CLOUD — managed hosting on Hetzner in Europe,
                     managed S3 storage, dedicated Postgres & zero lock-in
+          04        AGENT ERA — MCP + CLI under the same access rules
+          05        THE PANEL — Rebase CMS and Studio over the same backend
+          06        CUSTOMERS — case studies
           close     the three lanes, the terms, and the ask
 
         Colour is spent twice and only twice: the blue slab on 03 and the coral
@@ -138,11 +137,11 @@ const CLOUD_PILLARS = [
                             {/* The click every arm of an experiment counts as a
                                 conversion (analytics.ts reads the attribute). */}
                             <a
-                                href={DEMO_URL} target="_blank" rel="noopener noreferrer"
+                                href={translatePath("/cloud")}
                                 data-ab-conversion="hero_cta_click"
                                 class="inline-flex items-center justify-start gap-2.5 rounded-lg bg-primary px-8 min-h-(--control-large) text-base font-semibold text-white shadow-[0_8px_28px_-6px_rgb(0_112_244/0.65)] transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                             >
-                                {t("hero.cta.demo")}
+                                {t("cta.button.cloud")}
                                 <ArrowRight size={17} aria-hidden="true" />
                             </a>
                             <button
@@ -463,135 +462,16 @@ const CLOUD_PILLARS = [
                 </div>
             </div>
         </section>
-        <!-- CHAPTER 03 — THE ADMIN PANEL. After the backend and its rules, so the
-             panel reads as a layer over the backend, never as a CMS pitch.
-             Was 01 until 2026-11-23.
-             Promoted to 01 on `ground-raised` so the 620px interactive
-             AdminDemoCarousel — the richest visual artifact on the site — is
-             the very first thing the reader sees after the hero and logo strip. -->
+        <!-- CHAPTER 03 — REBASE CLOUD. Promoted right after Security so the
+             managed Postgres BaaS on Hetzner sits in the first half of the
+             page. Sits on base ground between the raised `rls-check` band and
+             the raised Agent Era chapter. -->
         <div>
-            <section class="chapter drafted border-b border-tone-max/8 relative py-chapter">
-                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                    <div class="chapter-rule">
-                        <p class="eyebrow flex items-center gap-2.5"><span class="dot text-cyan-300" aria-hidden="true"></span>{t("panel.badge")}</p>
-                        <span class="chapter-index">03 / 06</span>
-                    </div>
-                    <div class="mt-lead max-w-[42rem] animate-on-scroll fade-in-up">
-                        <h2 class="font-headers text-display-2 text-balance">
-                            {t("panel.title")}
-                        </h2>
-                        <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed">{t("modes.subtitle")}</p>
-                    </div>
-                    {/* No `.frame`: the carousel draws the panel's own edge, and
-                        §6 allows a demo one frame, not two. The view toggle is page
-                        furniture and sits outside the product's edge.
-
-                        `lg:bleed-x`: the panel is the two-pane view the bleed
-                        doctrine's second test is written for — a list beside a
-                        record, where every extra pixel is another field on the
-                        form. A capped step past both gutters, so the frame reads
-                        as the product and not as a figure in the column. */}
-                    <div class="mt-content lg:bleed-x animate-on-scroll fade-in-up">
-                        <AdminDemoCarousel client:visible height={620} />
-                    </div>
-                    <div class="mt-content grid grid-cols-1 md:grid-cols-3 border-t border-tone-max/8">
-                        <div class="md:border-r border-tone-max/8 py-10 md:pr-8">
-                            <p class="font-mono text-2xs uppercase tracking-[0.18em] text-tone-400">{t("modes.baas.tag")}</p>
-                            <h3 class="mt-3 font-headers text-lg">{t("modes.baas.title")}</h3>
-                            <p class="mt-2 text-sm text-page-copy leading-relaxed">{t("modes.baas.desc")}</p>
-                            <p class="mt-4 font-mono text-2xs text-tone-400">@rebasepro/server</p>
-                        </div>
-                        <div class="md:border-r border-tone-max/8 py-10 md:px-8 border-t md:border-t-0">
-                            <p class="font-mono text-2xs uppercase tracking-[0.18em] text-tone-400">{t("modes.cms.tag")}</p>
-                            <h3 class="mt-3 font-headers text-lg">{t("modes.cms.title")}</h3>
-                            <p class="mt-2 text-sm text-page-copy leading-relaxed">{t("modes.cms.desc")}</p>
-                            <p class="mt-4 font-mono text-2xs text-tone-400">@rebasepro/cms</p>
-                        </div>
-                        <div class="py-10 md:pl-8 border-t md:border-t-0 border-tone-max/8">
-                            <p class="font-mono text-2xs uppercase tracking-[0.18em] text-tone-400">{t("modes.full.tag")}</p>
-                            <h3 class="mt-3 font-headers text-lg">{t("modes.full.title")}</h3>
-                            <p class="mt-2 text-sm text-page-copy leading-relaxed">{t("modes.full.desc")}</p>
-                            <p class="mt-4 font-mono text-2xs text-tone-400">@rebasepro/app</p>
-                        </div>
-                    </div>
-                    <a href={translatePath("/cms")} class="accent-link mt-10">
-                        {t("showcase.exploreCms")}
-                        <ArrowRight size={15} />
-                    </a>
-                </div>
-            </section>
-        </div>
-
-        {/* CHAPTER 04 — a HAZARD guarantee.
-
-            Same test as 02, the other side of it. The claim is again the absence
-            of an event — "an agent can't screw up" — and again unshowable: the
-            console beside it demonstrates what an agent CAN reach, never that it
-            failed to do damage. It runs on `ground-raised` rather than a second
-            coloured slab: the page spends chroma twice, on 02 and on the close.
-
-            The divider that used to introduce this chapter is gone. A ground
-            change is the same gesture, and running both would have two devices
-            doing one job.
-
-            It ran on `ground-raised` until 2026-09-12, when chapter 02 moved
-            above the security slab and took the page's only base ground with it
-            — leaving the rls-check band (raised) butted straight against this
-            one, two identical greys with the seam between them invisible. This
-            chapter takes the page ground now and keeps its hairlines, so the
-            alternation survives the reorder. */}
-        <div>
-            <section class="chapter drafted relative ground-raised py-chapter">
-                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                    <div class="chapter-rule">
-                        <p class="eyebrow flex items-center gap-2.5"><span class="dot text-amber-300" aria-hidden="true"></span>{t("agentera.badge")}</p>
-                        <span class="chapter-index">04 / 06</span>
-                    </div>
-                    <div class="mt-lead grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-                        <div class="lg:col-span-5">
-                            <h2 class="font-headers text-display-2 text-balance">
-                                {t("agentera.title")}.
-                            </h2>
-                            <p class="mt-lead leading-relaxed" set:html={t("agentera.p1")}></p>
-                            <a href={translatePath("/ai")} class="accent-link mt-10">
-                                {t("agentera.link")}
-                                <ArrowRight size={15} />
-                            </a>
-                        </div>
-                        {/* Bleeds toward the viewport edge. Boxed into seven of
-                            twelve columns the console read as a thumbnail of the
-                            product rather than the product; the copy column
-                            stays on the shell, so the left edge is unaffected. */}
-                        <div class="lg:col-span-7 lg:bleed-right animate-on-scroll fade-in-up delay-100">
-                            <AgentConsoleDemo client:visible />
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
-
-        <!-- CHAPTER 05 — CUSTOMERS. The carousel renders its own eyebrow, title
-             and subtitle; wrapping it in a second header duplicated all three.
-             It also renders its own `py-28 sm:py-36`, and this wrapper used to
-             add `py-24 sm:py-32` on top — 272px of ground above the heading and
-             272px below it, against ~128px everywhere else, which is what left
-             most of a screen empty between the customers and the close. The
-             wrapper keeps only the hairline. -->
-        <div class="chapter border-t border-tone-max/8">
-            <CaseStudiesCarousel t={t} />
-        </div>
-
-        <!-- CHAPTER 06 — REBASE CLOUD. Managed hosting on Hetzner in Germany,
-             built-in S3-compatible object storage, dedicated Postgres with
-             off-site WAL backups, and resource-based pricing. Sits on
-             `ground-raised` between Customers (base ground) and the coral
-             close so adjacent sections never share a ground. -->
-        <div>
-            <section id="s-cloud" class="chapter drafted relative ground-raised border-t border-tone-max/8 py-chapter">
+            <section id="s-cloud" class="chapter drafted relative border-b border-tone-max/8 py-chapter">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="chapter-rule">
                         <p class="eyebrow flex items-center gap-2.5"><span class="dot text-emerald-400" aria-hidden="true"></span>{t("cloud.home.badge")}</p>
-                        <span class="chapter-index">06 / 06</span>
+                        <span class="chapter-index">03 / 06</span>
                     </div>
 
                     <div class="mt-lead grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-end">
@@ -703,6 +583,87 @@ const CLOUD_PILLARS = [
                     </div>
                 </div>
             </section>
+        </div>
+
+        {/* CHAPTER 04 — a HAZARD guarantee (Agent Era). */}
+        <div>
+            <section class="chapter drafted relative ground-raised py-chapter">
+                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+                    <div class="chapter-rule">
+                        <p class="eyebrow flex items-center gap-2.5"><span class="dot text-amber-300" aria-hidden="true"></span>{t("agentera.badge")}</p>
+                        <span class="chapter-index">04 / 06</span>
+                    </div>
+                    <div class="mt-lead grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+                        <div class="lg:col-span-5">
+                            <h2 class="font-headers text-display-2 text-balance">
+                                {t("agentera.title")}.
+                            </h2>
+                            <p class="mt-lead leading-relaxed" set:html={t("agentera.p1")}></p>
+                            <a href={translatePath("/ai")} class="accent-link mt-10">
+                                {t("agentera.link")}
+                                <ArrowRight size={15} />
+                            </a>
+                        </div>
+                        <div class="lg:col-span-7 lg:bleed-right animate-on-scroll fade-in-up delay-100">
+                            <AgentConsoleDemo client:visible />
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- CHAPTER 05 — THE ADMIN PANEL. Follows the backend, security,
+             Rebase Cloud and agents so it reads clearly as a built-in layer
+             over the BaaS rather than a CMS-first pitch. Right-sized inside
+             the standard shell (520px) instead of full-bleed 620px. -->
+        <div>
+            <section class="chapter drafted border-t border-tone-max/8 relative py-chapter">
+                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+                    <div class="chapter-rule">
+                        <p class="eyebrow flex items-center gap-2.5"><span class="dot text-cyan-300" aria-hidden="true"></span>{t("panel.badge")}</p>
+                        <span class="chapter-index">05 / 06</span>
+                    </div>
+                    <div class="mt-lead max-w-[42rem] animate-on-scroll fade-in-up">
+                        <h2 class="font-headers text-display-2 text-balance">
+                            {t("panel.title")}
+                        </h2>
+                        <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed">{t("modes.subtitle")}</p>
+                    </div>
+                    <div class="mt-content animate-on-scroll fade-in-up">
+                        <AdminDemoCarousel client:visible height={520} />
+                    </div>
+                    <div class="mt-content grid grid-cols-1 md:grid-cols-3 border-t border-tone-max/8">
+                        <div class="md:border-r border-tone-max/8 py-10 md:pr-8">
+                            <p class="font-mono text-2xs uppercase tracking-[0.18em] text-tone-400">{t("modes.baas.tag")}</p>
+                            <h3 class="mt-3 font-headers text-lg">{t("modes.baas.title")}</h3>
+                            <p class="mt-2 text-sm text-page-copy leading-relaxed">{t("modes.baas.desc")}</p>
+                            <p class="mt-4 font-mono text-2xs text-tone-400">@rebasepro/server</p>
+                        </div>
+                        <div class="md:border-r border-tone-max/8 py-10 md:px-8 border-t md:border-t-0">
+                            <p class="font-mono text-2xs uppercase tracking-[0.18em] text-tone-400">{t("modes.cms.tag")}</p>
+                            <h3 class="mt-3 font-headers text-lg">{t("modes.cms.title")}</h3>
+                            <p class="mt-2 text-sm text-page-copy leading-relaxed">{t("modes.cms.desc")}</p>
+                            <p class="mt-4 font-mono text-2xs text-tone-400">@rebasepro/cms</p>
+                        </div>
+                        <div class="py-10 md:pl-8 border-t md:border-t-0 border-tone-max/8">
+                            <p class="font-mono text-2xs uppercase tracking-[0.18em] text-tone-400">{t("modes.full.tag")}</p>
+                            <h3 class="mt-3 font-headers text-lg">{t("modes.full.title")}</h3>
+                            <p class="mt-2 text-sm text-page-copy leading-relaxed">{t("modes.full.desc")}</p>
+                            <p class="mt-4 font-mono text-2xs text-tone-400">@rebasepro/app</p>
+                        </div>
+                    </div>
+                    <a href={translatePath("/cms")} class="accent-link mt-10">
+                        {t("showcase.exploreCms")}
+                        <ArrowRight size={15} />
+                    </a>
+                </div>
+            </section>
+        </div>
+
+        <!-- CHAPTER 06 — CUSTOMERS. Sits on `ground-raised` between Chapter 05
+             (base ground) and the coral close so adjacent chapters alternate. -->
+        <div class="chapter ground-raised border-t border-tone-max/8">
+            <CaseStudiesCarousel t={t} />
         </div>
 
         {/* The roadmap used to run here. It is not in SITE-STORY's beat table,
@@ -824,18 +785,24 @@ const CLOUD_PILLARS = [
                     </div>
                 </div>
 
-                <div class="mt-12 flex flex-wrap gap-3">
+                <div class="mt-12 flex flex-wrap items-center gap-3">
                     <a
-                        href={DEMO_URL} target="_blank" rel="noopener noreferrer"
+                        href={translatePath("/cloud")}
                         class="inline-flex items-center justify-center rounded-lg bg-primary px-6 min-h-(--control-large) text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
                     >
-                        {t("cta.button.demo")}
+                        {t("cta.button.cloud")}
                     </a>
                     <a
                         href={translatePath("/docs")}
                         class="inline-flex items-center justify-center rounded-lg border border-tone-max/15 px-6 min-h-(--control-large) text-sm font-semibold text-tone-max transition-colors hover:border-tone-max/35"
                     >
                         {t("cta.button.docs")}
+                    </a>
+                    <a
+                        href={DEMO_URL} target="_blank" rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center px-3 min-h-(--control-large) text-sm font-semibold text-tone-300 transition-colors hover:text-tone-max"
+                    >
+                        {t("cta.button.demo")}
                     </a>
                 </div>
             </div>

@@ -111,7 +111,7 @@ const BANNED = [
    Rules". Also read in the `.md` mirrors, which are what an LLM is handed. */
 const BANNED_EN = [
     /\b(?:Rebase|our|open-source|the entire) framework\b/i, /\bthe framework (?:is|you run)\b/i,
-    /\bRebase (?:is|—) an? [^.]{0,30}\b(?:BaaS|backend-as-a-service)\b/i, /\bBaaS Core\b/,
+    /\bBaaS Core\b/,
     /\b(?:generated|React) back office\b/i, /\bRebase generates (?:the|a) back office\b/i,
     /\bsurface (?:your team|you can hand)\b/i, /\bthree layers\b/i,
     /\bPlatform overview\b/, /\bClient SDK\b/,

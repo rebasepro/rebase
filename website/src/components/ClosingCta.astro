@@ -40,8 +40,8 @@ const translatePath = useTranslatedPath(lang);
 const t = useTranslations(lang);
 
 const {
-    title = "Point it at your database.",
-    blurb = "Scaffold a project with one command — no account, nothing to provision.",
+    title = t("cta.title"),
+    blurb = t("cta.closing.blurb"),
     trackId = "page",
     demoHref = DEMO_URL,
 } = Astro.props;
@@ -74,10 +74,10 @@ const [RUNNER, PACKAGE, VERB] = COMMAND.match(/^(\S+ \S+) (\S+) (\S+)$/)!.slice(
                 </button>
 
                 <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
-                    <a href={demoHref} target="_blank" rel="noopener noreferrer"
+                    <a href={translatePath("/cloud")}
                        class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 min-h-(--control-large) text-base font-semibold text-white shadow-[0_8px_28px_-6px_rgb(0_112_244/0.65)] transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                       data-track id={`${trackId}-cta-demo`}>
-                        {t("cta.button.demo")}
+                       data-track id={`${trackId}-cta-cloud`}>
+                        {t("cta.button.cloud")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none"
                              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M5 12h14"/>
@@ -93,6 +93,11 @@ const [RUNNER, PACKAGE, VERB] = COMMAND.match(/^(\S+ \S+) (\S+) (\S+)$/)!.slice(
                             <path d="M5 12h14"/>
                             <path d="m12 5 7 7-7 7"/>
                         </svg>
+                    </a>
+                    <a href={demoHref} target="_blank" rel="noopener noreferrer"
+                       class="inline-flex items-center gap-x-2 text-tone-400 hover:text-tone-max transition-colors text-sm font-semibold"
+                       data-track id={`${trackId}-cta-demo`}>
+                        {t("cta.button.demo")}
                     </a>
                 </div>
             </div>
