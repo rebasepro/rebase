@@ -236,9 +236,8 @@ same under its live check.
 
 ## More than one database
 
-Declare each in your code (`database("analytics")`) and deploy: it is created on the
-project's Postgres server as `DATABASE_URL__ANALYTICS`, sharing its CPU, memory, disk,
-backups and bill ([details](/docs/backend/multiple-sources/#on-rebase-cloud)).
+Declare each (`database("analytics")`) and deploy: it is made on the project's server as
+`DATABASE_URL__ANALYTICS`, sharing its resources and bill ([details](/docs/backend/multiple-sources/#on-rebase-cloud)).
 
 ## File storage
 
