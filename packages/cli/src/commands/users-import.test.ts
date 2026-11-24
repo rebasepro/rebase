@@ -12,7 +12,7 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_USERS_PER_IMPORT } from "@rebasepro/types";
 
-import { importUserOf, usersCommand } from "./users";
+import { importHashAlgorithmOf, importUserOf, usersCommand } from "./users";
 
 const argv = (...words: string[]) => ["node", "rebase", ...words];
 
@@ -134,5 +134,44 @@ describe("rebase users import", () => {
 
         await expect(usersCommand("import", argv("users", "import", "--json"))).rejects.toThrow("exit:1");
         expect(calls).toEqual([]);
+    });
+
+    it("sends Supabase's encrypted_password as passwordHash with --password-hashes bcrypt", async () => {
+        stubServer();
+        const hash = "$2a$10$" + "N".repeat(53);
+        fs.writeFileSync(path.join(root, "users.csv"), [
+            "id,email,encrypted_password",
+            `5b0a3c9e-21f4-4d3b-8a6e-7c1d2e3f4a5b,ada@example.com,${hash}`,
+            "6c1b4d0f-32a5-4e4c-9b7f-8d2e3f4a5b6c,magic@example.com,"
+        ].join("\n"));
+
+        await usersCommand("import", argv("users", "import", "users.csv", "--password-hashes", "bcrypt", "--json"));
+
+        expect(bodies[0]).toEqual({
+            passwordHashAlgorithm: "bcrypt",
+            users: [
+                { id: "5b0a3c9e-21f4-4d3b-8a6e-7c1d2e3f4a5b", email: "ada@example.com", passwordHash: hash },
+                { id: "6c1b4d0f-32a5-4e4c-9b7f-8d2e3f4a5b6c", email: "magic@example.com" }
+            ]
+        });
+        expect(output()).toMatchObject({ created: 2, failed: 0 });
+    });
+
+    it("refuses a file with password hashes and no --password-hashes, before any request", async () => {
+        const calls = stubServer();
+        fs.writeFileSync(path.join(root, "users.json"), JSON.stringify([{ email: "ada@example.com", password_hash: "$2b$10$" + "N".repeat(53) }]));
+
+        await expect(usersCommand("import", argv("users", "import", "users.json", "--json"))).rejects.toThrow("exit:1");
+        await expect(usersCommand("import", argv("users", "import", "users.json", "--password-hashes", "md5", "--json"))).rejects.toThrow("exit:1");
+        expect(calls).toEqual([]);
+    });
+});
+
+describe("--password-hashes, against the file", () => {
+    it("is optional with no hash column, required with one, and takes only a known format", () => {
+        expect(importHashAlgorithmOf(undefined, [{ email: "a@example.com" }])).toBeUndefined();
+        expect(importHashAlgorithmOf("bcrypt", [{ email: "a@example.com", passwordHash: "$2b$…" }])).toBe("bcrypt");
+        expect(() => importHashAlgorithmOf(undefined, [{ email: "a@example.com", passwordHash: "$2b$…" }])).toThrow(/--password-hashes bcrypt/);
+        expect(() => importHashAlgorithmOf("argon2", [])).toThrow(/takes bcrypt \(got "argon2"\)/);
     });
 });

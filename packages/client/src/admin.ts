@@ -95,14 +95,20 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
 
     /**
      * Import accounts from another system, keeping their ids (`id`, often a
-     * uuid) so the rows that point at them still do. No password, no email:
-     * an imported account signs in by magic link, an email code, a provider or
-     * a password reset. An account whose id or email is already taken is
+     * uuid) so the rows that point at them still do. No email, and no
+     * password unless each account carries the other system's hash as
+     * `passwordHash` and `passwordHashAlgorithm` names its format: without
+     * one, an imported account signs in by magic link, an email code, a
+     * provider or a password reset. An account whose id or email is already taken is
      * `skipped`, never updated. At most `MAX_USERS_PER_IMPORT` (100) accounts
      * per call; `dryRun: true` checks them and writes nothing.
      */
-    async function importUsers(users: ImportUserInput[], options?: { dryRun?: boolean }) {
-        const body: ImportUsersRequest = { users, ...(options?.dryRun ? { dryRun: true } : {}) };
+    async function importUsers(users: ImportUserInput[], options?: { dryRun?: boolean; passwordHashAlgorithm?: ImportUsersRequest["passwordHashAlgorithm"] }) {
+        const body: ImportUsersRequest = {
+            users,
+            ...(options?.dryRun ? { dryRun: true } : {}),
+            ...(options?.passwordHashAlgorithm ? { passwordHashAlgorithm: options.passwordHashAlgorithm } : {})
+        };
         return transport.request<ImportUsersResult>(adminPath + "/users/import", {
             method: "POST",
             body: JSON.stringify(body)

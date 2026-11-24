@@ -264,3 +264,25 @@ export async function replaceUserPassword(
     // went to the wrong place. Every outstanding one goes with the old password.
     await authRepo.deleteAllPasswordResetTokensForUser?.(uid);
 }
+
+/**
+ * Store the same password under a different hash, ending nothing: the one
+ * write of a password hash that is not {@link replaceUserPassword}.
+ *
+ * It exists for an account imported with another system's bcrypt hash
+ * (`POST /admin/users/import`), which the login route re-hashes to scrypt the
+ * moment its holder proves the password. The password does not change, so
+ * nobody who could sign in before is shut out after, and ending the account's
+ * other sessions, or the reset links in its inbox, would punish the holder for
+ * signing in. `newHash` must be a hash of the password just verified, never of
+ * a new one: a new password goes through `replaceUserPassword`.
+ * `test/password-change-revokes-sessions.test.ts` holds this file as the only
+ * caller of `updatePassword`.
+ */
+export async function rehashUserPassword(
+    authRepo: Pick<AuthRepository, "updatePassword">,
+    uid: string,
+    newHash: string
+): Promise<void> {
+    await authRepo.updatePassword(uid, newHash);
+}

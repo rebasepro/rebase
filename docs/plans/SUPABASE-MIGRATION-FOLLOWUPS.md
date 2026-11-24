@@ -150,6 +150,12 @@ never a password hash from another system unless its algorithm is declared,
 and sending no email. `CreateUserData` needs an optional `id` across both
 repositories.
 
+**Update (2026-11-24):** bcrypt hashes are now imported when declared:
+`passwordHashAlgorithm: "bcrypt"` on the request, `--password-hashes bcrypt`
+on the CLI, which reads Supabase's `encrypted_password` column. The login
+route upgrades each to scrypt at its first sign-in. Other formats (argon2,
+Firebase's modified scrypt) are not taken yet.
+
 ## Item 13. `init --yes` writes agent files for every assistant
 
 The rule files for every assistant are template content (one copy of the rules

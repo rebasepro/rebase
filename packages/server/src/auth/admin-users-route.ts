@@ -470,8 +470,8 @@ values: prepResult.values },
      * outcome per account; see `import-users.ts`.
      */
     router.post("/users/import", requireScope("users:write"), async (c) => {
-        const { users, dryRun } = readImportRequest(await c.req.json());
-        return c.json(await importUsers(c, users, { dryRun, authRepo, hooks: ops }));
+        const { users, dryRun, passwordHashAlgorithm } = readImportRequest(await c.req.json());
+        return c.json(await importUsers(c, users, { dryRun, authRepo, hooks: ops, ...(passwordHashAlgorithm ? { passwordHashAlgorithm } : {}) }));
     });
 
     router.put("/users/:uid", requireScope("users:write"), async (c) => {

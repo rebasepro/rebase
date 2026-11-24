@@ -75,6 +75,7 @@
     "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/utils": "workspace:*",
+    "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
     "jsonwebtoken": "^9.0.3",
     "ws": "^8.21.1",

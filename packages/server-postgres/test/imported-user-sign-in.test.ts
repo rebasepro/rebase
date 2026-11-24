@@ -132,6 +132,30 @@ describe("an imported account signs in under its imported id", () => {
         expect(login.status).toBe(200);
         expect(login.json.user?.uid).toBe("c0ffee00-0000-4000-8000-000000000001");
     });
+
+    it("keeps a Supabase bcrypt hash, signs in with the old password, and stores scrypt after", async () => {
+        const id = "c0ffee00-0000-4000-8000-000000000002";
+        const email = "hash@triptelier.test";
+        // Supabase's `encrypted_password` for "Supabase-Passw0rd", as Go's bcrypt writes it ($2a$), at cost 4 to keep this fast.
+        const encrypted = "$2a$04$3g4Pp.E3vJ.qFR8HI4tbQuf4jxz/ih6ToNgeIP0mJeOSJwKA/54i2";
+        const imported = await post<ImportUsersResult>("/admin/users/import", {
+            passwordHashAlgorithm: "bcrypt",
+            users: [{ id, email, emailVerified: true, passwordHash: encrypted }]
+        }, SERVICE_KEY);
+        expect(imported.json).toMatchObject({ created: 1, failed: 0 });
+        const stored = async () => (await pglite.query<{ password_hash: string | null }>("SELECT password_hash FROM rebase.users WHERE id = $1", [id])).rows[0].password_hash;
+        expect(await stored()).toBe(encrypted);
+
+        expect((await post<Session>("/auth/login", { email, password: "wrong-Passw0rd" })).status).toBe(401);
+        const login = await post<Session>("/auth/login", { email, password: "Supabase-Passw0rd" });
+
+        expect(login.status).toBe(200);
+        expect(login.json.user?.uid).toBe(id);
+        const upgraded = await stored();
+        expect(upgraded).not.toBe(encrypted);
+        expect(upgraded).toMatch(/^[0-9a-f]{64}:[0-9a-f]{128}$/);
+        expect((await post<Session>("/auth/login", { email, password: "Supabase-Passw0rd" })).status).toBe(200);
+    });
 });
 
 describe("a users table keyed by uuid", () => {

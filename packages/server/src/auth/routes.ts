@@ -8,8 +8,9 @@ import { generateRefreshToken, hashRefreshToken, processJwtService, type JwtServ
 import { extractBearerToken } from "./bearer-token";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
+import { hashPassword as builtinHashPassword, isBcryptHash, verifyPassword as builtinVerifyPassword } from "./password";
 import { createRequireAuth, requireAuth } from "./middleware";
-import { judgeAccessToken, replaceUserPassword } from "./token-revocation";
+import { judgeAccessToken, rehashUserPassword, replaceUserPassword } from "./token-revocation";
 import { EmailService, EmailConfig, resolveEmailLinkBase } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate, resolveEmailBranding } from "../email/templates";
 import { HonoEnv } from "../api/types";
@@ -351,6 +352,36 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     const requireLiveSession = createRequireAuth({ revocationRepo: authRepo });
     const { emailService, emailConfig, allowRegistration = false } = config;
     const ops = resolveAuthHooks(config.authHooks);
+
+    /**
+     * An account imported with another system's bcrypt hash
+     * (`POST /admin/users/import`, `passwordHashAlgorithm: "bcrypt"`) gets
+     * Rebase's own scrypt hash the first time its password is proven, so the
+     * bcrypt path, and bcryptjs, are each account's once.
+     *
+     * Only when both password hooks are the built-in ones: a project with its
+     * own `hashPassword` may not write a hash the built-in verifier reads, and
+     * one with its own `verifyPassword` decides for itself what it accepts.
+     *
+     * `rehashUserPassword` and not `replaceUserPassword`: the password is the
+     * one the holder just typed, so nothing about who may sign in changes, and
+     * ending the account's other sessions would be wrong. A failure is logged
+     * and the sign-in goes on: the bcrypt hash still works, and the next
+     * sign-in tries again.
+     */
+    async function upgradeImportedPasswordHash(uid: string, storedHash: string, password: string): Promise<void> {
+        if (ops.hashPassword !== builtinHashPassword || ops.verifyPassword !== builtinVerifyPassword) return;
+        if (!isBcryptHash(storedHash)) return;
+        try {
+            await rehashUserPassword(authRepo, uid, await builtinHashPassword(password));
+            logger.info("[Security Audit] Imported password hash upgraded", { eventType: "auth.password.rehashed", uid, from: "bcrypt" });
+        } catch (error) {
+            logger.warn("Could not upgrade an imported password hash; the account keeps signing in with it", {
+                uid,
+                error: error instanceof Error ? error.message : error
+            });
+        }
+    }
 
     /**
      * Apply the `transformAuthResponse` hook if provided.
@@ -827,6 +858,7 @@ displayName: user.displayName });
                 });
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
+            await upgradeImportedPasswordHash(user.id, user.passwordHash, password);
         }
 
         // Only after the password is proven, so the answer tells nobody but
