@@ -416,7 +416,14 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         // answered 400 before `readRefreshToken` could read the cookie, which
         // broke every in-tab refresh under cookieAuth; it now treats `""` as
         // absent, wherever it comes from.
-        refreshToken: z.string().optional()
+        refreshToken: z.string().optional(),
+        // The client's load-time question, "is anyone signed in here?". In
+        // cookie mode the page cannot read the cookie, so it asks on every
+        // load, and for a visitor with no session the honest answer is "no",
+        // not a refusal: see the handler. A body field rather than a header,
+        // so the request needs nothing a CORS `allowHeaders` list must name,
+        // and a server that predates it ignores it and answers 401 as before.
+        probe: z.boolean().optional()
     });
     // `logoutSchema` and `updateProfileSchema` were declared here and used by
     // nothing: `/auth/logout` and `PATCH /auth/me` live in `session-routes.ts`,
@@ -1619,6 +1626,13 @@ message: "Verification email sent" });
         const refreshToken = readRefreshToken(c, parsed, config.cookieAuth);
 
         if (!refreshToken) {
+            // A probe that presents no token is a visitor with no session, and
+            // that is the whole answer: 204, nothing to restore. A 401 would
+            // put a red "Failed to load resource" line in the console of every
+            // new visitor's first page. Only the absence of a token is answered
+            // this way; a token that is presented and refused — unknown,
+            // expired, revoked — is refused below, probe or not.
+            if (parsed.probe === true) return c.body(null, 204);
             // Presenting no token at all is not a malformed request — it is an
             // unauthenticated one, and the overwhelmingly common case is a
             // first-time visitor, because clients refresh on page load before

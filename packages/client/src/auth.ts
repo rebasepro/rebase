@@ -281,9 +281,13 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
      * 0.23, with 400 INVALID_INPUT) never read the cookie — so no tab that outlived
      * its access token could renew it, while a reload, which had no session in
      * memory and so sent no field, could.
+     *
+     * `probe` marks the load-time restore of {@link probeSession}: in cookie
+     * mode the body is then `{ "probe": true }`.
      */
-    function refreshTokenBody(): string {
-        return JSON.stringify(authFlowMode === "cookie" ? {} : { refreshToken: currentSession?.refreshToken });
+    function refreshTokenBody(probe = false): string {
+        if (authFlowMode === "cookie") return JSON.stringify(probe ? { probe: true } : {});
+        return JSON.stringify({ refreshToken: currentSession?.refreshToken });
     }
 
     /**
@@ -970,11 +974,34 @@ redirectUri });
     }
 
     function refreshSession(): Promise<RebaseSession> {
+        return startRefresh(false);
+    }
+
+    /**
+     * The cookie-mode restore on load: a refresh that says it is only asking
+     * whether a session exists (`{ "probe": true }`).
+     *
+     * The refresh token is an HttpOnly cookie this page cannot read, and a
+     * session can begin without this client seeing it — an OAuth redirect, a
+     * sign-in in another tab, a cookie a sibling app set on a shared
+     * `cookieAuth.domain` — so the question is asked on every load. To a probe
+     * that presents no cookie at all the server answers `204`, which this
+     * client takes as "nobody is signed in" (`NOT_SIGNED_IN`), where a 401
+     * would put a red "Failed to load resource" line in every new visitor's
+     * console. A server that predates the probe ignores the field and answers
+     * `401 NO_SESSION`, which means the same. A cookie that is presented and
+     * refused is a 401 either way.
+     */
+    function probeSession(): Promise<RebaseSession> {
+        return startRefresh(true);
+    }
+
+    function startRefresh(probe: boolean): Promise<RebaseSession> {
         // Share a single in-flight refresh across concurrent callers — of the
         // same session. One started for a session that has since ended answers
         // with nothing of use to the session that replaced it.
         if (inFlightRefresh && inFlightEpoch === sessionEpoch) return inFlightRefresh;
-        const refresh = withRefreshLock(() => doRefreshSession()).finally(() => {
+        const refresh = withRefreshLock(() => doRefreshSession(probe)).finally(() => {
             if (inFlightRefresh === refresh) inFlightRefresh = null;
         });
         inFlightRefresh = refresh;
@@ -1038,7 +1065,7 @@ redirectUri });
         return sibling;
     }
 
-    async function doRefreshSession(): Promise<RebaseSession> {
+    async function doRefreshSession(probe: boolean): Promise<RebaseSession> {
         const epoch = sessionEpoch;
         try {
             // Inside the refresh lock, so a sibling that held it has finished
@@ -1049,7 +1076,7 @@ redirectUri });
                 if (adopted) return adopted;
             }
             try {
-                return await requestRefresh(epoch);
+                return await requestRefresh(epoch, probe);
             } catch (err) {
                 // Refused as already used: a sibling rotated it while this
                 // request was on the wire (or without taking the lock).
@@ -1059,7 +1086,7 @@ redirectUri });
                     ? siblingSession()
                     : null;
                 if (!late) throw err;
-                return adoptSibling(late) ?? await requestRefresh(epoch);
+                return adoptSibling(late) ?? await requestRefresh(epoch, probe);
             }
         } catch (err) {
             if (epoch !== sessionEpoch) return supersededRefresh();
@@ -1067,7 +1094,7 @@ redirectUri });
         }
     }
 
-    async function requestRefresh(epoch: number): Promise<RebaseSession> {
+    async function requestRefresh(epoch: number, probe: boolean): Promise<RebaseSession> {
         if (authFlowMode !== "cookie" && !currentSession?.refreshToken) {
             // A `RebaseClientError`, not a bare `Error`: the SDK documents one
             // class a `catch` block has to check for, and this is raised before
@@ -1082,11 +1109,16 @@ redirectUri });
         const res = await fetchFn(authUrl("/refresh"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: refreshTokenBody(),
+            body: refreshTokenBody(probe),
             credentials: authFlowMode === "cookie" ? "include" : undefined
         } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (epoch !== sessionEpoch) return supersededRefresh();
+        if (res.status === 204) {
+            // The server's answer to a probe that presented no refresh token:
+            // there is no session here to restore. See `probeSession`.
+            throw new RebaseClientError("Not signed in: this browser holds no session to restore.", { code: "NOT_SIGNED_IN" });
+        }
         if (!res.ok) {
             const err = apiError(res.status, body, res.statusText);
             if (isMalformedRefreshError(err)) {
@@ -1894,14 +1926,17 @@ refreshToken: session.refreshToken };
                 settleRestore("none");
             }
         } else if (authFlowMode === "cookie") {
-            // Silent refresh on boot to pick up httpOnly session
-            const restore = refreshSession().then(() => {
+            // Ask the server whether the httpOnly cookie holds a session.
+            const restore = probeSession().then(() => {
                 settleRestore("restored");
             }).catch((err: unknown) => {
-                // A 401 is the usual answer — no cookie, or an expired one —
-                // and means there is nothing to restore. Only a failure to
-                // reach the server leaves the question open.
-                settleRestore(isFatalRefreshError(err) || isMalformedRefreshError(err)
+                // "Not signed in" is the usual answer — no cookie (a 204, or a
+                // 401 from a server that predates the probe), or a refused
+                // one — and means there is nothing to restore. Only a failure
+                // to reach the server leaves the question open.
+                const answered = isFatalRefreshError(err) || isMalformedRefreshError(err)
+                    || (err instanceof RebaseClientError && err.code === "NOT_SIGNED_IN");
+                settleRestore(answered
                     ? (currentSession ? "restored" : "none")
                     : (currentSession ? "restored" : "unreachable"));
             }).finally(() => {
