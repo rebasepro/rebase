@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-    Alert,
     Button,
     Checkbox,
     cls,
@@ -18,7 +17,7 @@ import {
 } from "@rebasepro/ui";
 import { useSnackbarController, useTranslation } from "@rebasepro/app";
 import { asBoolean, asNullableString, isRecord } from "../../utils/adminFetch";
-import { EmptyState, LoadingRow, SectionHeader, statementsOf, useConfirmSql } from "./shared";
+import { EmptyState, LoadingRow, SectionHeader, SectionLoadFailure, statementsOf, useConfirmSql } from "./shared";
 import { matches, useCatalogList } from "./useCatalogList";
 
 interface DbExtension {
@@ -48,7 +47,7 @@ const CORE_EXTENSIONS = new Set(["plpgsql"]);
 export function ExtensionsSection() {
     const { t } = useTranslation();
     const snackbar = useSnackbarController();
-    const { items, error, reload, requestJson, sourcePath } = useCatalogList("extensions", "extensions", parseExtension);
+    const { items, failure, reload, requestJson, sourcePath } = useCatalogList("extensions", "extensions", parseExtension);
     const [search, setSearch] = useState("");
     const [installing, setInstalling] = useState<string | null>(null);
     const [confirmDialog, confirm] = useConfirmSql();
@@ -109,8 +108,8 @@ export function ExtensionsSection() {
                     </Tooltip>
                 </>}
             />
-            {error && <Alert color="error">{error}</Alert>}
-            {items === null ? (error ? null : <LoadingRow/>) : shown.length === 0 ? (
+            {failure && <SectionLoadFailure failure={failure} stale={items !== null} onRetry={() => void reload()}/>}
+            {items === null ? (failure ? null : <LoadingRow/>) : shown.length === 0 ? (
                 <EmptyState icon={<PuzzleIcon size={iconSize.large}/>} message={t("studio_database_extensions_empty")}/>
             ) : (
                 <div className={cls("rounded-lg border divide-y divide-hairline overflow-hidden", defaultBorderMixin)}>

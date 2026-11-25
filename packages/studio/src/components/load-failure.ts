@@ -28,6 +28,14 @@
  * backups and an account that may not list them. One classifier and one view, so
  * the next pane inherits the distinction instead of rediscovering it.
  *
+ * ## A tool the server does not offer
+ *
+ * A backend may leave a tool's API out on purpose: the route answers 404, or
+ * 501 when the feature is not configured. Nothing about the project is broken
+ * and there is nothing to retry, so the pane says the tool is not available on
+ * this server instead of putting "Not found" in red over an empty list that
+ * still offers to create things.
+ *
  * The view that renders one of these is `load-failure-view.tsx`. It is a
  * separate file so that this classifier — the part with the rules in it — can
  * be tested without dragging in `@rebasepro/app` and, behind it, react-router.
@@ -37,7 +45,9 @@ export type LoadFailureKind =
     /** The project's own rules, or the caller's own role, said no. Not an error. */
     | "denied"
     /** We could not reach or read the source — including a session the server no longer accepts. */
-    | "unavailable";
+    | "unavailable"
+    /** The server does not serve this tool's API (404, or 501 for a feature it has not configured). Not an error. */
+    | "not_offered";
 
 export interface LoadFailure {
     kind: LoadFailureKind;
@@ -57,9 +67,29 @@ function statusOf(err: unknown): number | null {
     return null;
 }
 
+/**
+ * A message that is nothing but "Not found": what a server that has no such
+ * route answers, flattened by an SDK that dropped the status.
+ */
+const BARE_NOT_FOUND = /^(?:404\s+)?not found\.?$/i;
+
+/** Whether `detail` says no more than "Not found", and so adds nothing under a title. */
+export function isBareNotFound(detail: string): boolean {
+    return BARE_NOT_FOUND.test(detail.trim());
+}
+
 export function classifyLoadFailure(err: unknown): LoadFailure {
     const detail = err instanceof Error ? err.message : String(err);
     const status = statusOf(err);
+
+    // 404 and 501 are the server saying it has no such API: a backend that
+    // leaves the tool out, or one that has not configured it. Without a status,
+    // only a message that is "Not found" and nothing else counts — "No row
+    // DJBH" or "Bucket not found" are about a resource, not the route.
+    const notOffered = status !== null
+        ? status === 404 || status === 501
+        : isBareNotFound(detail);
+    if (notOffered) return { kind: "not_offered", detail, retryable: false };
 
     // 403 is the rule's answer, and the only status that is. A 401 is the
     // session — expired, revoked, signed out elsewhere — and says nothing about

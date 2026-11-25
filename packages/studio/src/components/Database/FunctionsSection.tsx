@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
 import {
-    Alert,
     Button,
     Chip,
     cls,
@@ -20,7 +19,7 @@ import {
 import { useSnackbarController, useTranslation } from "@rebasepro/app";
 import { asBoolean, asNullableString, asString, isRecord } from "../../utils/adminFetch";
 import { sqlDraftLink } from "./links";
-import { EmptyState, LoadingRow, SectionHeader, SqlBlock, statementsOf, useConfirmSql } from "./shared";
+import { EmptyState, LoadingRow, SectionHeader, SectionLoadFailure, SqlBlock, statementsOf, useConfirmSql } from "./shared";
 import { matches, useCatalogList } from "./useCatalogList";
 
 interface DbFunction {
@@ -60,7 +59,7 @@ export function FunctionsSection() {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const snackbar = useSnackbarController();
-    const { items, error, reload, requestJson, sourcePath } = useCatalogList("functions", "functions", parseFunction);
+    const { items, failure, reload, requestJson, sourcePath } = useCatalogList("functions", "functions", parseFunction);
     const [search, setSearch] = useState("");
     const [open, setOpen] = useState<string | null>(null);
     const [confirmDialog, confirm] = useConfirmSql();
@@ -94,8 +93,8 @@ export function FunctionsSection() {
                     </Tooltip>
                 </>}
             />
-            {error && <Alert color="error">{error}</Alert>}
-            {items === null ? (error ? null : <LoadingRow/>) : shown.length === 0 ? (
+            {failure && <SectionLoadFailure failure={failure} stale={items !== null} onRetry={() => void reload()}/>}
+            {items === null ? (failure ? null : <LoadingRow/>) : shown.length === 0 ? (
                 <EmptyState icon={<FunctionSquareIcon size={iconSize.large}/>} message={t("studio_database_functions_empty")}/>
             ) : (
                 <div className={cls("rounded-lg border divide-y divide-hairline overflow-hidden", defaultBorderMixin)}>

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIcon,
-    Alert,
     cls,
     defaultBorderMixin,
     IconButton,
@@ -24,7 +23,8 @@ import { useSnackbarController, useTranslation } from "@rebasepro/app";
 import { asNullableString, asNumber, asString, isRecord, useAdminFetch } from "../../utils/adminFetch";
 import { useSourcePath } from "./source";
 import { formatDuration } from "./format";
-import { EmptyState, LoadingRow, SectionHeader, statementsOf, useConfirmSql } from "./shared";
+import { EmptyState, LoadingRow, SectionHeader, SectionLoadFailure, statementsOf, useConfirmSql } from "./shared";
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 
 /** How often the session list is re-read while it is on screen. */
 export const ACTIVITY_REFRESH_MS = 5_000;
@@ -67,7 +67,8 @@ export function ActivitySection() {
     const { requestJson } = useAdminFetch();
     const sourcePath = useSourcePath();
     const [sessions, setSessions] = useState<Session[] | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    /** Why the sessions could not be read, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
     const [paused, setPaused] = useState(false);
     const [pageVisible, setPageVisible] = useState(() => typeof document === "undefined" || document.visibilityState !== "hidden");
     const [confirmDialog, confirm] = useConfirmSql();
@@ -80,13 +81,17 @@ export function ActivitySection() {
             const raw = await requestJson(sourcePath("/admin/db/insights/activity"));
             const list = isRecord(raw) && Array.isArray(raw.sessions) ? raw.sessions : [];
             setSessions(list.map(parseSession).filter((session): session is Session => session !== null));
-            setError(null);
+            setFailure(null);
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : t("studio_database_load_failed"));
+            setFailure(classifyLoadFailure(err));
         } finally {
             inFlight.current = false;
         }
-    }, [requestJson, sourcePath, t]);
+    }, [requestJson, sourcePath]);
+
+    // A server that does not serve the sessions route will not start to between
+    // two refreshes: stop asking until the reader refreshes by hand.
+    const notOffered = failure?.kind === "not_offered";
 
     useEffect(() => {
         const onVisibility = () => setPageVisible(document.visibilityState !== "hidden");
@@ -95,11 +100,12 @@ export function ActivitySection() {
     }, []);
 
     useEffect(() => {
+        if (notOffered) return undefined;
         void load();
         if (paused || !pageVisible) return undefined;
         const timer = setInterval(() => void load(), ACTIVITY_REFRESH_MS);
         return () => clearInterval(timer);
-    }, [load, paused, pageVisible]);
+    }, [load, paused, pageVisible, notOffered]);
 
     const cancel = async (session: Session) => {
         try {
@@ -153,8 +159,8 @@ export function ActivitySection() {
                     </Tooltip>
                 </>}
             />
-            {error && <Alert color="error">{error}</Alert>}
-            {sessions === null ? (error ? null : <LoadingRow/>) : sessions.length === 0 ? (
+            {failure && <SectionLoadFailure failure={failure} stale={sessions !== null} onRetry={() => void load()}/>}
+            {sessions === null ? (failure ? null : <LoadingRow/>) : sessions.length === 0 ? (
                 <EmptyState icon={<ActivityIcon size={iconSize.large}/>} message={t("studio_database_activity_empty")}/>
             ) : (
                 <div className={cls("overflow-x-auto rounded-lg border", defaultBorderMixin)}>

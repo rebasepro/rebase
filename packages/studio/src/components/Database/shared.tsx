@@ -11,6 +11,8 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
+import type { LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
 
 /** A section's heading row: title, one line on what it shows, and its controls. */
 export function SectionHeader({ title, description, actions }: {
@@ -51,6 +53,32 @@ export function EmptyState({ icon, message }: { icon?: React.ReactNode; message:
             {icon && <div className="text-text-disabled dark:text-text-disabled-dark">{icon}</div>}
             <Typography variant="label" className="px-4">{message}</Typography>
         </div>
+    );
+}
+
+/**
+ * A section that could not be read. With nothing on screen yet the failure is
+ * the section — a refusal, a server without this route, or a read that failed,
+ * told apart as every Studio pane tells them apart. Over rows read earlier it
+ * is one line above them, so a failed refresh does not throw away what the
+ * reader was looking at.
+ */
+export function SectionLoadFailure({ failure, stale, onRetry }: {
+    failure: LoadFailure;
+    /** Whether rows from an earlier read are still shown. */
+    stale: boolean;
+    onRetry: () => void;
+}) {
+    const { t } = useTranslation();
+    if (stale) return <Alert color="error">{failure.detail}</Alert>;
+    return (
+        <LoadFailureView
+            failure={failure}
+            title={t("studio_database_load_failed")}
+            deniedTitle={t("studio_database_denied_title")}
+            deniedHint={t("studio_database_denied_hint")}
+            onRetry={onRetry}
+        />
     );
 }
 

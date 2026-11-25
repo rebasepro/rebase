@@ -11,6 +11,10 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A Studio tool the server does not offer says so, the same way in every pane.** When a backend leaves a tool's API out (its route answers 404, or 501 for a feature it has not configured), Webhooks, Logs, Tables, Database, the API explorer and Storage now show "Not available on this server" with one calm sentence, no Retry, and nothing to create. They used to show "Not found" in red, as a banner over an empty list that still offered "Create Webhook" or "Create your first table", as inline text in every Database section, or as a 404 screen of the API explorer's own. Webhooks, Logs, Tables and Database also tell a refused listing from a failed one, as Backups and Cron Jobs already did, and Logs stops polling a server that has no log route.
+
 ## [0.38.0] - 2026-11-25
 
 ### Added

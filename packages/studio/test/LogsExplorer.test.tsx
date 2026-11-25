@@ -150,6 +150,25 @@ describe("LogsExplorer", () => {
         expect(await screen.findByText("polled line")).toBeTruthy();
     });
 
+    it("says a server that serves no logs does not offer them, and shows nothing else", async () => {
+        // A backend that leaves logs out answers 404 on both routes. That used
+        // to be "Not found" in small red text under a toolbar of filters for a
+        // log that does not exist.
+        global.fetch = jest.fn<typeof fetch>(async () => new FakeResponse({
+            status: 404,
+            json: { error: { code: "NOT_FOUND", message: "Not found" } }
+        }));
+
+        render(<LogsExplorer/>);
+
+        expect(await screen.findByText("Not available on this server")).toBeTruthy();
+        expect(screen.getByText(/This server does not offer this tool/)).toBeTruthy();
+        // "Not found" says nothing the title does not.
+        expect(screen.queryByText("Not found")).toBeNull();
+        expect(screen.queryByLabelText("Search logs")).toBeNull();
+        expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    });
+
     it("admits the gap when the server had to drop entries", async () => {
         const { stream } = renderStreaming();
         stream.push(frame("snapshot", { entries: [],

@@ -30,7 +30,15 @@ jest.mock("@rebasepro/app", () => {
         useApiConfig: () => apiConfig,
         useApiBase: () => "http://api.test/api",
         useAuthController: () => authController,
-        useTranslation: () => translation
+        useTranslation: () => translation,
+        // The kit's error view, reduced to what it shows: title, body, Retry.
+        ErrorView: ({ title, error, onRetry }: { title?: string; error: React.ReactNode; onRetry?: () => void }) => (
+            <div>
+                <span>{title}</span>
+                <div>{error}</div>
+                {onRetry && <button onClick={onRetry}>{t("retry")}</button>}
+            </div>
+        )
     };
 });
 
@@ -67,6 +75,17 @@ describe("the API explorer's load failure, in Spanish", () => {
 
         expect(screen.queryByText("This session cannot read the API specification")).toBeNull();
         expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    });
+
+    it("says a server without the specification route does not offer it, in Spanish", async () => {
+        answer(404, "Not Found");
+        renderInSpanish();
+
+        expect(await screen.findByText("No disponible en este servidor")).toBeTruthy();
+        expect(screen.getByText(/Este servidor no ofrece esta herramienta/)).toBeTruthy();
+        // Nothing to retry, and "404 Not Found" says nothing the title does not.
+        expect(screen.queryByRole("button", { name: "Reintentar" })).toBeNull();
+        expect(screen.queryByText("404 Not Found")).toBeNull();
     });
 
     it("says a specification it could not read in Spanish", async () => {

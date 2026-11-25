@@ -23,6 +23,7 @@ import {
 import { idNum, useLogTail } from "./useLogTail";
 import type { LogEntry, LogTransport } from "./useLogTail";
 import { useTranslation } from "@rebasepro/app";
+import { LoadFailureView } from "../load-failure-view";
 import { entriesToJsonLines, entryToJson, formatFieldValue, hasMetadata, pillFields, requestSummary, statusTone } from "./logEntryView";
 
 const LEVEL_COLORS: Record<string, string> = {
@@ -194,6 +195,22 @@ export function LogsExplorer() {
         });
     }, []);
 
+    // A server that does not serve logs has no tail to filter or follow: the
+    // failure is the whole pane.
+    if (error?.kind === "not_offered" && logs.length === 0) {
+        return (
+            <div className="flex flex-col h-full w-full bg-surface-sheet">
+                <LoadFailureView
+                    className="flex-1"
+                    failure={error}
+                    title={t("studio_logs_read_failed")}
+                    deniedTitle={t("studio_logs_denied_title")}
+                    deniedHint={t("studio_logs_denied_hint")}
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col h-full w-full bg-surface-sheet">
             {/* Toolbar */}
@@ -283,7 +300,7 @@ export function LogsExplorer() {
                 screen — otherwise the view quietly freezes. */}
             {error && logs.length > 0 && (
                 <Alert color="warning" size="small" outerClassName="mx-4 my-1.5 shrink-0">
-                    {error}
+                    {error.detail}
                 </Alert>
             )}
 
@@ -311,14 +328,20 @@ export function LogsExplorer() {
                             onToggle={toggle}
                         />
                     ))}
-                    {logs.length === 0 && (
+                    {/* The tail retries on its own, so the failure offers no
+                        Retry of its own. */}
+                    {logs.length === 0 && error && (
+                        <LoadFailureView
+                            failure={error}
+                            title={t("studio_logs_read_failed")}
+                            deniedTitle={t("studio_logs_denied_title")}
+                            deniedHint={t("studio_logs_denied_hint")}
+                        />
+                    )}
+                    {logs.length === 0 && !error && (
                         <div className="p-8 text-center">
-                            <Typography
-                                variant="body2"
-                                className={error ? "text-red-600 dark:text-red-500" : undefined}
-                                color={error ? undefined : "secondary"}
-                            >
-                                {error ?? t("studio_logs_empty")}
+                            <Typography variant="body2" color="secondary">
+                                {t("studio_logs_empty")}
                             </Typography>
                         </div>
                     )}

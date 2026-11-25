@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
     BooleanSwitch,
     BooleanSwitchWithLabel,
     Button,
@@ -41,6 +40,8 @@ import {
     isRecord,
     useAdminFetch
 } from "../../utils/adminFetch";
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
 
 const WEBHOOK_EVENTS = ["INSERT", "UPDATE", "DELETE"] as const;
 
@@ -90,7 +91,8 @@ export function WebhooksView() {
 
     const [webhooks, setWebhooks] = useState<WebhookRow[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    /** Why the listing failed, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
     const [testingId, setTestingId] = useState<string | null>(null);
 
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -106,17 +108,20 @@ export function WebhooksView() {
 
     const loadWebhooks = useCallback(async () => {
         setLoading(true);
-        setError(null);
+        setFailure(null);
         try {
             const raw = await requestJson("/admin/webhooks");
             const arr = isRecord(raw) && Array.isArray(raw.webhooks) ? raw.webhooks : [];
             setWebhooks(arr.map(parseWebhook).filter((w): w is WebhookRow => w !== null));
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : t("studio_webhooks_load_failed"));
+            setFailure(classifyLoadFailure(err));
         } finally {
             setLoading(false);
         }
-    }, [requestJson, t]);
+    }, [requestJson]);
+
+    /** A server without the webhooks API has nothing to create one in. */
+    const notOffered = failure?.kind === "not_offered";
 
     useEffect(() => {
         void loadWebhooks();
@@ -262,18 +267,26 @@ export function WebhooksView() {
                             <RefreshCwIcon size={iconSize.small} />
                         </IconButton>
                     </Tooltip>
-                    <Button size="small" color="primary" variant="filled" onClick={openCreate}>
-                        <PlusIcon size={iconSize.small} />
-                        {t("studio_webhooks_new")}
-                    </Button>
+                    {!notOffered && (
+                        <Button size="small" color="primary" variant="filled" onClick={openCreate}>
+                            <PlusIcon size={iconSize.small} />
+                            {t("studio_webhooks_new")}
+                        </Button>
+                    )}
                 </div>
             </div>
 
             <div className="flex-1 overflow-auto p-5 flex flex-col gap-4 bg-surface-card">
-                {error && <Alert color="error">{error}</Alert>}
-
                 {loading ? (
                     <div className="flex justify-center py-12"><CircularProgress size="small" /></div>
+                ) : failure ? (
+                    <LoadFailureView
+                        failure={failure}
+                        title={t("studio_webhooks_load_failed")}
+                        deniedTitle={t("studio_webhooks_denied_title")}
+                        deniedHint={t("studio_webhooks_denied_hint")}
+                        onRetry={() => void loadWebhooks()}
+                    />
                 ) : webhooks.length === 0 ? (
                     <Card className="p-8 text-center flex flex-col items-center gap-3">
                         <SendIcon className="w-8 h-8 text-text-disabled" />

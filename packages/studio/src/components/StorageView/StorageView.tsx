@@ -54,6 +54,7 @@ import {
 import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiBase, useApiConfig, useTranslation } from "@rebasepro/app";
 import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStorageKey, type DownloadConfig, type StorageReference, type StorageSource } from "@rebasepro/types";
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
 import { useVisibleFileMetadata } from "./useVisibleFileMetadata";
 import { StoragePoliciesPanel } from "./StoragePoliciesPanel";
 import { useSearchParams } from "react-router";
@@ -1313,6 +1314,18 @@ message: e instanceof Error ? e.message : String(e) });
                 <div className="flex-grow flex items-center justify-center">
                     <CircularProgress size="small"/>
                 </div>
+            );
+        }
+
+        if (failure?.kind === "not_offered") {
+            return (
+                <LoadFailureView
+                    className="flex-grow h-auto"
+                    failure={failure}
+                    title={t("studio_storage_read_failed")}
+                    deniedTitle={t("studio_storage_denied_title")}
+                    deniedHint={t("studio_storage_denied_hint")}
+                />
             );
         }
 
