@@ -57,6 +57,21 @@ export type {
     SchemaTablesOptions
 } from "./backend/options";
 
+// The Database and Tables views' API (`/api/admin/db`), for a backend that
+// mounts it itself: on an `admin` of its choosing (a read-only connection, say)
+// and behind its own gate. The server mounts them only once it could create the
+// rebase.* catalog, which a database another tool owns may not allow.
+export {
+    createDbAdminRoutes,
+    createDbInsightsRoutes,
+    createDbCatalogRoutes
+} from "./baas";
+export type {
+    DbAdminRoutesOptions,
+    DbInsightsRoutesOptions,
+    DbCatalogRoutesOptions
+} from "./baas";
+
 // =============================================================================
 // Server-side singleton (import { rebase } from "@rebasepro/server")
 // =============================================================================
