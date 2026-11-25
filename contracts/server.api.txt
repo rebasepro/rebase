@@ -123,6 +123,9 @@ function createContractRoutes
 function createCronRoutes
 function createCronStore
 function createCustomAuthAdapter
+function createDbAdminRoutes
+function createDbCatalogRoutes
+function createDbInsightsRoutes
 function createDdlBootstrapper
 function createDevEmailSink
 function createDiscordProvider
@@ -371,6 +374,9 @@ interface CronLogSweep { counted, deleted }
 interface CronStore { ensureTable, fetchJobStates, fetchJobStats, fetchLogs, fetchRunSummaries, insertLog, releaseRunLease, saveEnabledOverride, sweepClaims, sweepLogs, tryAcquireRunLease, tryClaimRun }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DatabaseConnection { close, isConnected, type }
+interface DbAdminRoutesOptions { admin, getServedTables, reloadSchema }
+interface DbCatalogRoutesOptions { admin, reloadSchema, sources }
+interface DbInsightsRoutesOptions { admin, getServedTables, loadRlsCheck, sources }
 interface DdlBootstrapper { ensureObject, isReadable, step }
 interface DeclaredErrorAnswer { code, details, expected, message, status }
 interface DeclaredTables { defs, descriptors, rpc, source, tables }
