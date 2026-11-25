@@ -26,3 +26,5 @@ export { fetchAuthConfig, clearAuthConfigCache, createAuthConfigCache } from "./
 export type { AuthConfigResponse, AuthConfigCache } from "./api";
 // Sign in with Apple in the admin: building blocks of the LoginView, for a copy of it
 export { isAppleCancellation, preloadAppleSdk } from "./apple-sign-in";
+// Sign in with Google, the same: the script its button runs, fetched on demand
+export { loadGoogleIdentityServices } from "./google-sign-in";
