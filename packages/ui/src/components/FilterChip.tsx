@@ -75,11 +75,15 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(f
                 // grammar (an alpha highlight for the active one, text otherwise)
                 // and not the chip grammar (a hue tint). A primary ring here made
                 // every preset look like a selected enum cell.
+                // The inactive chip rests on the hover wash so it reads as a
+                // control and not as toolbar text; the active one steps up to
+                // the active wash with a hairline, which keeps it apart from a
+                // resting neighbour that now has a fill of its own.
                 active
-                    ? "bg-surface-active text-text-primary dark:text-text-primary-dark"
+                    ? "bg-surface-active ring-1 ring-inset ring-hairline-strong text-text-primary dark:text-text-primary-dark"
                     : cls(
-                        "bg-transparent text-text-secondary dark:text-text-secondary-dark",
-                        !disabled && "hover:bg-surface-hover"
+                        "bg-surface-hover text-text-secondary dark:text-text-secondary-dark",
+                        !disabled && "hover:bg-surface-active"
                     ),
                 disabled && "opacity-50 cursor-not-allowed",
                 className
