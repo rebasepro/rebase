@@ -82,7 +82,8 @@ function resize(available: number, needed: number) {
 function renderToolbar() {
     const { container } = render(<CollectionTableToolbar loading={false} actionsStart={<Probe/>}/>);
     toolbar = container.firstElementChild as HTMLElement;
-    row = toolbar.firstElementChild as HTMLElement;
+    // The toolbar holds the scroller, and the scroller the row of controls.
+    row = toolbar.firstElementChild?.firstElementChild as HTMLElement;
     // The layout effect measured before the elements were known to the stub.
     act(() => observed?.());
 }
