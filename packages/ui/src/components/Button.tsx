@@ -53,7 +53,7 @@ const ButtonInner = React.memo(React.forwardRef<
         // a fill of that same colour (or the rose, or the red) is invisible: a
         // keyboard user tabbing to the one main action on a screen saw nothing
         // change. A white ring inside the fill reads on all three.
-        "border border-primary bg-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] focus-visible:ring-on-primary/90 text-on-primary hover:text-on-primary hover:brightness-105": variant === "filled" && color === "primary" && !disabled,
+        "border border-primary bg-primary focus-visible:ring-on-primary/90 text-on-primary hover:text-on-primary hover:brightness-105": variant === "filled" && color === "primary" && !disabled,
         "border border-secondary bg-secondary focus-visible:ring-on-secondary/90 text-on-secondary hover:text-on-secondary hover:brightness-105": variant === "filled" && color === "secondary" && !disabled,
         "border border-red-600 bg-red-600 hover:bg-red-700 focus-visible:ring-white/90 text-white hover:text-white": variant === "filled" && color === "error" && !disabled,
         "border border-hairline-strong bg-surface-raised hover:bg-surface-raised-hover text-text-primary hover:text-text-primary dark:text-text-primary-dark hover:dark:text-text-primary-dark": variant === "filled" && color === "text" && !disabled,
