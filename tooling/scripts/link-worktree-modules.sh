@@ -80,14 +80,18 @@ done
 # Keep this list in step with `packages:` in pnpm-workspace.yaml. `e2e` used to
 # be here and is gone — it moved under tests/ and is no longer an importer.
 # `saas/*` is deliberately absent: it is gitignored, so a worktree never has it.
-for p in app app/frontend app/backend website tooling/videos tooling/rebase-agent-skills; do
+for p in app app/frontend app/backend website tooling/videos tooling/rebase-agent-skills \
+    infra/stock-bundle infra/stock-bundle/backend infra/stock-bundle/admin; do
     link_importer "$p"
 done
 for p in "$WORKTREE"/examples/*/; do
-    [ -d "$p" ] && link_importer "examples/$(basename "$p")"
+    if [ -d "$p" ]; then link_importer "examples/$(basename "$p")"; fi
 done
 # `examples/hybrid/*` in pnpm-workspace.yaml: its backend and frontend are
 # importers of their own, and unlinked they resolve no `@rebasepro/*` at all.
 for p in "$WORKTREE"/examples/hybrid/*/; do
-    [ -f "$p/package.json" ] && link_importer "examples/hybrid/$(basename "$p")"
+    # An `if`, not `[ … ] && …`: the glob also matches the node_modules just
+    # linked, and a failed test as the loop's last command made the script
+    # exit 1 under `set -e` after linking everything.
+    if [ -f "$p/package.json" ]; then link_importer "examples/hybrid/$(basename "$p")"; fi
 done
