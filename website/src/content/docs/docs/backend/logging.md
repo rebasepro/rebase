@@ -66,7 +66,7 @@ export default defineCron({
 ## Reading the log
 
 - **Studio**, *Logs*: the running process's recent lines, live. Pick a level ("warn and above") and a source, search messages and field values, and open a line to see its fields. A request reads as `GET /path 404 · 16 ms`.
-- **Rebase Cloud console**, *Container logs*: every pod's output, with level counts, search and the same readable rows.
+- **Rebase Cloud console**, *Logs*: every pod's output, with level counts, search and the same readable rows. Presets show one kind of line at a time: requests, scheduled jobs, startup or the rest.
 - **CLI**: `rebase cloud logs --runtime` prints each record as one readable line (`14:30:32.126 WARN  [boot] Driver version skew …  fix="…"`); `--level warn`, `--grep`, `--since`, `-f` and `--raw` are on [the CLI page](/docs/cli/cloud/#logs). `rebase logs` reads one local process the same way.
 - **Agents**: the Rebase Cloud MCP `logs` tool takes `level`, `grep`, `sinceTime` and `previous`, and returns one compact line per record; pass its `nextSinceTime` back as `sinceTime` to read on from where it stopped.
 
