@@ -199,7 +199,7 @@ function contextFields(): Record<string, unknown> | undefined {
 // and those in a project's own code.
 
 /** Leading pictographs (with their variation selectors, joiners and skin tones) and the space after them. */
-const LEADING_PICTOGRAPHS = /^(?:[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}][\u{FE0F}\u{20E3}\u{200D}\u{1F3FB}-\u{1F3FF}\p{Extended_Pictographic}]*\s*)+/u;
+const LEADING_PICTOGRAPHS = /^(?:[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}](?:\u{FE0F}|\u{20E3}|\u{200D}|[\u{1F3FB}-\u{1F3FF}]|\p{Extended_Pictographic})*\s*)+/u;
 
 /** A leading `[Tag]` naming a subsystem: a word, possibly two, not a sentence. */
 const LEADING_TAG = /^\[([A-Za-z][\w.:/-]*(?: [\w.:/-]+){0,2})\]\s*/;
