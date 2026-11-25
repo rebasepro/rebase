@@ -1,5 +1,5 @@
 ---
-sourceHash: e0693d8234ac665d
+sourceHash: 8f68cfb67afebe1c
 title: REST API
 sidebar_label: REST API
 description: Automatisch generierte REST-API-Endpunkte für jede Tabelle mit Filterung, Sortierung, Paginierung und Einbindung von Relationen.
@@ -377,7 +377,7 @@ GET /api/meta/contract
 ```
 
 ```json
-{ "schemaVersion": "v2:…", "runtime": { "version": "0.37.0", "contract": 2 }, "tables": [ … ] }
+{ "schemaVersion": "v2:…", "runtime": { "version": "0.37.1", "contract": 2 }, "tables": [ … ] }
 ```
 
 Es erfordert den Scope **`schema:read`**, den ein Administrator besitzt, und auf einem Deployment ohne konfigurierte Authentifizierung wird es gar nicht bereitgestellt (404 `CONTRACT_UNAVAILABLE`), anstatt das Schema für jedermann offenzulegen. Schema-Versionen beginnen seit 0.31 mit `v2:`: Sie werden aus den kompilierten Tabellen berechnet, sodass sich die Version jedes Projekts einmalig geändert hat. Der Geschwister-Endpunkt gibt einen Versions-String zurück, der für das Schema steht, ohne es zu beschreiben, und ist bewusst ohne Anmeldedaten erreichbar — was von CI-Jobs gepollt wird:

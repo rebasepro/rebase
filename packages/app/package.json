@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/app",
-  "version": "0.37.0",
+  "version": "0.37.1",
   "description": "Framework-agnostic runtime for the admin panel of Rebase, the open-source Postgres BaaS",
   "keywords": [
     "rebase",

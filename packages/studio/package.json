@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/studio",
-  "version": "0.37.0",
+  "version": "0.37.1",
   "description": "Rebase Studio — SQL editor, schema visualiser, RLS policy editor and API explorer for Rebase, the open-source Postgres BaaS.",
   "keywords": [
     "rebase",

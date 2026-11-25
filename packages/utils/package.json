@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/utils",
-  "version": "0.37.0",
+  "version": "0.37.1",
   "description": "Utility functions for Rebase, the open-source Postgres BaaS",
   "keywords": [
     "rebase",

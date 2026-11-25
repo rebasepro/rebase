@@ -11,6 +11,8 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+## [0.37.1] - 2026-11-25
+
 ### Added
 
 - **`@rebasepro/server` exports the Database and Tables views' API: `createDbAdminRoutes`, `createDbInsightsRoutes` and `createDbCatalogRoutes`**, with their option types. The server mounts `/api/admin/db` only once it could create its `rebase.*` catalog, so on a database another tool owns, reached with a role that cannot create tables, Studio's Tables and Database views answered "Not found". A backend can now mount the routes itself, on an `admin` it chooses (a read-only connection, for example) and behind its own gate, and let only some methods through.

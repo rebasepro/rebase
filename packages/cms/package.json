@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/cms",
-  "version": "0.37.0",
+  "version": "0.37.1",
   "description": "Admin panel views, forms and routing for Rebase, the open-source Postgres BaaS",
   "keywords": [
     "rebase",

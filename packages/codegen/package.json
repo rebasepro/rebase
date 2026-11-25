@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/codegen",
-  "version": "0.37.0",
+  "version": "0.37.1",
   "description": "Generate a typed JS SDK from the table definitions of Rebase, the open-source Postgres BaaS",
   "keywords": [
     "sdk",
