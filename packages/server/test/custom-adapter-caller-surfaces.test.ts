@@ -43,7 +43,11 @@ const secrets = defineTable("admin_secrets", {
 const ACCOUNTS: Record<string, AuthenticatedUser> = {
     "adapter-member": { uid: "m-1", email: "m@example.test", roles: [], isAdmin: false },
     "adapter-staff": { uid: "s-1", email: "s@example.test", roles: ["staff"], isAdmin: false },
-    "adapter-admin": { uid: "a-1", email: "a@example.test", roles: ["admin"], isAdmin: true }
+    "adapter-admin": { uid: "a-1", email: "a@example.test", roles: ["admin"], isAdmin: true },
+    // Scopes the adapter names itself: a grant to a role other than `admin`,
+    // and an `admin` narrowed below what the role holds.
+    "adapter-dev": { uid: "d-1", email: "d@example.test", roles: ["dev"], isAdmin: false, scopes: ["data:read", "logs:read"] },
+    "adapter-narrow-admin": { uid: "n-1", email: "n@example.test", roles: ["admin"], isAdmin: true, scopes: ["data:read"] }
 };
 
 const adapter = createCustomAuthAdapter({
@@ -122,6 +126,17 @@ describe("a backend with its own auth adapter", () => {
         const staff = await app.request("/api/docs", bearer("adapter-staff"));
         expect(staff.status).toBe(200);
         expect(await staff.text()).toContain("staff_only");
+    });
+
+    it("judges the admin routes by the scopes the adapter named, as verifyCredential and the socket do", async () => {
+        const app = await boot();
+        // Granted `logs:read` by the adapter, with no `admin` role.
+        expect((await app.request("/api/admin/logs", bearer("adapter-dev"))).status).toBe(200);
+        // No scopes named: the roles decide, and `staff` holds no admin scope.
+        expect((await app.request("/api/admin/logs", bearer("adapter-staff"))).status).toBe(403);
+        // Narrowed: the `admin` role would hold `logs:read`; the adapter said less.
+        expect((await app.request("/api/admin/logs", bearer("adapter-narrow-admin"))).status).toBe(403);
+        expect((await app.request("/api/admin/logs", bearer("adapter-admin"))).status).toBe(200);
     });
 
     it("serves /api/admin/ui-config to an adapter-authenticated caller", async () => {
