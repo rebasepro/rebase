@@ -27,9 +27,10 @@ import {
     LayoutGridIcon,
     ListIcon,
     LoadingButton,
+    LucideIconByName,
     Music2Icon,
-    PlusIcon,
     RefreshCwIcon,
+    SearchBar,
     ResizablePanels,
     Select,
     SelectItem,
@@ -41,6 +42,7 @@ import {
     Tab,
     Tabs,
     TextField,
+    ToggleButtonGroup,
     Tooltip,
     Trash2Icon,
     Typography,
@@ -167,6 +169,11 @@ function getExtension(name: string): string {
 }
 
 /** Whether the grid draws `file` as a thumbnail — which needs a link to it. */
+/** What a file is, in a word: its extension, or the subtype its content type names. */
+function fileTypeLabel(file: { name: string; contentType?: string }): string {
+    return getExtension(file.name) || file.contentType?.split("/")[1]?.toUpperCase() || "—";
+}
+
 function isImageFile(file: { name: string; contentType?: string }): boolean {
     return file.contentType?.startsWith("image/") === true || IMAGE_EXTENSIONS.includes(getExtension(file.name).toLowerCase());
 }
@@ -457,8 +464,8 @@ message: e instanceof Error ? e.message : String(e) });
                 "bg-surface-card"
             )}>
                 {/* Header */}
-                <div className={cls("flex items-center justify-between h-10 px-3 border-b bg-surface-sheet shrink-0", defaultBorderMixin)}>
-                    <Typography variant="body2" className="font-medium truncate flex-1 mr-2">
+                <div className="flex items-center justify-between h-[42px] pl-4 pr-2 shrink-0">
+                    <Typography variant="body2" className="text-[13px] font-medium truncate flex-1 mr-2" title={file.name}>
                         {file.name}
                     </Typography>
                     <div className="flex items-center gap-0.5">
@@ -489,7 +496,7 @@ message: e instanceof Error ? e.message : String(e) });
 
                 {/* Preview */}
                 <div className="flex-1 overflow-auto">
-                    <div className={cls("flex flex-col items-center justify-center min-h-[200px] p-4 bg-surface-sheet border-b", defaultBorderMixin)}>
+                    <div className="mx-3 flex flex-col items-center justify-center min-h-[200px] p-4 rounded-lg bg-surface-field">
                         {(() => {
                             const ext = getExtension(file.name)?.toLowerCase() || "";
                             const isImage = file.contentType?.startsWith("image/") || IMAGE_EXTENSIONS.includes(ext);
@@ -502,7 +509,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     <img
                                         src={previewUrl}
                                         alt={file.name}
-                                        className="max-w-full max-h-[400px] object-contain rounded-md shadow-sm"
+                                        className="max-w-full max-h-[400px] object-contain rounded-md"
                                     />
                                 );
                             } else if (isVideo && previewUrl) {
@@ -516,15 +523,15 @@ message: e instanceof Error ? e.message : String(e) });
                             } else if (isAudio && previewUrl) {
                                 return (
                                     <div className="flex flex-col items-center gap-4">
-                                        <Music2Icon className="text-surface-accent-400 w-10 h-10"/>
+                                        <Music2Icon size={32} className="text-text-disabled dark:text-text-disabled-dark"/>
                                         <audio src={previewUrl} controls className="w-full max-w-xs"/>
                                     </div>
                                 );
                             } else {
                                 return (
-                                    <div className="flex flex-col items-center gap-3 text-surface-accent-400">
-                                        <FileIconComponent className="w-10 h-10"/>
-                                        <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <FileIconComponent size={32} className="text-text-disabled dark:text-text-disabled-dark"/>
+                                        <Typography variant="caption" color="disabled">
                                             {t("studio_storage_no_preview")}
                                         </Typography>
                                     </div>
@@ -532,7 +539,6 @@ message: e instanceof Error ? e.message : String(e) });
                             }
                         })()}
                     </div>
-                </div>
 
                     {/* Metadata */}
                     <div className="p-4 space-y-3">
@@ -543,7 +549,7 @@ message: e instanceof Error ? e.message : String(e) });
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <Typography variant="caption" className="text-surface-accent-500 text-xs">
+                                <Typography variant="caption" color="secondary" className="block">
                                     {t("studio_storage_name")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px] break-all">
@@ -551,7 +557,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 </Typography>
                             </div>
                             <div>
-                                <Typography variant="caption" className="text-surface-accent-500 text-xs">
+                                <Typography variant="caption" color="secondary" className="block">
                                     {t("studio_storage_type")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px]">
@@ -560,7 +566,7 @@ message: e instanceof Error ? e.message : String(e) });
                             </div>
                             {file.size !== undefined && (
                                 <div>
-                                    <Typography variant="caption" className="text-surface-accent-500 text-xs">
+                                    <Typography variant="caption" color="secondary" className="block">
                                         {t("studio_storage_size")}
                                     </Typography>
                                     <Typography variant="body2" className="text-[13px]">
@@ -569,7 +575,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 </div>
                             )}
                             <div>
-                                <Typography variant="caption" className="text-surface-accent-500 text-xs">
+                                <Typography variant="caption" color="secondary" className="block">
                                     {t("studio_storage_extension")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px] font-mono">
@@ -577,7 +583,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 </Typography>
                             </div>
                             <div className="col-span-2">
-                                <Typography variant="caption" className="text-surface-accent-500 text-xs">
+                                <Typography variant="caption" color="secondary" className="block">
                                     {t("studio_storage_path")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px] font-mono break-all">
@@ -588,13 +594,13 @@ message: e instanceof Error ? e.message : String(e) });
 
                         {link && (
                             <div className="pt-2">
-                                <Typography variant="caption" className="text-surface-accent-500 text-xs block mb-1">
+                                <Typography variant="caption" color="secondary" className="block mb-1">
                                     {t("studio_storage_url")}
                                 </Typography>
                                 <div
                                     className={cls(
-                                        "flex items-center gap-2 p-2 rounded cursor-pointer transition-colors",
-                                        "bg-surface-raised hover:bg-surface-raised-hover"
+                                        "flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors",
+                                        "bg-surface-field hover:bg-surface-hover"
                                     )}
                                     onClick={handleCopy}
                                 >
@@ -605,7 +611,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         <div className="shrink-0">
                                             {urlCopied
                                                 ? <CheckIcon size={14} className="text-green-500"/>
-                                                : <CopyIcon size={14} className="text-surface-accent-400"/>
+                                                : <CopyIcon size={14} className="text-text-secondary dark:text-text-secondary-dark"/>
                                             }
                                         </div>
                                     </Tooltip>
@@ -623,6 +629,7 @@ message: e instanceof Error ? e.message : String(e) });
                         )}
                     </div>
                 </div>
+            </div>
 
             {/* Delete Confirmation */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -659,26 +666,17 @@ message: e instanceof Error ? e.message : String(e) });
 // Main StorageView Export
 // ──────────────────────────────────────────────
 
-export const StorageView = () => {
-    const [tab, setTab] = useState<"files" | "policies">("files");
-    const { t } = useTranslation();
-    return (
-        <div className="flex flex-col h-full w-full overflow-hidden">
-            <Tabs
-                value={tab}
-                onValueChange={(v) => { if (v === "files" || v === "policies") setTab(v); }}
-                variant="boxy"
-                className="border-b border-hairline px-4 bg-surface-sheet shrink-0"
-            >
-                <Tab value="files">{t("studio_storage_tab_files")}</Tab>
-                <Tab value="policies">{t("studio_storage_tab_policies")}</Tab>
-            </Tabs>
-            <div className="flex-1 min-h-0 overflow-hidden">
-                {tab === "files" ? <StorageFilesBrowser /> : <StoragePoliciesPanel />}
-            </div>
-        </div>
-    );
-};
+/**
+ * The Storage view, laid out as the Tables view is: the source's top-level
+ * folders in a side list, and for the folder open its path, its tabs (the
+ * files, and the access policies), a toolbar and the contents.
+ */
+export const StorageView = () => <StorageFilesBrowser/>;
+
+/** The name a folder is listed by, without the trailing slash some sources give a prefix. */
+function folderKey(fullPath: string): string {
+    return fullPath.replace(/\/+$/, "");
+}
 
 const StorageFilesBrowser = () => {
     const { t } = useTranslation();
@@ -714,6 +712,19 @@ const StorageFilesBrowser = () => {
     const [listedFrom, setListedFrom] = useState<StorageSource | null>(null);
     // View mode: decides which files need more than the listing says.
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+    const [tab, setTab] = useState<"files" | "policies">("files");
+    /** What the folder open is narrowed to, by name. A folder opened starts unfiltered. */
+    const [filter, setFilter] = useState("");
+    /**
+     * The source's top-level folders, for the side list, and the source they
+     * were listed from. Kept apart from `folders`: the side list stays while a
+     * folder below is open.
+     */
+    const [rootFolders, setRootFolders] = useState<{ source: string; folders: StorageFile[] } | null>(null);
+    const selectedSourceKeyRef = useRef(selectedSourceKey);
+    useEffect(() => {
+        selectedSourceKeyRef.current = selectedSourceKey;
+    }, [selectedSourceKey]);
     /**
      * Which files are worth a metadata request: one the listing did not
      * describe (a source whose listing carries no sizes), and, in the grid, an
@@ -806,6 +817,13 @@ const StorageFilesBrowser = () => {
             setFolders(folderItems);
             setFiles(fileItems);
             setListedFrom(source);
+            // The root's listing is the side list's too: no second request for it.
+            if (!path) {
+                setRootFolders({
+                    source: selectedSourceKeyRef.current,
+                    folders: folderItems
+                });
+            }
         } catch (e) {
             if (!isCurrent()) return;
             console.error("Storage list error:", e);
@@ -823,6 +841,36 @@ const StorageFilesBrowser = () => {
         // ref-sync effect above runs first, so `storageSourceRef` is current.
         fetchContents(currentPath);
     }, [currentPath, fetchContents, selectedSourceKey]);
+
+    // With a folder below the root open — a link, a reload, another source —
+    // the side list reads the root on its own. A failure leaves it empty; the
+    // folder open says what went wrong.
+    useEffect(() => {
+        if (!currentPath || rootFolders?.source === selectedSourceKey) return;
+        let current = true;
+        const source = storageSourceRef.current;
+        listAllPages(source, "")
+            .then(result => {
+                if (!current) return;
+                setRootFolders({
+                    source: selectedSourceKey,
+                    folders: result.prefixes.map(ref => ({
+                        name: ref.name,
+                        fullPath: ref.fullPath,
+                        isFolder: true
+                    }))
+                });
+            })
+            .catch(() => {
+                if (current) setRootFolders({
+                    source: selectedSourceKey,
+                    folders: []
+                });
+            });
+        return () => {
+            current = false;
+        };
+    }, [currentPath, rootFolders?.source, selectedSourceKey]);
 
     /** A link to `file`, minted now through the source being browsed — see {@link FileLink}. */
     const mintFileLink = useCallback(async (file: StorageFile): Promise<FileLink | null> =>
@@ -872,6 +920,7 @@ const StorageFilesBrowser = () => {
             return next;
         }, { replace: true });
         clearSelection();
+        setFilter("");
     }, [setSearchParams, clearSelection]);
 
     // Switching source keeps the folder path, not the files picked in it: the
@@ -889,8 +938,21 @@ const StorageFilesBrowser = () => {
         handleNavigate(parts.join("/"));
     }, [currentPath, handleNavigate]);
 
+    // What the filter leaves of the folder open: what is shown, selected and deleted.
+    const query = filter.trim().toLowerCase();
+    const visibleFolders = useMemo(() => query ? folders.filter(folder => folder.name.toLowerCase().includes(query)) : folders, [folders, query]);
+    const visibleFiles = useMemo(() => query ? files.filter(file => file.name.toLowerCase().includes(query)) : files, [files, query]);
+
+    // A selection is of what was shown: a filter that hides part of it drops it,
+    // so nothing out of sight is deleted with it.
+    const handleFilter = useCallback((value: string) => {
+        setFilter(value);
+        setSelectedPaths(new Set());
+        lastClickedRef.current = null;
+    }, []);
+
     // All items (folders + files) in display order, for shift-range select
-    const allItems = useMemo(() => [...folders, ...files], [folders, files]);
+    const allItems = useMemo(() => [...visibleFolders, ...visibleFiles], [visibleFolders, visibleFiles]);
 
     // ── Multi-select click handler ──
     const handleItemClick = useCallback((item: StorageFile, e: React.MouseEvent) => {
@@ -1231,9 +1293,17 @@ message: e instanceof Error ? e.message : String(e) });
     // Handle refresh
     const handleRefresh = useCallback(() => {
         fetchContents(currentPath);
+        // At the root the listing is the side list's; below it, the side list reads again.
+        if (currentPath) setRootFolders(null);
     }, [currentPath, fetchContents]);
 
     const segments = breadcrumbSegments(currentPath, t("studio_storage_root"));
+    const sourceLabel = (key: string) => storageSources.registry[key]?.label
+        ?? (key === DEFAULT_STORAGE_SOURCE_KEY ? t("studio_storage_default_source") : key);
+    const openNewFolder = () => {
+        setNewFolderName("");
+        setNewFolderDialogOpen(true);
+    };
 
 
     // ── Render file grid/list ──
@@ -1241,12 +1311,7 @@ message: e instanceof Error ? e.message : String(e) });
         if (loading) {
             return (
                 <div className="flex-grow flex items-center justify-center">
-                    <div className="text-center">
-                        <CircularProgress size="medium"/>
-                        <Typography variant="body2" className="mt-4 text-text-secondary dark:text-text-secondary-dark font-mono tracking-tight animate-pulse">
-                            {t("studio_storage_loading")}
-                        </Typography>
-                    </div>
+                    <CircularProgress size="small"/>
                 </div>
             );
         }
@@ -1258,10 +1323,10 @@ message: e instanceof Error ? e.message : String(e) });
                         <Typography variant="subtitle2" className="block">
                             {t("studio_storage_denied_title")}
                         </Typography>
-                        <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark block mt-2">
+                        <Typography variant="body2" color="secondary" className="block mt-2">
                             {t("studio_storage_denied_hint")}
                         </Typography>
-                        <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark block mt-3 font-mono break-all">
+                        <Typography variant="caption" color="disabled" className="block mt-3 font-mono break-all">
                             {failure.detail}
                         </Typography>
                     </div>
@@ -1281,41 +1346,50 @@ message: e instanceof Error ? e.message : String(e) });
             );
         }
 
-
-        if (allItems.length === 0) {
+        if (folders.length === 0 && files.length === 0) {
             return (
-                <div className="flex-grow flex items-center justify-center text-text-disabled dark:text-text-disabled-dark">
-                    <div className="text-center">
-                        <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-                        </svg>
-                        <Typography variant="body2">
-                            {t("studio_storage_empty")}
-                        </Typography>
-                        <div className="flex items-center gap-2 mt-3">
-                            <Button variant="text" onClick={() => {
-                                setNewFolderName("");
-                                setNewFolderDialogOpen(true);
-                            }}>
-                                <FolderPlusIcon size={iconSize.smallest}/>
-                                {t("studio_storage_new_folder")}
-                            </Button>
-                            <Button onClick={() => setUploadDialogOpen(true)}>
-                                <PlusIcon size={iconSize.smallest}/>
-                                {t("studio_storage_upload_files")}
-                            </Button>
-                        </div>
+                <div className="flex-grow flex flex-col items-center justify-center p-8 text-center gap-4">
+                    <FolderIcon className="w-10 h-10 text-text-disabled dark:text-text-disabled-dark"/>
+                    <Typography variant="body2" color="secondary">
+                        {t("studio_storage_empty")}
+                    </Typography>
+                    <div className="flex items-center gap-2">
+                        <Button size="small" variant="outlined" onClick={openNewFolder}>
+                            <FolderPlusIcon size={iconSize.smallest}/>
+                            {t("studio_storage_new_folder")}
+                        </Button>
+                        <Button size="small" variant="outlined" onClick={() => setUploadDialogOpen(true)}>
+                            <UploadCloudIcon size={iconSize.smallest}/>
+                            {t("studio_storage_upload_files")}
+                        </Button>
                     </div>
                 </div>
             );
         }
+
+        if (allItems.length === 0) {
+            return (
+                <div className="flex-grow flex items-center justify-center p-8 text-center">
+                    <Typography variant="body2" color="secondary">
+                        {t("studio_storage_no_match", { query: filter.trim() })}
+                    </Typography>
+                </div>
+            );
+        }
+
+        const toggleChecked = (path: string) => setSelectedPaths(prev => {
+            const next = new Set(prev);
+            if (next.has(path)) next.delete(path);
+            else next.add(path);
+            return next;
+        });
 
         if (viewMode === "list") {
             return (
                 <div className="flex-grow overflow-auto">
                     <Table className="w-full">
                         <TableHeader className="text-xs font-normal text-text-secondary dark:text-text-secondary-dark">
-                            <TableCell className="pl-3 pr-0 py-2 w-8">
+                            <TableCell className="pl-4 pr-0 py-2 w-8">
                                 <Checkbox
                                     size="small"
                                     checked={allItems.length > 0 && selectedPaths.size === allItems.length}
@@ -1330,56 +1404,40 @@ message: e instanceof Error ? e.message : String(e) });
                         </TableHeader>
                         {/* A list on the sheet: rows have no fill of their own. */}
                         <TableBody variant="list">
-                            {folders.map(folder => {
+                            {visibleFolders.map(folder => {
                                 const isChecked = selectedPaths.has(folder.fullPath);
                                 return (
                                     <TableRow
                                         key={folder.fullPath}
                                         data-storage-item
-                                        className={cls(
-                                            "group",
-                                            isChecked && "bg-primary/5 dark:bg-primary/10"
-                                        )}
+                                        className={cls("cursor-pointer", isChecked && "bg-surface-active")}
                                         onClick={(e) => handleItemClick(folder, e)}
                                         onDoubleClick={() => handleItemDoubleClick(folder)}
                                     >
-                                        <TableCell className="pl-3 pr-0 py-2.5" onClick={(e) => e.stopPropagation()}>
-                                            <Checkbox
-                                                size="small"
-                                                checked={isChecked}
-                                                onCheckedChange={() => {
-                                                    setSelectedPaths(prev => {
-                                                        const next = new Set(prev);
-                                                        if (next.has(folder.fullPath)) next.delete(folder.fullPath);
-                                                        else next.add(folder.fullPath);
-                                                        return next;
-                                                    });
-                                                }}
-                                            />
+                                        <TableCell className="pl-4 pr-0 py-2" onClick={(e) => e.stopPropagation()}>
+                                            <Checkbox size="small" checked={isChecked} onCheckedChange={() => toggleChecked(folder.fullPath)}/>
                                         </TableCell>
-                                        <TableCell className="px-2 py-2.5">
-                                            <div className="flex items-center gap-2">
-                                                <FolderIcon size={iconSize.smallest} className="text-amber-500 dark:text-amber-400 shrink-0"/>
+                                        <TableCell className="px-2 py-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <FolderIcon size={14} className="text-text-secondary dark:text-text-secondary-dark shrink-0"/>
                                                 <Typography variant="body2" className="text-[13px] font-medium truncate">
                                                     {folder.name}
                                                 </Typography>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="px-4 py-2.5">
-                                            <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
+                                        <TableCell className="px-4 py-2">
+                                            <Typography variant="caption" color="secondary">
                                                 {t("studio_storage_folder")}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell className="px-4 py-2.5 text-right">
-                                            <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">
-                                                —
-                                            </Typography>
+                                        <TableCell className="px-4 py-2 text-right">
+                                            <Typography variant="caption" color="disabled">—</Typography>
                                         </TableCell>
-                                        <TableCell className="px-2 py-2.5"/>
+                                        <TableCell className="px-2 py-2"/>
                                     </TableRow>
                                 );
                             })}
-                            {files.map(listed => {
+                            {visibleFiles.map(listed => {
                                 const file = withMetadata(listed);
                                 const FileIconComp = getFileIcon(file.contentType, file.name);
                                 const isChecked = selectedPaths.has(file.fullPath);
@@ -1389,56 +1447,43 @@ message: e instanceof Error ? e.message : String(e) });
                                         ref={observeFile}
                                         data-storage-path={file.fullPath}
                                         data-storage-item
-                                        className={cls(
-                                            "group",
-                                            isChecked && "bg-primary/5 dark:bg-primary/10"
-                                        )}
+                                        className={cls("cursor-pointer", isChecked && "bg-surface-active")}
                                         onClick={(e) => handleItemClick(file, e)}
                                         onDoubleClick={() => handleItemDoubleClick(file)}
                                     >
-                                        <TableCell className="pl-3 pr-0 py-2.5" onClick={(e) => e.stopPropagation()}>
-                                            <Checkbox
-                                                size="small"
-                                                checked={isChecked}
-                                                onCheckedChange={() => {
-                                                    setSelectedPaths(prev => {
-                                                        const next = new Set(prev);
-                                                        if (next.has(file.fullPath)) next.delete(file.fullPath);
-                                                        else next.add(file.fullPath);
-                                                        return next;
-                                                    });
-                                                }}
-                                            />
+                                        <TableCell className="pl-4 pr-0 py-2" onClick={(e) => e.stopPropagation()}>
+                                            <Checkbox size="small" checked={isChecked} onCheckedChange={() => toggleChecked(file.fullPath)}/>
                                         </TableCell>
-                                        <TableCell className="px-2 py-2.5">
-                                            <div className="flex items-center gap-2">
-                                                <FileIconComp size={iconSize.smallest} className="text-surface-accent-400 shrink-0"/>
+                                        <TableCell className="px-2 py-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <FileIconComp size={14} className="text-text-disabled dark:text-text-disabled-dark shrink-0"/>
                                                 <Typography variant="body2" className="text-[13px] truncate">
                                                     {file.name}
                                                 </Typography>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="px-4 py-2.5">
-                                            <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
-                                                {getExtension(file.name) || file.contentType?.split("/")[1]?.toUpperCase() || "—"}
+                                        <TableCell className="px-4 py-2">
+                                            <Typography variant="caption" color="secondary">
+                                                {fileTypeLabel(file)}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell className="px-4 py-2.5 text-right">
-                                            <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark font-mono text-xs">
+                                        <TableCell className="px-4 py-2 text-right">
+                                            <Typography variant="caption" color="secondary" className="font-mono">
                                                 {file.size !== undefined ? formatFileSize(file.size) : "—"}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
-                                            <IconButton aria-label={t("studio_storage_delete")}
-                                                size="smallest"
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={() => {
-                                                    setDeleteDialogTarget(file);
-                                                    setDeleteDialogOpen(true);
-                                                }}
-                                            >
-                                                <Trash2Icon size={14}/>
-                                            </IconButton>
+                                        <TableCell className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                                            <Tooltip title={t("studio_storage_delete")}>
+                                                <IconButton aria-label={t("studio_storage_delete")}
+                                                    size="smallest"
+                                                    onClick={() => {
+                                                        setDeleteDialogTarget(file);
+                                                        setDeleteDialogOpen(true);
+                                                    }}
+                                                >
+                                                    <Trash2Icon size={14}/>
+                                                </IconButton>
+                                            </Tooltip>
                                         </TableCell>
                                     </TableRow>
                                 );
@@ -1451,32 +1496,38 @@ message: e instanceof Error ? e.message : String(e) });
 
         // Grid view
         return (
-            <div className="flex-grow overflow-auto p-4">
-                {/* Folder cards */}
-                {folders.length > 0 && (
-                    <div className="mb-4">
-                        <Typography variant="caption" className="text-[10px] uppercase tracking-wider font-semibold text-text-disabled dark:text-text-disabled-dark mb-2 block">
+            <div className="flex-grow overflow-auto px-4 pb-4">
+                {visibleFolders.length > 0 && (
+                    <section className="mb-5">
+                        <Typography variant="caption" color="secondary" className="font-medium block mb-2">
                             {t("studio_storage_folders")}
                         </Typography>
-                        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
-                            {folders.map(folder => {
+                        <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(168px,1fr))]">
+                            {visibleFolders.map(folder => {
                                 const isChecked = selectedPaths.has(folder.fullPath);
                                 return (
                                     <div
                                         key={folder.fullPath}
                                         data-storage-item
+                                        role="button"
+                                        tabIndex={0}
+                                        title={folder.name}
                                         className={cls(
-                                            "rounded-lg p-3 cursor-pointer border",
-                                            "transition-colors duration-150",
-                                            defaultBorderMixin,
-                                            "hover:bg-surface-hover hover:shadow-sm",
-                                            "flex items-center gap-2",
-                                            isChecked && "ring-2 ring-primary bg-primary/5 dark:bg-primary/10"
+                                            "h-10 px-3 rounded-lg flex items-center gap-2 cursor-pointer transition-colors",
+                                            isChecked
+                                                ? "bg-surface-active ring-1 ring-primary"
+                                                : "bg-surface-raised hover:bg-surface-raised-hover"
                                         )}
                                         onClick={(e) => handleItemClick(folder, e)}
                                         onDoubleClick={() => handleItemDoubleClick(folder)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                e.preventDefault();
+                                                handleItemDoubleClick(folder);
+                                            }
+                                        }}
                                     >
-                                        <FolderIcon size={iconSize.smallest} className="text-amber-500 dark:text-amber-400 shrink-0"/>
+                                        <FolderIcon size={14} className="text-text-secondary dark:text-text-secondary-dark shrink-0"/>
                                         <Typography variant="body2" className="text-[13px] font-medium truncate">
                                             {folder.name}
                                         </Typography>
@@ -1484,40 +1535,46 @@ message: e instanceof Error ? e.message : String(e) });
                                 );
                             })}
                         </div>
-                    </div>
+                    </section>
                 )}
 
-                {/* FileIcon cards */}
-                {files.length > 0 && (
-                    <div>
-                        <Typography variant="caption" className="text-[10px] uppercase tracking-wider font-semibold text-text-disabled dark:text-text-disabled-dark mb-2 block">
-                            {t("studio_storage_files_heading", { count: files.length })}
+                {visibleFiles.length > 0 && (
+                    <section>
+                        <Typography variant="caption" color="secondary" className="font-medium block mb-2">
+                            {t("studio_storage_files_heading", { count: visibleFiles.length })}
                         </Typography>
-                        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
-                            {files.map(listed => {
+                        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(168px,1fr))]">
+                            {visibleFiles.map(listed => {
                                 const file = withMetadata(listed);
                                 const FileIconComp = getFileIcon(file.contentType, file.name);
                                 const isImage = isImageFile(file);
                                 const isChecked = selectedPaths.has(file.fullPath);
-
+                                const typeLabel = fileTypeLabel(file);
                                 return (
                                     <div
                                         key={file.fullPath}
                                         ref={observeFile}
                                         data-storage-path={file.fullPath}
                                         data-storage-item
+                                        role="button"
+                                        tabIndex={0}
+                                        title={file.name}
                                         className={cls(
-                                            "rounded-lg overflow-hidden cursor-pointer border",
-                                            "transition-shadow duration-150",
-                                            defaultBorderMixin,
-                                            "hover:shadow-md",
-                                            isChecked && "ring-2 ring-primary"
+                                            "rounded-xl overflow-hidden cursor-pointer border transition-colors",
+                                            isChecked
+                                                ? "border-primary ring-1 ring-primary bg-surface-active"
+                                                : cls(defaultBorderMixin, "bg-surface-card hover:bg-surface-card-hover")
                                         )}
                                         onClick={(e) => handleItemClick(file, e)}
                                         onDoubleClick={() => handleItemDoubleClick(file)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                e.preventDefault();
+                                                openPreview(file);
+                                            }
+                                        }}
                                     >
-                                        {/* Thumbnail or icon */}
-                                        <div className="aspect-square relative overflow-hidden bg-surface-raised flex items-center justify-center">
+                                        <div className="aspect-[4/3] overflow-hidden bg-surface-field flex flex-col items-center justify-center gap-2">
                                             {isImage && file.downloadUrl ? (
                                                 <img
                                                     src={file.downloadUrl}
@@ -1526,183 +1583,254 @@ message: e instanceof Error ? e.message : String(e) });
                                                     loading="lazy"
                                                 />
                                             ) : (
-                                                <FileIconComp className="text-surface-accent-400 dark:text-surface-accent-500 w-8 h-8"/>
-                                            )}
-
-                                            {/* Extension badge */}
-                                            {getExtension(file.name) && (
-                                                <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-black/50 text-white backdrop-blur-sm">
-                                                    {getExtension(file.name)}
-                                                </div>
+                                                <>
+                                                    <FileIconComp size={24} className="text-text-disabled dark:text-text-disabled-dark"/>
+                                                    {typeLabel !== "—" && (
+                                                        <Typography variant="caption" color="disabled" className="font-mono">
+                                                            {typeLabel}
+                                                        </Typography>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
-
-                                        {/* Name & size */}
-                                        <div className="p-2.5">
-                                            <Typography variant="body2" className="text-[12px] font-medium truncate text-surface-900 dark:text-white">
+                                        <div className="px-3 py-2">
+                                            <Typography variant="body2" className="text-[13px] font-medium truncate">
                                                 {file.name}
                                             </Typography>
-                                            <Typography variant="caption" color="secondary" className="truncate block mt-0.5 text-xs">
-                                                {file.size !== undefined ? formatFileSize(file.size) : "—"}
-                                            </Typography>
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                {typeLabel !== "—" && (
+                                                    <>
+                                                        <Typography variant="caption" color="secondary">{typeLabel}</Typography>
+                                                        <Typography variant="caption" color="disabled" aria-hidden>·</Typography>
+                                                    </>
+                                                )}
+                                                <Typography variant="caption" color="secondary" className="truncate">
+                                                    {file.size !== undefined ? formatFileSize(file.size) : "—"}
+                                                </Typography>
+                                            </div>
                                         </div>
                                     </div>
                                 );
                             })}
                         </div>
-                    </div>
+                    </section>
                 )}
             </div>
         );
     };
 
+    const rootListed = rootFolders?.source === selectedSourceKey ? rootFolders.folders : null;
+    const openRootKey = currentPath.split("/").filter(Boolean)[0] ?? "";
+    const countLabel = loading || failure ? null : [
+        t("studio_storage_file_count", { count: files.length }),
+        folders.length > 0 ? t("studio_storage_folder_count", { count: folders.length }) : null
+    ].filter(Boolean).join(" · ");
+    const sideItemClass = (active: boolean) => cls(
+        "w-full text-left px-2.5 h-8 rounded-lg flex items-center gap-2 transition-colors cursor-pointer",
+        active
+            ? "bg-surface-active text-text-primary dark:text-text-primary-dark font-medium"
+            : "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-hover hover:text-text-primary dark:hover:text-text-primary-dark"
+    );
+    const openFromSide = (path: string) => {
+        setTab("files");
+        if (path !== currentPath) handleNavigate(path);
+    };
+
     return (
         <div className="flex h-full w-full bg-surface-card overflow-hidden text-text-primary dark:text-text-primary-dark">
-            <div className="flex h-full w-full">
-                {/* Main content */}
-                <div className="flex-grow flex flex-col min-w-0 h-full">
-                            {/* Toolbar */}
-                            <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-sheet shrink-0 h-10", defaultBorderMixin)}>
-                                <div className="flex items-center gap-1.5 flex-grow overflow-hidden px-3 py-2">
-                                    {/* Breadcrumbs — always visible */}
-                                    {currentPath && (
-                                        <Tooltip title={t("studio_storage_go_up")}>
-                                            <IconButton aria-label={t("studio_storage_go_up")} size="small" onClick={handleNavigateUp}>
-                                                <ArrowLeftIcon size={iconSize.smallest}/>
-                                            </IconButton>
-                                        </Tooltip>
-                                    )}
-                                    <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar">
-                                        {segments.map((seg, i) => (
-                                            <React.Fragment key={seg.path}>
-                                                {i > 0 && (
-                                                    <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark mx-0.5">/</Typography>
-                                                )}
-                                                <Button
-                                                    variant="text"
-                                                    size="small"
-                                                    className={cls(
-                                                        "px-1.5 py-0.5 min-h-0 min-w-0 h-6 text-xs whitespace-nowrap normal-case font-normal",
-                                                        i === segments.length - 1
-                                                            ? "text-text-primary dark:text-text-primary-dark font-medium"
-                                                            : "text-text-secondary dark:text-text-secondary-dark"
-                                                    )}
-                                                    onClick={() => handleNavigate(seg.path)}
-                                                >
+            <aside className={cls("w-60 shrink-0 flex flex-col border-r bg-surface-card", defaultBorderMixin)}>
+                <div className={cls("h-[42px] px-3 border-b bg-surface-sheet flex items-center justify-between gap-2 shrink-0", defaultBorderMixin)}>
+                    <div className="flex items-center gap-2 min-w-0">
+                        <LucideIconByName name="HardDrive" size={14} className="text-text-secondary dark:text-text-secondary-dark shrink-0"/>
+                        <Typography variant="caption" className="font-medium text-text-secondary dark:text-text-secondary-dark truncate">
+                            {t("studio_tool_storage")}
+                        </Typography>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <Tooltip title={t("studio_storage_refresh")}>
+                            <IconButton size="small" aria-label={t("studio_storage_refresh")} onClick={handleRefresh} disabled={loading}>
+                                <RefreshCwIcon size={iconSize.smallest}/>
+                            </IconButton>
+                        </Tooltip>
+                    </div>
+                </div>
+
+                <div className="px-2 pt-2">
+                    <ToggleButtonGroup
+                        fullWidth
+                        aria-label={t("studio_storage_view_mode")}
+                        value={viewMode}
+                        onValueChange={(mode) => {
+                            setViewMode(mode);
+                            setTab("files");
+                        }}
+                        options={[
+                            {
+                                value: "grid",
+                                label: t("studio_storage_mode_grid"),
+                                icon: <LayoutGridIcon size={iconSize.smallest}/>
+                            },
+                            {
+                                value: "list",
+                                label: t("studio_storage_mode_list"),
+                                icon: <ListIcon size={iconSize.smallest}/>
+                            }
+                        ]}
+                    />
+                </div>
+
+                {/* Only shown when there is more than one storage source to browse. */}
+                {sourceKeys.length > 1 && (
+                    <div className="px-2 pt-2">
+                        <Select
+                            size="small"
+                            fullWidth
+                            position="item-aligned"
+                            value={selectedSourceKey}
+                            onValueChange={(value) => {
+                                if (value && value !== selectedSourceKey) handleSourceChange(value);
+                            }}
+                            renderValue={sourceLabel}>
+                            {sourceKeys.map((key) => (
+                                <SelectItem key={key} value={key}>{sourceLabel(key)}</SelectItem>
+                            ))}
+                        </Select>
+                    </div>
+                )}
+
+                <nav className="flex-1 overflow-y-auto px-2 pt-2 pb-3 flex flex-col gap-0.5" aria-label={t("studio_storage_folders")}>
+                    <button type="button" className={sideItemClass(tab === "files" && !currentPath)} onClick={() => openFromSide("")}>
+                        <HomeIcon size={14} className="shrink-0 text-text-disabled dark:text-text-disabled-dark"/>
+                        <span className="truncate text-[13px]">{t("studio_storage_root")}</span>
+                    </button>
+                    {rootListed === null ? (
+                        <div className="flex items-center justify-center py-6"><CircularProgress size="small"/></div>
+                    ) : rootListed.map(folder => {
+                        const key = folderKey(folder.fullPath);
+                        return (
+                            <button
+                                key={folder.fullPath}
+                                type="button"
+                                title={folder.name}
+                                className={cls(sideItemClass(tab === "files" && openRootKey === key), "pl-5")}
+                                onClick={() => openFromSide(key)}
+                            >
+                                <FolderIcon size={14} className="shrink-0 text-text-disabled dark:text-text-disabled-dark"/>
+                                <span className="truncate text-[13px]">{folder.name}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
+            </aside>
+
+            <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                {/* Identity: where this is */}
+                <div className="h-[42px] px-4 flex items-center justify-between gap-4 bg-surface-sheet shrink-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        {currentPath && (
+                            <Tooltip title={t("studio_storage_go_up")}>
+                                <IconButton aria-label={t("studio_storage_go_up")} size="small" onClick={handleNavigateUp}>
+                                    <ArrowLeftIcon size={iconSize.smallest}/>
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                        <div className="flex items-center min-w-0 overflow-x-auto no-scrollbar font-mono">
+                            {segments.map((seg, i) => {
+                                const last = i === segments.length - 1;
+                                return (
+                                    <React.Fragment key={seg.path}>
+                                        {i > 0 && (
+                                            <Typography variant="subtitle2" color="disabled" className="font-mono px-0.5">/</Typography>
+                                        )}
+                                        {last ? (
+                                            <Typography variant="subtitle2" className="font-mono font-semibold whitespace-nowrap px-1">
+                                                {seg.label}
+                                            </Typography>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="px-1 rounded-md whitespace-nowrap hover:bg-surface-hover cursor-pointer"
+                                                onClick={() => {
+                                                    setTab("files");
+                                                    handleNavigate(seg.path);
+                                                }}
+                                            >
+                                                <Typography variant="subtitle2" color="secondary" className="font-mono">
                                                     {seg.label}
-                                                </Button>
-                                            </React.Fragment>
-                                        ))}
-                                    </div>
+                                                </Typography>
+                                            </button>
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </div>
+                        {sourceKeys.length > 1 && (
+                            <Chip size="smallest" className="shrink-0">{sourceLabel(selectedSourceKey)}</Chip>
+                        )}
+                        {countLabel && (
+                            <Typography variant="caption" color="secondary" className="whitespace-nowrap">
+                                {countLabel}
+                            </Typography>
+                        )}
+                    </div>
+                </div>
 
-                                    <div className="flex-1"/>
+                <Tabs
+                    value={tab}
+                    onValueChange={(v) => { if (v === "files" || v === "policies") setTab(v); }}
+                    variant="boxy"
+                    className="border-b border-hairline px-4 bg-surface-sheet shrink-0"
+                >
+                    <Tab value="files">{t("studio_storage_tab_files")}</Tab>
+                    <Tab value="policies">{t("studio_storage_tab_policies")}</Tab>
+                </Tabs>
 
-                                    {/* Selection actions or file count */}
-                                    {selectedPaths.size > 0 ? (
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            <Typography variant="body2" className="text-[13px] font-medium whitespace-nowrap">
+                {tab === "policies" ? (
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                        <StoragePoliciesPanel/>
+                    </div>
+                ) : (
+                    <div className="flex-1 flex min-h-0">
+                        <div className="flex-1 flex flex-col min-w-0">
+                            {/* Toolbar */}
+                            <div className="px-4 py-2 flex items-center justify-between gap-3 shrink-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <SearchBar
+                                        key={`${selectedSourceKey}:${currentPath}`}
+                                        size="small"
+                                        onTextSearch={(value) => handleFilter(value ?? "")}
+                                        placeholder={t("studio_storage_filter_placeholder")}
+                                    />
+                                    {selectedPaths.size > 0 && (
+                                        <>
+                                            <Typography variant="body2" className="text-[13px] font-medium whitespace-nowrap px-1">
                                                 {t("studio_storage_selected_count", { count: selectedPaths.size })}
                                             </Typography>
                                             <Button
                                                 size="small"
-                                                variant="text"
+                                                variant="outlined"
+                                                color="error"
                                                 onClick={() => {
                                                     setDeleteDialogTarget("selection");
                                                     setDeleteDialogOpen(true);
                                                 }}
                                             >
-                                                <Trash2Icon size={14} className="mr-1"/>
+                                                <Trash2Icon size={iconSize.smallest}/>
                                                 {t("studio_storage_delete")}
                                             </Button>
-                                            <Button
-                                                size="small"
-                                                variant="text"
-                                                onClick={() => {
-                                                    setSelectedPaths(new Set());
-                                                    setSelectedFile(null);
-                                                    setSelectedLink(null);
-                                                }}
-                                            >
-                                                <XIcon size={14} className="mr-1"/>
+                                            <Button size="small" variant="text" onClick={clearSelection}>
                                                 {t("studio_storage_deselect")}
                                             </Button>
-                                        </div>
-                                    ) : !loading ? (
-                                        <Chip size="small" className="shrink-0 text-xs">
-                                            {t("studio_storage_file_count", { count: files.length })}
-                                            {folders.length > 0 ? `, ${t("studio_storage_folder_count", { count: folders.length })}` : ""}
-                                        </Chip>
-                                    ) : null}
-                                </div>
-
-                                <div className="flex shrink-0 items-center justify-end gap-1.5 pr-1">
-
-                                    {/* Backend picker — only shown when more than one storage source is available */}
-                                    {sourceKeys.length > 1 && (
-                                        <Select
-                                            size="small"
-                                            position="item-aligned"
-                                            value={selectedSourceKey}
-                                            onValueChange={(value) => {
-                                                if (value && value !== selectedSourceKey) handleSourceChange(value);
-                                            }}
-                                            renderValue={(key) => {
-                                                const label = storageSources.registry[key]?.label;
-                                                return label ?? (key === DEFAULT_STORAGE_SOURCE_KEY ? t("studio_storage_default_source") : key);
-                                            }}>
-                                            {sourceKeys.map((key) => (
-                                                <SelectItem key={key} value={key}>
-                                                    {storageSources.registry[key]?.label
-                                                        ?? (key === DEFAULT_STORAGE_SOURCE_KEY ? t("studio_storage_default_source") : key)}
-                                                </SelectItem>
-                                            ))}
-                                        </Select>
+                                        </>
                                     )}
-
-                                    <Tooltip title={t("studio_storage_grid_view")}>
-                                        <IconButton aria-label={t("studio_storage_grid_view")}
-                                            size="small"
-                                            onClick={() => setViewMode("grid")}
-                                            className={cls(viewMode === "grid" && "bg-surface-raised")}
-                                        >
-                                            <LayoutGridIcon size={iconSize.smallest}/>
-                                        </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title={t("studio_storage_list_view")}>
-                                        <IconButton aria-label={t("studio_storage_list_view")}
-                                            size="small"
-                                            onClick={() => setViewMode("list")}
-                                            className={cls(viewMode === "list" && "bg-surface-raised")}
-                                        >
-                                            <ListIcon size={iconSize.smallest}/>
-                                        </IconButton>
-                                    </Tooltip>
-
-                                    <div className={cls("h-4 w-px mx-0.5", defaultBorderMixin, "bg-surface-raised")}/>
-
-                                    <Tooltip title={t("studio_storage_refresh")}>
-                                        <IconButton aria-label={t("studio_storage_refresh")} size="small" onClick={handleRefresh} disabled={loading}>
-                                            <RefreshCwIcon size={iconSize.smallest}/>
-                                        </IconButton>
-                                    </Tooltip>
-
-                                    <Tooltip title={t("studio_storage_new_folder")}>
-                                        <IconButton aria-label={t("studio_storage_new_folder")}
-                                            size="small"
-                                            onClick={() => {
-                                                setNewFolderName("");
-                                                setNewFolderDialogOpen(true);
-                                            }}
-                                        >
-                                            <FolderPlusIcon size={iconSize.smallest}/>
-                                        </IconButton>
-                                    </Tooltip>
-                                    <Button
-                                        size="small"
-                                        color="primary"
-                                        onClick={() => setUploadDialogOpen(true)}
-                                    >
-                                        <UploadCloudIcon size={iconSize.smallest} className="mr-1"/>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <Button size="small" variant="outlined" onClick={openNewFolder}>
+                                        <FolderPlusIcon size={iconSize.smallest}/>
+                                        {t("studio_storage_new_folder")}
+                                    </Button>
+                                    <Button size="small" color="primary" variant="filled" onClick={() => setUploadDialogOpen(true)}>
+                                        <UploadCloudIcon size={iconSize.smallest}/>
                                         {t("studio_storage_upload")}
                                     </Button>
                                 </div>
@@ -1713,54 +1841,27 @@ message: e instanceof Error ? e.message : String(e) });
                                  className="flex-grow flex flex-col overflow-hidden min-h-0 relative"
                                  onClick={(e) => {
                                      const target = e.target as HTMLElement;
-                                     if (!target.closest("[data-storage-item]") && selectedPaths.size > 0) {
-                                         setSelectedPaths(new Set());
-                                         setSelectedFile(null);
-                                         setSelectedLink(null);
-                                     }
+                                     if (!target.closest("[data-storage-item]") && selectedPaths.size > 0) clearSelection();
                                  }}
                             >
                                 <input {...getDropInputProps()} />
                                 {renderContents()}
-                                {/* Drag overlay */}
                                 {isDragActive && (
-                                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/5 dark:bg-primary/10 backdrop-blur-[2px]">
-                                        <div className="flex flex-col items-center gap-2 p-6 rounded-xl border-2 border-dashed border-primary bg-surface-scrim">
-                                            <UploadCloudIcon className="w-10 h-10 text-primary"/>
-                                            <Typography variant="subtitle2" className="text-primary font-semibold">
+                                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-scrim">
+                                        <div className={cls("flex flex-col items-center gap-2 p-6 rounded-xl border border-dashed bg-surface-card", "border-primary")}>
+                                            <UploadCloudIcon size={32} className="text-primary"/>
+                                            <Typography variant="subtitle2">
                                                 {t("studio_storage_drop_to_upload")}
                                             </Typography>
-                                            <Typography variant="caption" color="secondary">
-                                                {t("studio_storage_upload_to")} /{currentPath || t("studio_storage_root_folder")}
+                                            <Typography variant="caption" color="secondary" className="font-mono">
+                                                /{currentPath}
                                             </Typography>
                                         </div>
                                     </div>
                                 )}
                             </div>
-
-                            {/* Status bar */}
-                            <div className={cls("px-4 py-1.5 border-t bg-surface-sheet flex items-center justify-between shrink-0", defaultBorderMixin)}>
-                                <div className="flex items-center gap-4 text-xs">
-                                    <span className="text-text-disabled dark:text-text-disabled-dark font-semibold uppercase tracking-tighter">
-                                        {t("studio_storage_path")}
-                                    </span>
-                                    <span className="font-mono text-text-secondary dark:text-text-secondary-dark">
-                                        /{currentPath || ""}
-                                    </span>
-                                </div>
-                                {selectedPaths.size > 0 ? (
-                                    <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                        {t("studio_storage_items_selected", { count: selectedPaths.size })}
-                                    </div>
-                                ) : selectedFile ? (
-                                    <div className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                        {t("studio_storage_selected_label")} <span className="font-mono">{selectedFile.name}</span>
-                                    </div>
-                                ) : null}
-                            </div>
                         </div>
 
-                        {/* Preview panel */}
                         {selectedFile && (
                             <div className="w-80 lg:w-96 shrink-0">
                                 <FilePreviewPanel
@@ -1775,7 +1876,9 @@ message: e instanceof Error ? e.message : String(e) });
                                 />
                             </div>
                         )}
-            </div>
+                    </div>
+                )}
+            </main>
 
             {/* Upload Dialog */}
             <UploadDialog

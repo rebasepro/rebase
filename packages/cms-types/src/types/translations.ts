@@ -2397,6 +2397,11 @@ export interface RebaseTranslations {
     studio_storage_go_up?: string;
     studio_storage_grid_view?: string;
     studio_storage_list_view?: string;
+    studio_storage_view_mode?: string;
+    studio_storage_mode_grid?: string;
+    studio_storage_mode_list?: string;
+    studio_storage_filter_placeholder?: string;
+    studio_storage_no_match?: string;
     studio_storage_default_source?: string;
     studio_storage_name?: string;
     studio_storage_type?: string;

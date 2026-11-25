@@ -106,9 +106,16 @@ jest.mock("react-router", () => ({
 
 import { StorageView } from "../src/components/StorageView/StorageView";
 
+/** The folder or file tile named `name` in the browser's contents — not the side list's entry of the same name. */
+async function findItem(name: string): Promise<HTMLElement> {
+    const tile = (await screen.findAllByText(name)).find(element => element.closest("[data-storage-item]"));
+    if (!tile) throw new Error(`no tile named ${name}`);
+    return tile;
+}
+
 /** Select `name` in the grid, press the toolbar's Delete, and confirm. */
 async function deleteFromGrid(name: string) {
-    fireEvent.click(await screen.findByText(name));
+    fireEvent.click(await findItem(name));
     await screen.findByText("1 selected");
     // The toolbar's Delete comes first; the dialog's is inside the prompt's box.
     fireEvent.click(screen.getAllByRole("button", { name: /Delete/ })[0]);
@@ -177,6 +184,6 @@ describe("folders in the storage browser", () => {
 
         await waitFor(() => expect(messages("error")).toEqual(["“locked” is still there after the delete"]));
         expect(messages("success")).toEqual([]);
-        expect(screen.getByText("locked")).toBeTruthy();
+        expect(await findItem("locked")).toBeTruthy();
     });
 });

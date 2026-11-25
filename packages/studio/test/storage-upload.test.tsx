@@ -157,7 +157,7 @@ describe("the storage list view", () => {
         render(<StorageView/>);
         await screen.findByText("report.pdf");
 
-        await act(async () => { fireEvent.click(screen.getByRole("button", { name: "List view" })); });
+        await act(async () => { fireEvent.click(screen.getByRole("button", { name: "List" })); });
 
         const row = (await screen.findByText("report.pdf")).closest("tr");
         expect(row).not.toBeNull();
