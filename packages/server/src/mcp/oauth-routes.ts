@@ -144,10 +144,13 @@ interface AuthorizeRequestClaims {
 
 export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
-    const { store, publicUrl, mcpPath } = config;
+    const { store, mcpPath } = config;
     const jwt = config.jwt ?? processJwtService;
-    const issuer = issuerFor(publicUrl);
-    const canonicalResource = canonicalResourceUri(publicUrl, mcpPath);
+    // Read from `config` on every request, not once here: under `rebase dev`
+    // the public URL is the port the server bound, which is not known until
+    // after these routes are built (`devLoopbackOrigin`).
+    const issuer = (): string => issuerFor(config.publicUrl);
+    const canonicalResource = (): string => canonicalResourceUri(config.publicUrl, mcpPath);
     const vocabulary = config.vocabulary ?? DATA_SCOPE_VOCABULARY;
 
     // The limiters are created PER ROUTER, not at module scope.
@@ -340,7 +343,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         }
 
         const fail = (error: string, description: string) =>
-            c.redirect(errorRedirect(redirectUri, error, description, state, issuer), 302);
+            c.redirect(errorRedirect(redirectUri, error, description, state, issuer()), 302);
 
         if (q.response_type !== "code") {
             return fail("unsupported_response_type", "Only the authorization code flow is supported.");
@@ -366,8 +369,8 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         if (!resource) {
             return fail("invalid_request", "resource is required (RFC 8707).");
         }
-        if (!resourceMatches(resource, canonicalResource)) {
-            return fail("invalid_target", `resource must identify ${canonicalResource}.`);
+        if (!resourceMatches(resource, canonicalResource())) {
+            return fail("invalid_target", `resource must identify ${canonicalResource()}.`);
         }
 
         const scope = narrowScope(q.scope, vocabulary);
@@ -380,7 +383,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
                 codeChallenge,
                 codeChallengeMethod,
                 scope,
-                resource: canonicalResource,
+                resource: canonicalResource(),
                 ...(state ? { state } : {})
             },
             AUTHORIZE_REQUEST_TTL_SECONDS
@@ -400,7 +403,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             mfaVerifyUrl: `${config.authBasePath}/mfa/challenge/verify`,
             redirectUri,
             decisionUrl: `${c.req.path}/decision`,
-            resource: canonicalResource,
+            resource: canonicalResource(),
             nonce
         }), 200, consentPageHeaders(nonce, redirectUri));
     });
@@ -428,7 +431,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
 
         if (!approved) {
             return c.redirect(
-                errorRedirect(request.redirectUri, "access_denied", "The user declined.", request.state, issuer),
+                errorRedirect(request.redirectUri, "access_denied", "The user declined.", request.state, issuer()),
                 302
             );
         }
@@ -438,7 +441,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         const session = await verifiedSession(sessionToken);
         if (!session) {
             return c.redirect(
-                errorRedirect(request.redirectUri, "access_denied", "Not signed in.", request.state, issuer),
+                errorRedirect(request.redirectUri, "access_denied", "Not signed in.", request.state, issuer()),
                 302
             );
         }
@@ -451,7 +454,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             return c.redirect(
                 errorRedirect(request.redirectUri, "access_denied",
                     "A guest session cannot connect an application. Sign in with an account.",
-                    request.state, issuer),
+                    request.state, issuer()),
                 302
             );
         }
@@ -476,7 +479,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         // RFC 9207. The metadata advertises support, which obliges us to emit it
         // on every authorization response — a client that sees the advertisement
         // and no `iss` MUST reject the response.
-        target.searchParams.set("iss", issuer);
+        target.searchParams.set("iss", issuer());
 
         logger.info("[oauth] Authorization code issued", {
             clientId: request.clientId,
@@ -721,7 +724,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             scope: grant.scope,
             clientId: grant.clientId,
             aud: grant.resource,
-            iss: issuer
+            iss: issuer()
         }, ACCESS_TOKEN_TTL_SECONDS);
 
         const refreshToken = randomHex(32);

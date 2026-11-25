@@ -21,7 +21,7 @@ import path from "path";
 import { execa } from "execa";
 
 import { getProjectPort } from "../utils/dev-server";
-import { appBannerLines, backendWatchCommand, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devServedSiteUrl, devStaticShape, devWatchArgs, devWatchIncludes, envFileHiddenFromTsx, needsStaleSchemaPreflight, pathWithinApp, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
+import { appBannerLines, backendWatchCommand, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devServedSiteUrl, devStaticShape, devWatchArgs, devWatchIncludes, envFileHiddenFromTsx, needsStaleSchemaPreflight, pathWithinApp, pinnedPortRefusal, readEnvValue, devSwitchesMcpOn, mcpMountedUrl, mcpBannerLines, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
 import { validateManifest } from "../manifest";
 
@@ -1000,5 +1000,55 @@ describe("the banner's app lines", () => {
         const shape = shapeOf({ web: { type: "static", root: "apps/web", output: "apps/web/dist", path: "/", cms: "/admin" } });
         expect(shape.cms?.servedLocally).toBe(true);
         expect(appBannerLines(LOCAL, API, shape)).toContainEqual(["➜ CMS:   ", `${LOCAL}/admin`]);
+    });
+});
+
+describe("devSwitchesMcpOn", () => {
+    it("switches /mcp on when nobody has decided", () => {
+        expect(devSwitchesMcpOn({}, undefined)).toBe(true);
+        expect(devSwitchesMcpOn({}, "PORT=3001\n# REBASE_MCP_ENABLED=false\n")).toBe(true);
+        expect(devSwitchesMcpOn({}, "REBASE_MCP_ENABLED=\n")).toBe(true);
+    });
+
+    it("leaves a decision in .env to answer, false included: a variable it set would outrank the file", () => {
+        expect(devSwitchesMcpOn({}, "REBASE_MCP_ENABLED=false\n")).toBe(false);
+        expect(devSwitchesMcpOn({}, "REBASE_MCP_ENABLED=true\n")).toBe(false);
+    });
+
+    it("leaves a decision in the shell to answer", () => {
+        expect(devSwitchesMcpOn({ REBASE_MCP_ENABLED: "false" }, undefined)).toBe(false);
+    });
+});
+
+describe("mcpMountedUrl", () => {
+    const api = "http://localhost:3914";
+
+    it("fills in the API's address when the dev server could not name its own yet", () => {
+        expect(mcpMountedUrl("ℹ️ [INFO] MCP endpoint mounted at /mcp on this dev server's own address (OAuth at /api/oauth)", api))
+            .toBe("http://localhost:3914/mcp");
+    });
+
+    it("keeps a configured public URL", () => {
+        expect(mcpMountedUrl("ℹ️ [INFO] MCP endpoint mounted at https://admin.shop.com/mcp (OAuth at /api/oauth)", api))
+            .toBe("https://admin.shop.com/mcp");
+    });
+
+    it("is undefined for any other line, so the banner shows MCP only once it mounted", () => {
+        expect(mcpMountedUrl("[mcp] Surface enabled but REBASE_PUBLIC_URL is not set — not mounting.", api)).toBeUndefined();
+        expect(mcpMountedUrl("Server running at http://localhost:3914", api)).toBeUndefined();
+    });
+});
+
+describe("mcpBannerLines", () => {
+    it("lines up with either banner's API label", () => {
+        const app = appBannerLines("http://localhost:5173", "http://localhost:3914", { declaresStaticApp: true });
+        const [mcp, hint] = mcpBannerLines("http://localhost:3914/mcp", app);
+        const api = app.find(([label]) => label.startsWith("➜ API:"));
+        expect(mcp[0].length).toBe(api?.[0].length);
+        expect(mcp).toEqual([expect.stringMatching(/^➜ MCP:\s+$/), "http://localhost:3914/mcp"]);
+        expect(hint[1]).toContain("rebase mcp connect");
+
+        const headless: Array<[string, string]> = [["➜ API:      ", "http://localhost:3914"]];
+        expect(mcpBannerLines("http://localhost:3914/mcp", headless)[0][0]).toBe("➜ MCP:      ");
     });
 });

@@ -183,6 +183,54 @@ describe("the documented first run", () => {
     });
 });
 
+// Before `db push`, which edits the schema and so restarts the backend under
+// these checks.
+describe("the app's MCP server, on the first run", () => {
+    // The server names itself `localhost`, its own loopback name; the suite
+    // reaches it at 127.0.0.1. Same server, same port.
+    const own = () => `http://localhost:${new URL(backend?.baseUrl ?? "http://x").port}`;
+
+    it("is on under `rebase dev`, at the server's own address, with nothing configured", async () => {
+        // `rebase dev` switches `/mcp` on and the server names its own loopback
+        // address, so an AI client can connect without REBASE_PUBLIC_URL. On
+        // the managed database too: the OAuth tables have to be created there.
+        const res = await fetch(`${backend?.baseUrl}/.well-known/oauth-protected-resource/mcp`);
+        expect(res.status).toBe(200);
+        expect(await res.json()).toMatchObject({
+            resource: `${own()}/mcp`,
+            authorization_servers: [own()]
+        });
+        // The endpoint answers with the challenge a client follows to sign in.
+        const mcp = await fetch(`${backend?.baseUrl}/mcp`, { method: "POST", body: "{}", headers: { "content-type": "application/json" } });
+        expect(mcp.status).toBe(401);
+        expect(mcp.headers.get("www-authenticate")).toContain(`${own()}/.well-known/oauth-protected-resource/mcp`);
+    });
+
+    it("tells `rebase dev` it mounted, which is what puts it in the banner", () => {
+        // `--backend-only` on a project with an admin app prints no summary
+        // box, so the box itself is unit-tested (`mcpBannerLines`); this is
+        // the line it is built from, arriving through the real child process.
+        expect(backend?.output()).toContain("MCP endpoint mounted at /mcp");
+    });
+
+    it("`rebase mcp url` finds it from the project, and `connect --print` hands every client the same URL", async () => {
+        const url = await execa("node", [cliBin, "mcp", "url", "--json"], { cwd: projectDir, env, reject: false });
+        expect(url.exitCode).toBe(0);
+        expect(JSON.parse(url.stdout)).toEqual({ url: `${own()}/mcp` });
+
+        const printed = await execa("node", [cliBin, "mcp", "connect", "--print", "--json"], { cwd: projectDir, env, reject: false });
+        expect(printed.exitCode).toBe(0);
+        expect(JSON.parse(printed.stdout)).toMatchObject({
+            name: "myapp-local",
+            url: `${own()}/mcp`,
+            clients: {
+                "claude-code": { kind: "run", args: ["mcp", "add", "--transport", "http", "myapp-local", `${own()}/mcp`] },
+                claude: { kind: "unreachable" }
+            }
+        });
+    });
+});
+
 describe("rebase db push on the managed database", () => {
     it("plans against a throwaway second PGlite, and can drop what boot only adds", async () => {
         // Atlas plans a diff by replaying into a second empty database; PGlite

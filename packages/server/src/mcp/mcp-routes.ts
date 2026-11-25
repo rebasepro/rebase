@@ -249,14 +249,16 @@ type McpCallerEnv = HonoEnv & { Variables: { mcpCaller: McpCaller } };
  */
 export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
-    const canonicalResource = canonicalResourceUri(config.publicUrl, config.mcpPath);
+    // Per request, not once: under `rebase dev` the public URL is the port the
+    // server bound, known only after these routes are built (`devLoopbackOrigin`).
+    const canonicalResource = (): string => canonicalResourceUri(config.publicUrl, config.mcpPath);
     const jwt = config.jwt ?? processJwtService;
     const vocabulary = config.vocabulary ?? DATA_SCOPE_VOCABULARY;
     const defaultScope = vocabulary.defaultScope;
     // An app's own tools refuse undeclared arguments as the defaults do, and
     // one that declares `confirm` takes two calls. Confirmation wraps first,
     // so the argument it adds is one the declared-arguments check knows.
-    const confirmations = { jwt, store: config.confirmations ?? memoryConfirmationStore(), audience: canonicalResource };
+    const confirmations = { jwt, store: config.confirmations ?? memoryConfirmationStore(), get audience() { return canonicalResource(); } };
     const allTools: readonly McpToolDefinition[] = config.tools
         ? config.tools.map(tool => declaredArgumentsOnly(withConfirmation(tool, confirmations)))
         : MCP_TOOLS;
@@ -366,7 +368,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         // The audience is passed explicitly on every call. `verifyMcpAccessToken`
         // has no default for it, so this is the check the specification requires
         // — a token minted for another Rebase project cannot be spent here.
-        const payload = await jwt.verifyMcpAccessToken(token, canonicalResource);
+        const payload = await jwt.verifyMcpAccessToken(token, canonicalResource());
         if (!payload) {
             return c.json(
                 { error: "invalid_token", error_description: "The access token is invalid, expired, or for another resource." },

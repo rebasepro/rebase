@@ -227,6 +227,7 @@ export function listenWithPortRetry(
                 // documented above (announcing a port we are not on); the fix is
                 // the same in both: the socket is the only thing that knows.
                 const bound = boundPort(server) ?? port;
+                lastBoundDevPort = bound;
 
                 if (!portFileDir) {
                     resolve(bound);
@@ -356,8 +357,35 @@ function processAlive(pid: number): boolean {
  * all is the mark. The dev files are named for that server and describe it
  * first.
  */
-function startedByRebaseDev(): boolean {
-    return parseEnvBoolean(process.env.REBASE_DEV_PORT_EXPLICIT) !== undefined;
+function startedByRebaseDev(env: NodeJS.ProcessEnv = process.env): boolean {
+    return parseEnvBoolean(env.REBASE_DEV_PORT_EXPLICIT) !== undefined;
+}
+
+/** The port {@link listenWithPortRetry} last bound in this process, outside production. */
+let lastBoundDevPort: number | undefined;
+
+/**
+ * This server's own address, `http://localhost:<port>`, when `rebase dev`
+ * started it — else undefined.
+ *
+ * What `/mcp` names as its public URL when `REBASE_PUBLIC_URL` is not set. A
+ * deployment has to say where it is reachable (see `create-backend.ts`); a dev
+ * server is on loopback and the CLI that started it knows that, which is what
+ * lets `rebase dev` switch `/mcp` on without asking for a URL.
+ *
+ * The port the server *bound*, once it has: the routes are built before the
+ * server listens, and the dev port can move after that (a walk past a port in
+ * use, the affinity file after a restart), so a caller reads this per request
+ * rather than once. Before the bind, `PORT`, which is what `rebase dev` asked
+ * for.
+ *
+ * Never in production, where `rebase dev` is not the one deciding.
+ */
+export function devLoopbackOrigin(env: NodeJS.ProcessEnv = process.env): string | undefined {
+    if (env.NODE_ENV === "production" || !startedByRebaseDev(env)) return undefined;
+    const requested = Number(env.PORT);
+    const port = lastBoundDevPort ?? (Number.isInteger(requested) && requested > 0 && requested < 65536 ? requested : undefined);
+    return port === undefined ? undefined : `http://localhost:${port}`;
 }
 
 /**

@@ -167,6 +167,7 @@ import {
 } from "../storage/orphan-scans";
 import { supportsRlsScoping } from "../auth/rls-scope";
 import { createOAuthStore, type OAuthStore } from "../mcp/oauth-store";
+import { devLoopbackOrigin } from "../utils/dev-port";
 import { createDeviceLoginStore } from "../auth/device-login-store";
 import { createUiPreferencesStore } from "../ui-config/ui-preferences-store";
 import { createUiConfigRoutes, UI_CONFIG_FILE } from "../ui-config/ui-config-routes";
@@ -1832,7 +1833,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     //     alternative — deriving the origin from the `Host` header — makes the
     //     issuer identity a thing the caller supplies, and a resource server
     //     whose audience check reads its expected value out of the request is
-    //     not performing an audience check. So: configured, or absent.
+    //     not performing an audience check. So: configured, or absent. The
+    //     one exception is a server `rebase dev` started, which names its own
+    //     loopback address (`devLoopbackOrigin`), never the request's.
     //  2. The driver must support `withAuth()`. `scopeDataDriver` returns the
     //     driver UNSCOPED when it does not, which `/api/data` tolerates for a
     //     custom test driver and which is catastrophic here, where
@@ -1847,9 +1850,18 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // Prepared here — the checks, and the tables — and mounted by `mount()`,
     // because its documents name the URLs of the auth and OAuth routes, and
     // only a mount knows where those are.
-    let mcpReady: { store: OAuthStore; publicUrl: string } | undefined;
+    let mcpReady: { store: OAuthStore; publicUrl: () => string; configured: boolean } | undefined;
     if (surfaces.mcp) {
-        const publicUrl = process.env.REBASE_PUBLIC_URL;
+        const configuredPublicUrl = process.env.REBASE_PUBLIC_URL;
+        // Under `rebase dev`, with no URL configured, the server's own loopback
+        // address: the one exception to precondition 1. The origin is not read
+        // from the request (that is what the rule forbids); it is the address
+        // this process bound, which `rebase dev` started on localhost. Read per
+        // request, because the port is only known once the server listens.
+        const devOrigin = configuredPublicUrl ? undefined : devLoopbackOrigin();
+        const publicUrl = configuredPublicUrl
+            ? () => configuredPublicUrl
+            : devOrigin ? () => devLoopbackOrigin() ?? devOrigin : undefined;
         const driver = defaultDriver;
         if (!publicUrl) {
             logger.warn("[mcp] Surface enabled but REBASE_PUBLIC_URL is not set — not mounting. " +
@@ -1880,7 +1892,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                     ready = false;
                     logger.error("[mcp] Could not prepare the OAuth tables — not mounting.", { error });
                 }
-                if (ready) mcpReady = { store, publicUrl };
+                if (ready) mcpReady = { store, publicUrl, configured: Boolean(configuredPublicUrl) };
             }
         }
     }
@@ -1892,7 +1904,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
      */
     const mountMcp = (app: Hono<HonoEnv>, basePath: string, announce: boolean): void => {
         if (!mcpReady) return;
-        const { store, publicUrl } = mcpReady;
+        const { store, publicUrl, configured } = mcpReady;
         const mcpPath = "/mcp";
         const oauthBasePath = `${basePath}/oauth`;
         // The repository the admin gate re-reads from, so a grant answers to
@@ -1904,7 +1916,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // Tokens this backend's OAuth server minted, with its own key.
             jwt,
             identity,
-            publicUrl,
+            get publicUrl() { return publicUrl(); },
             mcpPath,
             oauthBasePath,
             getDriver: () => defaultDriver,
@@ -1962,7 +1974,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         app.route(oauthBasePath, group(createOAuthRoutes({
             store,
             jwt,
-            publicUrl,
+            get publicUrl() { return publicUrl(); },
             mcpPath,
             authBasePath: `${basePath}/auth`,
             // Open registration is what makes the Claude connector flow work at
@@ -1975,7 +1987,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             vocabulary: config.mcp?.scopes
         })));
 
-        if (announce) logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);
+        if (announce) {
+            logger.info(configured
+                ? `MCP endpoint mounted at ${publicUrl()}${mcpPath} (OAuth at ${oauthBasePath})`
+                // The port is not bound yet, so no URL to print: `rebase dev`
+                // prints it once the server is up, and `rebase mcp connect`
+                // reads it from the server.
+                : `MCP endpoint mounted at ${mcpPath} on this dev server's own address (OAuth at ${oauthBasePath})`);
+        }
     };
 
     /**
