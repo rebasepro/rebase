@@ -119,6 +119,18 @@ function warnIfAdminFlagWithoutAdminRole(user: AuthenticatedUser): void {
 }
 
 /** The request's `user` for an account the adapter recognised. */
+/**
+ * The scopes the adapter named for this caller, where `callerScopes` and
+ * `hasScope` read a credential's: `AuthenticatedUser.scopes` is what the
+ * credential may do when the adapter says so, and absent means what the roles
+ * hold. Dropped here, an adapter that granted an admin scope to a role other
+ * than `admin` — or narrowed a session — was heard by `verifyCredential` and
+ * the socket, and not by the admin routes' scope checks.
+ */
+function setAdapterScopes(c: Context<HonoEnv>, user: AuthenticatedUser): void {
+    if (user.scopes) c.set("scopes", [...user.scopes]);
+}
+
 function requestUserOf(user: AuthenticatedUser): NonNullable<HonoEnv["Variables"]["user"]> {
     return {
         uid: user.uid,
@@ -152,6 +164,7 @@ export function createAdapterCallerResolution(adapter: AuthAdapter): {
         if ("refused" in verdict) return refuse(c, verdict.refused);
         if (verdict.user) {
             c.set("user", requestUserOf(verdict.user));
+            setAdapterScopes(c, verdict.user);
             return next();
         }
         if (c.req.header("authorization") !== undefined) {
@@ -198,6 +211,7 @@ driver });
         if (authenticatedUser) {
             // Authenticated — set user context and scope driver
             c.set("user", requestUserOf(authenticatedUser));
+            setAdapterScopes(c, authenticatedUser);
             try {
                 c.set("driver", await scopeDataDriver(driver, {
                     uid: authenticatedUser.uid,
