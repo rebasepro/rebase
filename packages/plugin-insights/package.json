@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/plugin-insights",
-  "version": "0.38.0",
+  "version": "0.38.1",
   "description": "KPI tiles and charts for the admin panel of Rebase, the open-source Postgres BaaS: useInsightData loads each figure once per signed-in user and shares it.",
   "keywords": [
     "rebase",

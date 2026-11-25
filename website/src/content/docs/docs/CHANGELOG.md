@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.38.1] - 2026-11-25
+
 ### Fixed
 
 - **The admin routes hear the scopes an auth adapter returns.** When an adapter's `verifyRequest` answered a user with `scopes`, `verifyCredential` and, since 0.37.0, the WebSocket used them, but the HTTP caller resolution dropped them and judged the admin routes by the user's roles alone. So an adapter that granted `logs:read` or `schema:read` to a role other than `admin` saw Studio's Logs and API views refused with `SCOPE_MISSING`, and one that narrowed an `admin` session still had every scope on those routes. The request now carries them, as it does for API keys and platform tokens.

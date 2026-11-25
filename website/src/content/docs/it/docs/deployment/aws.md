@@ -1,5 +1,5 @@
 ---
-sourceHash: a9c2c31f7de0499c
+sourceHash: 14f33a0add4e9f92
 title: Distribuzione di Rebase su AWS
 description: Distribuisci la tua istanza Rebase in modo sicuro su Amazon Web Services utilizzando RDS e AWS App Runner con una forte attenzione all'Europa.
 sidebar_label: AWS
@@ -35,7 +35,7 @@ rebase build
 Per App Runner, che effettua il pull da un registry, incorpora il bundle in un'immagine derivata. Si tratta di tre righe e fissa con precisione ciò che viene eseguito:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.38.0
+FROM rebasepro/server:0.38.1
 COPY dist-bundle /bundle
 ```
 

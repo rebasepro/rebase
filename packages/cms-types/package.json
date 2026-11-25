@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/cms-types",
-  "version": "0.38.0",
+  "version": "0.38.1",
   "description": "Type definitions for the admin panel (CMS and Studio) of Rebase, the open-source Postgres BaaS",
   "keywords": [
     "rebase",

@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/mcp",
-  "version": "0.38.0",
+  "version": "0.38.1",
   "description": "Model Context Protocol server for Rebase, the open-source Postgres BaaS — schema, database, document and user tools for AI agents.",
   "keywords": [
     "rebase",

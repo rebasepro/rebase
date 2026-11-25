@@ -1,5 +1,5 @@
 ---
-sourceHash: 8ee08febacd52a0b
+sourceHash: af88a900323a0f86
 title: Applications et dépôts
 sidebar_label: Applications & Dépôts
 description: Un projet est un backend plus les applications qui communiquent avec lui, chacune pouvant vivre dans son propre dépôt.
@@ -492,7 +492,7 @@ indicateur de version ne révèle rien sur le schéma qu'il représente :
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.38.0","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.38.1","contract":1}}
 ```
 
 Comparer les deux dans la CI transforme une incompatibilité silencieuse en une vérification échouée. L'indicateur

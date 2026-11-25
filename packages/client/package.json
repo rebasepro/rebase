@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/client",
-  "version": "0.38.0",
+  "version": "0.38.1",
   "description": "Typed TypeScript SDK for Rebase, the open-source Postgres BaaS — CRUD, auth, storage and realtime",
   "keywords": [
     "rebase",

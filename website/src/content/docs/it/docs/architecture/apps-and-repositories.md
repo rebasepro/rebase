@@ -1,5 +1,5 @@
 ---
-sourceHash: 8ee08febacd52a0b
+sourceHash: af88a900323a0f86
 title: App e repository
 sidebar_label: App e repository
 description: Un progetto è un backend insieme alle app che comunicano con esso, ciascuna delle quali può risiedere nel proprio repository.
@@ -503,7 +503,7 @@ di versione non rivela nulla sullo schema che rappresenta:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.38.0","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.38.1","contract":1}}
 ```
 
 Il confronto dei due in CI trasforma una discrepanza silenziosa in un controllo
