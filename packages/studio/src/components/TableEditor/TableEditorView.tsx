@@ -105,7 +105,7 @@ export function TableEditorView() {
             setTables(list);
             return list;
         } catch (err: unknown) {
-            setFailure(classifyLoadFailure(err));
+            setFailure(classifyLoadFailure(err, { toolLevel: true }));
             return null;
         } finally {
             setLoading(false);

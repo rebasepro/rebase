@@ -114,7 +114,7 @@ export function WebhooksView() {
             const arr = isRecord(raw) && Array.isArray(raw.webhooks) ? raw.webhooks : [];
             setWebhooks(arr.map(parseWebhook).filter((w): w is WebhookRow => w !== null));
         } catch (err: unknown) {
-            setFailure(classifyLoadFailure(err));
+            setFailure(classifyLoadFailure(err, { toolLevel: true }));
         } finally {
             setLoading(false);
         }

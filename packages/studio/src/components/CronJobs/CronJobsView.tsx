@@ -176,7 +176,7 @@ function CronSchedulerMonitorView() {
                 // about a project whose crons the caller may not read. This
                 // view polls every 15s, so the toast is also gone long before
                 // anyone looks.
-                if (!cancelled) setFailure(classifyLoadFailure(e));
+                if (!cancelled) setFailure(classifyLoadFailure(e, { toolLevel: true }));
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -252,7 +252,7 @@ function CronSchedulerMonitorView() {
             // held — or nothing — after a failed refresh. "No cron jobs" and
             // "could not read the cron jobs" are not the same statement, so the
             // reason stays on screen rather than passing through a snackbar.
-            setFailure(classifyLoadFailure(e));
+            setFailure(classifyLoadFailure(e, { toolLevel: true }));
         }
     }
 

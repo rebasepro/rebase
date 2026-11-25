@@ -136,6 +136,14 @@ describe("a failure that is not a refusal is still a failure", () => {
 
 describe("an empty list is still empty", () => {
 
+    it("Backups says a server without the backups API does not offer it", async () => {
+        listBackups.mockRejectedValue(Object.assign(new Error("Not found"), { status: 404 }));
+        render(<BackupsView/>);
+
+        expect(await screen.findByText(translate("studio_tool_not_offered_title"))).toBeTruthy();
+        expect(screen.queryByText(translate("studio_backups_read_failed"))).toBeNull();
+    });
+
     it("Backups shows the ordinary empty state when the call succeeds", async () => {
         listBackups.mockResolvedValue({ backups: [], destinationKind: "local", configured: true });
         render(<BackupsView/>);
@@ -180,6 +188,21 @@ describe("a job's executions that could not be read", () => {
 
         expect(await screen.findByText(translate("studio_cron_logs_read_failed"))).toBeTruthy();
         expect(screen.queryByText("No executions yet")).toBeNull();
+    });
+
+    it("reads a 404 for one job's runs as that job gone, not the cron tool missing", async () => {
+        // The cron API is there: it just listed the job. A 404 on its runs is
+        // about the job, so the pane keeps "could not read" — not "Not
+        // available on this server".
+        listJobs.mockResolvedValue({ jobs: [nightly] });
+        getJobLogs.mockRejectedValue(Object.assign(new Error("Job 'nightly' not found"), { status: 404 }));
+        render(<CronJobsView/>);
+
+        fireEvent.click(await screen.findByText("Nightly cleanup"));
+
+        expect(await screen.findByText(translate("studio_cron_logs_read_failed"))).toBeTruthy();
+        expect(screen.getByText("Job 'nightly' not found")).toBeTruthy();
+        expect(screen.queryByText(translate("studio_tool_not_offered_title"))).toBeNull();
     });
 
     it("still says there are none when there are none", async () => {

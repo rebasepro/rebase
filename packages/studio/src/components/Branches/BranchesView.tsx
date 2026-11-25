@@ -104,7 +104,7 @@ export function BranchesView() {
             // "No branches yet. Create one…" over a refused listing invites the
             // reader to create a branch they are not allowed to see, and then
             // hides the one they already have.
-            setFailure(classifyLoadFailure(e));
+            setFailure(classifyLoadFailure(e, { toolLevel: true }));
         } finally {
             setLoading(false);
         }

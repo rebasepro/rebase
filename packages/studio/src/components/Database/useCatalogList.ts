@@ -21,7 +21,7 @@ export function useCatalogList<T>(path: string, key: string, parse: (raw: unknow
             const list = isRecord(raw) && Array.isArray(raw[key]) ? raw[key] : [];
             setItems(list.map(parse).filter((item): item is T => item !== null));
         } catch (err: unknown) {
-            setFailure(classifyLoadFailure(err));
+            setFailure(classifyLoadFailure(err, { toolLevel: true }));
         }
     }, [requestJson, sourcePath, path, key, parse]);
 

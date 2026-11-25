@@ -235,7 +235,7 @@ function KeysPane({
                 setPersonalOff(true);
                 setFailure(null);
             } else {
-                setFailure(classifyLoadFailure(e));
+                setFailure(classifyLoadFailure(e, { toolLevel: true }));
             }
         } finally {
             setLoading(false);

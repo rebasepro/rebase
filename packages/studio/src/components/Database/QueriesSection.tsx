@@ -79,7 +79,7 @@ export function QueriesSection() {
                 rows: asNumber(row.rows)
             })) : []);
         } catch (err: unknown) {
-            setFailure(classifyLoadFailure(err));
+            setFailure(classifyLoadFailure(err, { toolLevel: true }));
         } finally {
             setLoading(false);
         }

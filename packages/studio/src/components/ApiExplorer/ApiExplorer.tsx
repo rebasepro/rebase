@@ -69,7 +69,7 @@ export function ApiExplorer() {
                 }
             } catch (err: unknown) {
                 if (!cancelled) {
-                    setFailure(classifyLoadFailure(err));
+                    setFailure(classifyLoadFailure(err, { toolLevel: true }));
                     setFailedStatus(err instanceof AdminRequestError ? err.status : null);
                     setLoading(false);
                 }

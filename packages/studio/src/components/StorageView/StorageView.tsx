@@ -831,7 +831,9 @@ const StorageFilesBrowser = () => {
             // A refusal from the project's own `storageAuthorize` hook is not a
             // fault — see `load-failure.ts`. Rendering both the same way told
             // a customer with a working project that their storage was broken.
-            setFailure(classifyLoadFailure(e));
+            // The root listing stands for the tool; a 404 inside a folder is
+            // about that folder, and stays a failure to read.
+            setFailure(classifyLoadFailure(e, { toolLevel: !path }));
         } finally {
             if (isCurrent()) setLoading(false);
         }

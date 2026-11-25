@@ -83,7 +83,7 @@ export function ActivitySection() {
             setSessions(list.map(parseSession).filter((session): session is Session => session !== null));
             setFailure(null);
         } catch (err: unknown) {
-            setFailure(classifyLoadFailure(err));
+            setFailure(classifyLoadFailure(err, { toolLevel: true }));
         } finally {
             inFlight.current = false;
         }

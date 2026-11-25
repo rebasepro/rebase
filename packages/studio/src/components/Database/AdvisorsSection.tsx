@@ -99,7 +99,7 @@ export function AdvisorsSection({ onCount }: { onCount?: (count: number) => void
                 : []);
             setDegraded(isRecord(raw) ? asStringArray(raw.degraded) : []);
         } catch (err: unknown) {
-            setFailure(classifyLoadFailure(err));
+            setFailure(classifyLoadFailure(err, { toolLevel: true }));
         } finally {
             setLoading(false);
         }

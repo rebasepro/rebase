@@ -150,7 +150,7 @@ async function failureMessage(resp: { status: number; json?: () => Promise<unkno
  * does not serve logs (404, or 501 from the admin gate), or a failure to read.
  */
 async function responseFailure(resp: { status: number; json?: () => Promise<unknown> }): Promise<LoadFailure> {
-    return classifyLoadFailure(new AdminRequestError(await failureMessage(resp), resp.status));
+    return classifyLoadFailure(new AdminRequestError(await failureMessage(resp), resp.status), { toolLevel: true });
 }
 
 export interface LogTail {

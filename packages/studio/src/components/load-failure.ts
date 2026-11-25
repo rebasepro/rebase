@@ -36,6 +36,11 @@
  * this server instead of putting "Not found" in red over an empty list that
  * still offers to create things.
  *
+ * Only the call that stands for the tool may read a 404 that way: a pane's
+ * own listing or a Database section's read, passed `{ toolLevel: true }`. A
+ * 404 from a route about one item — a branch's diff, one cron job's runs — is
+ * that item gone, and the default keeps it a failure to read, with Retry.
+ *
  * The view that renders one of these is `load-failure-view.tsx`. It is a
  * separate file so that this classifier — the part with the rules in it — can
  * be tested without dragging in `@rebasepro/app` and, behind it, react-router.
@@ -78,17 +83,27 @@ export function isBareNotFound(detail: string): boolean {
     return BARE_NOT_FOUND.test(detail.trim());
 }
 
-export function classifyLoadFailure(err: unknown): LoadFailure {
+export interface ClassifyOptions {
+    /**
+     * The request is the tool's own listing — the one whose route is the
+     * tool's API — so a 404 or 501 means the server does not offer the tool.
+     * Off by default: from a per-item route a 404 is the item, not the tool.
+     */
+    toolLevel?: boolean;
+}
+
+export function classifyLoadFailure(err: unknown, options: ClassifyOptions = {}): LoadFailure {
     const detail = err instanceof Error ? err.message : String(err);
     const status = statusOf(err);
 
-    // 404 and 501 are the server saying it has no such API: a backend that
-    // leaves the tool out, or one that has not configured it. Without a status,
-    // only a message that is "Not found" and nothing else counts — "No row
-    // DJBH" or "Bucket not found" are about a resource, not the route.
-    const notOffered = status !== null
+    // From the tool's own listing, 404 and 501 are the server saying it has no
+    // such API: a backend that leaves the tool out, or one that has not
+    // configured it. Without a status, only a message that is "Not found" and
+    // nothing else counts — "No row DJBH" or "Bucket not found" are about a
+    // resource, not the route.
+    const notOffered = options.toolLevel === true && (status !== null
         ? status === 404 || status === 501
-        : isBareNotFound(detail);
+        : isBareNotFound(detail));
     if (notOffered) return { kind: "not_offered", detail, retryable: false };
 
     // 403 is the rule's answer, and the only status that is. A 401 is the
