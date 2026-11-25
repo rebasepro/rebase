@@ -639,7 +639,7 @@ Gated — needs `schema:read`: an admin, the service key, or an API key holding 
 ```json
 {
   "schemaVersion": "a1b2c3…",
-  "runtime": { "version": "0.36.0", "contract": 1 },
+  "runtime": { "version": "0.37.0", "contract": 1 },
   "tables": [ "…TableDescriptor[], as GET /api/schema/tables serves an administrator…" ]
 }
 ```

@@ -1,5 +1,5 @@
 ---
-sourceHash: a66729d3b9ef84ff
+sourceHash: ff7c7bfb22c875e0
 title: Autoalojamiento
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial del runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS estándar.
@@ -84,7 +84,7 @@ Dado que ya están allí, puedes montar el bundle en modo solo lectura; vale la 
 Para un despliegue real, es preferible empaquetar ambos dentro de una imagen, lo que también fija con exactitud lo que se ejecuta:
 
 ```dockerfile
-FROM rebasepro/server:0.36.0
+FROM rebasepro/server:0.37.0
 COPY dist-bundle /bundle
 ```
 
@@ -201,7 +201,7 @@ El runtime es un contenedor ordinario que escucha en `$PORT`, por lo que cualqui
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.36.0 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.37.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -329,7 +329,7 @@ Todo lo anterior consiste en un único contenedor que sirve todo el proyecto, qu
 ## Actualización
 
 ```yaml
-image: rebasepro/server:0.36.0
+image: rebasepro/server:0.37.0
 ```
 
 Reinicia. Tu bundle no cambia. Dentro de una misma versión principal del contrato del runtime, un bundle que haya sido validado seguirá funcionando; consulta [Compatibility](/docs/architecture/runtime-and-bundles/#compatibility).

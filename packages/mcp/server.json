@@ -9,12 +9,12 @@
     "source": "github",
     "subfolder": "packages/mcp"
   },
-  "version": "0.36.0",
+  "version": "0.37.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@rebasepro/mcp",
-      "version": "0.36.0",
+      "version": "0.37.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

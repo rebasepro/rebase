@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/types",
-  "version": "0.36.0",
+  "version": "0.37.0",
   "description": "Shared type definitions for Rebase, the open-source Postgres BaaS",
   "keywords": [
     "rebase",

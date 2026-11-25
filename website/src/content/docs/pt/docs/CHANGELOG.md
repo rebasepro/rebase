@@ -11,6 +11,8 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-25
+
 ### Added
 
 - **Skills over MCP.** A backend can serve [Agent Skills](https://agentskills.io/specification) on its `/mcp` endpoint, through the MCP skills extension (`io.modelcontextprotocol/skills`, SEP-2640). `mcp: { skills: "./skills" }` names a folder of skill folders, each holding a `SKILL.md` and the files it links to. A client on protocol revision 2026-07-28 or later (Claude Code, Claude) lists them with `skills/list` and loads one when it needs it. Claude Code names each one `<connector>:<skill>`. Each entry carries a SHA-256 manifest of its files. A file that changed on disk since the server read it is refused, not served against a manifest it no longer matches. A skill that breaks a rule is left out and the boot log says why. The rules: no frontmatter, a name that is not its folder's, a symlink inside, or over 512 files or 16 MiB. Every authenticated connection can read the skills, whatever its scopes. `mcp.tools`, `mcp.scopes` and `mcp.instructions` are now optional, so `skills` can be given on its own beside the data tools.

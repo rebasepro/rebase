@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/cli",
-  "version": "0.36.0",
+  "version": "0.37.0",
   "description": "CLI for Rebase, the open-source Postgres BaaS — scaffold, run, migrate and deploy a Postgres backend",
   "keywords": [
     "cli",
