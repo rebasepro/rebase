@@ -1,11 +1,3 @@
 {
-  "open": {
-    "ci:rebase:main": {
-      "title": "CI main 54edaaa: e2e-admin focus-ring.spec.ts:81 'collection list draws whole rings' fails (clipped focus rings; 87 other admin tests pass). Head commit only touched changelogs; likely from UI layout commits since green 401d0ed: 3294a6b (admin frame no longer scrolls as whole), b1846a3 (collection toolbar narrow widths), eafa7cf (filter preset chips). Fix needs browser repro; no PR.",
-      "firstSeen": "2026-11-25T11:33:46Z",
-      "lastSeen": "2026-11-25T11:33:46Z",
-      "pagedAt": null,
-      "pr": null
-    }
-  }
+  "open": {}
 }
