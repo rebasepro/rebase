@@ -205,6 +205,50 @@ export interface RebaseTranslations {
     rls_simulate_access: string;
     /** What the simulator does, at the top of its popover */
     rls_simulate_access_description: string;
+    /** The "Connect AI" button in the drawer: the app's MCP server */
+    mcp_connect: string;
+    /** Heading of the Connect AI popover */
+    mcp_connect_title: string;
+    /** What connecting an AI agent does, under the heading */
+    mcp_connect_description: string;
+    /** Connect AI tab for any other MCP client */
+    mcp_connect_tab_other: string;
+    /** Under the `claude mcp add` command */
+    mcp_connect_claude_code_hint: string;
+    /** One-click install button for an editor; {{client}} is its name */
+    mcp_connect_add_to: string;
+    /** Under the Add to Cursor button */
+    mcp_connect_cursor_hint: string;
+    /** Under the Add to VS Code button */
+    mcp_connect_vscode_hint: string;
+    /** How to add the URL as a connector in Claude */
+    mcp_connect_claude_steps: string;
+    /** Link to Claude's connector settings */
+    mcp_connect_open_claude: string;
+    /** How to add the URL as a connector in ChatGPT */
+    mcp_connect_chatgpt_steps: string;
+    /** Under the generic mcpServers configuration */
+    mcp_connect_other_hint: string;
+    /** On localhost: why Claude and ChatGPT are not offered */
+    mcp_connect_remote_only_local: string;
+    /** Heading of the list of agents this person connected */
+    mcp_connected_agents: string;
+    /** The list of connected agents is empty */
+    mcp_no_connected_agents: string;
+    /** Revoke one connected agent */
+    mcp_disconnect: string;
+    /** After a disconnect: an issued access token lasts up to an hour */
+    mcp_disconnected_note: string;
+    /** The connected agents could not be loaded; {{message}} is why */
+    mcp_grants_error: string;
+    /** Shown to an administrator while /mcp is off */
+    mcp_off_title: string;
+    /** Why an administrator would turn /mcp on */
+    mcp_off_description: string;
+    /** How to turn /mcp on under rebase dev */
+    mcp_off_local: string;
+    /** Before the variables that turn /mcp on for a deployment */
+    mcp_off_deployed: string;
     /** Simulator tab: simulate a role */
     rls_simulate_tab_role: string;
     /** Simulator tab: simulate an existing user */

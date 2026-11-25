@@ -27,3 +27,4 @@ export * from "./RebaseAuth";
 export * from "./SchemaDriftBanner";
 export * from "./ConnectionLostBanner";
 export * from "./studio/RlsSimulatorBar";
+export * from "./mcp/McpConnectButton";

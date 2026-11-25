@@ -2,7 +2,7 @@
 import React from "react";
 
 import { Link, useNavigate } from "react-router";
-import { RebaseLogo, LanguageToggle, RlsSimulatorBar } from "@rebasepro/app";
+import { RebaseLogo, LanguageToggle, McpConnectButton, RlsSimulatorBar } from "@rebasepro/app";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import {
     Avatar,
@@ -242,6 +242,7 @@ export const DefaultAppBar = function DefaultAppBar({
 
             {/* On a large layout the drawer is always on screen and carries
                 this control; one per screen. */}
+            {!(hasDrawer && largeLayout) && <McpConnectButton compact/>}
             {!(hasDrawer && largeLayout) && <RlsSimulatorBar/>}
 
             {includeLanguageToggle && <LanguageToggle/>}

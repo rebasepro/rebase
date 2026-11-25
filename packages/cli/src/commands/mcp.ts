@@ -26,6 +26,20 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
+import {
+    CLAUDE_CONNECTORS_URL,
+    claudeCodeAddArgs,
+    claudeCodeAddCommand,
+    cursorInstallLink,
+    defaultMcpServerName,
+    genericMcpConfig,
+    isLoopbackUrl,
+    MCP_CLIENT_KEYS,
+    MCP_METADATA_PATH,
+    mcpUrlFromMetadata,
+    vscodeInstallLink,
+    type McpClientKey
+} from "@rebasepro/common";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 import { findProjectRoot, readEnvFile } from "../utils/project";
@@ -37,15 +51,9 @@ import { note, noteBlank, printGroupHelp, type HelpAction } from "./cloud/contex
 /** Everything the switch below dispatches, for the did-you-mean. */
 export const MCP_SUBCOMMANDS = ["connect", "url"] as const;
 
-/** Where a Rebase server publishes what `/mcp` is (RFC 9728). */
-export const MCP_METADATA_PATH = "/.well-known/oauth-protected-resource/mcp";
-
 /* ═══════════════════════════════════════════════════════════════
    Clients
    ═══════════════════════════════════════════════════════════════ */
-
-export const MCP_CLIENT_KEYS = ["claude-code", "cursor", "vscode", "claude", "chatgpt"] as const;
-export type McpClientKey = typeof MCP_CLIENT_KEYS[number];
 
 interface McpClient {
     label: string;
@@ -59,6 +67,9 @@ interface McpClient {
      */
     remoteOnly: boolean;
 }
+
+// Re-exported for the tests and for callers that read the CLI's surface.
+export { cursorInstallLink, isLoopbackUrl, MCP_CLIENT_KEYS, MCP_METADATA_PATH, mcpUrlFromMetadata, vscodeInstallLink, type McpClientKey };
 
 export const MCP_CLIENTS: Record<McpClientKey, McpClient> = {
     "claude-code": { label: "Claude Code", homeMarkers: [".claude"], bin: "claude", remoteOnly: false },
@@ -83,22 +94,6 @@ export type ConnectStep =
     /** This client cannot reach this server, and why. */
     | { kind: "unreachable"; reason: string };
 
-/** `cursor://…/mcp/install`, Cursor's one-click install link. */
-export function cursorInstallLink(name: string, mcpUrl: string): string {
-    const config = Buffer.from(JSON.stringify({ url: mcpUrl }), "utf-8").toString("base64");
-    return `cursor://anysphere.cursor-deeplink/mcp/install?name=${encodeURIComponent(name)}&config=${encodeURIComponent(config)}`;
-}
-
-/** `vscode:mcp/install?…`, VS Code's one-click install link. */
-export function vscodeInstallLink(name: string, mcpUrl: string): string {
-    return `vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name, type: "http", url: mcpUrl }))}`;
-}
-
-/** The `mcpServers` entry any other client takes. */
-export function genericMcpConfig(name: string, mcpUrl: string): { mcpServers: Record<string, { url: string }> } {
-    return { mcpServers: { [name]: { url: mcpUrl } } };
-}
-
 export function connectStep(client: McpClientKey, name: string, mcpUrl: string): ConnectStep {
     if (MCP_CLIENTS[client].remoteOnly && isLoopbackUrl(mcpUrl)) {
         return {
@@ -109,7 +104,7 @@ export function connectStep(client: McpClientKey, name: string, mcpUrl: string):
     }
     switch (client) {
         case "claude-code":
-            return { kind: "run", command: "claude", args: ["mcp", "add", "--transport", "http", name, mcpUrl] };
+            return { kind: "run", command: "claude", args: claudeCodeAddArgs(name, mcpUrl) };
         case "cursor":
             return { kind: "open", url: cursorInstallLink(name, mcpUrl) };
         case "vscode":
@@ -117,7 +112,7 @@ export function connectStep(client: McpClientKey, name: string, mcpUrl: string):
         case "claude":
             return {
                 kind: "steps",
-                url: "https://claude.ai/settings/connectors",
+                url: CLAUDE_CONNECTORS_URL,
                 lines: ["In Claude, open Settings → Connectors.", "Add custom connector, and paste the URL.", "Sign in when Claude asks."]
             };
         case "chatgpt":
@@ -131,49 +126,6 @@ export function connectStep(client: McpClientKey, name: string, mcpUrl: string):
 /* ═══════════════════════════════════════════════════════════════
    Where /mcp is
    ═══════════════════════════════════════════════════════════════ */
-
-/** localhost, *.localhost, 127.0.0.0/8, ::1 and 0.0.0.0 — what a vendor's servers cannot reach. */
-export function isLoopbackUrl(url: string): boolean {
-    let host: string;
-    try {
-        host = new URL(url).hostname.toLowerCase();
-    } catch {
-        return false;
-    }
-    return host === "localhost" || host.endsWith(".localhost") || host === "[::1]" || host === "::1"
-        || host === "0.0.0.0" || /^127\.\d+\.\d+\.\d+$/.test(host);
-}
-
-/** The `resource` of a protected-resource document, when it is one. */
-export function mcpUrlFromMetadata(body: unknown): string | undefined {
-    if (typeof body !== "object" || body === null || Array.isArray(body)) return undefined;
-    const resource: unknown = Reflect.get(body, "resource");
-    if (typeof resource !== "string") return undefined;
-    try {
-        const parsed = new URL(resource);
-        return parsed.protocol === "http:" || parsed.protocol === "https:" ? resource : undefined;
-    } catch {
-        return undefined;
-    }
-}
-
-/**
- * The name the server is registered under in each client.
- *
- * Never `rebase`: that is the `@rebasepro/mcp` server in the project's
- * `.mcp.json`, and a server registered under the same name in a narrower scope
- * hides it. The project's package name, with `-local` for a dev server, so the
- * local and the deployed project can both be connected.
- */
-export function defaultServerName(projectName: string | undefined, mcpUrl: string): string {
-    const slug = (projectName ?? "")
-        .replace(/^@[^/]+\//, "")
-        .toLowerCase()
-        .replace(/[^a-z0-9-]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-    const base = !slug || slug === "rebase" ? "rebase-app" : slug;
-    return isLoopbackUrl(mcpUrl) ? `${base}-local` : base;
-}
 
 function projectName(projectRoot: string | null): string | undefined {
     if (!projectRoot) return undefined;
@@ -414,7 +366,7 @@ function printEverything(name: string, mcpUrl: string): void {
     const local = isLoopbackUrl(mcpUrl);
     console.log(`  ${chalk.bold("MCP URL")}       ${chalk.cyan(mcpUrl)}`);
     noteBlank();
-    console.log(`  ${chalk.bold("Claude Code")}   ${chalk.cyan(`claude mcp add --transport http ${name} ${mcpUrl}`)}`);
+    console.log(`  ${chalk.bold("Claude Code")}   ${chalk.cyan(claudeCodeAddCommand(name, mcpUrl))}`);
     console.log(`  ${chalk.bold("Cursor")}        ${chalk.gray(cursorInstallLink(name, mcpUrl))}`);
     console.log(`  ${chalk.bold("VS Code")}       ${chalk.gray(vscodeInstallLink(name, mcpUrl))}`);
     if (!local) console.log(`  ${chalk.bold("Claude, ChatGPT")} ${chalk.gray("Settings → Connectors → add a custom connector with the URL above")}`);
@@ -432,7 +384,7 @@ async function connect(rawArgs: string[]): Promise<void> {
     const named = flags["--client"] !== undefined ? parsedLine(() => parseClientList(flags["--client"] ?? "")) : undefined;
     const server = resolveServer(flags);
     const mcpUrl = await discoverMcpUrl(server);
-    const name = flags["--name"]?.trim() || defaultServerName(projectName(server.projectRoot), mcpUrl);
+    const name = flags["--name"]?.trim() || defaultMcpServerName(projectName(server.projectRoot), mcpUrl);
 
     // Nobody to ask, and nothing named: hand over everything, refuse nothing.
     const interactive = process.stdin.isTTY === true && process.stdout.isTTY === true && !isJsonMode();

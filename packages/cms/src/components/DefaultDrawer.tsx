@@ -32,7 +32,7 @@ import {
 } from "@rebasepro/ui";
 import { DrawerNavigationGroup } from "./DrawerNavigationGroup";
 import { DrawerExpansionContext, useDrawerExpansion } from "./drawer_expansion";
-import { LanguageToggle, RebaseLogo, RlsSimulatorBar, useCanSimulateAccess } from "@rebasepro/app";
+import { LanguageToggle, McpConnectButton, RebaseLogo, RlsSimulatorBar, useCanConnectMcp, useCanSimulateAccess } from "@rebasepro/app";
 import { useApp } from "./app/useApp";
 import { BrandLogo } from "./BrandLogo";
 
@@ -508,6 +508,7 @@ export function DrawerFooterActions({
     const isFloating = drawerHovered && !drawerOpen;
     const portalRef = React.useRef<HTMLDivElement>(null);
     const canSimulateAccess = useCanSimulateAccess();
+    const canConnectMcp = useCanConnectMcp();
 
     // User avatar
     let avatarComponent: React.ReactElement | null;
@@ -526,6 +527,20 @@ export function DrawerFooterActions({
 
     return (
         <div className="shrink-0 pt-2 pb-0" ref={portalRef}>
+            {/* The app's MCP server, for AI agents. An icon on the collapsed rail,
+                the pill when expanded, and no row while there is nothing to
+                connect to. */}
+            {canConnectMcp && (
+                <div className="flex items-center px-[16px] py-1">
+                    <div className={cls("flex", { "w-[44px] justify-center": !showFullContent })}>
+                        <McpConnectButton
+                            compact={!showFullContent}
+                            side="right"
+                            align="end"
+                            portalContainer={portalRef.current}/>
+                    </div>
+                </div>
+            )}
             {/* The RLS simulator: an icon on the collapsed rail, the pill when expanded. */}
             {canSimulateAccess && (
                 <div className="flex items-center px-[16px] py-1">

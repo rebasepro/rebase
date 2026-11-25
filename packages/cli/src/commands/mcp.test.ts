@@ -13,10 +13,10 @@ import os from "os";
 import path from "path";
 import { spawn } from "child_process";
 
+import { defaultMcpServerName as defaultServerName } from "@rebasepro/common";
 import {
     connectStep,
     cursorInstallLink,
-    defaultServerName,
     detectedClients,
     isLoopbackUrl,
     linkOpener,

@@ -141,6 +141,7 @@ export {
     PencilIcon,
     PhoneIcon,
     PinIcon,
+    PlugIcon,
     PlayIcon,
     PlusIcon,
     PowerIcon,
