@@ -107,6 +107,19 @@ function fitCount(chips: number[], overflow: number, available: number): number 
     return chips.length;
 }
 
+/**
+ * The room left at the end of `parent` after its last child — what `element`
+ * could still grow into. The chips are sized to what they show, so the room
+ * they have is their own width plus this, not their width alone.
+ */
+function freeSpaceAfter(element: HTMLElement, parent: HTMLElement | null): number {
+    if (!parent) return 0;
+    const last = parent.lastElementChild;
+    if (!last) return 0;
+    const marginEnd = last === element ? 0 : parseFloat(getComputedStyle(last).marginRight) || 0;
+    return Math.max(0, parent.getBoundingClientRect().right - last.getBoundingClientRect().right - marginEnd);
+}
+
 // ─── Overflow Menu ──────────────────────────────────────────────────
 
 interface OverflowMenuProps {
@@ -293,12 +306,14 @@ export function FilterPresetsButton<M extends Record<string, unknown>>({
         const wrapper = wrapperRef.current;
         const measure = measureRef.current;
         if (!wrapper || !measure) return undefined;
+        const parent = wrapper.parentElement;
         const read = () => {
             // The measuring row holds every chip, then a "+N" trigger, then
-            // the folded trigger.
-            const widths = Array.from(measure.children).map(c => (c as HTMLElement).offsetWidth);
+            // the folded trigger. Fractional widths, so a sum of them is not
+            // a pixel short and the last chip clipped.
+            const widths = Array.from(measure.children).map(c => c.getBoundingClientRect().width);
             const next = {
-                available: wrapper.clientWidth,
+                available: Math.floor(wrapper.getBoundingClientRect().width + freeSpaceAfter(wrapper, parent)),
                 chips: widths.slice(0, -2),
                 overflow: widths[widths.length - 2] ?? 0,
                 folded: widths[widths.length - 1] ?? 0
@@ -316,9 +331,12 @@ export function FilterPresetsButton<M extends Record<string, unknown>>({
         if (typeof ResizeObserver === "undefined") return undefined;
         // The wrapper for the room, the measuring row for the chips — which
         // change width when the labels do, or when the font finishes loading.
+        // The group around it too: the wrapper is only as wide as what it
+        // shows, so the room growing reaches it only through its parent.
         const observer = new ResizeObserver(read);
         observer.observe(wrapper);
         observer.observe(measure);
+        if (parent) observer.observe(parent);
         return () => observer.disconnect();
     }, [measureKey]);
 
@@ -333,8 +351,12 @@ export function FilterPresetsButton<M extends Record<string, unknown>>({
     // Before the first measurement, every chip: the layout effect runs again
     // before paint and narrows it.
     const visibleCount = fit ? fitCount(fit.chips, fit.overflow, fit.available) : filterPresets.length;
-    const naturalWidth = fit
-        ? fit.chips.reduce((sum, w, i) => sum + w + (i > 0 ? CHIP_GAP : 0), 0)
+    // As wide as what is shown, and no wider: the room left over goes after
+    // the controls that follow (the count), not into a gap before them.
+    const shownWidth = fit
+        ? Math.ceil(
+            fit.chips.slice(0, visibleCount).reduce((sum, w, i) => sum + w + (i > 0 ? CHIP_GAP : 0), 0)
+            + (visibleCount > 0 && visibleCount < fit.chips.length ? CHIP_GAP + fit.overflow : 0))
         : undefined;
 
     return (
@@ -342,10 +364,11 @@ export function FilterPresetsButton<M extends Record<string, unknown>>({
             ref={wrapperRef}
             // `width: 0` with `flex-grow`: the chips add nothing to the
             // toolbar's width (which would only make it scroll), and take the
-            // room it has, up to what they all need. Never narrower than the
-            // folded chip. py-0.5 gives the inset focus ring room inside the clip.
+            // room it has, up to what the chips shown need. Never narrower
+            // than the folded chip. py-0.5 gives the inset focus ring room
+            // inside the clip.
             className="relative flex items-center gap-1 grow shrink-0 overflow-hidden py-0.5"
-            style={{ width: 0, maxWidth: naturalWidth, minWidth: fit?.folded }}
+            style={{ width: 0, maxWidth: shownWidth, minWidth: fit ? Math.ceil(fit.folded) : undefined }}
         >
             {visibleCount === 0
                 ? <OverflowMenu
