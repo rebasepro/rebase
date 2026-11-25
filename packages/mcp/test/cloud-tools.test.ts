@@ -431,7 +431,45 @@ describe("running the cloud tools", () => {
         cliPrints(JSON.stringify({ deploymentId: "d1", status: "success", logs: "a\nb\nc\nd" }));
         const result = await call("rebase_cloud_logs", { source: "build", tail: 2 });
         expect(result.isError).toBeFalsy();
-        expect(result.content[0].text).toContain('"logs":"c\\nd"');
+        const text: string = result.content[0].text;
+        // A header without the log, then the lines as text.
+        expect(text).toContain('{"deploymentId":"d1","status":"success","logsLinesDropped":2}\n\nc\nd\n');
+    });
+
+    it("logs: a runtime read is a header, then one compact line per record", async () => {
+        const record = (pod: string, fields: Record<string, unknown>): string =>
+            `2026-11-24T14:30:32.999999999Z [rebase-backend-7d9f-${pod}] ${JSON.stringify(fields)}`;
+        cliPrints(JSON.stringify({
+            runtime: true,
+            preview: null,
+            logs: [
+                record("aaaaa", {
+                    severity: "WARNING", message: "request", timestamp: "2026-11-24T14:30:32.126Z", component: "http",
+                    method: "GET", path: "/api/x", route: "/api/x", status: 404, latencyMs: 16, requestId: "r-1"
+                }),
+                record("bbbbb", { severity: "INFO", message: "cron ran", timestamp: "2026-11-24T14:30:33.000Z", component: "cron", job: "nightly" }),
+                "2026-11-24T14:30:34.000000000Z [rebase-backend-7d9f-aaaaa] plain words"
+            ].join("\n"),
+            pods: [
+                { pod: "rebase-backend-7d9f-aaaaa", state: "ok", lines: 2, message: null, hint: null, truncated: false, restarts: 0, container: "app" },
+                { pod: "rebase-backend-7d9f-bbbbb", state: "ok", lines: 1, message: null, hint: null, truncated: false, restarts: 1, container: "app" }
+            ],
+            state: "ok",
+            message: null,
+            truncated: false,
+            nextSinceTime: "2026-11-24T14:30:34.000000000Z"
+        }));
+        const result = await call("rebase_cloud_logs", {});
+        const text: string = result.content[0].text;
+        expect(text).toContain(
+            '{"runtime":true,"preview":null,"pods":[{"pod":"rebase-backend-7d9f-aaaaa","state":"ok","lines":2,"restarts":0},' +
+            '{"pod":"rebase-backend-7d9f-bbbbb","state":"ok","lines":1,"restarts":1}],"state":"ok","message":null,"truncated":false,' +
+            '"nextSinceTime":"2026-11-24T14:30:34.000000000Z"}\n\n' +
+            "2026-11-24T14:30:32.126Z WARNING [aaaaa] [http] GET /api/x 404 16ms requestId=r-1\n" +
+            "2026-11-24T14:30:33.000Z INFO [bbbbb] [cron] cron ran job=nightly\n" +
+            "2026-11-24T14:30:34.000000000Z [aaaaa] plain words\n"
+        );
+        expect(text).not.toContain('\\"severity\\"');
     });
 
     it("logs: a filtered runtime read says what `tail` counted and whether the search was capped", async () => {

@@ -1,5 +1,5 @@
 ---
-sourceHash: 21c6a414fb5571e4
+sourceHash: 2455a5d25bcb60fd
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Die Befehlsgruppen für Rebase Cloud in der CLI – Auth, Projektverknüpfung, Deployments, Benachrichtigungen, Konfiguration, Organisationen, Datenbanken, Ressourcen, Compute, Speicher, Cluster, Abrechnung und Nutzung.
@@ -188,13 +188,14 @@ Siehe [Preview einer Änderung](/docs/deployment/cloud/#preview-a-change).
 
 `rebase cloud logs` gibt das neueste Build-Log aus, und `-f` verfolgt einen Build, der
 noch läuft. `--runtime` liest stattdessen aus, was die App ausgibt, und zwar von jedem Pod
-dahinter, wobei jede Zeile mit ihrem Pod gekennzeichnet ist:
+dahinter, wobei jede Zeile ihren Pod nennt, wenn mehr als einer geschrieben hat:
 
 ```bash
 rebase cloud logs --runtime -f                    # follow until Ctrl-C (exits 0)
 rebase cloud logs --runtime --since 15m --grep timeout
 rebase cloud logs --runtime -f --level error      # errors only
 rebase cloud logs --runtime --previous            # a restarted container's last run
+rebase cloud logs --runtime --raw
 ```
 
 - `--since` akzeptiert eine Zeitdauer (`30s`, `5m`, `1h`) oder eine RFC3339-Zeitangabe.
@@ -209,6 +210,7 @@ rebase cloud logs --runtime --previous            # a restarted container's last
 - `--level error|warn|info|debug` behält Zeilen mit diesem oder einem schwerwiegenderen Schweregrad bei. Es liest
   die strukturierte `severity`, die ein Rebase-Backend protokolliert, ein Level-Wort am Anfang einer
   Klartextzeile oder ein Fehlermuster wie `TypeError:`. Zeilen ohne solche Angaben werden ausgelassen.
+- Eine strukturierte Zeile wird lesbar ausgegeben: `14:30:32.126 WARN  [boot] Driver version skew …  fix="bump …"`, eine Anfrage als `GET /api/data/rooms/RCTF 404 16ms  requestId=…`. `--raw` gibt stattdessen jede Zeile so aus, wie der Pod sie geschrieben hat; Klartextzeilen bleiben in beiden Fällen unverändert, und `--json` enthält immer die Originalzeilen.
 
 Ein Follow fragt alle zwei Sekunden ab und gibt jede Zeile einmal aus. Es kündigt Pods an,
 die starten, stoppen oder neu starten. Wenn ein Container neu startet, werden auch die letzten

@@ -118,8 +118,30 @@ if (FETCH_MODE) {
     }
 }
 
-function log(message) {
-    console.log(`[entrypoint] ${message}`);
+/**
+ * One line of the entrypoint's output, in the runtime's own shape.
+ *
+ * The image runs with NODE_ENV=production, where every runtime line is a JSON
+ * record (`packages/server/src/utils/logger.ts`); the entrypoint printed plain
+ * `[entrypoint] …` text before it, so the first lines of every boot were the
+ * ones a severity filter could not see. Outside production (a local
+ * `docker run` with NODE_ENV overridden) it stays readable text.
+ */
+function record(severity, message, fields) {
+    if (process.env.NODE_ENV === "production") {
+        const line = JSON.stringify({ severity, message, timestamp: new Date().toISOString(), component: "entrypoint", ...fields });
+        (severity === "ERROR" ? process.stderr : process.stdout).write(line + "\n");
+    } else {
+        (severity === "INFO" ? console.log : console.error)(`[entrypoint] ${severity === "INFO" ? "" : severity + ": "}${message}`);
+    }
+}
+
+function log(message, fields) {
+    record("INFO", message, fields);
+}
+
+function warn(message, fields) {
+    record("WARNING", message, fields);
 }
 
 /**
@@ -133,8 +155,7 @@ function log(message) {
 let bundleDir = BUNDLE;
 
 function fail(message, hint) {
-    console.error(`[entrypoint] ${message}`);
-    if (hint) console.error(`[entrypoint] ${hint}`);
+    record("ERROR", message, hint ? { fix: hint } : undefined);
     process.exit(1);
 }
 
@@ -399,16 +420,17 @@ for (const pkg of (FETCH_MODE || ZERO_CODE_MODE) ? [] : RUNTIME_PROVIDED) {
         fs.symlinkSync(provided, inBundle, "dir");
         log(stat
             ? `deduped ${pkg} → the runtime's own copy`
-            : `linked ${pkg} → the runtime's own copy, so functions can import it`);
+            : `linked ${pkg} → the runtime's own copy, so functions can import it`, { package: pkg });
     } catch (err) {
         // Non-fatal on purpose: a project with no custom functions and no crons
         // is unaffected, and refusing to boot over it would turn a degraded
         // deploy into an outage. Loud, because the degradation is subtle — the
         // process is healthy either way, and only the boot log says which.
-        console.error(
-            `[entrypoint] WARNING: could not link ${pkg} into the bundle (${err.message}). ` +
+        warn(
+            `could not link ${pkg} into the bundle (${err.message}). ` +
             "Custom functions and cron jobs will fail to load with \"Cannot find package\", " +
-            "or — if the bundle carries its own copy — with \"server not initialized yet\"."
+            "or — if the bundle carries its own copy — with \"server not initialized yet\".",
+            { package: pkg }
         );
     }
 }

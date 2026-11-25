@@ -19,6 +19,7 @@
  * matches a pattern that rules out a flag or rides in a `--flag=value` form
  * that keeps it a value.
  */
+import { logReadBody } from "./log-lines.js";
 
 /** One property of a tool's input schema, the subset these tools use. */
 export interface PropertySchema {
@@ -407,6 +408,18 @@ export function withTailedLogs(value: unknown, count: number): unknown {
 }
 
 /**
+ * What `rebase_cloud_logs` hands the model: a one-line JSON header (pods,
+ * state, `nextSinceTime`, what was cut or filtered), then the log as text —
+ * a runtime log compact (`log-lines.ts`), a build log as it came. Null when
+ * the CLI printed something other than an object.
+ */
+export function cloudLogsBody(value: unknown, call: CloudCall): string | null {
+    const tailed = withTailedLogs(value, call.tailLines);
+    if (typeof tailed !== "object" || tailed === null || Array.isArray(tailed)) return null;
+    return logReadBody({ ...tailed }, { compact: call.argv.includes("--runtime") });
+}
+
+/**
  * The way forward after a refusal this server recognises, or null. Written
  * here, so it is trusted text; the CLI's own message stays fenced as untrusted
  * data beside it.
@@ -474,13 +487,17 @@ export function cloudSuccessNext(tool: CloudCommandTool, call: CloudCall): strin
                 ? "The deploy was triggered and not followed. rebase_cloud_status shows when it finishes; rebase_cloud_logs with " +
                     "`source: \"build\"` shows its build log."
                 : "The deploy finished. `live` says whether the new version answered; rebase_cloud_logs shows what it prints.";
-        case "rebase_cloud_logs":
-            if (!call.argv.includes("--runtime")) return "This is the latest deployment's build log.";
+        case "rebase_cloud_logs": {
+            if (!call.argv.includes("--runtime")) return "This is the latest deployment's build log: a JSON header, then its lines.";
+            const shape = "A JSON header (pods, state, nextSinceTime), then one line per log line: " +
+                "`<time> <SEVERITY> [<pod>] [<component>] <message> key=value…`, the pod only when several wrote, " +
+                "a request's message as `METHOD path status latency`.";
             return call.argv.some((a) => a.startsWith("--grep=") || a.startsWith("--level="))
-                ? "`tail` counted matching lines, searched across the window; `filter` says how many lines were searched and " +
+                ? `${shape} \`tail\` counted matching lines, searched across the window; \`filter\` says how many lines were searched and ` +
                     "matched. `filter.scanCapped: true` means older lines in the window were not searched. Pass `nextSinceTime` " +
                     "back as `since` to read only what came after."
-                : "Pass `nextSinceTime` back as `since` to read only what came after.";
+                : `${shape} Pass \`nextSinceTime\` back as \`since\` to read only what came after.`;
+        }
         case "rebase_cloud_env_list":
             return "Values are never listed. rebase_cloud_env_set replaces one; a change applies on the next rebase_cloud_deploy.";
         case "rebase_cloud_env_set":

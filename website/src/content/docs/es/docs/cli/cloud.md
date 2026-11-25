@@ -1,5 +1,5 @@
 ---
-sourceHash: 21c6a414fb5571e4
+sourceHash: 2455a5d25bcb60fd
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Los grupos de comandos para Rebase Cloud en la CLI — autenticación, enlace de proyectos, despliegues, notificaciones, configuración, organizaciones, bases de datos, recursos, cómputo, almacenamiento, clústeres, facturación y uso.
@@ -188,13 +188,14 @@ Consulta [Previsualizar un cambio](/docs/deployment/cloud/#preview-a-change).
 
 `rebase cloud logs` imprime el último registro de compilación, y `-f` sigue un proceso de compilación que
 aún se está ejecutando. En su lugar, `--runtime` lee lo que la aplicación imprime, desde cada pod
-detrás de ella, con cada línea etiquetada con su pod:
+detrás de ella, con cada línea nombrando su pod cuando escribió más de uno:
 
 ```bash
 rebase cloud logs --runtime -f                    # follow until Ctrl-C (exits 0)
 rebase cloud logs --runtime --since 15m --grep timeout
 rebase cloud logs --runtime -f --level error      # errors only
 rebase cloud logs --runtime --previous            # a restarted container's last run
+rebase cloud logs --runtime --raw
 ```
 
 - `--since` acepta una duración (`30s`, `5m`, `1h`) o una marca temporal RFC3339.
@@ -209,6 +210,7 @@ rebase cloud logs --runtime --previous            # a restarted container's last
 - `--level error|warn|info|debug` conserva las líneas con esa severidad o peor. Lee
   la `severity` estructurada que registra un backend de Rebase, una palabra de nivel al inicio de una
   línea simple, o un formato de error como `TypeError:`. Las líneas sin ninguno de estos se omiten.
+- Una línea estructurada se imprime legible: `14:30:32.126 WARN  [boot] Driver version skew …  fix="bump …"`, y una petición como `GET /api/data/rooms/RCTF 404 16ms  requestId=…`. `--raw` imprime en cambio cada línea tal como la escribió el pod; las líneas de texto plano se imprimen igual en ambos casos, y `--json` siempre lleva las líneas originales.
 
 Un seguimiento consulta cada dos segundos e imprime cada línea una vez. Anuncia los pods
 que se inician, detienen o reinician. Cuando un contenedor se reinicia, también imprime las últimas

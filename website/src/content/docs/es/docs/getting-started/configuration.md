@@ -1,5 +1,5 @@
 ---
-sourceHash: 9acb2b3f441697d7
+sourceHash: 45d6fa4b1ef2c72a
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos de Rebase.
@@ -257,6 +257,7 @@ publicada). Un proyecto que ha hecho eject gestiona estas decisiones en su propi
 | `REBASE_VAPID_SUBJECT` | Dirección `mailto:` o URL `https://` de contacto para los servicios push. Por defecto toma el origen de un `REBASE_PUBLIC_URL` con HTTPS. | — |
 | `REBASE_MAX_BODY_SIZE` | Tamaño máximo del cuerpo de la petición, **en bytes** (`10485760`, no `10MB`; un valor no numérico impedirá el arranque en lugar de anular el límite silenciosamente). `0` desactiva el límite. | `10485760` (10 MiB) |
 | `REBASE_ENABLE_SWAGGER` | Superficie OpenAPI (estado tripartito). Sin definir en cualquier entorno: sirve `/api/docs` únicamente a los emisores a quienes `GET /api/schema/tables` describe tablas (mostrando solo las tablas que tienen visibles), sin UI de Swagger. `true` expone todo el documento a cualquier usuario, con la **UI** de Swagger en `/api/swagger` fuera de producción (nunca en producción). `false` mantiene el documento restringido al acceso de administradores. | — |
+| `REBASE_DEPLOYMENT_ID` | El despliegue que ejecuta este proceso, como lo nombra la plataforma; aparece en la línea que dice que el runtime escucha. Rebase Cloud la define. | — |
 | `REBASE_METRICS` | Expone métricas de Prometheus en `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Añade `includeSubDomains` a la cabecera `Strict-Transport-Security`, haciendo que los navegadores rechacen HTTP simple en todos los subdominios durante seis meses (incluyendo hosts no atendidos por este proceso). Actívalo únicamente si todos los subdominios operan exclusivamente bajo HTTPS. Cualquier valor distinto de `true`/`false` impedirá el arranque. Consulta [Cabeceras de seguridad](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Token Bearer de seguridad para `/metrics`. Si no se define, el endpoint queda expuesto a cualquier conexión entrante al puerto (apropiado para redes privadas, no para redes públicas; los registros de inicio mostrarán una advertencia). | — |

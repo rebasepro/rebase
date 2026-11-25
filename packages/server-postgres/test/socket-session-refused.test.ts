@@ -134,7 +134,7 @@ describe("the SDK in a Node script", () => {
         // open and close: what is under test is what the SDK says.
         const toStdout = (...args: unknown[]) => {
             const line = args.map(String).join(" ");
-            if (!line.includes("[WebSocket Server] Socket ")) stdout.push(line);
+            if (!line.includes("[websocket] Socket ")) stdout.push(line);
         };
         // Node writes all three to stdout.
         jest.spyOn(console, "log").mockImplementation(toStdout);
@@ -186,7 +186,7 @@ describe("the SDK in a Node script", () => {
         expect(refused[0]).toMatch(/refused this session/);
         expect(refused[0]).toContain("SESSION_REVOKED");
         // One AUTHENTICATE for the one token, so the server judged it once.
-        expect(warnings.filter(line => line.includes("[Security Audit] Refused an access token"))).toHaveLength(1);
+        expect(warnings.filter(line => line.includes("[security-audit] Refused an access token"))).toHaveLength(1);
     });
 
     it("names ACCOUNT_DISABLED for a disabled account", async () => {

@@ -1,5 +1,5 @@
 ---
-sourceHash: adb0c8f318e1c09a
+sourceHash: 9240cd2dc83f4b7b
 title: Custom Functions
 sidebar_label: Custom Functions
 description: Aggiungi endpoint API Hono personalizzati insieme alle tue route CRUD di Rebase. Individuazione automatica da una directory, con accesso completo all'istanza backend.
@@ -560,10 +560,10 @@ declare function notifyFulfilment(url: string, session: Record<string, string>):
 
 ## Debugging
 
-Durante il caricamento delle funzioni, la procedura di avvio registra il messaggio `Loaded custom functions` indicandone il numero complessivo. Ciascuna funzione viene inoltre registrata individualmente a livello `debug` (`LOG_LEVEL=debug`):
+Scrivi i log da una funzione con `logger` da `@rebasepro/server/functions`, non con `console.log`: vedi [Logging](/docs/backend/logging/). Durante il caricamento delle funzioni, la procedura di avvio registra il messaggio `Loaded custom functions` indicandone il numero complessivo. Ciascuna funzione viene inoltre registrata individualmente a livello `debug` (`LOG_LEVEL=debug`):
 
 ```
-⚡ Loaded function route: hello
+Loaded function route: hello
 ```
 
 In caso di fallimento durante il caricamento, il loader restituisce informazioni diagnostiche dettagliate:

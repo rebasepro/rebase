@@ -3,6 +3,7 @@ import * as path from "path";
 import { pathToFileURL } from "url";
 import { declareCron, type CronJobDefinition, type CronResourceOptions } from "@rebasepro/types";
 import { logger } from "../utils/logger.js";
+import { processTimeZone } from "./process-time-zone.js";
 import { nativeDynamicImport, type ModuleImporter } from "../utils/dynamic-import.js";
 import { describeLoadFailure, SYNTAX_ERROR_ADVICE } from "../utils/load-failure.js";
 import { warnDeprecated } from "@rebasepro/common";
@@ -257,9 +258,10 @@ export async function readCronsDirectory(
                 const id = path.basename(file, path.extname(file));
                 const definition = exported as CronJobDefinition;
                 crons[id] = definition;
+                const timezone = definition.timezone ?? processTimeZone();
                 logger.info(
-                    `⏰ Loaded cron job: ${id} (${definition.schedule}` +
-                    `${definition.timezone ? ` ${definition.timezone}` : " in the process's local time"})`
+                    `Loaded cron job: ${id} (${definition.schedule} ${timezone})`,
+                    { component: "cron", cron: id, schedule: definition.schedule, timezone, ...(definition.timezone ? undefined : { timezoneFrom: "process" }) }
                 );
             } catch (err: unknown) {
                 const message =

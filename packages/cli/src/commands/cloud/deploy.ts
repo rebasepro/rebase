@@ -91,10 +91,12 @@ import {
     fetchRuntimeLogsPage,
     filterThenTail,
     followRuntimeLogs,
+    lineLevel,
     paintLine,
     parseLevelFlag,
     parseSinceFlag,
     recordFilter,
+    renderLine,
     SERVER_DEFAULT_TAIL_LINES,
     type FollowSink,
     type LogRecord,
@@ -2555,6 +2557,7 @@ export const LOGS_FLAGS = {
     "--previous": Boolean,
     "--grep": String,
     "--level": String,
+    "--raw": Boolean,
     // Boolean, with the preview named by the one positional: `deploy --preview`
     // is a boolean too, and the dispatcher's value-flag list has to be one list
     // (`value-flags.test.ts`) — a value `--preview` would eat `deploy`'s app name.
@@ -2562,7 +2565,15 @@ export const LOGS_FLAGS = {
 } as const;
 
 /** The flags that read the running app's log, and mean nothing for a build log. */
-const RUNTIME_ONLY_FLAGS = ["--since", "--tail", "--previous", "--grep", "--level"] as const;
+const RUNTIME_ONLY_FLAGS = ["--since", "--tail", "--previous", "--grep", "--level", "--raw"] as const;
+
+/**
+ * How a terminal prints one runtime line: as it came with `--raw`, else read
+ * ({@link renderLine}), naming the pod when the read spans several.
+ */
+function runtimeLinePrinter(raw: boolean): (rec: LogRecord, pods: number) => string {
+    return raw ? (rec) => paintLine(rec) : (rec, pods) => renderLine(rec, { showPod: pods > 1 });
+}
 
 export async function logsCommand(rawArgs: string[], projectRef: string): Promise<void> {
     // Strict: `--folow` used to be dropped, so a caller that asked to follow
@@ -2653,6 +2664,7 @@ export async function logsCommand(rawArgs: string[], projectRef: string): Promis
                 filter,
                 subject,
                 preview: preview?.name,
+                raw: args["--raw"] === true,
                 ...(filtered ? { initialTail: matchTail } : {})
             });
             return;
@@ -2667,13 +2679,15 @@ export async function logsCommand(rawArgs: string[], projectRef: string): Promis
         const read = filterThenTail(page, filter, filtered ? matchTail : Number.MAX_SAFE_INTEGER);
         const records = read.records;
         const logs = filtered ? records.map((r) => r.raw).join("\n") : (page.logs ?? null);
+        const print = runtimeLinePrinter(args["--raw"] === true);
+        const podCount = Math.max((page.pods ?? []).length, new Set(records.map((r) => r.pod)).size);
         emit(
             () => {
                 console.log("");
                 console.log(chalk.bold(`  📄 Runtime logs — ${subject}`) + (args["--previous"] ? chalk.gray("  previous instance") : ""));
                 console.log("");
                 printRuntimePodStates(page, preview?.name);
-                if (records.length > 0) for (const r of records) console.log(paintLine(r));
+                if (records.length > 0) for (const r of records) console.log(print(r, podCount));
                 else console.log(chalk.gray(filtered && page.logs ? "  (no line matches)" : "  (no logs)"));
                 console.log("");
                 if (filtered && page.logs) {
@@ -2911,7 +2925,7 @@ function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
  * `cloud logs --runtime --follow`: poll until Ctrl-C, then exit 0.
  *
  * In JSON mode stdout is NDJSON — one compact object per line, `{"type":"line",
- * "ts","pod","text"}` for a log line and `{"type":"event","event",…}` for a pod
+ * "ts","pod","text","level"}` for a log line and `{"type":"event","event",…}` for a pod
  * starting, restarting or going, a reconnect — so a reader can act on each as
  * it arrives. On a terminal the events are narration, on stderr.
  */
@@ -2923,11 +2937,14 @@ async function followRuntime(
         filter: (rec: LogRecord) => boolean;
         subject: string;
         preview?: string;
+        /** Print lines as they came (`--raw`) instead of read. */
+        raw: boolean;
         /** Filtered: the matches per pod the first poll prints. */
         initialTail?: number;
     }
 ): Promise<void> {
     const json = isJsonMode();
+    const print = runtimeLinePrinter(opts.raw);
     const controller = new AbortController();
     const onSigint = (): void => controller.abort();
     // `once`: a second Ctrl-C while a request is in flight kills the process
@@ -2936,11 +2953,11 @@ async function followRuntime(
 
     const sink: FollowSink = json
         ? {
-            line: (r) => process.stdout.write(`${JSON.stringify({ type: "line", ts: r.ts, pod: r.pod, text: r.text })}\n`),
+            line: (r) => process.stdout.write(`${JSON.stringify({ type: "line", ts: r.ts, pod: r.pod, text: r.text, level: lineLevel(r.text) })}\n`),
             event: (e) => process.stdout.write(`${JSON.stringify({ type: "event", ...e })}\n`)
         }
         : {
-            line: (r) => console.log(paintLine(r)),
+            line: (r, ctx) => console.log(print(r, ctx.pods)),
             event: (e) => {
                 const text = describeEvent(e, { preview: opts.preview });
                 if (text) note(chalk.gray(text), "");

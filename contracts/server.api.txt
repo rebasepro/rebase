@@ -645,6 +645,7 @@ const FIELDLESS_AGGREGATES
 const FIELD_OPERATORS
 const FIREBASE_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 const IMPERSONATE_HEADER
+const IMPORTED_PASSWORD_HASH_ALGORITHMS
 const INCLUDE_COUNT_KEY
 const JSON_FIELD_BRAND
 const JUNCTION_PIVOT_KEY
@@ -738,6 +739,7 @@ function getDataSourceCapabilities
 function hasAdminRole
 function hasFieldOperation
 function holdsAdminRole
+function importedPasswordHashProblem
 function importedUserIdProblem
 function intersectScopes
 function isAdminScope
@@ -1026,8 +1028,8 @@ interface HasOneDef { access, brand, foreignKey, kind, private, sourceKey, targe
 interface HasOptions { access, foreignKey, private, sourceKey }
 interface HealthCheckResult { details, healthy, latencyMs }
 interface HistoryRetentionConfig { maxEntries, ttlDays }
-interface ImportUserInput { createdAt, displayName, email, emailVerified, id, photoUrl, roles }
-interface ImportUsersRequest { dryRun, users }
+interface ImportUserInput { createdAt, displayName, email, emailVerified, id, passwordHash, photoUrl, roles }
+interface ImportUsersRequest { dryRun, passwordHashAlgorithm, users }
 interface ImportUsersResult { created, dryRun, failed, results, skipped }
 interface IncludeOptions { count, fields, include, limit, logical, orderBy, where }
 interface IncludeOptionsFor { count, fields, include, limit, logical, orderBy, where }
@@ -1176,8 +1178,9 @@ interface SqlFilesOutcome { applied, dir, removed, unchanged }
 interface SqlScriptColumn { name, source, type }
 interface SqlScriptColumnSource { column, schema, table }
 interface SqlScriptNotice { message, severity }
-interface SqlScriptResult { columns, command, effectiveRole, notices, rowCount, rows, tables, truncated }
+interface SqlScriptResult { columns, command, effectiveRole, notices, rowCount, rows, statements, tables, truncated }
 interface SqlScriptTable { hasInheritors, kind, primaryKey, schema, table }
+interface SqlStatementResult { columns, command, rowCount, rows, tables, truncated }
 interface SqlTemplate { brand, text }
 interface StaticRedirectMatch { location, status }
 interface StaticRedirectRequest { host, path, search }
@@ -1328,6 +1331,7 @@ type GeneratedDatabase
 type HistoryConfig
 type IdOf
 type ImportUserOutcome
+type ImportedPasswordHashAlgorithm
 type IncludeArgOf
 type IncludeOf
 type IncludeSpec
@@ -2017,6 +2021,7 @@ type RelativeTimeLabels { daysAgo, hoursAgo, inAMoment, inDays, inHours, inMinut
 
 ## @rebasepro/server/functions
 class ApiError { badRequest, code, conflict, databaseUnavailable, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
+const logger { child, debug, error, info, warn }
 const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, push, resolveToken, rpc, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, sqlAsAdmin, storage, storageRegistry, ws }
 const requireAdmin
 const requireAuth
@@ -2054,6 +2059,7 @@ interface CheckRateLimitOptions { key, limit, name, windowMs }
 interface DefineFunctionOptions { timeoutMs }
 interface FunctionRateLimit { limit, name, windowMs }
 interface FunctionUser { email, roles, uid }
+interface Logger { child, debug, error, info, warn }
 interface RateLimitDecision { allowed, remaining, retryAfterMs }
 interface RateLimitOptions { key, limit, message, name, windowMs }
 interface RebaseFunctionContext { rebase }

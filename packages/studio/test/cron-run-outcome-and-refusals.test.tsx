@@ -167,3 +167,48 @@ describe("the execution history", () => {
         expect(screen.queryByText("2.0s")).toBeNull();
     });
 });
+
+/**
+ * What a run returned. Most jobs return a flat count — `{ synced: 42 }` — and
+ * that read as a JSON block with braces and quotes around two numbers.
+ */
+describe("a run's result", () => {
+    async function openRun(log: CronJobLogEntry) {
+        listJobs.mockResolvedValue({ jobs: [nightly] });
+        getJobLogs.mockResolvedValue({ logs: [log] });
+        render(<CronJobsView/>);
+        fireEvent.click(await screen.findByText("Nightly sync"));
+        const row = await screen.findByRole("button", { expanded: false });
+        // A control, so it opens from the keyboard as well as the mouse.
+        fireEvent.keyDown(row, { key: "Enter" });
+        expect(row.getAttribute("aria-expanded")).toBe("true");
+        return row;
+    }
+
+    it("reads a flat object as key: value rows", async () => {
+        await openRun(runLog({ result: { synced: 42, skipped: 3, dryRun: false, cursor: null, region: "eu" }, logs: ["started", "done"] }));
+
+        expect(screen.getByText(translateEn("studio_cron_result"))).toBeTruthy();
+        expect(screen.getByText("synced").nextElementSibling?.textContent).toBe("42");
+        expect(screen.getByText("skipped").nextElementSibling?.textContent).toBe("3");
+        expect(screen.getByText("dryRun").nextElementSibling?.textContent).toBe("false");
+        expect(screen.getByText("cursor").nextElementSibling?.textContent).toBe("null");
+        expect(screen.queryByText(/"synced"/)).toBeNull();
+        // The run's own log lines are still there, as they were.
+        expect(screen.getByText("started")).toBeTruthy();
+        expect(screen.getByText("done")).toBeTruthy();
+    });
+
+    it("keeps the JSON for a result with structure in it", async () => {
+        await openRun(runLog({ result: { synced: 42, failures: [{ id: "a", reason: "timeout" }] } }));
+
+        expect(screen.getByText(/"failures": \[/)).toBeTruthy();
+        // No row of its own: the key is inside the JSON, not a term.
+        expect(screen.queryByText("synced")).toBeNull();
+    });
+
+    it("keeps the JSON for a result that is not an object", async () => {
+        await openRun(runLog({ result: [1, 2, 3] }));
+        expect(screen.getByText(/1,\s+2,\s+3/)).toBeTruthy();
+    });
+});

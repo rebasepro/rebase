@@ -48,10 +48,11 @@ export function createMicrosoftProvider(config: {
 
     if (multiTenant) {
         logger.warn(
-            `[Rebase] Microsoft provider configured with tenantId "${tenantId}", which accepts sign-ins from `
+            `Microsoft provider configured with tenantId "${tenantId}", which accepts sign-ins from `
             + "every Entra tenant. Email addresses are reported as unverified unless the app registration emits "
             + "the xms_edov optional claim. Set an explicit tenantId, or enable xms_edov, to allow automatic "
-            + "linking onto existing accounts."
+            + "linking onto existing accounts.",
+            { component: "auth", provider: "microsoft", tenantId }
         );
     }
 

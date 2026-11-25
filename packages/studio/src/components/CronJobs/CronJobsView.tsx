@@ -502,12 +502,45 @@ function StatCard({ label, value, mono, chipColor, highlight }: {
     );
 }
 
+/**
+ * A run's `result` as `key: value` rows, when it is a plain object whose values
+ * are all scalars — `{ synced: 42, skipped: 3 }`, the shape most jobs return.
+ * `null` for anything else (an array, a nested object, a bare value), which
+ * keeps the JSON: flattening a structure would hide its shape.
+ */
+function flatResultRows(result: unknown): Array<[string, string]> | null {
+    if (result === null || typeof result !== "object" || Array.isArray(result)) return null;
+    const entries = Object.entries(result);
+    if (entries.length === 0) return null;
+    const rows: Array<[string, string]> = [];
+    for (const [key, value] of entries) {
+        if (value === null) rows.push([key, "null"]);
+        else if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") rows.push([key, String(value)]);
+        else return null;
+    }
+    return rows;
+}
+
 function LogRow({ log }: { log: CronJobLogEntry }) {
     const { t } = useTranslation();
     const [expanded, setExpanded] = useState(false);
+    const resultRows = log.result !== undefined ? flatResultRows(log.result) : null;
+    const toggle = () => setExpanded(open => !open);
     return (
         <div className="px-5 py-2.5 hover:bg-surface-hover transition-colors">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+            <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={expanded}
+                className="flex items-center gap-3 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                onClick={toggle}
+                onKeyDown={e => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggle();
+                    }
+                }}
+            >
                 {log.success
                     ? <CheckCircleIcon size={iconSize.smallest} className="text-emerald-500 shrink-0"/>
                     : <AlertCircleIcon size={iconSize.smallest} className="text-red-500 shrink-0"/>}
@@ -536,8 +569,19 @@ function LogRow({ log }: { log: CronJobLogEntry }) {
                     )}
                     {log.result !== undefined && (
                         <div className="p-2 rounded bg-surface-sheet border border-hairline-strong">
-                            <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-1 block">Result</Typography>
-                            <pre className="font-mono text-xs text-surface-600 dark:text-surface-400 whitespace-pre-wrap break-all">{JSON.stringify(log.result, null, 2)}</pre>
+                            <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-1 block">{t("studio_cron_result")}</Typography>
+                            {resultRows ? (
+                                <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5">
+                                    {resultRows.map(([key, value]) => (
+                                        <React.Fragment key={key}>
+                                            <Typography component="dt" variant="mono" color="secondary" className="text-xs">{key}</Typography>
+                                            <Typography component="dd" variant="mono" className="text-xs break-all text-surface-700 dark:text-surface-300">{value}</Typography>
+                                        </React.Fragment>
+                                    ))}
+                                </dl>
+                            ) : (
+                                <pre className="font-mono text-xs text-surface-600 dark:text-surface-400 whitespace-pre-wrap break-all">{JSON.stringify(log.result, null, 2)}</pre>
+                            )}
                         </div>
                     )}
                 </div>

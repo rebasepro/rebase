@@ -4,6 +4,7 @@ import { streamSSE } from "hono/streaming";
 import type { HonoEnv } from "./types";
 import { ApiError, errorHandler } from "./errors";
 import { addLogSink } from "../utils/logger";
+import { matchedRoute } from "../utils/request-logger";
 
 export interface LogEntry {
     id: string;
@@ -16,24 +17,105 @@ export interface LogEntry {
 
 /** What a caller can narrow the log by, in either direction (query or stream). */
 export interface LogFilterOptions {
+    /**
+     * The lowest level shown: `warn` is warnings and errors. A floor, as the
+     * CLI's `--level` and every log tool read it: somebody asking for warnings
+     * wants the errors too.
+     */
     level?: string;
+    source?: string;
+    /** Matched, case-insensitively, against the message and every metadata value. */
+    search?: string;
+    since?: string;
+}
+
+/** Each level's place on the floor `level` sets. */
+const LEVEL_RANK: Readonly<Record<LogEntry["level"], number>> = {
+    debug: 0,
+    info: 1,
+    warn: 2,
+    error: 3
+};
+
+/** The spellings `level` takes beyond the four names: what the stdout record's `severity` says. */
+const LEVEL_ALIASES: Readonly<Record<string, LogEntry["level"]>> = {
+    warning: "warn"
+};
+
+/**
+ * The level a `level` parameter names, or `undefined` when it names none.
+ *
+ * Exported for the routes, which answer an unknown level with a 400 rather than
+ * an empty log that looks like a quiet server.
+ */
+export function parseLogLevel(raw: string): LogEntry["level"] | undefined {
+    const key = raw.trim().toLowerCase();
+    if (isLogLevel(key)) return key;
+    return Object.prototype.hasOwnProperty.call(LEVEL_ALIASES, key) ? LEVEL_ALIASES[key] : undefined;
+}
+
+function isLogLevel(value: string): value is LogEntry["level"] {
+    return Object.prototype.hasOwnProperty.call(LEVEL_RANK, value);
+}
+
+/**
+ * A filter ready to test entries one at a time: the level as its rank and the
+ * search term lowercased.
+ *
+ * The distinction matters on the stream path: `query()` normalizes once and
+ * then scans, but a subscriber tests one entry at a time and would otherwise
+ * redo the same work on every request the server handles.
+ */
+interface NormalizedFilter {
+    /** Unset: every level. `Infinity`: a level nobody logs at, so nothing matches. */
+    minRank?: number;
     source?: string;
     search?: string;
     since?: string;
 }
 
-/**
- * A filter with the search term already lowercased.
- *
- * The distinction matters on the stream path: `query()` lowercases once and then
- * scans, but a subscriber tests one entry at a time and would otherwise redo the
- * same `toLowerCase()` on every request the server handles.
- */
-type NormalizedFilter = LogFilterOptions;
-
 function normalizeFilter(options: LogFilterOptions): NormalizedFilter {
-    return { ...options,
-        search: options.search?.toLowerCase() };
+    const asked = options.level?.trim() ? options.level : undefined;
+    const level = asked === undefined ? undefined : parseLogLevel(asked);
+    return {
+        minRank: asked === undefined ? undefined : level ? LEVEL_RANK[level] : Number.POSITIVE_INFINITY,
+        source: options.source,
+        search: options.search ? options.search.toLowerCase() : undefined,
+        since: options.since
+    };
+}
+
+/** A metadata value as the text search reads it: strings as they are, structures as JSON. */
+function searchableText(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "object") {
+        try {
+            return JSON.stringify(value) ?? "";
+        } catch {
+            return "";
+        }
+    }
+    return String(value);
+}
+
+/**
+ * Whether the lowercased `needle` is in the entry's message or any of its
+ * metadata values.
+ *
+ * The metadata is what makes a line findable by the thing somebody has in
+ * hand: a request id from a client's error report, a job id, a user id. Those
+ * live in fields, not in the message. Keys are not matched: searching `status`
+ * should not match every request.
+ */
+function matchesSearch(entry: Pick<LogEntry, "message" | "metadata">, needle: string): boolean {
+    if (entry.message.toLowerCase().includes(needle)) return true;
+    const metadata = entry.metadata;
+    if (!metadata) return false;
+    for (const value of Object.values(metadata)) {
+        if (searchableText(value).toLowerCase().includes(needle)) return true;
+    }
+    return false;
 }
 
 /**
@@ -43,11 +125,12 @@ function normalizeFilter(options: LogFilterOptions): NormalizedFilter {
  * and the failure that produces is invisible — a tail that quietly shows a
  * different set of lines than the snapshot it started from.
  */
-function matchesFilter(entry: Pick<LogEntry, "level" | "source" | "message" | "timestamp">, filter: NormalizedFilter): boolean {
-    if (filter.level && entry.level !== filter.level) return false;
+function matchesFilter(entry: Pick<LogEntry, "level" | "source" | "message" | "timestamp" | "metadata">, filter: NormalizedFilter): boolean {
+    if (filter.minRank !== undefined && LEVEL_RANK[entry.level] < filter.minRank) return false;
     if (filter.source && entry.source !== filter.source) return false;
-    if (filter.search && !entry.message.toLowerCase().includes(filter.search)) return false;
     if (filter.since && entry.timestamp < filter.since) return false;
+    // Last: the only test that may build the metadata of a request entry.
+    if (filter.search && !matchesSearch(entry, filter.search)) return false;
     return true;
 }
 
@@ -58,6 +141,8 @@ export type LogListener = (entry: LogEntry) => void;
 interface RequestRecord {
     method: string;
     path: string;
+    /** The route template that answered (`/api/data/:table/:id`), when one did. */
+    route: string | undefined;
     status: number;
     duration: number;
     requestId: string | undefined;
@@ -105,6 +190,7 @@ class StoredLogEntry {
         return {
             method: text.method,
             path: text.path,
+            ...(text.route && { route: text.route }),
             status: text.status,
             duration: text.duration,
             ...(text.requestId && { requestId: text.requestId }),
@@ -293,6 +379,7 @@ export function logMiddleware(options: LogMiddlewareOptions = {}): MiddlewareHan
         logBuffer.pushRequest(level, sourceForRequestPath(c.req.path, options.basePath), {
             method: c.req.method,
             path: c.req.path,
+            route: matchedRoute(c),
             status,
             duration,
             requestId: reqId,
@@ -303,17 +390,52 @@ export function logMiddleware(options: LogMiddlewareOptions = {}): MiddlewareHan
 }
 
 /**
- * Prefixes the server writes at the head of a log message, and the `source`
- * each one belongs to.
+ * The ring's `source` for each `component` a log line names.
  *
- * The ring's `source` is a closed set the Studio filters on, and the messages
- * carry their origin as a bracketed prefix — `[API]`, `[Auth]`, `[functions]`,
- * `[schema]`. Matching them is what makes a teed line filterable beside the
- * request entries rather than a heap under "system".
+ * The ring's `source` is a closed set the Studio filters on; a line's
+ * `component` is the open set of subsystems the logger writes (`http`, `cron`,
+ * `rls`, `channelbus`, …). This folds one into the other so a teed line sits
+ * beside the request entries of the subsystem it is about rather than in a heap
+ * under "system".
+ *
+ * `functions` is filed under `api`: a function's own line is most often the
+ * reason for a request entry's 500, and the API filter is where somebody
+ * looking at that 500 is. `rls` is `auth` because a policy refusal is an
+ * access-control answer. Anything not listed is `system`.
+ */
+const SOURCE_BY_COMPONENT: Readonly<Record<string, LogEntry["source"]>> = {
+    http: "api",
+    api: "api",
+    rest: "api",
+    functions: "api",
+    auth: "auth",
+    oauth: "auth",
+    rls: "auth",
+    storage: "storage",
+    s3: "storage",
+    gcs: "storage",
+    realtime: "realtime",
+    websocket: "realtime",
+    ws: "realtime",
+    cdc: "realtime",
+    channelbus: "realtime"
+};
+
+/** The `source` for a line's `component`. Exported for its test. */
+export function sourceForComponent(component: string): LogEntry["source"] {
+    const key = component.trim().toLowerCase();
+    return Object.prototype.hasOwnProperty.call(SOURCE_BY_COMPONENT, key) ? SOURCE_BY_COMPONENT[key] : "system";
+}
+
+/**
+ * Prefixes a message may still carry at its head, and the `source` each one
+ * belongs to: what a line says about its origin when it has no `component`
+ * field — one logged before the logger moved the tag into that field, or
+ * written by something that does not go through it.
  */
 const SOURCE_BY_PREFIX: Array<[RegExp, LogEntry["source"]]> = [
-    [/^\[?(api|rest)\b/i, "api"],
-    [/^\[?auth\b/i, "auth"],
+    [/^\[?(api|rest|http)\b/i, "api"],
+    [/^\[?(auth|rls)\b/i, "auth"],
     [/^\[?(storage|s3|gcs)\b/i, "storage"],
     [/^\[?(realtime|ws|websocket|cdc)\b/i, "realtime"]
 ];
@@ -325,8 +447,8 @@ const SOURCE_BY_PREFIX: Array<[RegExp, LogEntry["source"]]> = [
  * writes, which is the shape of check that stops working without failing.
  */
 export function sourceForMessage(message: string): LogEntry["source"] {
-    // The level emoji comes first on several call sites (`⚠️ [API] …`), so the
-    // prefix is whatever is inside the first bracket, wherever that is.
+    // A level emoji may come first (`⚠️ [API] …`), so the prefix is whatever
+    // is inside the first bracket, wherever that is.
     const bracketed = message.match(/\[([^\]]{1,32})\]/);
     const candidate = bracketed?.[1] ?? message;
     for (const [pattern, source] of SOURCE_BY_PREFIX) {
@@ -335,18 +457,46 @@ export function sourceForMessage(message: string): LogEntry["source"] {
     return "system";
 }
 
+/** The component a line names: its `component` field, else the tag at the head of its message. */
+function componentOf(message: string, data: Record<string, unknown>): string | undefined {
+    if (typeof data.component === "string" && data.component.trim() !== "") return data.component.trim().toLowerCase();
+    const tag = message.match(/^[^[\w]*\[([A-Za-z][\w.-]{0,31})\]/);
+    return tag ? tag[1].toLowerCase() : undefined;
+}
+
 /**
- * Feed the Logs Explorer everything the server says at warn and above.
+ * Components whose `info` lines are teed as well as their warnings.
  *
- * The ring used to be filled by `logMiddleware` alone, so the panel showed a
- * wall of `GET /api/data/posts 200 4ms` and not one of the errors, warnings or
- * boot diagnoses being written to stdout at the same moment. A function that
- * threw was the sharpest case: the request entry said `500` and the reason
- * existed only in a terminal the person looking at the panel does not have.
+ * A cron run says it ran (`"nightly" completed in 840ms`) and a boot says what
+ * it decided (which database, which tables, which port) at `info`, and those
+ * are the first two questions somebody opening the panel to debug asks: did my
+ * job run, and what did this instance start up as. Both are bounded by
+ * something other than traffic — a boot happens once per process, and a cron
+ * job writes a line or two per scheduled run — so they cannot flood the ring
+ * the way per-request chatter would.
+ */
+const INFO_TEED_COMPONENTS: ReadonlySet<string> = new Set(["cron", "boot"]);
+
+/**
+ * Feed the Logs Explorer what the server says that a person debugging needs:
+ * everything at warn and above, and the `info` lines of the components in
+ * {@link INFO_TEED_COMPONENTS}.
  *
- * Warn and above, deliberately. `info` is where the steady-state chatter lives,
- * and a 10,000-entry ring filled with it evicts the lines somebody opened the
- * panel to find.
+ * The ring is otherwise filled by `logMiddleware` alone, and a panel of
+ * `GET /api/data/posts 200 4ms` without the errors, warnings and boot
+ * diagnoses written to stdout at the same moment is one where a function's 500
+ * has its status and not its reason.
+ *
+ * Not every `info`: that is where the steady-state chatter lives, and a
+ * 10,000-entry ring filled with it evicts the lines somebody opened the panel
+ * to find. And never the `request` line, at any level: `requestLogger` writes
+ * one to stdout for every request, and `logMiddleware` has already recorded
+ * the same request here with the fields this panel renders, so teeing it would
+ * write every request twice.
+ *
+ * The entry's `source` comes from the line's `component` (see
+ * {@link sourceForComponent}), and from a `[Prefix]` in its message when it has
+ * none. The `component` stays in the metadata: the source is coarser.
  *
  * Idempotent: called from `createLogsRoutes`, which a split deployment may
  * reach more than once.
@@ -355,12 +505,13 @@ let detachLoggerTee: (() => void) | undefined;
 export function teeLoggerIntoLogBuffer(): () => void {
     if (detachLoggerTee) return detachLoggerTee;
     const detach = addLogSink((level, message, data) => {
-        if (level !== "warn" && level !== "error") return;
-        // `requestLogger` writes this one to stdout for every request, and
-        // `logMiddleware` has already recorded the same request here with the
-        // fields this panel renders. Teeing it too would double every failure.
         if (message === "request") return;
-        addLog(level, sourceForMessage(message), message, Object.keys(data).length > 0 ? data : undefined);
+        const component = componentOf(message, data);
+        const teed = level === "warn" || level === "error"
+            || (level === "info" && component !== undefined && INFO_TEED_COMPONENTS.has(component));
+        if (!teed) return;
+        const source = typeof data.component === "string" ? sourceForComponent(data.component) : sourceForMessage(message);
+        addLog(level, source, message, Object.keys(data).length > 0 ? data : undefined);
     });
     detachLoggerTee = () => {
         detach();
@@ -491,11 +642,29 @@ export function createLogsRoutes(timing: LogStreamTiming = {}, options: LogsRout
         return parsed;
     };
 
+    /**
+     * The `level` parameter, or a 400 naming the levels it takes.
+     *
+     * An unknown level would match nothing, and an empty answer to
+     * `?level=warnings` is the same picture as a server with nothing wrong.
+     */
+    const levelParam = (raw: string | undefined): string | undefined => {
+        if (raw === undefined || raw.trim() === "") return undefined;
+        if (parseLogLevel(raw)) return raw;
+        throw new ApiError(
+            400,
+            "INVALID_PARAM",
+            `Invalid \`level\`: ${raw}. Expected debug, info, warn or error — the lowest level to show.`,
+            undefined,
+            true
+        );
+    };
+
     // GET /api/logs — Query logs
     app.get("/", (c) => {
         const query = c.req.query();
         const result = logBuffer.query({
-            level: query.level,
+            level: levelParam(query.level),
             source: query.source,
             search: query.search,
             limit: window(query.limit, "limit", LOG_WINDOW_MAX),
@@ -531,11 +700,12 @@ export function createLogsRoutes(timing: LogStreamTiming = {}, options: LogsRout
     // the outside needs an id cursor and dedupe on every frame.
     app.get("/stream", (c) => {
         const query = c.req.query();
-        const filter = normalizeFilter({
-            level: query.level,
+        const filterOptions: LogFilterOptions = {
+            level: levelParam(query.level),
             source: query.source,
             search: query.search
-        });
+        };
+        const filter = normalizeFilter(filterOptions);
         const limit = window(query.limit, "limit", LOG_WINDOW_MAX) ?? 200;
 
         // Reverse proxies buffer text responses by default, which turns a live
@@ -561,7 +731,7 @@ export function createLogsRoutes(timing: LogStreamTiming = {}, options: LogsRout
                 }
                 pending.push(entry);
             });
-            const snapshot = logBuffer.query({ ...filter,
+            const snapshot = logBuffer.query({ ...filterOptions,
                 limit });
 
             // A client that goes away has to end this handler, or the

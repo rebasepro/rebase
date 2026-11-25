@@ -801,7 +801,19 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
                     resolve();
                 });
             });
-            logger.info(`Rebase runtime listening on port ${port}`);
+            // The one line that says what is running: which runtime, which
+            // bundle it was built against, on which contract, for which
+            // deployment — the first thing to read when a log looks wrong.
+            logger.info(`Rebase runtime listening on port ${port}`, {
+                component: "boot",
+                port,
+                runtimeVersion: readRuntimeVersion(driverRoots),
+                builtAgainst: bundle.manifest.runtime?.builtAgainst,
+                contract: bundle.manifest.runtime?.contract,
+                node: process.version,
+                ...(env.REBASE_DEPLOYMENT_ID ? { deploymentId: env.REBASE_DEPLOYMENT_ID } : undefined),
+                ...(process.env.HOSTNAME ? { instance: process.env.HOSTNAME } : undefined)
+            });
         } else {
             port = await listenWithPortRetry(server, env.PORT, {
                 portFileDir: devRoot,
@@ -1225,7 +1237,12 @@ export function warnOnDriverSkew(
                     "A driver is installed from your bundle's dependencies, NOT supplied by the platform image, " +
                     "so a newer runtime does not update it. Capabilities added after " +
                     `${source.driverVersion} are unavailable to this deployment — bump ` +
-                    `"${source.driverPackage}" in your project's package.json and redeploy.`
+                    `"${source.driverPackage}" in your project's package.json and redeploy.`,
+                {
+                    component: "boot",
+                    driverSkew: { kind: "stale", dataSource: source.key, package: source.driverPackage, installed: source.driverVersion, runtime: runtimeVersion },
+                    fix: `bump "${source.driverPackage}" to ${runtimeVersion} in package.json and redeploy`
+                }
             );
             continue;
         }
@@ -1238,7 +1255,12 @@ export function warnOnDriverSkew(
                     "has only its driver half running here — the other half is missing, and the usual symptom " +
                     "is a subsystem that is silently inert rather than one that errors. " +
                     "Deploy a newer platform image (or pin the runtime version), " +
-                    `or pin "${source.driverPackage}" back to ${runtimeVersion} in your project's package.json.`
+                    `or pin "${source.driverPackage}" back to ${runtimeVersion} in your project's package.json.`,
+                {
+                    component: "boot",
+                    driverSkew: { kind: "ahead", dataSource: source.key, package: source.driverPackage, installed: source.driverVersion, runtime: runtimeVersion },
+                    fix: `pin "${source.driverPackage}" to ${runtimeVersion} in package.json, or deploy a newer runtime`
+                }
             );
         }
     }

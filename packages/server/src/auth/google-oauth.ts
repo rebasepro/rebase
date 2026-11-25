@@ -146,10 +146,11 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
     // button still renders, and the failure only surfaces when someone clicks
     // it — so say it at boot instead.
     if (!clientSecret) {
-        console.warn(
-            "[Rebase] Google provider configured without a client secret. ID-token and access-token "
+        logger.warn(
+            "Google provider configured without a client secret. ID-token and access-token "
             + "sign-in still work, but the authorization-code flow used by the admin login button will "
-            + "fail. Set GOOGLE_CLIENT_SECRET to enable it."
+            + "fail. Set GOOGLE_CLIENT_SECRET to enable it.",
+            { component: "auth", provider: "google", missing: "GOOGLE_CLIENT_SECRET", fix: "set GOOGLE_CLIENT_SECRET" }
         );
     }
     let googleClient: InstanceType<typeof import("google-auth-library/build/src/index.js").OAuth2Client> | undefined;

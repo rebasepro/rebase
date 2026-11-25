@@ -1,5 +1,5 @@
 ---
-sourceHash: 9acb2b3f441697d7
+sourceHash: 45d6fa4b1ef2c72a
 title: Ambiente e Configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -259,6 +259,7 @@ pubblicata. Un progetto che ha eseguito l'eject gestisce queste impostazioni dir
 | `REBASE_VAPID_SUBJECT` | Un indirizzo `mailto:` o un URL `https://` che i servizi push possono contattare. Il valore predefinito è l'origine di un `REBASE_PUBLIC_URL` in `https`. | — |
 | `REBASE_MAX_BODY_SIZE` | Dimensione massima del corpo della richiesta, **in byte** (`10485760`, non `10MB` — un valore non numerico impedisce l'avvio anziché rimuovere silenziosamente il limite). `0` disattiva il limite. | `10485760` (10 MiB) |
 | `REBASE_ENABLE_SWAGGER` | La superficie OpenAPI. A tre stati. Se non impostata, in ogni ambiente: `/api/docs` viene servita ai chiamanti a cui `GET /api/schema/tables` descrive le tabelle, ciascuno con il documento relativo alle tabelle a lui descritte, senza Swagger UI. `true` pubblica l'intero documento per tutti, con la Swagger **UI** su `/api/swagger` fuori dalla produzione (mai in produzione). `false` mantiene il documento protetto dal controllo di accesso amministrativo. | — |
+| `REBASE_DEPLOYMENT_ID` | Il deployment che questo processo esegue, come lo chiama la piattaforma; indicato nella riga che dice che il runtime è in ascolto. Rebase Cloud la imposta. | — |
 | `REBASE_METRICS` | Espone le metriche Prometheus su `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Aggiunge `includeSubDomains` all'header `Strict-Transport-Security`, facendo sì che i browser rifiutino le connessioni HTTP in chiaro su qualsiasi sottodominio dell'host per sei mesi — inclusi gli host non serviti da questo processo. Attivare solo se ogni sottodominio del dominio supporta esclusivamente HTTPS. Qualsiasi valore diverso da `true`/`false` impedisce l'avvio. Vedi [Header di sicurezza](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Token Bearer posto a protezione di `/metrics`. Se non impostato, l'endpoint rimane aperto a chiunque possa raggiungere la porta — accettabile su una rete privata, sconsigliato su una pubblica, come segnalato dai log di avvio. | — |

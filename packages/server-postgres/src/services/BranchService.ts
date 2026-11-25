@@ -7,6 +7,7 @@
  * same `rebase` schema convention used by entity_history, auth, etc.
  */
 
+import { logger } from "@rebasepro/server";
 import { sql } from "drizzle-orm";
 import { Client } from "pg";
 import { BranchInfo } from "@rebasepro/types";
@@ -757,7 +758,7 @@ export class BranchService {
             caught = signal;
             void reopen()
                 .catch((err: unknown) => {
-                    console.error(err instanceof Error ? err.message : String(err));
+                    logger.error("Could not reopen the database after an interrupted branch copy", { component: "branch", signal, error: err });
                 })
                 .finally(() => {
                     release();

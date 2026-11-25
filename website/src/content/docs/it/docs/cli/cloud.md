@@ -1,5 +1,5 @@
 ---
-sourceHash: 21c6a414fb5571e4
+sourceHash: 2455a5d25bcb60fd
 title: rebase cloud
 sidebar_label: rebase cloud
 description: I gruppi di comandi per Rebase Cloud nella CLI — autenticazione, collegamento del progetto, deploy, notifiche, configurazione, organizzazioni, database, risorse, calcolo, storage, cluster, fatturazione e utilizzo.
@@ -187,13 +187,14 @@ Consulta [Preview a change](/docs/deployment/cloud/#preview-a-change).
 
 `rebase cloud logs` stampa il log di build più recente, e `-f` segue in tempo reale (tail) una build che
 è ancora in esecuzione. `--runtime` legge invece ciò che l'app stampa, da ogni pod
-sottostante, con ciascuna riga etichettata con il relativo pod:
+sottostante, con ciascuna riga che nomina il relativo pod quando ne hanno scritto più di uno:
 
 ```bash
 rebase cloud logs --runtime -f                    # follow until Ctrl-C (exits 0)
 rebase cloud logs --runtime --since 15m --grep timeout
 rebase cloud logs --runtime -f --level error      # errors only
 rebase cloud logs --runtime --previous            # a restarted container's last run
+rebase cloud logs --runtime --raw
 ```
 
 - `--since` accetta una durata (`30s`, `5m`, `1h`) o un orario RFC3339.
@@ -208,6 +209,7 @@ rebase cloud logs --runtime --previous            # a restarted container's last
 - `--level error|warn|info|debug` mantiene le righe con tale gravità o superiore. Riconosce
   la `severity` strutturata registrata da un backend Rebase, una parola che indica il livello all'inizio di
   una riga di testo normale o un pattern di errore come `TypeError:`. Le righe prive di tali indicazioni vengono escluse.
+- Una riga strutturata viene stampata in forma leggibile: `14:30:32.126 WARN  [boot] Driver version skew …  fix="bump …"`, e una richiesta come `GET /api/data/rooms/RCTF 404 16ms  requestId=…`. `--raw` stampa invece ogni riga come l'ha scritta il pod; le righe di testo semplice restano invariate in entrambi i casi, e `--json` contiene sempre le righe originali.
 
 La modalità follow esegue un polling ogni due secondi e stampa ciascuna riga una sola volta. Segnala i pod
 che si avviano, si arrestano o si riavviano. Quando un container si riavvia, stampa anche le ultime

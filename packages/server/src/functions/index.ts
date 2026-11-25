@@ -77,6 +77,18 @@ export type { DefineFunctionOptions, RebaseFunctionContext } from "./define-func
  */
 export { rebase } from "../singleton";
 
+/**
+ * The runtime's structured logger, the same object the package root exports.
+ *
+ * `logger.info("charged", { orderId, amountCents })` writes one JSON line in
+ * production with the fields beside the message, and a line written while a
+ * request runs carries that request's `requestId` and `uid` without being
+ * passed them. `console.log` from a function is plain text with neither.
+ * Portable: it touches no Node global (see `../utils/host.ts`).
+ */
+export { logger } from "../utils/logger";
+export type { Logger } from "../utils/logger";
+
 // ── Request context ──────────────────────────────────────────────────────
 export {
     getUser,

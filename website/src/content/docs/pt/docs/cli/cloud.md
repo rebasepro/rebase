@@ -1,5 +1,5 @@
 ---
-sourceHash: 21c6a414fb5571e4
+sourceHash: 2455a5d25bcb60fd
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Os grupos de comandos para o Rebase Cloud na CLI — autenticação, vínculo de projeto, deploys, notificações, configuração, organizações, bancos de dados, recursos, computação, armazenamento, clusters, faturamento e uso.
@@ -187,13 +187,14 @@ Consulte [Preview a change](/docs/deployment/cloud/#preview-a-change).
 
 `rebase cloud logs` imprime o log de build mais recente, e `-f` acompanha um build que
 ainda esteja em execução. `--runtime` lê o que o aplicativo imprime, de cada pod
-por trás dele, com cada linha identificada por seu pod:
+por trás dele, com cada linha nomeando seu pod quando mais de um escreveu:
 
 ```bash
 rebase cloud logs --runtime -f                    # follow until Ctrl-C (exits 0)
 rebase cloud logs --runtime --since 15m --grep timeout
 rebase cloud logs --runtime -f --level error      # errors only
 rebase cloud logs --runtime --previous            # a restarted container's last run
+rebase cloud logs --runtime --raw
 ```
 
 - `--since` aceita uma duração (`30s`, `5m`, `1h`) ou um horário RFC3339.
@@ -208,6 +209,7 @@ rebase cloud logs --runtime --previous            # a restarted container's last
 - `--level error|warn|info|debug` mantém as linhas nessa severidade ou superior. Ele lê
   o campo estruturado `severity` registrado pelo backend do Rebase, uma palavra de nível no início de uma
   linha simples ou um padrão de erro como `TypeError:`. Linhas sem isso são omitidas.
+- Uma linha estruturada é impressa de forma legível: `14:30:32.126 WARN  [boot] Driver version skew …  fix="bump …"`, e uma requisição como `GET /api/data/rooms/RCTF 404 16ms  requestId=…`. `--raw` imprime cada linha como o pod a escreveu; linhas de texto simples saem iguais nos dois casos, e `--json` sempre traz as linhas originais.
 
 O acompanhamento faz polling a cada dois segundos e imprime cada linha uma única vez. Ele anuncia pods
 que iniciam, param ou reiniciam. Quando um container reinicia, ele também imprime as últimas
