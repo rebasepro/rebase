@@ -97,6 +97,16 @@ Deploying code from your machine stays with the CLI (`rebase cloud deploy`) and
 the [local MCP server](/docs/ai/mcp/), which also covers local development,
 schema generation and database branches.
 
+## Skills
+
+The connector also serves the 24 [Rebase agent skills](/docs/ai/skills/),
+the same ones `rebase skills install` copies into a project. Claude loads one
+when the task calls for it: how to define a table, write a hook, set up auth,
+deploy. Nothing needs installing. Claude Code lists them as
+`<connector>:rebase-tables` and so on, under the name you gave the connector.
+Skills over MCP need a client on protocol revision 2026-07-28 or later, and
+are in public beta in Claude Code.
+
 ## Every change is confirmed
 
 A tool that changes something takes two calls. The first changes nothing: it

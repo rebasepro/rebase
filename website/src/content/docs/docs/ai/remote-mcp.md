@@ -180,5 +180,52 @@ One limit. Disconnecting a client (`DELETE /api/oauth/grants/:clientId`, with th
 person's own session) revokes its refresh tokens at once, but an access token
 already issued keeps working until it expires, within the hour.
 
+## Skills
+
+The endpoint can also serve [Agent Skills](https://agentskills.io/specification)
+over MCP: instructions an assistant loads when the task needs them, such as how
+your team files an order or what a field means. Put each skill in its own
+folder, with a `SKILL.md` whose frontmatter has a `name` matching the folder
+and a `description`, plus any files it links to. Then name the parent folder
+in the backend config:
+
+```ts
+// skills/order-intake/SKILL.md, skills/order-intake/references/fields.md, …
+createRebaseBackend({
+    ...options, // the rest of your backend config
+    mcp: { skills: "./skills" }
+});
+```
+
+The path is relative to the working directory. The data tools stay as they
+are, and `skills` sits beside `tools` when a backend brings its own.
+
+- **What a client sees.** Clients on protocol revision 2026-07-28 or later
+  (Claude Code, Claude) list the skills and load one when it is relevant.
+  Claude Code names each one `<connector>:<skill>`. These are served through
+  the MCP skills extension (`io.modelcontextprotocol/skills`): `skills/list`,
+  `skills/get`, and `resources/read` of `skill://<name>/…`. Each skill comes
+  with a SHA-256 manifest of its files. The client checks every file against
+  that manifest, and the person's approval is bound to it.
+- **Who can read them.** Every authenticated connection, whatever its scopes.
+  Put nothing in a skill that is not for everyone who connects.
+- **When they change.** The folder is read on the first request that needs it,
+  so an edit takes effect at the next deploy or restart. A file that changes on
+  disk before then is refused, not served against a manifest it no longer
+  matches.
+- **What is left out.** A skill that breaks a rule is skipped, and the boot log
+  says why. The rules: no frontmatter, a name that differs from its folder's,
+  a symlink inside, or more than 512 files or 16 MiB. Hidden files such as
+  `.gitkeep` are never served. A skill over Claude Code's own limits (100 KB
+  per file, 400 KB in all) is served with a warning, because Claude Code will
+  not load it.
+
+The endpoint answers both protocol eras. A 2025-era client opens with
+`initialize`, as before. A 2026-07-28 client sends no handshake. Every request
+carries its protocol version and capabilities in `params._meta`, plus the
+`MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` headers, which must agree
+with the body. Its capabilities come from `server/discover`. Skills are
+declared only there.
+
 The routes are in [Endpoints](/docs/backend/endpoints/#mcp-surface) and the
 variables in [Configuration](/docs/getting-started/configuration/#mcp-surface).

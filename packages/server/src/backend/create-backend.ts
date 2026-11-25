@@ -52,6 +52,8 @@ import nodePath from "node:path";
 import { readFileSync } from "node:fs";
 import { servedFrontendPaths } from "../serve-spa";
 import { PROJECT_VIEW_FILE, withProjectView, type McpAppCompiler, type McpAppResource } from "../mcp/mcp-apps";
+import type { McpSkillsSource } from "../mcp/mcp-skills";
+import { nodeSkillFiles } from "../mcp/mcp-skills-node";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createRebaseClient } from "@rebasepro/client";
@@ -1959,6 +1961,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             tools: config.mcp?.tools,
             instructions: config.mcp?.instructions,
             vocabulary: config.mcp?.scopes,
+            // The skills it serves, read from their folder on the first
+            // request that needs them. The adapter is Node's filesystem, so
+            // it is bound here, at boot, and not on the request path.
+            skills: mcpSkillsFrom(config.mcp?.skills),
             // A confirmed call is spent once across every replica.
             confirmations: store
         };
@@ -5143,6 +5149,13 @@ export function realtimeSocketPath(basePath: string | undefined): string {
  * `initialize` or `tools/list` — not at boot: the HTML is large, and a
  * backend no MCP client calls never loads it.
  */
+/** The `mcp.skills` folder as the MCP endpoint reads it, resolved against the working directory. */
+function mcpSkillsFrom(folder: string | undefined): McpSkillsSource | undefined {
+    if (folder === undefined) return undefined;
+    const root = nodePath.resolve(process.cwd(), folder);
+    return async () => nodeSkillFiles(root);
+}
+
 async function loadMcpApps(): Promise<readonly McpAppResource[]> {
     const { MCP_APPS } = await import("@rebasepro/mcp-apps");
     const candidates = [

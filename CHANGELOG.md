@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Skills over MCP.** A backend can serve [Agent Skills](https://agentskills.io/specification) on its `/mcp` endpoint, through the MCP skills extension (`io.modelcontextprotocol/skills`, SEP-2640). `mcp: { skills: "./skills" }` names a folder of skill folders, each holding a `SKILL.md` and the files it links to. A client on protocol revision 2026-07-28 or later (Claude Code, Claude) lists them with `skills/list` and loads one when it needs it. Claude Code names each one `<connector>:<skill>`. Each entry carries a SHA-256 manifest of its files. A file that changed on disk since the server read it is refused, not served against a manifest it no longer matches. A skill that breaks a rule is left out and the boot log says why. The rules: no frontmatter, a name that is not its folder's, a symlink inside, or over 512 files or 16 MiB. Every authenticated connection can read the skills, whatever its scopes. `mcp.tools`, `mcp.scopes` and `mcp.instructions` are now optional, so `skills` can be given on its own beside the data tools.
+- **The local MCP server (`@rebasepro/mcp`) serves the 24 Rebase agent skills**, the ones `rebase skills install` copies into a project. In Claude Code they appear as `/rebase:rebase-tables` and so on. If `@rebasepro/agent-skills` cannot be found, the server starts without them and says so on stderr.
+- **The hosted Rebase connector serves the same 24 skills**, so a person who connects Rebase in Claude gets them without installing anything. They go live with the next control-plane deploy.
+- **`/mcp` speaks protocol revision 2026-07-28 beside the 2025 revisions.** A 2026-07-28 request names its revision and the client's capabilities in `params._meta`, and sends no `initialize`. `server/discover` answers what `initialize` did. Every result carries `resultType: "complete"`, and the cacheable ones carry `ttlMs` and `cacheScope`. The `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` headers are required and must agree with the body; a request that breaks this gets `400` with `-32020`. An unserved revision gets `-32022` and the list of served revisions. `initialize` now also accepts `2025-11-25`, which is the revision it answers a client that names a newer one.
+
+### Changed
+
+- **`@rebasepro/mcp` runs on the MCP TypeScript SDK v2** (`@modelcontextprotocol/server` 2.4.0, replacing `@modelcontextprotocol/sdk` 1.30), so it speaks protocol revision 2026-07-28 over stdio as well as the 2025 revisions. Its tools and their behaviour are unchanged. Its resources now go through the SDK: `resources` is declared with `listChanged: true`, and `resources/templates/list` lists `rebase://tables/{+name}`, `rebase://schema` and `skill://{+path}`. An unknown resource URI is answered with the SDK's resource-not-found error. A `rebase://tables/` URI is parsed before it is read, so `..` segments are removed first. A name that would still leave the schema directory is refused, as before.
+
 ## [0.36.0] - 2026-11-24
 
 ### Added

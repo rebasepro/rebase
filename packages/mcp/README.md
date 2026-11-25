@@ -26,6 +26,8 @@ pnpm exec rebase-mcp
 
 `@rebasepro/mcp` implements the [Model Context Protocol](https://modelcontextprotocol.io) over stdio, allowing AI assistants (Gemini, Claude, Cursor, etc.) to interact with a Rebase project. It provides tools and exposes collection definitions and generated schemas as MCP resources. It has native support for managing multiple local and remote projects.
 
+It also serves the 24 Rebase agent skills (from `@rebasepro/agent-skills`) over the MCP skills extension (`io.modelcontextprotocol/skills`). A client on protocol revision 2026-07-28 or later lists them and loads one when it needs it; Claude Code names them `/rebase:rebase-tables` and so on. The server speaks 2026-07-28 and the 2025 revisions over stdio.
+
 ## Multi-Project Support
 
 The MCP server supports managing multiple Rebase projects simultaneously. This is ideal when working in an IDE with multiple open workspaces or when interacting with both local development servers and remote staging/production environments.

@@ -249,6 +249,8 @@ export interface HarnessOptions {
     confirmations?: McpRoutesConfig["confirmations"];
     /** The UI preference layers a caller's views and describe_table present the tables with. */
     getUiPreferences?: McpRoutesConfig["getUiPreferences"];
+    /** The skills `/mcp` serves. Absent, it serves none. */
+    skills?: McpRoutesConfig["skills"];
 }
 
 export function buildApp(options: HarnessOptions = {}) {
@@ -275,7 +277,8 @@ export function buildApp(options: HarnessOptions = {}) {
         vocabulary: options.vocabulary,
         instructions: options.instructions,
         confirmations: options.confirmations,
-        getUiPreferences: options.getUiPreferences
+        getUiPreferences: options.getUiPreferences,
+        skills: options.skills
     };
     app.route("/", createMcpWellKnownRoutes(mcpConfig));
     app.route("/mcp", createMcpRoutes(mcpConfig));

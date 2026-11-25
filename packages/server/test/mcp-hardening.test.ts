@@ -287,7 +287,9 @@ describe("JSON-RPC framing", () => {
             jsonrpc: "2.0", id: 1, method: "initialize",
             params: { protocolVersion: "2099-01-01" }
         })).json() as { result: { protocolVersion: string } };
-        expect(body.result.protocolVersion).toBe("2025-06-18");
+        // The newest 2025-era revision: `initialize` belongs to that era, and
+        // a 2026-07-28 client never sends it (see mcp-skills.test.ts).
+        expect(body.result.protocolVersion).toBe("2025-11-25");
     });
 
     it("declares no capability it does not implement", async () => {

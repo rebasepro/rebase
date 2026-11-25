@@ -18,6 +18,18 @@ tables are declared, why migrations are two steps, and which mistakes the
 framework will not catch for it. For tools that act on your data, see the
 [MCP server](/docs/ai/mcp).
 
+## Over MCP, with nothing installed
+
+The same skills reach Claude over MCP. The [Rebase connector](/docs/ai/rebase-connector/#skills)
+and the [local MCP server](/docs/ai/mcp/#skills) both serve all 24, and a
+client on protocol revision 2026-07-28 or later loads one when it needs it.
+Claude Code names them `<server>:rebase-tables` and so on. Installing them into
+the repo, as below, is still what makes them reach every assistant, pinned to
+the release the project runs.
+
+Your own app can serve skills to the people who use it, too: see
+[the remote MCP endpoint](/docs/ai/remote-mcp/#skills).
+
 ## Set up by `rebase init`
 
 A new project does not need the command. `rebase init` asks
