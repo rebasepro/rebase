@@ -515,6 +515,17 @@ html[data-theme="light"]:not([data-scrolled], [data-menu-open]):has(.hero-under-
     margin-inline: calc(-1 * min(12rem, max(0px, (100vw - 72rem) / 2 - 1.5rem)));
 }
 
+/* A row of cards that steps a LITTLE past the shell: out to the drafted rails
+   (`--rail-in - --shell-pad`, what a lone frame already gets), then up to 3rem
+   further where the gutter has room. Made for the pricing tiers (2026-11-25):
+   a three-up row of copy-heavy cards boxed inside the reading column read as
+   cramped, and `bleed-x`'s 12rem would pull the copy too far from its heading.
+   The copy stays inside each card's padding, so left edges of TEXT still sit
+   near the column; it is the card edges that bleed. */
+@utility bleed-rails {
+    margin-inline: calc(var(--rail-in) - var(--shell-pad) - min(3rem, max(0px, (100vw - 72rem) / 2 - 1.5rem)));
+}
+
 /* A raised ground eats the muted tier's headroom, so the muted tier lifts with
    it. `--color-surface-500` (#747a81) is tuned for #000 and the frame, where it
    measures 4.84:1 and 4.57:1 — deliberately close to the line, because it is
