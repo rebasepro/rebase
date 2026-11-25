@@ -61,7 +61,7 @@ const rule = "─".repeat(88);
               withhold — the view is an unfiltered path around them.
       <span class="text-tone-max">Fix</span>
           <span class="text-emerald-400">ALTER VIEW "public"."billing_overview" SET (security_invoker = true);</span>
-          <span class="text-emerald-400">-- Callers then need their own SELECT privilege on public.ledger, and the</span>
+          <span class="text-emerald-400">-- Callers then need their own SELECT privilege on "public"."ledger", and the</span>
           <span class="text-emerald-400">-- policies there apply to them.</span>
       <span class="text-tone-600">Docs    https://rebase.pro/docs/rls-check#view-bypasses-rls</span>
 
@@ -104,10 +104,10 @@ const rule = "─".repeat(88);
 
   <span class="text-rose-400">critical 3</span>   <span class="text-tone-600">high 0   medium 0   low 0   info 0</span>
   <span class="text-tone-600">3 confirmed · 0 worth checking · 15 checks run against 3 tables in 1 schema</span>
-  <span class="text-tone-600">1 of 3 tables have row-level security disabled</span>
+  <span class="text-tone-600">1 of 3 tables has row-level security disabled</span>
 
   <span class="text-tone-max">Exit code 1</span> <span class="text-tone-600">— at least one finding is "high" or worse (--fail-on high).</span>
-  <span class="text-tone-600">Scanned 2026-09-05T09:14:02.881Z · read-only, and nothing left this machine.</span>
+  <span class="text-tone-600">Scanned 2026-11-25T17:34:44.580Z · read-only, and nothing left this machine.</span>
 
 <span class="text-tone-600">rls-check is free and maintained by the team behind Rebase — https://rebase.pro</span>
 </pre>

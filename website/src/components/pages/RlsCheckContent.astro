@@ -37,6 +37,23 @@ import ClosingCta from "../ClosingCta.astro";
 // DATABASE_URL, POSTGRES_URL, then a .env in the working directory.
 const COMMAND = "npx @rebasepro/rls-check";
 const PAGE_URL = "https://rebase.pro/rls-check";
+const SOURCE_URL = "https://github.com/rebasepro/rebase/tree/main/packages/rls-check";
+const NPM_URL = "https://www.npmjs.com/package/@rebasepro/rls-check";
+
+// The output formats the terminal report does not show. Each command is one the
+// tool's --help prints; the copy for each is in i18n (rlscheckpage.more.*).
+const OUTPUTS = [
+    { key: "html", command: "npx @rebasepro/rls-check --html rls-report.html" },
+    { key: "agent", command: "npx @rebasepro/rls-check --format agent" },
+    { key: "json", command: "npx @rebasepro/rls-check --json > rls-report.json" }
+] as const;
+
+// The same step the docs give under "In CI" (/docs/rls-check#in-ci). A string,
+// because `${{ … }}` is not something an Astro template can hold literally.
+const CI_YAML = `- name: Audit RLS
+  run: npx @rebasepro/rls-check --fail-on high
+  env:
+    DATABASE_URL: \${{ secrets.DATABASE_URL }}`;
 
 const bySeverity = (["critical", "high", "medium"] as const).map((severity) => ({
     severity,
@@ -114,7 +131,7 @@ import HeroBackdrop from "../HeroBackdrop.astro";
                  before anything persuasive. -->
             <dl class="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div>
-                    <dt class="text-tone-max font-semibold text-sm mb-1">Read-only</dt>
+                    <dt class="text-tone-max font-semibold text-sm mb-1">{t("rlscheckpage.trust.readonly")}</dt>
                     <dd class="text-sm text-tone-400 leading-relaxed">{t("rlscheckpage.07")}</dd>
                 </div>
                 <div>
@@ -126,6 +143,17 @@ import HeroBackdrop from "../HeroBackdrop.astro";
                     <dd class="text-sm text-tone-400 leading-relaxed">{t("rlscheckpage.11")}</dd>
                 </div>
             </dl>
+
+            <!-- A stranger deciding whether to trust a binary with production
+                 credentials should be one click from every query it runs. -->
+            <p class="mt-8 text-sm text-tone-400">
+                {t("rlscheckpage.source")}
+                <a href={SOURCE_URL} target="_blank" rel="noopener"
+                   class="ml-1 text-primary-light hover:text-tone-max underline underline-offset-2">{t("rlscheckpage.source.github")}</a>
+                <span class="text-tone-600 mx-1.5" aria-hidden="true">·</span>
+                <a href={NPM_URL} target="_blank" rel="noopener"
+                   class="text-primary-light hover:text-tone-max underline underline-offset-2">{t("rlscheckpage.source.npm")}</a>
+            </p>
         </div>
     </section>
 
@@ -173,7 +201,69 @@ import HeroBackdrop from "../HeroBackdrop.astro";
         </div>
     </section>
 
-    <ComparisonFaq competitor="rls-check" heading="Questions about rls-check" faqs={faqs} pageUrl={PAGE_URL} />
+    <!-- Other shapes of the same scan -->
+    <section class="relative z-0 py-chapter border-t border-tone-900/60">
+        <div class="mx-auto max-w-5xl px-6 lg:px-8">
+            <h2 class="text-2xl sm:text-3xl text-tone-max mb-3">{t("rlscheckpage.more.title")}</h2>
+            <p class="text-tone-400 mb-10 leading-relaxed max-w-2xl">{t("rlscheckpage.more.lede")}</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {OUTPUTS.map(({ key, command }) => (
+                    <div class="frame p-6 flex flex-col">
+                        <h3 class="text-tone-max leading-snug mb-2">{t(`rlscheckpage.more.${key}.title`)}</h3>
+                        <p class="text-sm text-tone-400 leading-relaxed mb-5">{t(`rlscheckpage.more.${key}.body`)}</p>
+                        <!-- The flag is the point of each card, so the command wraps
+                             at its spaces rather than scrolling the flag out of view. -->
+                        <div class="mt-auto self-stretch flex items-start justify-between gap-3 rounded-lg bg-tone-900/80 border border-tone-700/80 px-3 py-2.5">
+                            <code class="font-mono text-2xs leading-relaxed text-tone-200 min-w-0">{command.split(" ").map((word, i) => (
+                                <>{i > 0 && " "}<span class="whitespace-nowrap">{word}</span></>
+                            ))}</code>
+                            <button data-track-copy={`rls-check-${key}`} data-command={command}
+                                    class="copy-btn shrink-0 text-tone-500 hover:text-tone-max transition-colors"
+                                    aria-label={`Copy ${command}`} title="Copy to clipboard">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                     stroke-linejoin="round" aria-hidden="true">
+                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    </section>
+
+    <!-- CI: the FAQ said "yes"; this is the step to paste -->
+    <section class="relative z-0 py-chapter border-t border-tone-900/60">
+        <div class="mx-auto max-w-5xl px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            <div>
+                <h2 class="text-2xl sm:text-3xl text-tone-max mb-3">{t("rlscheckpage.ci.title")}</h2>
+                <p class="text-tone-400 leading-relaxed mb-5">{t("rlscheckpage.ci.lede")}</p>
+                <a href="/docs/rls-check#in-ci"
+                   class="text-sm text-primary-light hover:text-tone-max underline underline-offset-2">{t("rlscheckpage.ci.docs")}</a>
+            </div>
+            <div class="rounded-2xl overflow-hidden ring-1 ring-tone-max/10 bg-[#09090b] island-dark">
+                <div class="px-4 py-2.5 border-b border-tone-max/5 flex items-center justify-between gap-2 bg-tone-900/50">
+                    <span class="text-xs font-mono text-tone-500">.github/workflows/ci.yml</span>
+                    <button data-track-copy="rls-check-ci" data-command={CI_YAML}
+                            class="copy-btn shrink-0 text-tone-500 hover:text-tone-max transition-colors"
+                            aria-label="Copy the CI step" title="Copy to clipboard">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round" aria-hidden="true">
+                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                        </svg>
+                    </button>
+                </div>
+                <pre class="p-5 overflow-x-auto font-mono text-xs leading-[1.7] text-tone-300">{CI_YAML}</pre>
+            </div>
+        </div>
+    </section>
+
+    <ComparisonFaq competitor="rls-check" heading={t("rlscheckpage.faq.heading")} faqs={faqs} pageUrl={PAGE_URL} />
 
     <ClosingCta
         title={t("close.rlscheck.title")}

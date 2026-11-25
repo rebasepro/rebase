@@ -33,6 +33,8 @@ export interface Props {
     ogType?: string;
     /** Keep the page out of search results (the 404). */
     noindex?: boolean;
+    /** The page's own keywords meta; the product-wide set when omitted. */
+    keywords?: string;
 }
 
 
@@ -63,7 +65,8 @@ const {
     showBanner = false,
     ogImage = routeOgImage,
     ogType = "website",
-    noindex = false
+    noindex = false,
+    keywords = "Postgres backend, row-level security, open-source backend, Postgres REST API, typed SDK, Postgres realtime, admin panel for Postgres, self-hosted backend"
 } = Astro.props;
 
 // The English pair, for the JSON-LD graph: structured data describes the
@@ -395,8 +398,7 @@ const twitterImageType = /\.jpe?g$/.test(ogImage) ? "image/jpeg" : "image/png";
         <link rel="alternate" hreflang={alt.hreflang} href={alt.href}>
     ))}
     <meta name="description" content={description}>
-    <meta name="keywords"
-          content="Postgres backend, row-level security, open-source backend, Postgres REST API, typed SDK, Postgres realtime, admin panel for Postgres, self-hosted backend">
+    <meta name="keywords" content={keywords}>
     <meta name="robots" content={noindex ? "noindex, follow" : "index, follow"}>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="sitemap" href="/sitemap-index.xml"/>
