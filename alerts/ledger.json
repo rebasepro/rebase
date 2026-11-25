@@ -6,6 +6,13 @@
       "lastSeen": "2026-11-25T17:06:21.248Z",
       "pagedAt": null,
       "pr": null
+    },
+    "ci:rebase:main": {
+      "title": "CI main failing: eslint no-misleading-character-class in packages/server/src/utils/logger.ts:202 (run 45664171556). Fix in draft PR #104.",
+      "firstSeen": "2026-11-25T17:40:31.472Z",
+      "lastSeen": "2026-11-25T17:40:31.472Z",
+      "pagedAt": null,
+      "pr": "https://github.com/rebasepro/rebase/pull/104"
     }
   }
 }
