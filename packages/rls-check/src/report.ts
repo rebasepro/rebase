@@ -610,11 +610,13 @@ function renderSummary(
     if (result.stats.tablesWithoutRls > 0) {
         out.push(
             `  ${style.dim(
+                // The verb agrees with the count of disabled tables, the noun with
+                // the total: "1 of 3 tables has", "2 of 4 tables have".
                 `${result.stats.tablesWithoutRls} of ${result.stats.tables} ${plural(
                     result.stats.tables,
-                    "table has",
-                    "tables have"
-                )} row-level security disabled`
+                    "table",
+                    "tables"
+                )} ${plural(result.stats.tablesWithoutRls, "has", "have")} row-level security disabled`
             )}`
         );
     }

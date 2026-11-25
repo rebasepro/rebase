@@ -1,5 +1,5 @@
 ---
-sourceHash: 313f8530404811bc
+sourceHash: cd9f3ee19e982c40
 slug: it/docs/rls-check
 title: rls-check
 description: Esegui l'audit della row-level security su qualsiasi database PostgreSQL — Supabase, Neon, RDS o il tuo server. Sola lettura, nessuna registrazione, Rebase non richiesto.
@@ -35,10 +35,10 @@ chiamata di rete oltre a quella verso il tuo database.
 # From the environment — DATABASE_URL, then POSTGRES_URL, then a .env in the cwd
 npx @rebasepro/rls-check
 
-# For a database that is not the one in your environment
-DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
+# Another database: paste its string at a hidden prompt, out of npm's echo and your history
+read -rs DATABASE_URL && export DATABASE_URL && npx @rebasepro/rls-check
 
-# As an argument. Works, but see the warning above about where the password lands
+# As an argument. Works, but npm echoes it and your shell history keeps it, password and all
 npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 

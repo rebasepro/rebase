@@ -10,7 +10,7 @@ ESM-only: `"type": "module"` with no CommonJS build. It is a command, so that
 matters only if you import it — and on Node `>=22.22.0`, the floor it declares,
 `require()` of it resolves too: Node has supported `require(esm)` from 22.12.
 
-Run it in your project directory and it finds the database itself: `DATABASE_URL`, then `POSTGRES_URL`, then a `.env` beside you. Point it somewhere else with `DATABASE_URL="postgresql://user:password@host:5432/database" npx @rebasepro/rls-check`.
+Run it in your project directory and it finds the database itself: `DATABASE_URL`, then `POSTGRES_URL`, then a `.env` beside you. To scan some other database, paste its string at a hidden prompt — `read -rs DATABASE_URL && export DATABASE_URL && npx @rebasepro/rls-check` — so the password lands in neither npm's echo of the command nor your shell history, which is where `DATABASE_URL="…"` typed on the command line, or an argument, would put it.
 
 It also takes the connection string as an argument, but prefer not to: npm echoes the command line before the program starts and your shell records it, so the password lands in two places `rls-check` cannot redact. Writing `$DATABASE_URL` there does not help — the shell expands it before npm sees it.
 
@@ -173,7 +173,7 @@ Ids are stable. They go into `--skip` lists and CI baselines, so a rename is tre
 ## Usage
 
 ```
-DATABASE_URL="postgresql://..." npx @rebasepro/rls-check [options]
+npx @rebasepro/rls-check [options]          # DATABASE_URL, POSTGRES_URL, then ./.env
 npx @rebasepro/rls-check [connection-string] [options]
 
   --json                 Machine-readable ScanResult on stdout, and nothing else.
@@ -344,7 +344,7 @@ Findings are sorted worst-first and then by schema, object and id, so two scans 
 `--format agent` is for a coding agent that runs `npx @rebasepro/rls-check` against the database it is building and then fixes what it finds. It writes one JSON document to stdout and nothing else; the exit code is the same as for any other format.
 
 ```bash
-DATABASE_URL="postgresql://..." npx @rebasepro/rls-check --format agent
+npx @rebasepro/rls-check --format agent
 ```
 
 Every finding names the check id (one of the fifteen `--list-checks` prints) and the failing object, and carries a `remediation` built for that check id:

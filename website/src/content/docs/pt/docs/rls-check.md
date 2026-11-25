@@ -1,5 +1,5 @@
 ---
-sourceHash: 313f8530404811bc
+sourceHash: cd9f3ee19e982c40
 slug: pt/docs/rls-check
 title: rls-check
 description: Audite a segurança em nível de linha (RLS) em qualquer banco de dados PostgreSQL — Supabase, Neon, RDS ou seu próprio servidor. Somente leitura, sem necessidade de cadastro ou do Rebase.
@@ -35,10 +35,10 @@ chamada de rede além daquela direcionada ao seu banco de dados.
 # A partir do ambiente — DATABASE_URL, depois POSTGRES_URL, depois um .env no diretório atual
 npx @rebasepro/rls-check
 
-# Para um banco de dados que não seja o do seu ambiente
-DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
+# Outro banco: cole a string num prompt oculto, fora do eco do npm e do seu histórico
+read -rs DATABASE_URL && export DATABASE_URL && npx @rebasepro/rls-check
 
-# Como um argumento. Funciona, mas veja o aviso acima sobre onde a senha vai parar
+# Como argumento. Funciona, mas o npm a repete e o histórico do shell a guarda, com a senha
 npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 

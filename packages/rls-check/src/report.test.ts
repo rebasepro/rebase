@@ -361,6 +361,17 @@ describe("renderReport", () => {
         expect(renderReport(result(), { ...options, failOn: "none" })).toContain("--fail-on none");
     });
 
+    it("agrees the verb with the disabled count and the noun with the total", () => {
+        const line = (tables: number, tablesWithoutRls: number) =>
+            renderReport(
+                result({ stats: { schemas: 1, tables, policies: 0, tablesWithoutRls, checksRun: 15 } }),
+                options
+            );
+        expect(line(3, 1)).toContain("1 of 3 tables has row-level security disabled");
+        expect(line(4, 2)).toContain("2 of 4 tables have row-level security disabled");
+        expect(line(1, 1)).toContain("1 of 1 table has row-level security disabled");
+    });
+
     it("is explicit when there is nothing to report", () => {
         const text = renderReport(result({ findings: [] }), options);
         expect(text).toContain("No findings");

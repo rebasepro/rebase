@@ -2,7 +2,7 @@
  * `@rebasepro/rls-check` — a read-only Row-Level Security audit for any
  * PostgreSQL database.
  *
- *   npx @rebasepro/rls-check "postgresql://user:pass@host:5432/database"
+ *   npx @rebasepro/rls-check   # reads DATABASE_URL, POSTGRES_URL, then ./.env
  *
  * Two entry points:
  *
