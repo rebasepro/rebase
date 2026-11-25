@@ -807,7 +807,14 @@ export function createPostgresWebSocket(
                     // Kept, as the JWT branch keeps them: the built-in auth is
                     // an adapter, so dropping them here left every
                     // claim-tenanted collection with no tenant on the socket.
-                    ...(adapterUser.claims ? { claims: adapterUser.claims } : {})
+                    ...(adapterUser.claims ? { claims: adapterUser.claims } : {}),
+                    // Kept, as the HTTP routes keep them (`verifyCredential`
+                    // reads `user.scopes` before the roles): an adapter that
+                    // names what a session may do — an admin scope for a role
+                    // other than `admin`, or a narrower set — meant it on HTTP
+                    // only, and its people's admin-plane frames came back
+                    // SCOPE_MISSING.
+                    ...(adapterUser.scopes ? { scopes: [...adapterUser.scopes] } : {})
                 }
             };
         }

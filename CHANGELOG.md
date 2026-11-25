@@ -18,6 +18,10 @@
 - **The Google sign-in script is fetched by the Google button.** It was a `<script>` in the app's `index.html`, so every page load ran it, signed-in sessions included. The login view now adds it when a Google button mounts and reuses a tag that is already there. A scaffolded project, whose `index.html` never had the tag, gets a working Google button.
 - **The Rebase Cloud console's login screen downloads 1,457 kB of JavaScript instead of 6,708 kB (453 kB gzipped instead of 1,803 kB).** The staff-only admin mode (the CMS, Studio and the console's table customizations) loads when it is opened, and only staff prefetch it. Spanish loads when it is shown. Each package's own code splitting now survives the console's chunk policy. The fonts are self-hosted, so nothing on Google's servers blocks the first paint, and the assets ship with brotli siblings.
 
+### Fixed
+
+- **A socket keeps the scopes an auth adapter returns.** When an adapter's `verifyToken` or `verifyRequest` answered a user with `scopes`, the HTTP routes used them but the WebSocket dropped them and fell back to what the user's roles hold. So an adapter that granted `database:write` to a role other than `admin` saw every Studio SQL console run refused with `SCOPE_MISSING`. One that narrowed a session got the roles' full scopes on the socket. The socket now keeps them, as it already did for API keys.
+
 ## [0.36.0] - 2026-11-24
 
 ### Added
