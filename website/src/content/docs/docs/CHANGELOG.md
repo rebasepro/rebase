@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-25
+
 ### Added
 
 - **`logger` from `@rebasepro/server/functions`.** The runtime's structured logger, the same object the package root exports, on the functions entry: `logger.info("charged", { orderId })` is one JSON line in production with the request's `requestId` and `uid` on it. A function's `console.log` is plain text with neither.

@@ -3,7 +3,7 @@
 #
 #   rebase build
 #   cat > Dockerfile <<'EOF'
-#   FROM rebasepro/server:0.37.1
+#   FROM rebasepro/server:0.38.0
 #   COPY dist-bundle /bundle
 #   EOF
 #   docker build -t registry.example.com/my-app:1.4.0 .

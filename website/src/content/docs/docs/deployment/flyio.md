@@ -37,7 +37,7 @@ rebase build
 Commit a three-line `Dockerfile` at the project root:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.37.1
+FROM rebasepro/server:0.38.0
 COPY dist-bundle /bundle
 ```
 

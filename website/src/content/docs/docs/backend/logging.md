@@ -8,8 +8,6 @@ A Rebase backend writes one line per event to stdout. In production (`NODE_ENV=p
 
 ## The shape of a line
 
-<span class="since-badge" data-since="0.38">Since 0.38</span>
-
 Every production line has the same three keys first, then its fields:
 
 ```json

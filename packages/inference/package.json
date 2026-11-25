@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/inference",
-  "version": "0.37.1",
+  "version": "0.38.0",
   "description": "Infer a Rebase collection schema from existing data (Rebase is the open-source Postgres BaaS).",
   "keywords": [
     "rebase",

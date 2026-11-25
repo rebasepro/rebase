@@ -1,5 +1,5 @@
 ---
-sourceHash: cf8fcea550eb297d
+sourceHash: 39dad6e02745cb69
 title: Implantando o Rebase na Railway
 description: Implante o Rebase na Railway a partir da imagem de runtime publicada e do bundle do seu projeto. Mantenha o foco na UE.
 sidebar_label: Railway
@@ -34,7 +34,7 @@ rebase build
 Faça o commit de um `Dockerfile` de três linhas na raiz do repositório, para que a etapa de build da Railway seja apenas uma cópia em vez de uma compilação:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.37.1
+FROM rebasepro/server:0.38.0
 COPY dist-bundle /bundle
 ```
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3d7c2fddfbbc2a0a
+sourceHash: a9c2c31f7de0499c
 title: Bereitstellung von Rebase auf AWS
 description: Stellen Sie Ihre Rebase-Instanz sicher auf Amazon Web Services bereit, indem Sie RDS und AWS App Runner mit einem starken europäischen Fokus nutzen.
 sidebar_label: AWS
@@ -35,7 +35,7 @@ rebase build
 Für App Runner, das Images aus einer Registry bezieht, binden Sie das Bundle in ein abgeleitetes Image ein. Das sind lediglich drei Zeilen und legt exakt fest, was ausgeführt wird:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.37.1
+FROM rebasepro/server:0.38.0
 COPY dist-bundle /bundle
 ```
 

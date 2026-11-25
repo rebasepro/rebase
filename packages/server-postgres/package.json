@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/server-postgres",
-  "version": "0.37.1",
+  "version": "0.38.0",
   "description": "PostgreSQL driver for Rebase, the open-source Postgres BaaS, built on Drizzle ORM",
   "keywords": [
     "cms",
