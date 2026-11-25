@@ -166,10 +166,12 @@ export function CollectionTableToolbar({
 
                         {/* At least as wide as the scroller, and never narrower
                             than its controls: the two groups cannot be squeezed
-                            into each other. */}
+                            into each other. The right padding is room for the
+                            last control's focus ring, which the scroller would
+                            otherwise cut. */}
                         <div
                             ref={rowRef}
-                            className={"pl-2 @3xl/collection:pl-4 flex flex-row justify-between items-center min-w-full w-max"}>
+                            className={"pl-2 @3xl/collection:pl-4 pr-1 flex flex-row justify-between items-center min-w-full w-max"}>
 
                             {/* Takes the free space, which the preset chips in
                                 `actionsStart` grow into — and never narrower
