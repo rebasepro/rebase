@@ -13,6 +13,10 @@
 
 - **`@rebasepro/mcp` runs on the MCP TypeScript SDK v2** (`@modelcontextprotocol/server` 2.4.0, replacing `@modelcontextprotocol/sdk` 1.30), so it speaks protocol revision 2026-07-28 over stdio as well as the 2025 revisions. Its tools and their behaviour are unchanged. Its resources now go through the SDK: `resources` is declared with `listChanged: true`, and `resources/templates/list` lists `rebase://tables/{+name}`, `rebase://schema` and `skill://{+path}`. An unknown resource URI is answered with the SDK's resource-not-found error. A `rebase://tables/` URI is parsed before it is read, so `..` segments are removed first. A name that would still leave the schema directory is refused, as before.
 
+### Fixed
+
+- **A socket keeps the scopes an auth adapter returns.** When an adapter's `verifyToken` or `verifyRequest` answered a user with `scopes`, the HTTP routes used them but the WebSocket dropped them and fell back to what the user's roles hold. So an adapter that granted `database:write` to a role other than `admin` saw every Studio SQL console run refused with `SCOPE_MISSING`. One that narrowed a session got the roles' full scopes on the socket. The socket now keeps them, as it already did for API keys.
+
 ## [0.36.0] - 2026-11-24
 
 ### Added
