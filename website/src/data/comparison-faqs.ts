@@ -52,6 +52,10 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
             q: "cfaq.supabase.4.q",
             a: "cfaq.supabase.4.a"
         },
+        {
+            q: "cfaq.supabase.5.q",
+            a: "cfaq.supabase.5.a"
+        },
         HOSTING
     ],
 
@@ -71,6 +75,10 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
         {
             q: "cfaq.firebase.4.q",
             a: "cfaq.firebase.4.a"
+        },
+        {
+            q: "cfaq.firebase.5.q",
+            a: "cfaq.firebase.5.a"
         },
         HOSTING
     ],

@@ -11,16 +11,27 @@ import {
 import { deepEqual as equal } from "fast-equals"
 import { hashString, slugify } from "@rebasepro/utils";
 
-// iconKeys are now PascalCase strings (e.g. "ShoppingCart", "Users")
-const iconKeysMap: Record<string, string> = iconKeys.reduce((acc: Record<string, string>, key) => {
-    // Also add lowercase versions and snake_case versions to support legacy lookups
-    const lower = key.toLowerCase();
-    const snake = key.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "");
-    acc[lower] = key;
-    acc[snake] = key;
-    acc[key] = key;
-    return acc;
-}, {});
+let iconKeysMapCache: Record<string, string> | null = null;
+
+/**
+ * Every icon name, by itself and by its lowercase and snake_case spellings
+ * (legacy lookups) — about five thousand entries, three regex passes over
+ * every lucide name. Built on the first icon drawn, not when this module
+ * loads: it used to run during the entry chunk's evaluation, before anything
+ * could paint.
+ */
+function getIconKeysMap(): Record<string, string> {
+    if (iconKeysMapCache) return iconKeysMapCache;
+    // iconKeys are PascalCase strings (e.g. "ShoppingCart", "Users")
+    const map: Record<string, string> = {};
+    for (const key of iconKeys) {
+        map[key.toLowerCase()] = key;
+        map[key.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")] = key;
+        map[key] = key;
+    }
+    iconKeysMapCache = map;
+    return map;
+}
 
 const warnedIconKeys = new Set<string>();
 
@@ -58,6 +69,7 @@ export function getIcon(iconKey?: string | React.ReactNode,
         const lowerKey = iconKey.toLowerCase();
         const slugifiedKey = slugify(iconKey).replace(/-/g, "_");
 
+        const iconKeysMap = getIconKeysMap();
         const mappedKey = iconKeysMap[iconKey] || iconKeysMap[lowerKey] || iconKeysMap[slugifiedKey];
 
         if (!mappedKey) {
@@ -108,6 +120,7 @@ export const IconForView = React.memo(
 
         let pathname = slugify(("singularName" in collectionOrView ? collectionOrView.singularName : undefined) ?? collectionOrView.name).replace(/-/g, "_");
 
+        const iconKeysMap = getIconKeysMap();
         let key: string | undefined;
         if (pathname in iconKeysMap)
             key = iconKeysMap[pathname];

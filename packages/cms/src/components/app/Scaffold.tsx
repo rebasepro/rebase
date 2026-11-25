@@ -245,8 +245,14 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
 
         return (
             <AppContext.Provider value={appContextValue}>
+                {/* `relative` makes this the containing block of every absolute
+                    descendant without a nearer one. Without it they resolve
+                    against the viewport and escape `overflow-hidden`: an
+                    `sr-only` label at its static position deep in a scrolled
+                    view grew the document, and the whole frame scrolled under
+                    the wheel wherever the inner view did not catch it first. */}
                 <div
-                    className={cls("flex h-screen w-screen overflow-hidden",
+                    className={cls("relative flex h-screen w-screen overflow-hidden",
                         "bg-surface-frame",
                         "text-surface-900 dark:text-white", className)}
                     style={{

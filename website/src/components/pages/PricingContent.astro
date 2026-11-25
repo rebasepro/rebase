@@ -66,14 +66,13 @@ const lede = [
 // card's, priced from the generated list; `defaultProjectLines` throws at
 // build time if they stop adding up to the exported total.
 const receipt = [
-    { label: t("pricing.calc.line.platform"), detail: "", amount: lines.platform },
     { label: t("pricing.calc.line.app"), detail: size(region.defaults.app), amount: lines.app },
     { label: t("pricing.calc.line.database"), detail: size(region.defaults.database), amount: lines.database },
     { label: t("pricing.calc.line.disk"), detail: `${region.defaults.diskGi} GB`, amount: lines.disk }
 ];
 
 const rateRows = [
-    { label: t("pricing.dials.rate.platform"), value: eur(rates.platformEur), per: t("pricing.dials.per.project") },
+    { label: t("pricing.dials.rate.minimum"), value: eur(rates.minimumEur), per: t("pricing.dials.per.project") },
     { label: t("pricing.dials.rate.appCpu"), value: eur(rates.appVcpuEur), per: t("pricing.dials.per.vcpu") },
     { label: t("pricing.dials.rate.appMemory"), value: eur(rates.appGbEur), per: t("pricing.dials.per.gb") },
     { label: t("pricing.dials.rate.databaseCpu"), value: eur(rates.databaseVcpuEur), per: t("pricing.dials.per.vcpu") },
@@ -117,7 +116,7 @@ const faqs = [
         })
     },
     { q: t("pricing.faq.location.q"), a: fill(t(offerKey("pricing.faq.location.a")), { place: facts.place, provider: facts.provider }) },
-    { q: t("pricing.faq.cancel.q"), a: t("pricing.faq.cancel.a") },
+    { q: t("pricing.faq.cancel.q"), a: fill(t("pricing.faq.cancel.a"), { minimum: eur(CLOUD_PRICES.minimumEur) }) },
     { q: t("pricing.faq.invoices.q"), a: t("pricing.faq.invoices.a") },
     { q: t("pricing.faq.exit.q"), a: t("pricing.faq.exit.a") }
 ];
@@ -133,15 +132,14 @@ const faqSchema = {
 // What the calculator script reads: the region's sizes and prices, and the
 // strings it writes. One JSON island, no second copy of any number.
 const calcData = {
-    platformFeeEur: CLOUD_PRICES.platformFeeEur,
+    minimumEur: CLOUD_PRICES.minimumEur,
     includedFilesGb: CLOUD_PRICES.included.filesGb,
     filesEurPerGb: CLOUD_PRICES.overage.filesEurPerGb,
     hoursInMonth: HOURS_IN_MONTH,
     sleep: CLOUD_FLAGS.sleep ? CLOUD_PRICES.sleep : null,
     region: { app: region.app, database: region.database, diskEurPerGib: region.diskEurPerGib, defaults: region.defaults },
     labels: {
-        platform: t("pricing.calc.line.platform"),
-        platformAsleep: t("pricing.calc.line.platformAsleep"),
+        minimum: t("pricing.calc.line.minimum"),
         app: t("pricing.calc.line.app"),
         database: t("pricing.calc.line.database"),
         disk: t("pricing.calc.line.disk"),
@@ -203,7 +201,7 @@ const fieldClass = "w-full rounded-lg border border-hairline bg-surface-field px
 
     <section class="relative z-0 pb-chapter">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:bleed-rails">
 
                 <div class="frame relative overflow-hidden p-8 flex flex-col">
                     <h2 class="text-xl text-tone-max mb-2">{t("pricing.oss.name")}</h2>
@@ -464,13 +462,13 @@ const fieldClass = "w-full rounded-lg border border-hairline bg-surface-field px
     // from. Lines are rounded to the cent and then summed, as an invoice is.
     interface SizePrice { cpu: string; memory: string; monthlyEur: number }
     interface CalcData {
-        platformFeeEur: number;
+        minimumEur: number;
         includedFilesGb: number;
         filesEurPerGb: number;
         hoursInMonth: number;
-        sleep: { platformFeeEur: number; hoursInMonth: number } | null;
+        sleep: { hoursInMonth: number } | null;
         region: { app: SizePrice[]; database: SizePrice[]; diskEurPerGib: number };
-        labels: Record<"platform" | "platformAsleep" | "app" | "database" | "disk" | "secondCopy" | "files" | "awake" | "hourly", string>;
+        labels: Record<"minimum" | "app" | "database" | "disk" | "secondCopy" | "files" | "awake" | "hourly", string>;
     }
 
     const dataEl = document.getElementById("cloud-calc-data");
@@ -510,21 +508,24 @@ const fieldClass = "w-full rounded-lg border border-hairline bg-surface-field px
             const sleeping = data.sleep !== null && checked("sleep");
             if (awakeEl instanceof HTMLElement) awakeEl.hidden = !sleeping;
 
-            const alwaysOn = cents(data.platformFeeEur + app.monthlyEur + db.monthlyEur + disk + secondCopy);
+            const alwaysOn = cents(app.monthlyEur + db.monthlyEur + disk + secondCopy);
             let lines: [string, number][];
             let total: number;
             if (sleeping && data.sleep) {
-                // src/sleep/accounting.ts: a sleeping month is the sleeping fee,
-                // the disk and the awake hours, never more than always on.
+                // src/sleep/accounting.ts: a sleeping month is the disk and the
+                // awake hours at the always-on rate, topped up to the monthly
+                // minimum, never more than always on.
                 const hours = Math.min(data.sleep.hoursInMonth, num("awake", 0));
                 const compute = app.monthlyEur + db.monthlyEur + (secondCopy > 0 ? db.monthlyEur : 0);
                 const fixed = disk + (secondCopy > 0 ? disk : 0);
-                const rate = (compute + data.platformFeeEur - data.sleep.platformFeeEur) / data.sleep.hoursInMonth;
-                const awake = cents(Math.min(hours * rate, alwaysOn - data.sleep.platformFeeEur - fixed));
-                lines = [[data.labels.platformAsleep, data.sleep.platformFeeEur], [data.labels.awake, awake], [data.labels.disk, fixed]];
-                total = cents(Math.min(data.sleep.platformFeeEur + fixed + awake, alwaysOn));
+                const rate = compute / data.sleep.hoursInMonth;
+                const awake = cents(Math.min(hours * rate, alwaysOn - fixed));
+                const topUp = cents(Math.max(0, Math.min(data.minimumEur, alwaysOn) - fixed - awake));
+                lines = [[data.labels.awake, awake], [data.labels.disk, fixed]];
+                if (topUp > 0) lines.push([data.labels.minimum, topUp]);
+                total = cents(Math.min(fixed + awake + topUp, alwaysOn));
             } else {
-                lines = [[data.labels.platform, data.platformFeeEur], [data.labels.app, app.monthlyEur], [data.labels.database, db.monthlyEur], [data.labels.disk, disk]];
+                lines = [[data.labels.app, app.monthlyEur], [data.labels.database, db.monthlyEur], [data.labels.disk, disk]];
                 if (secondCopy > 0) lines.push([data.labels.secondCopy, secondCopy]);
                 total = alwaysOn;
             }

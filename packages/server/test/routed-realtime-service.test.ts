@@ -157,6 +157,19 @@ describe("createRoutedRealtimeService", () => {
         expect(pg.handleClientMessage).toHaveBeenCalledTimes(1);
     });
 
+    it("refuses a table on a database it has no provider for, instead of subscribing it to the default's", async () => {
+        const strict = createRoutedRealtimeService({
+            providers: { "(default)": pg },
+            defaultKey: "(default)",
+            resolveKey: (path) => (path === "events" ? "analytics" : "(default)")
+        });
+        await expect(strict.handleClientMessage("c1", { type: "subscribe_collection", payload: { path: "events", subscriptionId: "s1" } }))
+            .rejects.toThrow(/database "analytics"/);
+        expect(pg.handleClientMessage).not.toHaveBeenCalled();
+        await strict.handleClientMessage("c1", { type: "subscribe_collection", payload: { path: "posts", subscriptionId: "s2" } });
+        expect(pg.handleClientMessage).toHaveBeenCalledTimes(1);
+    });
+
     it("lifecycle methods fan out to all providers", async () => {
         routed.onServerReady?.({ port: 3000 });
         await routed.destroy?.();

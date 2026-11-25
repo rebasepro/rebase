@@ -1,5 +1,5 @@
 ---
-sourceHash: 621ab8c5f03927d7
+sourceHash: 8f68cfb67afebe1c
 title: API REST
 sidebar_label: API REST
 description: Points de terminaison d'API REST générés automatiquement pour chaque table, avec filtrage, tri, pagination et inclusion des relations.
@@ -376,7 +376,7 @@ GET /api/meta/contract
 ```
 
 ```json
-{ "schemaVersion": "v2:…", "runtime": { "version": "0.35.1", "contract": 2 }, "tables": [ … ] }
+{ "schemaVersion": "v2:…", "runtime": { "version": "0.37.1", "contract": 2 }, "tables": [ … ] }
 ```
 
 Il nécessite la portée **`schema:read`**, détenue par un administrateur, et sur un déploiement où aucune authentification n'est configurée, il n'est pas du tout servi (404 `CONTRACT_UNAVAILABLE`) plutôt que d'exposer le schéma à n'importe qui. Les versions de schéma commencent par `v2:` depuis la version 0.31 : elles sont calculées à partir des tables compilées, de sorte que la version de chaque projet a changé une fois. Son homologue renvoie une chaîne de version qui représente le schéma sans le décrire, et est délibérément accessible sans identifiant — ce qu'interroge un job de CI :

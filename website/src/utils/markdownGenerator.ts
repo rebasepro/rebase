@@ -435,7 +435,6 @@ ${start}
 
 ## ${tr("pricing.dials.title")}
 
-- ${tr("pricing.calc.line.platform")}: ${eur(lines.platform)}
 - ${tr("pricing.calc.line.app")} (${size(region.defaults.app)}): ${eur(lines.app)}
 - ${tr("pricing.calc.line.database")} (${size(region.defaults.database)}): ${eur(lines.database)}
 - ${tr("pricing.calc.line.disk")} (${region.defaults.diskGi} GB): ${eur(lines.disk)}
@@ -443,7 +442,7 @@ ${start}
 
 ## ${tr("pricing.dials.rates.title")} (a month)
 
-- ${tr("pricing.dials.rate.platform")}: ${eur(rates.platformEur)} ${tr("pricing.dials.per.project")}
+- ${tr("pricing.dials.rate.minimum")}: ${eur(rates.minimumEur)} ${tr("pricing.dials.per.project")}
 - ${tr("pricing.dials.rate.appCpu")}: ${eur(rates.appVcpuEur)} ${tr("pricing.dials.per.vcpu")}
 - ${tr("pricing.dials.rate.appMemory")}: ${eur(rates.appGbEur)} ${tr("pricing.dials.per.gb")}
 - ${tr("pricing.dials.rate.databaseCpu")}: ${eur(rates.databaseVcpuEur)} ${tr("pricing.dials.per.vcpu")}

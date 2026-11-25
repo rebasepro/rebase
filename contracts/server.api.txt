@@ -26,6 +26,7 @@ class StoragePolicyError
 class TableRegistry { authTable, get, list, named, replaceAll, revision, setHooks, table, tables }
 class TransformCache { buildKey, get, set }
 class TusHandler { create, delete, head, options, patch, startCleanup }
+class UnknownDatabaseError { databaseKey, knownKeys }
 class UnknownStorageSourceError { knownKeys, storageId }
 class WebhookDispatcher { deliverQueuedJob, enqueueEntityChange, flush, onEntityChange, sendTest, setWebhooks, watchesTable }
 const ACCOUNT_SCOPED_STORAGE_BASES
@@ -122,6 +123,9 @@ function createContractRoutes
 function createCronRoutes
 function createCronStore
 function createCustomAuthAdapter
+function createDbAdminRoutes
+function createDbCatalogRoutes
+function createDbInsightsRoutes
 function createDdlBootstrapper
 function createDevEmailSink
 function createDiscordProvider
@@ -370,6 +374,9 @@ interface CronLogSweep { counted, deleted }
 interface CronStore { ensureTable, fetchJobStates, fetchJobStats, fetchLogs, fetchRunSummaries, insertLog, releaseRunLease, saveEnabledOverride, sweepClaims, sweepLogs, tryAcquireRunLease, tryClaimRun }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DatabaseConnection { close, isConnected, type }
+interface DbAdminRoutesOptions { admin, getServedTables, reloadSchema }
+interface DbCatalogRoutesOptions { admin, reloadSchema, sources }
+interface DbInsightsRoutesOptions { admin, getServedTables, loadRlsCheck, sources }
 interface DdlBootstrapper { ensureObject, isReadable, step }
 interface DeclaredErrorAnswer { code, details, expected, message, status }
 interface DeclaredTables { defs, descriptors, rpc, source, tables }
@@ -417,8 +424,9 @@ interface Logger { child, debug, error, info, warn }
 interface MagicLinkTokenInfo { expiresAt, uid }
 interface McpCaller { clientId, credential, roles, scopes, uid }
 interface McpScopeVocabulary { defaultScope, supported }
+interface McpStorageAccess { authorize, authorizeData, registry }
 interface McpToolAnnotations { destructiveHint, idempotentHint, openWorldHint, readOnlyHint }
-interface McpToolContext { authAdapter, caller, compileApp, driver, tables, uiPreferences }
+interface McpToolContext { authAdapter, caller, compileApp, driver, storage, tables, uiPreferences }
 interface McpToolDefinition { annotations, confirm, description, inputSchema, modelResult, name, offeredWithView, outputSchema, ownText, requiredScope, run, structuredContent, title, ui }
 interface MetricsHandle { middleware, registry, setKnownCollections }
 interface MfaChallengeInfo { attempts, createdAt, factorId, id, ipAddress, verifiedAt }
@@ -665,6 +673,7 @@ const MCP_APP_MODULES { @rebasepro/app, @rebasepro/cms, @rebasepro/ui, react, re
 const NULL_OPS
 const POLICY_EXPRESSION_KINDS
 const POSTGRES_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+const PRECOMPRESS_MIN_BYTES
 const PUBLIC_STORAGE_PREFIX
 const REBASE_ADMIN_REQUEST_ROLE
 const REBASE_ADMIN_ROLE
@@ -758,6 +767,7 @@ function isNumericColumnType
 function isPercentileFraction
 function isPolicyExpressionKind
 function isPolicyShorthand
+function isPrecompressibleAsset
 function isPublicStorageKey
 function isPublicStoragePath
 function isRedactedSecurityRule
@@ -1610,6 +1620,7 @@ const ADMIN_ROLE
 const AUTH_SECRET_NAMES
 const AUTH_USERS_TABLE { schema, table }
 const CALLBACK_REJECTED
+const CLAUDE_CONNECTORS_URL
 const COLUMN_MODIFIER_ORDER
 const COMPOSITE_ID_SEPARATOR
 const DEFAULT_DOWNLOAD_URL_CACHE_ENTRIES
@@ -1624,6 +1635,9 @@ const ETAG_KEY
 const JUNCTION_TABLES_SQL
 const LOAD_REQUEST_ROLES_PLPGSQL
 const MAX_LOGICAL_NESTING_DEPTH
+const MCP_CLIENT_KEYS
+const MCP_METADATA_PATH
+const MCP_REMOTE_ONLY_CLIENTS
 const PAGE_WITH_OFFSET_MESSAGE
 const REBASE_INTERNAL_PREFIXES
 const REBASE_INTERNAL_SCHEMAS
@@ -1659,6 +1673,8 @@ function canWriteRelation
 function canWriteWithAccess
 function checkTableOperation
 function classifyTable
+function claudeCodeAddArgs
+function claudeCodeAddCommand
 function collectAllPages
 function columnAccess
 function columnByKey
@@ -1684,11 +1700,13 @@ function createDownloadUrlCache
 function createDriverTableRows
 function createPaginationHelpers { findAll, iterate }
 function createStampKeys
+function cursorInstallLink
 function cursorToStartAfter
 function customSqlTypeProblem
 function databaseOwnsDefault
 function declaredSchemaOf
 function decodeCursor
+function defaultMcpServerName
 function defaultOnCreate
 function denormalizeInclude
 function describeColumn
@@ -1710,6 +1728,7 @@ function findTableDdl
 function firstDuplicate
 function firstSqlRow
 function formatJsonPath
+function genericMcpConfig { mcpServers }
 function getColumnName
 function getEnumVarName
 function getTableVarName
@@ -1728,6 +1747,7 @@ function isIlikeSearchable
 function isInstantType
 function isIntegerFamilyType
 function isJsNumberType
+function isLoopbackUrl
 function isNativeArrayType
 function isRebaseInternalTable
 function isRelationalCollection
@@ -1745,6 +1765,7 @@ function keyColumnOf
 function keyColumns
 function keyForColumn
 function listTransforms
+function mcpUrlFromMetadata
 function mergeIncludeSpecs
 function normalizeDriverOrderBy
 function normalizeEmail
@@ -1845,6 +1866,7 @@ function valueCodecOf
 function valueCodecOfType
 function vectorColumnKeys
 function viaJoinTableNames
+function vscodeInstallLink
 function warnDeprecated
 function warnOnTableDdl
 function withETag
@@ -1916,6 +1938,7 @@ type FieldOperationKind
 type FilterTuple
 type KeyIdentity
 type ManyToManyDescriptor
+type McpClientKey
 type PageFinder
 type PaginationErrorCode
 type PrintTargetResolver

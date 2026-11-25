@@ -86,7 +86,18 @@ import { existingTables, provisionedWithoutHistoryProblem, pushOnMigratedDatabas
 import { promptConfirm } from "./cli-prompt";
 import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
 import { branchNameIn, branchSourceIn, resolveBranchSwitches, unexpectedBranchArgs } from "./branch-argv";
-import { assertKnownFlags, parseDriverLine, resolveDriverSwitches, schemaDirIn } from "./cli-flags";
+import { assertKnownFlags, parseDriverLine, resolveDriverSwitches, schemaDirIn, type RELAYED_FLAGS } from "./cli-flags";
+import {
+    DEFAULT_MIGRATIONS_DIR,
+    declaredDatabaseKeys,
+    migrationsDirUrl,
+    resolveDatabaseTarget,
+    scopedDatabaseTarget,
+    UnknownDatabaseTargetError,
+    withDatabaseTarget,
+    type DatabaseTarget
+} from "./database-target";
+import { loadDeclaredResources } from "./schema/declared-resources";
 import { assertNoCollectionsFlag, assertSchemaDirExists, DEFAULT_SCHEMA_DIR } from "./cli-schema-dir";
 import { DESIRED_STATE_URL, GENERATED_SQL_DIR, generatedSqlDir, prepareGeneratedSqlDir } from "./generated-sql";
 import { backupActionOf } from "./backup-argv";
@@ -105,7 +116,7 @@ import { ACTIVE_BRANCH_DATABASE_ENV, planIsEmpty, planPrune, parseOlderThan } fr
  * policies are written `TO` — `adminRolePreamble`.)
  */
 const rlsBootstrapSql = (): string =>
-    declaredRlsPolicyShape().policyTarget === "requestRole"
+    declaredRlsPolicyShape(scopedDatabaseTarget()?.key).policyTarget === "requestRole"
         ? `${RLS_BOOTSTRAP_SQL}\n${REQUEST_ROLE_FUNCTION_SQL};\n`
         : RLS_BOOTSTRAP_SQL;
 
@@ -301,9 +312,28 @@ export async function runPluginCommand(args: string[]) {
     }
 }
 
+/**
+ * The migration directory of the database this command acts on, relative to
+ * the working directory: `drizzle/migrations` for the default database, its
+ * own for each other one (`database-target.ts`).
+ */
+function migrationsDir(): string {
+    return scopedDatabaseTarget()?.migrationsDir ?? DEFAULT_MIGRATIONS_DIR;
+}
+
+/** {@link migrationsDir} as Atlas's `--dir` takes it. */
+function migrationsDirArg(): string {
+    return migrationsDirUrl(migrationsDir());
+}
+
+/** What a printed `rebase db …` command needs to reach this database again: `""`, or ` --database analytics`. */
+function targetSuffix(): string {
+    return scopedDatabaseTarget()?.commandSuffix ?? "";
+}
+
 /** The migration files on disk, sorted, or none if the directory is absent. */
 function listMigrationFiles(): string[] {
-    const dir = path.resolve(process.cwd(), "drizzle", "migrations");
+    const dir = path.resolve(process.cwd(), migrationsDir());
     if (!fs.existsSync(dir)) return [];
     return fs.readdirSync(dir).filter(f => f.endsWith(".sql")).sort();
 }
@@ -334,10 +364,10 @@ async function refuseProvisionedWithoutHistory(databaseUrl: string): Promise<voi
     try {
         const latestRecorded = await latestRecordedMigration(databaseUrl);
         if (latestRecorded !== null) return;
-        const dir = path.resolve(process.cwd(), "drizzle", "migrations");
+        const dir = path.resolve(process.cwd(), migrationsDir());
         const created = files.flatMap(file => tablesCreatedBy(fs.readFileSync(path.join(dir, file), "utf8")));
         const existing = await withAppClient(databaseUrl, client => existingTables(client, created));
-        problem = provisionedWithoutHistoryProblem({ latestRecorded, existing, newestVersion: latestMigrationVersion() });
+        problem = provisionedWithoutHistoryProblem({ latestRecorded, existing, newestVersion: latestMigrationVersion(), commandSuffix: targetSuffix() });
     } catch {
         return;
     }
@@ -397,7 +427,7 @@ async function stripCarvedOutFromNewestMigration(schemaDir: string): Promise<boo
 
     const newest = listMigrationFiles().at(-1);
     if (!newest) return false;
-    const file = path.resolve(process.cwd(), "drizzle", "migrations", newest);
+    const file = path.resolve(process.cwd(), migrationsDir(), newest);
 
     const result = stripCarvedOutStatements(fs.readFileSync(file, "utf-8"), patterns);
 
@@ -436,7 +466,7 @@ async function stripCarvedOutFromNewestMigration(schemaDir: string): Promise<boo
         out(chalk.gray(`  ✓ Kept Rebase's own columns out of ${newest} (${result.removed.length} statement(s))`));
     }
 
-    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir);
+    await runAtlas("migrate", ["hash", "--dir", migrationsDirArg()], schemaDir);
     return !result.empty;
 }
 
@@ -449,11 +479,11 @@ async function stripCarvedOutFromNewestMigration(schemaDir: string): Promise<boo
 async function makeDeclaredIndexesAdoptable(schemaDir: string): Promise<void> {
     const newest = listMigrationFiles().at(-1);
     if (!newest) return;
-    const file = path.resolve(process.cwd(), "drizzle", "migrations", newest);
+    const file = path.resolve(process.cwd(), migrationsDir(), newest);
     const result = declaredIndexesIfNotExists(fs.readFileSync(file, "utf-8"));
     if (result.rewritten === 0) return;
     fs.writeFileSync(file, result.sql, "utf-8");
-    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir);
+    await runAtlas("migrate", ["hash", "--dir", migrationsDirArg()], schemaDir);
 }
 
 /**
@@ -524,6 +554,9 @@ async function reportDestructiveMigration(migrationSql: string, migrationFile: s
  */
 const DB_FLAGS = {
     "--schema-dir": String,
+    // Which database: `database-target.ts`.
+    "--database": String,
+    "--all-databases": Boolean,
     "--allow-destructive": Boolean,
     "--prune-policies": Boolean,
     "--refuse-destructive": Boolean,
@@ -586,6 +619,83 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     const argsList = parseDriverLine(DB_FLAGS, rawArgs);
     const schemaDir = argsList["--schema-dir"] || DEFAULT_SCHEMA_DIR;
 
+    // One database per run, and every step of the run on that one: see
+    // `database-target.ts`. `--all-databases` is the same run once per
+    // declared database, the default first, stopping at the first that fails.
+    const targets = await databaseTargetsOf(argsList, schemaDir);
+    for (const target of targets) {
+        if (targets.length > 1 || !target.isDefault) {
+            out("");
+            out(chalk.bold(`  Database: ${target.key}`) + chalk.gray(` (${target.urlSource}, migrations in ${target.migrationsDir})`));
+        }
+        // Each database plans in an Atlas scratch copy of its own, dropped
+        // when its run succeeds — before the next database makes one.
+        await scratchDatabase.around(() => withDatabaseTarget(target, () =>
+            dbSchemaCommand(target, subcommand, rawArgs, argsList, schemaDir)));
+    }
+}
+
+/** A `db push | generate | migrate` line, as {@link DB_FLAGS} reads it. */
+type DbLine = arg.Result<typeof RELAYED_FLAGS & typeof DB_FLAGS>;
+
+/**
+ * The databases a `db push | generate | migrate` acts on, in order: the one
+ * `--database` names (the default when it names none), or with
+ * `--all-databases` the default and then every other declared one.
+ *
+ * Refused before anything is generated: a key the project does not declare
+ * (which would otherwise have been read as the default), `--database` with
+ * `--all-databases`, one connection string for several databases, and a named
+ * database nothing binds — whose run would get as far as Atlas before saying so.
+ */
+async function databaseTargetsOf(argsList: DbLine, schemaDir: string): Promise<DatabaseTarget[]> {
+    const requested = argsList["--database"];
+    const all = argsList["--all-databases"] === true;
+    const databaseUrlFlag = argsList["--database-url"];
+    if (requested !== undefined && all) {
+        outError(chalk.red("  ✗ --database and --all-databases both name the databases to act on. Pass one of them. Nothing was run."));
+        throw new CommandStopped("--database with --all-databases.");
+    }
+    // `resources.ts` declares the databases; the schema directory's parent is
+    // where it lives (the same rule `writePostgresDdl` reads extensions by).
+    const configDir = path.dirname(path.resolve(process.cwd(), schemaDir));
+    await loadDeclaredResources(configDir);
+
+    const keys = all ? declaredDatabaseKeys() : [requested];
+    if (all && keys.length > 1 && databaseUrlFlag) {
+        outError(chalk.red("  ✗ --all-databases with --database-url would run every database against one connection string. Nothing was run."));
+        outError(chalk.gray("    Bind each with DATABASE_URL__<KEY>, or run them one at a time: --database <key> --database-url <url>."));
+        throw new CommandStopped("--all-databases with --database-url.");
+    }
+    let targets: DatabaseTarget[];
+    try {
+        targets = keys.map(key => resolveDatabaseTarget({ requested: key, databaseUrlFlag, env: process.env, configDir }));
+    } catch (err) {
+        if (err instanceof UnknownDatabaseTargetError) {
+            outError(chalk.red(`  ✗ ${err.message}`));
+            throw new CommandStopped(err.message);
+        }
+        throw err;
+    }
+    const unbound = targets.filter(target => !target.isDefault && !target.url);
+    if (unbound.length > 0) {
+        const names = unbound.map(target => target.urlSource).join(", ");
+        outError(chalk.red(`  ✗ ${names} ${unbound.length === 1 ? "is" : "are"} not set, so there is no database to connect to. Nothing was run.`));
+        outError(chalk.gray("    Set it in .env (or the environment), or pass --database-url <url> with --database <key>."));
+        outError(chalk.gray("    Under `rebase dev`'s managed database, `rebase db …` binds every declared database itself."));
+        throw new CommandStopped(`${names} not set.`);
+    }
+    return targets;
+}
+
+/** `db push | generate | migrate` against one database — the one {@link withDatabaseTarget} scoped the run to. */
+async function dbSchemaCommand(
+    target: DatabaseTarget,
+    subcommand: "push" | "generate" | "migrate",
+    rawArgs: string[],
+    argsList: DbLine,
+    schemaDir: string
+): Promise<void> {
     if (subcommand === "generate") {
         out("");
         out(chalk.bold("  📦 Rebase DB Generate"));
@@ -598,7 +708,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         out("");
         const migrationName = argsList._[0] || "migration";
         const migrationsBefore = listMigrationFiles();
-        await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", DESIRED_STATE_URL], schemaDir);
+        await runAtlas("migrate", ["diff", migrationName, "--dir", migrationsDirArg(), "--to", DESIRED_STATE_URL], schemaDir);
         // The diff cannot be told to ignore the carved-out objects the way the
         // apply can, so the drop it plans for them is taken back out of the
         // file it just wrote. A migration that was nothing else is deleted.
@@ -610,9 +720,9 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         const newestWritten = wroteNewMigration ? listMigrationFiles().at(-1) : undefined;
         if (newestWritten) {
             await reportDestructiveMigration(
-                fs.readFileSync(path.resolve(process.cwd(), "drizzle", "migrations", newestWritten), "utf-8"),
+                fs.readFileSync(path.resolve(process.cwd(), migrationsDir(), newestWritten), "utf-8"),
                 newestWritten,
-                process.env.DATABASE_URL
+                target.url
             );
         }
         
@@ -630,12 +740,12 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         // A failure here takes the migration back out and stops: see
         // `finishNewMigration`. Atlas's half creates the tables, the append
         // locks them, and a migration with only the first half applies cleanly.
-        const migrationsDir = path.resolve(process.cwd(), "drizzle", "migrations");
-        const newestSql = fs.existsSync(migrationsDir) && wroteNewMigration
-            ? fs.readdirSync(migrationsDir).filter(f => f.endsWith(".sql")).sort().at(-1)
+        const migrationsPath = path.resolve(process.cwd(), migrationsDir());
+        const newestSql = fs.existsSync(migrationsPath) && wroteNewMigration
+            ? fs.readdirSync(migrationsPath).filter(f => f.endsWith(".sql")).sort().at(-1)
             : undefined;
         if (newestSql) {
-            const newestMigrationFile = path.join(migrationsDir, newestSql);
+            const newestMigrationFile = path.join(migrationsPath, newestSql);
             const finished = await finishNewMigration(newestMigrationFile, async () => {
                 // Make CREATE SCHEMA idempotent so it doesn't conflict with
                 // --revisions-schema (Atlas pre-creates the rebase schema
@@ -726,11 +836,11 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
 
                     // Re-hash the migration directory
                     out(chalk.gray("  Re-hashing migration files..."));
-                    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir, { throwOnFailure: true });
+                    await runAtlas("migrate", ["hash", "--dir", migrationsDirArg()], schemaDir, { throwOnFailure: true });
                     out(chalk.gray("  ✓ Migration directory checksum updated successfully."));
                 }
             }, async () => {
-                await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir, { throwOnFailure: true });
+                await runAtlas("migrate", ["hash", "--dir", migrationsDirArg()], schemaDir, { throwOnFailure: true });
             });
             if (!finished.ok) {
                 outError(chalk.red(`\n  ✗ Could not finish ${newestSql}: ${finished.error}`));
@@ -769,7 +879,8 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         const nextStep = nextStepAfterDbGenerate({
             newestVersion: latestMigrationVersion(),
             wrote: wroteNewMigration,
-            first: migrationsBefore.length === 0
+            first: migrationsBefore.length === 0,
+            commandSuffix: target.commandSuffix
         });
         out("");
         for (const line of nextStep) out(line);
@@ -801,7 +912,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 ? "  Step 2/3: Planning the change against the database (nothing is applied)..."
                 : "  Step 2/3: Pushing schema to database with Atlas..."));
             out("");
-            const databaseUrl = process.env.DATABASE_URL;
+            const databaseUrl = target.url;
             if (databaseUrl) await noteMigratedDatabase(databaseUrl);
             // Skipped under --dry-run: this creates the auth schema and its
             // functions, which is a write. "Show me what would happen" that
@@ -1092,7 +1203,9 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     // committed any new table with RLS off and the user role
                     // already holding DML on it; every later step may refuse.
                     await lockManagedTables(databaseUrl, schemaDir);
-                    await ensureAuthTables(databaseUrl, schemaDir);
+                    // The auth tables live in the default database, and only
+                    // there: another database holds the tables routed to it.
+                    if (target.isDefault) await ensureAuthTables(databaseUrl, schemaDir);
                     // After the tables exist and before the policies: the vector and
                     // search columns are `ALTER TABLE ... ADD COLUMN`, and a policy
                     // may reference the table they are added to.
@@ -1113,14 +1226,17 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     await ensureRlsUserRole(databaseUrl);
                     await applyPolicies(databaseUrl, schemaDir, pruned);
                     await reconcilePolicies(databaseUrl, schemaDir);
-                    await retireLegacyAuthSchema(databaseUrl);
-                    // Last: the push has applied the whole schema, tables and
-                    // policies, so it records the version a boot would.
-                    await stampSchemaVersion(databaseUrl, schemaDir);
+                    if (target.isDefault) {
+                        await retireLegacyAuthSchema(databaseUrl);
+                        // Last: the push has applied the whole schema, tables and
+                        // policies, so it records the version a boot would. Only
+                        // the default database is stamped, as only it is at boot.
+                        await stampSchemaVersion(databaseUrl, schemaDir);
+                    }
                 }
             });
         } else if (subcommand === "migrate") {
-            const databaseUrl = process.env.DATABASE_URL;
+            const databaseUrl = target.url;
             // `--baseline <version>` records the version as already applied and
             // starts from the next one. The database a Rebase boot has
             // provisioned is exactly the case it is for, and without it
@@ -1130,7 +1246,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // silence on one that has any, so the history is read first and
             // `planBaseline` picks the way that works.
             const baseline = argsList["--baseline"];
-            const baselineProblem = baseline ? baselineVersionProblem(baseline, listMigrationFiles()) : null;
+            const baselineProblem = baseline ? baselineVersionProblem(baseline, listMigrationFiles(), migrationsDir()) : null;
             if (baselineProblem) {
                 const [message, ...detail] = baselineProblem.split("\n");
                 outError(chalk.red(`  ✗ ${message}`));
@@ -1148,7 +1264,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             if (argsList["--refuse-destructive"] === true) {
                 const plan = await runAtlas(
                     "migrate",
-                    [...migrateApplyArgs(argsList._, atlasBaseline), "--dry-run"],
+                    [...migrateApplyArgs(argsList._, atlasBaseline, migrationsDirArg()), "--dry-run"],
                     schemaDir,
                     { captureStdout: true }
                 );
@@ -1176,17 +1292,17 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 out(chalk.gray(`  ${describeBaselinePlan(baseline, baselinePlan)}`));
                 out("");
                 if (baselinePlan.kind === "set") {
-                    await runAtlas("migrate", ["set", baseline, "--dir", "file://drizzle/migrations"], schemaDir);
+                    await runAtlas("migrate", ["set", baseline, "--dir", migrationsDirArg()], schemaDir);
                 }
             }
             await runAtlas(
                 "migrate",
-                migrateApplyArgs(argsList._, atlasBaseline),
+                migrateApplyArgs(argsList._, atlasBaseline, migrationsDirArg()),
                 schemaDir
             );
             if (databaseUrl) {
                 await ensureRlsUserRole(databaseUrl);
-                await retireLegacyAuthSchema(databaseUrl);
+                if (target.isDefault) await retireLegacyAuthSchema(databaseUrl);
                 // As push stamps what it applies, so the first boot after a
                 // migrate does not re-apply every policy once.
                 const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
@@ -1198,7 +1314,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         }
 
         out("");
-        out(chalk.green(`  ✓ rebase db ${subcommand} completed successfully.`));
+        out(chalk.green(`  ✓ rebase db ${subcommand}${target.commandSuffix} completed successfully.`));
         out("");
     }
 }
@@ -2538,9 +2654,12 @@ async function runAtlas(
         // ignore
     }
 
-    const databaseUrl = env.DATABASE_URL;
+    // The database this command acts on (`withDatabaseTarget`), or
+    // DATABASE_URL outside one.
+    const target = scopedDatabaseTarget();
+    const databaseUrl = target ? target.url : env.DATABASE_URL;
     if (!databaseUrl) {
-        outError(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
+        outError(chalk.red(`✗ ${target?.urlSource ?? "DATABASE_URL"} is not set. Make sure your .env file is configured.`));
         process.exit(1);
     }
 
@@ -2773,11 +2892,17 @@ async function generatePostgresDdlCommand(
         }
     }
 
+    // The database a `db` command acts on: its tables only. Passed by name
+    // as well as through the scope, because the child process below does not
+    // inherit the scope.
+    const database = scopedDatabaseTarget()?.key;
+
     if (!ddl) {
         await generateInProcess("Postgres DDL generator", "Postgres DDL", async ({ writePostgresDdl }) => {
             await writePostgresDdl({
                 schemaDir: path.resolve(process.cwd(), schemaDir),
-                outputPath: path.resolve(process.cwd(), outputPath)
+                outputPath: path.resolve(process.cwd(), outputPath),
+                database
             });
         });
         return;
@@ -2787,7 +2912,8 @@ async function generatePostgresDdlCommand(
         ddl.bin,
         ...ddl.args,
         `--schema-dir=${schemaDir}`,
-        `--output=${outputPath}`
+        `--output=${outputPath}`,
+        ...(database ? [`--database=${database}`] : [])
     ];
 
     try {

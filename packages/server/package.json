@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/server",
-  "version": "0.35.1",
+  "version": "0.37.1",
   "description": "Backend core of Rebase, the open-source Postgres BaaS — REST, auth, RLS, realtime, storage, functions and cron over your Postgres",
   "keywords": [
     "rebase",

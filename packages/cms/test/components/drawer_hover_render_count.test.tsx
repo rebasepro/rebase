@@ -86,6 +86,8 @@ jest.mock("@rebasepro/app", () => {
         LanguageToggle: () => null,
         RlsSimulatorBar: () => null,
         useCanSimulateAccess: () => false,
+        McpConnectButton: () => null,
+        useCanConnectMcp: () => false,
         RebaseLogo: () => null
     };
 });

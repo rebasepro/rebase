@@ -57,6 +57,21 @@ export type {
     SchemaTablesOptions
 } from "./backend/options";
 
+// The Database and Tables views' API (`/api/admin/db`), for a backend that
+// mounts it itself: on an `admin` of its choosing (a read-only connection, say)
+// and behind its own gate. The server mounts them only once it could create the
+// rebase.* catalog, which a database another tool owns may not allow.
+export {
+    createDbAdminRoutes,
+    createDbInsightsRoutes,
+    createDbCatalogRoutes
+} from "./baas";
+export type {
+    DbAdminRoutesOptions,
+    DbInsightsRoutesOptions,
+    DbCatalogRoutesOptions
+} from "./baas";
+
 // =============================================================================
 // Server-side singleton (import { rebase } from "@rebasepro/server")
 // =============================================================================
@@ -228,6 +243,8 @@ export type { ApiKeyIdentity, ApiKeyRefusal } from "./auth/api-keys";
 // extend or replace.
 export { McpToolError } from "./mcp/mcp-tools";
 export type { McpToolDefinition, McpToolContext, McpCaller, McpToolAnnotations } from "./mcp/mcp-tools";
+// What a tool context's `storage` holds: the storage tools' sources and rule.
+export type { McpStorageAccess } from "./mcp/storage-tools";
 // For a server that relays the view tools to an app's own `/mcp` (the hosted
 // connector): the view they open, which they are, their arguments, and what
 // show_app teaches about the code it runs — so the two never disagree.

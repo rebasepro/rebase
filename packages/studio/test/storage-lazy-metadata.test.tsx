@@ -123,6 +123,13 @@ class ViewportObserver extends TestIntersectionObserver {
 
 import { StorageView } from "../src/components/StorageView/StorageView";
 
+/** The folder or file tile named `name` in the browser's contents — not the side list's entry of the same name. */
+async function findItem(name: string): Promise<HTMLElement> {
+    const tile = (await screen.findAllByText(name)).find(element => element.closest("[data-storage-item]"));
+    if (!tile) throw new Error(`no tile named ${name}`);
+    return tile;
+}
+
 beforeEach(() => {
     inFlight = 0;
     maxInFlight = 0;
@@ -197,7 +204,7 @@ describe("deleting a folder of 40 files", () => {
         objects.add("keep.txt");
         render(<StorageView/>);
 
-        fireEvent.click(await screen.findByText("album"));
+        fireEvent.click(await findItem("album"));
         await screen.findByText("1 selected");
         fireEvent.click(screen.getAllByRole("button", { name: /Delete/ })[0]);
         const prompt = await screen.findByText("Delete 1 item?");

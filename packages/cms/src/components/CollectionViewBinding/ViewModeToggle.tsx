@@ -16,6 +16,7 @@ import {
     ToggleButtonOption
 } from "@rebasepro/ui";
 import { getIcon, useTranslation } from "@rebasepro/app";
+import { useToolbarLabels } from "../CollectionTableBinding/internal/CollectionTableToolbar";
 
 export type KanbanPropertyOption = {
     key: string;
@@ -84,6 +85,9 @@ export function ViewModeToggle({
 }: ViewModeToggleProps) {
 
     const { t } = useTranslation();
+    // The mode's name only where the toolbar has room for labels; the icon
+    // alone says which view this is.
+    const labelled = useToolbarLabels();
 
 
     // Get icon for current view mode.
@@ -179,9 +183,9 @@ export function ViewModeToggle({
                 onOpenChange={onOpenChange}
                 modal={false}
                 trigger={
-                    <Button size="small">
+                    <Button size="small" aria-label={labelled ? undefined : getViewModeName()}>
                         {getViewModeIcon()}
-                        <span className="ml-1 text-sm">{getViewModeName()}</span>
+                        {labelled && <span className="ml-1 text-sm">{getViewModeName()}</span>}
                     </Button>
                 }
             >

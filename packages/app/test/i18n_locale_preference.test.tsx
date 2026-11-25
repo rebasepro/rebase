@@ -138,3 +138,64 @@ describe("RebaseI18nProvider loads a translation before it shows it", () => {
         expect(view.getByTestId("probe").textContent).toBe("sv:Save");
     });
 });
+
+/**
+ * An app's own table for a language can be a loader, so the languages nobody
+ * is looking at cost nothing before the first paint. It is called the first
+ * time its language is shown — never for English-only sessions — and the
+ * language switches only once both Rebase's table and the app's are in.
+ */
+describe("RebaseI18nProvider and translations given as loaders", () => {
+    beforeEach(() => window.localStorage.clear());
+
+    it("does not call a loader for a language that is not shown", () => {
+        const loader = jest.fn(async () => ({ save: "Guardar (app)" }));
+        const view = render(<RebaseI18nProvider locale="en" translations={{ es: loader }}><Probe/></RebaseI18nProvider>);
+        expect(view.getByTestId("probe").textContent).toBe("en:Save");
+        expect(loader).not.toHaveBeenCalled();
+    });
+
+    it("merges a shipped language's loaded table over Rebase's when it is picked", async () => {
+        const loader = jest.fn(async () => ({ save: "Guardar (app)" }));
+        const view = render(<RebaseI18nProvider locale="en" translations={{ es: loader }}><Probe/></RebaseI18nProvider>);
+        await act(async () => {
+            await seen.current!.changeLanguage("es");
+        });
+        expect(view.getByTestId("probe").textContent).toBe("es:Guardar (app)");
+        expect(loader).toHaveBeenCalledTimes(1);
+    });
+
+    it("first paint of a stored language waits for the app's table too", async () => {
+        window.localStorage.setItem(REBASE_LOCALE_STORAGE_KEY, "es");
+        const painted: string[] = [];
+        function Recorder() {
+            const { t, i18n } = useTranslation("rebase_core");
+            painted.push(`${i18n.language}:${t("save")}`);
+            return null;
+        }
+        render(<RebaseI18nProvider locale="en" translations={{ es: async () => ({ save: "Guardar (app)" }) }}><Recorder/></RebaseI18nProvider>);
+        await waitFor(() => expect(painted.length).toBeGreaterThan(0));
+        expect(painted.every(text => text === "es:Guardar (app)")).toBe(true);
+    });
+
+    it("loads a language only the app has, falling back to English", async () => {
+        const view = render(<RebaseI18nProvider locale="en" translations={{ nl: async () => ({ save: "Opslaan" }) }}><Probe/></RebaseI18nProvider>);
+        await act(async () => {
+            await seen.current!.changeLanguage("nl");
+        });
+        expect(view.getByTestId("probe").textContent).toBe("nl:Opslaan");
+    });
+
+    it("an English table given as a loader is merged in when it arrives", async () => {
+        const view = render(<RebaseI18nProvider locale="en" translations={{ en: async () => ({ save: "Publish" }) }}><Probe/></RebaseI18nProvider>);
+        await waitFor(() => expect(view.getByTestId("probe").textContent).toBe("en:Publish"));
+    });
+
+    it("a loader that fails leaves Rebase's own table for that language", async () => {
+        const view = render(<RebaseI18nProvider locale="en" translations={{ fr: async () => { throw new Error("offline"); } }}><Probe/></RebaseI18nProvider>);
+        await act(async () => {
+            await seen.current!.changeLanguage("fr");
+        });
+        expect(view.getByTestId("probe").textContent).toBe("fr:Enregistrer");
+    });
+});

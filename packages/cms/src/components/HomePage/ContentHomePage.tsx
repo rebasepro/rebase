@@ -1,7 +1,7 @@
 import type { HomePageSection, NavigationEntry, NavigationGroupMapping, PluginGenericProps } from "@rebasepro/cms-types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Fuse from "fuse.js";
-import { CircularProgressCenter, Container, SearchBar } from "@rebasepro/ui";
+import type Fuse from "fuse.js";
+import { CircularProgressCenter, Container, loadChunk, SearchBar } from "@rebasepro/ui";
 import { AnalyticsEvent } from "@rebasepro/cms-types";
 import { FavouritesView } from "./FavouritesView";
 import { ErrorBoundary } from "@rebasepro/ui";
@@ -121,19 +121,38 @@ export function ContentHomePage({
             : rawNavigationEntries;
     }, [filteredUrls, rawNavigationEntries]);
 
+    // The search index is built on the first search, with `fuse.js` fetched
+    // then: it used to be built at mount, which put the library on the login
+    // screen's critical path for every session, searching or not.
+    const entriesRef = useRef(rawNavigationEntries);
+    entriesRef.current = rawNavigationEntries;
+    const latestQueryRef = useRef("");
     useEffect(() => {
-        fuse.current = new Fuse(rawNavigationEntries, {
-            keys: ["name", "description", "group", "path"]
-        });
+        fuse.current = null;
     }, [rawNavigationEntries]);
 
     const updateSearch = useCallback((v?: string) => {
-        if (!v?.trim()) {
+        const query = v?.trim() ?? "";
+        latestQueryRef.current = query;
+        if (!query) {
             setFilteredUrls(null);
             return;
         }
-        const results = fuse.current?.search(v.trim());
-        setFilteredUrls(results ? results.map((x) => x.item.url) : []);
+        const run = (index: Fuse<NavigationEntry>) => {
+            // A slower first load must not overwrite a newer query's results.
+            if (latestQueryRef.current !== query) return;
+            setFilteredUrls(index.search(query).map((x) => x.item.url));
+        };
+        if (fuse.current) {
+            run(fuse.current);
+            return;
+        }
+        loadChunk(() => import("fuse.js")).then(({ default: FuseIndex }) => {
+            fuse.current ??= new FuseIndex(entriesRef.current, {
+                keys: ["name", "description", "group", "path"]
+            });
+            run(fuse.current);
+        }, (error: unknown) => console.error("Search could not be loaded", error));
     }, []);
 
     /* ───────────────────────────────────────────────────────────────

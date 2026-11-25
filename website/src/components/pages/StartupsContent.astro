@@ -2,16 +2,12 @@
 import { offerKey } from "../../data/cloud-offer";
 const { lang, t } = Astro.props;
 
-import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+import { languages, defaultLang, useTranslations, useTranslatedPath } from '../../i18n/ui';
+const translatePath = useTranslatedPath(lang);
 
-
-
-// src/pages/startups.astro
-// The Layout component should handle the Header and Footer
-// import Header from '../../components/Header.astro';
-// import Footer from '../../components/Footer.astro';
 import ScreenshotsMarquee from '../../components/ScreenshotsMarquee.astro';
 import { SpreadsheetDemo } from '../../components/demos/SpreadsheetDemo';
+import { ConsoleDemo } from '../../components/demos/ConsoleDemo';
 import ClientLogos from '../../components/ClientLogos.astro';
 
 
@@ -34,8 +30,8 @@ import HeroBackdrop from "../HeroBackdrop.astro";
       <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
         <h1 class="mb-6 text-display-2 text-tone-max" set:html={t("startupspage.00")}></h1>
         <p class="mb-10 text-lg leading-8 text-tone-300 lg:text-xl" set:html={t("startupspage.01")}></p>
-        <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
-          {t("cta.button.demo")}
+        <a href={translatePath("/cloud")} class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
+          {t("cta.button.cloud")}
           <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
           </svg>
@@ -63,10 +59,8 @@ import HeroBackdrop from "../HeroBackdrop.astro";
           <p class="mt-lead text-lg leading-8 text-tone-400">{t("startupspage.03")}</p>
         </div>
 
-        <div class="relative rounded-2xl overflow-hidden ring-1 ring-tone-800">
-          <img src="/img/users_table.png" width="2430" height="992"
-               alt="Rebase CMS: the admin panel, editing rows in a users table"
-               class="w-full h-auto"/>
+        <div class="lg:bleed-x">
+          <ConsoleDemo client:visible />
         </div>
 
       </div>

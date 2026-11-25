@@ -1,6 +1,9 @@
 ---
 // Logo lockup for the "Rebase vs X" comparison hero.
 // Order matches the headline: Rebase first, then the competitor.
+// It sits UNDER the hero text, on the dark end of the backdrop: above the
+// headline the shader washed the competitor marks out. The wordmark matches
+// the header's (Inter, semibold) so the two "Rebase" lockups read as one.
 interface Props {
     name: string;
     logo?: string;
@@ -11,10 +14,10 @@ const { name, logo, logoClass = "h-7 sm:h-8" } = Astro.props;
 import { imgDims } from "../utils/imageDimensions";
 ---
 
-<div class="mb-8 flex items-center justify-center gap-5 sm:gap-7 animate-on-scroll fade-in">
+<div class="flex items-center gap-5 sm:gap-7 animate-on-scroll fade-in">
     <div class="flex h-10 items-center gap-2.5">
         <img src="/img/rebase_logo.svg" width="306" height="306" alt="" aria-hidden="true" class="h-7 sm:h-8 w-auto max-w-none"/>
-        <span class="text-xl sm:text-2xl text-tone-max">Rebase</span>
+        <span class="text-xl sm:text-2xl font-semibold whitespace-nowrap text-tone-max">Rebase</span>
     </div>
 
     <span class="text-2xs font-semibold uppercase tracking-[0.2em] text-tone-500">vs</span>

@@ -76,7 +76,7 @@ describe("the storage list view", () => {
     async function openList() {
         render(<StorageView/>);
         await waitFor(() => expect(defaultSource.listObjects).toHaveBeenCalled());
-        fireEvent.click(within(screen.getByTitle("List view")).getByRole("button"));
+        fireEvent.click(screen.getByRole("button", { name: "List" }));
         return screen.findByRole("table");
     }
 

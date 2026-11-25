@@ -307,3 +307,75 @@ describe("when it does mount", () => {
         }
     });
 });
+
+describe("a server `rebase dev` started names its own loopback address", () => {
+    // `rebase dev` switches the surface on (`REBASE_MCP_ENABLED`) and states
+    // `REBASE_DEV_PORT_EXPLICIT` on every backend it spawns. With no
+    // REBASE_PUBLIC_URL, the server's own address is the public URL: never the
+    // request's Host header, which would make the audience caller-supplied.
+    const saved: Record<string, string | undefined> = {};
+    const set = (vars: Record<string, string | undefined>) => {
+        for (const [key, value] of Object.entries(vars)) {
+            if (!(key in saved)) saved[key] = process.env[key];
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+        }
+    };
+    afterEach(() => {
+        for (const [key, value] of Object.entries(saved)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+            delete saved[key];
+        }
+    });
+
+    it("mounts on http://localhost:<PORT> before the server has bound", async () => {
+        set({ REBASE_DEV_PORT_EXPLICIT: "false", PORT: "3914" });
+        const app = await boot({ mcp: true, publicUrl: undefined });
+
+        const res = await app.request("/.well-known/oauth-protected-resource/mcp");
+        expect(res.status).toBe(200);
+        expect(await res.json()).toMatchObject({
+            resource: "http://localhost:3914/mcp",
+            authorization_servers: ["http://localhost:3914"]
+        });
+        // The challenge names the same server, so a client follows it home.
+        const mcp = await app.request("/mcp", { method: "POST", body: "{}" });
+        expect(mcp.headers.get("WWW-Authenticate")).toContain("http://localhost:3914/.well-known/oauth-protected-resource/mcp");
+    });
+
+    it("never derives one in production", async () => {
+        set({ REBASE_DEV_PORT_EXPLICIT: "false", PORT: "3914", NODE_ENV: "production" });
+        const app = await boot({ mcp: true, publicUrl: undefined });
+        expect(await mounted(app)).toBe(false);
+    });
+
+    it("prefers a configured REBASE_PUBLIC_URL", async () => {
+        set({ REBASE_DEV_PORT_EXPLICIT: "false", PORT: "3914" });
+        const app = await boot({ mcp: true, publicUrl: PUBLIC_URL });
+        const res = await app.request("/.well-known/oauth-protected-resource/mcp");
+        expect(await res.json()).toMatchObject({ resource: `${PUBLIC_URL}/mcp` });
+    });
+
+    // Last: the bound port is process state, and outranks PORT from here on.
+    it("follows the port the server actually bound, which moves after the routes are built", async () => {
+        set({ REBASE_DEV_PORT_EXPLICIT: "false", PORT: "3914" });
+        const app = await boot({ mcp: true, publicUrl: undefined });
+
+        // The routes exist; now the server binds somewhere other than PORT —
+        // a walk past a port in use, or the affinity file after a restart.
+        const { createServer } = await import("http");
+        const { listenWithPortRetry } = await import("../src/utils/dev-port");
+        const server = createServer();
+        const bound = await listenWithPortRetry(server, 0);
+        try {
+            expect(bound).not.toBe(3914);
+            const res = await app.request("/.well-known/oauth-protected-resource/mcp");
+            expect(await res.json()).toMatchObject({ resource: `http://localhost:${bound}/mcp` });
+            const as = await app.request("/.well-known/oauth-authorization-server");
+            expect(await as.json()).toMatchObject({ issuer: `http://localhost:${bound}` });
+        } finally {
+            await new Promise<void>(resolve => server.close(() => resolve()));
+        }
+    });
+});

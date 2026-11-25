@@ -16,7 +16,6 @@
  */
 import chalk from "chalk";
 import {
-    DEFAULT_RESOURCE_KEY,
     parseEnvBoolean,
     type AppAddress,
     type RebaseProjectManifest,
@@ -35,6 +34,7 @@ import {
 import { MANAGED_IDLE_TIMEOUT_MS } from "../dev-db/constraints";
 import { resolveCliEntry, resolveSpawn } from "../dev-db/daemon";
 import { lastDevDatabaseNotice, recordLastDevDatabase } from "../dev-db/last-dev-database";
+import { declaredAdditionalKeys } from "../dev-db/declared-databases";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -469,38 +469,6 @@ export function devWatchArgs(
 export function envFileHiddenFromTsx(envFile: string, backendDir: string): boolean {
     const relative = path.relative(backendDir, envFile);
     return !relative.startsWith("..") && !path.isAbsolute(relative);
-}
-
-/**
- * The databases the project declares beyond the default, by key.
- *
- * Read from the graph, so `database("analytics")` in `backend/resources.ts`
- * is enough for `rebase dev` to serve a second database — the declaration is
- * the request. A config that does not evaluate is the backend's problem to
- * report, in the terms it already uses; here it means "no additional
- * databases", not a refusal to start.
- */
-async function declaredAdditionalDatabases(projectRoot: string): Promise<string[]> {
-    try {
-        const loaded = loadManifest(projectRoot);
-        const backend = findBackendApp(loaded.manifest);
-        if (!backend) return [];
-        const { deriveResourceGraph, deriveOptionsFor } = await import("../resources/derive");
-        // The declarations alone: databases are declared in `backend/resources.ts`,
-        // and importing the tables (and the server's loader with them) would put
-        // seconds in front of the database start for nothing this asks.
-        const { graph } = await deriveResourceGraph({
-            ...deriveOptionsFor(projectRoot, backend.app),
-            schemaDir: undefined,
-            cronsDir: undefined,
-            functionsDir: undefined
-        });
-        return graph.resources
-            .filter(r => r.kind === "database" && r.transport === "server" && r.key !== DEFAULT_RESOURCE_KEY)
-            .map(r => r.key);
-    } catch {
-        return [];
-    }
 }
 
 /** Well-known filename the backend writes its actual port to. */
@@ -1179,6 +1147,59 @@ export function readEnvValue(envText: string, key: string): string | undefined {
     return value.length > 0 ? value : undefined;
 }
 
+/** The variable that switches the backend's `/mcp` surface on. */
+export const MCP_ENABLED_ENV = "REBASE_MCP_ENABLED";
+
+/**
+ * Whether `rebase dev` switches `/mcp` on for the backend it starts.
+ *
+ * The server keeps `/mcp` off unless someone opts in, because in production it
+ * hands credentials to third-party software (`init/surfaces.ts`). `rebase dev`
+ * is someone opting in: a dev server on this machine, whose AI clients sign in
+ * as the developer, is the case the "connect Claude in one step" story is for,
+ * and the server names its own loopback address as the public URL there
+ * (`devLoopbackOrigin`), so nothing else has to be configured.
+ *
+ * Only when nobody decided already. A value in the shell, or a line in the
+ * project's `.env` (`REBASE_MCP_ENABLED=false` included), is left to answer:
+ * a variable this command set would outrank the file, as if it were exported.
+ */
+export function devSwitchesMcpOn(shell: NodeJS.ProcessEnv, envFileText: string | undefined): boolean {
+    if (shell[MCP_ENABLED_ENV]?.trim()) return false;
+    if (envFileText !== undefined && readEnvValue(envFileText, MCP_ENABLED_ENV) !== undefined) return false;
+    return true;
+}
+
+/**
+ * The address the backend's `MCP endpoint mounted at …` line names, or
+ * undefined when the line is not that one.
+ *
+ * With `REBASE_PUBLIC_URL` set, the line carries the full URL; under `rebase
+ * dev` without it, the server has not bound its port yet when it mounts, so it
+ * says `/mcp` alone and the banner fills in the API's address. Either way the
+ * line is the proof `/mcp` mounted: the server says so only when it did.
+ */
+export function mcpMountedUrl(line: string, apiUrl: string): string | undefined {
+    const match = line.match(/MCP endpoint mounted at (https?:\/\/\S+?)?(\/\S*)/);
+    if (!match) return undefined;
+    return `${match[1] ?? apiUrl}${match[2]}`;
+}
+
+/**
+ * The banner's MCP lines, aligned with the box's own `➜ API:` label: the two
+ * banners (an app's, an API's) pad their labels to different widths.
+ */
+export function mcpBannerLines(mcpUrl: string, lines: ReadonlyArray<readonly [string, string]>): Array<[string, string]> {
+    const width = lines.find(([label]) => label.startsWith("➜ API:"))?.[0].length ?? "➜ MCP:   ".length;
+    return [
+        ["➜ MCP:".padEnd(width), mcpUrl],
+        [" ".repeat(width), "connect an AI agent: rebase mcp connect"]
+    ];
+}
+
+/** The "MCP mounted" line, wherever its URL comes from. */
+export const MCP_MOUNTED_MARKER = /MCP endpoint mounted at /;
+
 /**
  * The argv the first-boot schema push runs with.
  *
@@ -1591,7 +1612,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     // what the other commands follow.
                     followLastDev: false,
                     onProgress: (message) => console.log(chalk.gray(`  ${message}`)),
-                    additionalKeys: await declaredAdditionalDatabases(projectRoot)
+                    additionalKeys: declaredAdditionalKeys(projectRoot)
                 })
                 : null
         }));
@@ -1659,6 +1680,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
      * not name a URL that answers 404.
      */
     let swaggerPath: string | null = null;
+    /** The backend's `MCP endpoint mounted at …` line, once it printed one. */
+    let mcpMountedLine: string | null = null;
 
     function printSummary() {
         if (!backendUrl) return;
@@ -1676,6 +1699,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             const lines: Array<[string, string]> = declaresStaticApp
                 ? appBannerLines(stripAnsi(frontendUrl), api, staticShape)
                 : [["", ""], ["✦ Rebase API is ready!", ""], ["➜ API:      ", api]];
+            // Same rule as Swagger: only once the backend said `/mcp` mounted.
+            const mcpUrl = mcpMountedLine ? mcpMountedUrl(mcpMountedLine, api) : undefined;
+            if (declaresStaticApp && mcpUrl) lines.push(...mcpBannerLines(mcpUrl, lines));
 
             if (!declaresStaticApp) {
                 // Only when it is actually mounted. A project with no tables
@@ -1690,6 +1716,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     // "No docs" with no reason reads as a broken install.
                     lines.push(["  ", "(no tables served yet, so no data API and no docs)"]);
                 }
+                if (mcpUrl) lines.push(...mcpBannerLines(mcpUrl, lines));
                 if (managedConnectionString) {
                     lines.push(["", ""]);
                     lines.push(["Database (managed, this project only):", ""]);
@@ -1927,6 +1954,12 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // The server also reads its presence as "rebase dev started me", and
         // takes over `.rebase/state.json` from a `rebase start` beside it.
         env.REBASE_DEV_PORT_EXPLICIT = String(portIsPinned);
+
+        // `/mcp` on, so an AI client can connect to this dev server with one
+        // command (`rebase mcp connect`). See `devSwitchesMcpOn`.
+        let envFileText: string | undefined;
+        try { envFileText = envFile ? fs.readFileSync(envFile, "utf-8") : undefined; } catch { envFileText = undefined; }
+        if (devSwitchesMcpOn(process.env, envFileText)) env[MCP_ENABLED_ENV] = "true";
 
         // And where the frontend will be, for the same reason. `FRONTEND_URL`
         // is the base of every emailed link and one of the two things CORS is
@@ -2370,6 +2403,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             const cleanLine = stripAnsi(line);
             const swaggerMatch = cleanLine.match(/Swagger UI available.*"path":"([^"]+)"/);
             if (swaggerMatch) swaggerPath = swaggerMatch[1];
+            if (MCP_MOUNTED_MARKER.test(cleanLine)) mcpMountedLine = cleanLine;
 
             const serverMatch = cleanLine.match(/Server running at http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
             if (serverMatch) {

@@ -1,13 +1,7 @@
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-    CallToolRequestSchema,
-    ListToolsRequestSchema,
-    ListResourcesRequestSchema,
-    ReadResourceRequestSchema,
-    RootsListChangedNotificationSchema,
-    type CallToolRequest
-} from "@modelcontextprotocol/sdk/types.js";
+import { McpServer, ResourceTemplate, type CallToolRequest, type JSONValue, type Server } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import type { SkillCatalog } from "@modelcontextprotocol/server/ext/skills";
+import { loadSkills } from "@modelcontextprotocol/server/ext/skills/node";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn, type ChildProcess } from "node:child_process";
 import { config as loadDotenv, parse as parseDotenv } from "dotenv";
@@ -16,6 +10,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, chmodS
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { decideProjectScope, findProjectRoot, readCloudLink, type CloudLink } from "./project-scope.js";
 import {
     CLOUD_LOGS_DEFAULT_TAIL,
@@ -1335,15 +1330,6 @@ async function ensureAdmin(): Promise<void> {
     }
 }
 
-// ── MCP Server ──────────────────────────────────────────────────────────────
-
-export const server = new Server(
-    { name: "rebase-mcp-server",
-      version: MCP_SERVER_VERSION },
-    { capabilities: { tools: {},
-      resources: {} } }
-);
-
 // ── Tool Definitions ────────────────────────────────────────────────────────
 
 interface ToolDef {
@@ -1351,7 +1337,7 @@ interface ToolDef {
     description: string;
     inputSchema: {
         type: "object";
-        properties: Record<string, unknown>;
+        properties: Record<string, JSONValue>;
         required?: string[];
         additionalProperties?: boolean;
     };
@@ -2332,10 +2318,6 @@ export const ALL_TOOLS: ToolDef[] = [
 
 // ── Tool Handlers ───────────────────────────────────────────────────────────
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: ALL_TOOLS
-}));
-
 /**
  * Spawn the rebase CLI using the project's detected package manager.
  *
@@ -3309,7 +3291,12 @@ export function callerDirectory(): string {
     return clientRoots[0] ?? process.cwd();
 }
 
-async function refreshClientRoots(): Promise<void> {
+/**
+ * Asks a 2025-era client for its roots. The 2026-07-28 revision has no
+ * server-to-client requests, so a client on it declares no roots here and the
+ * working directory stays the answer.
+ */
+async function refreshClientRoots(server: Server): Promise<void> {
     if (!server.getClientCapabilities()?.roots) return;
     try {
         const { roots } = await server.listRoots();
@@ -3321,9 +3308,6 @@ async function refreshClientRoots(): Promise<void> {
         // the working directory as the answer.
     }
 }
-
-server.oninitialized = () => { void refreshClientRoots(); };
-server.setNotificationHandler(RootsListChangedNotificationSchema, async () => { await refreshClientRoots(); });
 
 /** A Cloud project the session's directory is linked to, as a registry-shaped entry for one call. */
 function linkedEntry(link: CloudLink): ProjectConfig {
@@ -3391,7 +3375,8 @@ async function scopedProjectFor(toolName: string, requested: string | undefined)
     }
 }
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+/** `tools/call`: a project-scoped tool runs against the project its `project` argument names. */
+async function callTool(request: CallToolRequest) {
     const name = request.params.name;
     if (!isProjectScoped(name)) return handleToolCall(request);
     const { project: requested, ...rest } = request.params.arguments ?? {};
@@ -3407,7 +3392,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { ...textResult(`Error: ${explainToolError(err, undefined, name)}`), isError: true };
     }
     return callScope.run(entry, () => handleToolCall({ ...request, params: { ...request.params, arguments: rest } }));
-});
+}
 
 // ── Resources ───────────────────────────────────────────────────────────────
 
@@ -3490,10 +3475,17 @@ export function findSchemaDir(projectDir: string = getProjectDir()): string | nu
     return null;
 }
 
-server.setRequestHandler(ListResourcesRequestSchema, async () => {
-    const resources: Array<{ uri: string; name: string; description: string; mimeType: string }> = [];
+/** A resource this server lists. */
+interface ListedResource {
+    uri: string;
+    name: string;
+    description: string;
+    mimeType: string;
+}
 
-    // Table modules: every file of the schema directory but its index.
+/** Table modules: every file of the schema directory but its index. */
+function listTableResources(): { resources: ListedResource[] } {
+    const resources: ListedResource[] = [];
     const schemaDir = findSchemaDir();
     if (schemaDir) {
         const files = readdirSync(schemaDir).filter((f) => f.endsWith(".ts") && f !== "index.ts" && !f.endsWith(".d.ts"));
@@ -3507,79 +3499,156 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
             });
         }
     }
+    return { resources };
+}
 
-    // Generated schema
+/** The generated schema, listed only once it has been generated. */
+function listSchemaResource(): { resources: ListedResource[] } {
     const backendDir = findBackendDir();
     const schemaPath = backendDir && resolve(backendDir, "src", "schema.generated.ts");
-    if (schemaPath && existsSync(schemaPath)) {
-        resources.push({
+    if (!schemaPath || !existsSync(schemaPath)) return { resources: [] };
+    return {
+        resources: [{
             uri: "rebase://schema",
             name: "Generated Drizzle Schema",
             description: "Auto-generated Drizzle ORM schema from the tables in backend/schema",
             mimeType: "text/typescript"
+        }]
+    };
+}
+
+function readSchemaResource(uri: string) {
+    const backendDir = findBackendDir();
+    if (!backendDir) {
+        throw new Error(
+            "No backend directory found. Looked for `backend/` and `app/backend/` under " +
+            `${getProjectDir()}.`
+        );
+    }
+    const schemaPath = resolve(backendDir, "src", "schema.generated.ts");
+    if (!existsSync(schemaPath)) {
+        // Naming the path matters: the previous message advised running a
+        // command the user had usually already run, because it was looking
+        // in a directory their project does not have.
+        throw new Error(`Generated schema not found at ${schemaPath}. Run \`rebase schema generate\` first.`);
+    }
+    return {
+        contents: [{
+            uri,
+            mimeType: "text/typescript",
+            text: readFileSync(schemaPath, "utf-8")
+        }]
+    };
+}
+
+function readTableResource(uri: string, name: string) {
+    const schemaDir = findSchemaDir();
+    if (!schemaDir) {
+        throw new Error(
+            `No schema directory found under ${getProjectDir()}: looked for the backend's "tables" in ` +
+            `rebase.json, else ${DEFAULT_TABLES_DIR}.`
+        );
+    }
+
+    const absoluteSchemaDir = resolve(schemaDir);
+    const filePath = resolve(absoluteSchemaDir, `${name}.ts`);
+    // With the separator: `…/schema_private/x.ts` starts with `…/schema` too.
+    if (!filePath.startsWith(absoluteSchemaDir + sep)) {
+        throw new Error("Access denied: path traversal detected");
+    }
+    if (!existsSync(filePath)) throw new Error(`Table module "${name}" not found in ${absoluteSchemaDir}.`);
+
+    return {
+        contents: [{
+            uri,
+            mimeType: "text/typescript",
+            text: readFileSync(filePath, "utf-8")
+        }]
+    };
+}
+
+// ── Server ──────────────────────────────────────────────────────────────────
+
+/**
+ * One MCP server instance with every tool and resource registered, and the
+ * Rebase agent skills when a catalog is given.
+ *
+ * `serveStdio` calls this once per era decision, so it registers handlers and
+ * nothing else: the project registry, the client roots and the dev server live
+ * at module scope and every instance shares them.
+ */
+export function createServer(skills?: SkillCatalog): McpServer {
+    const mcp = new McpServer({ name: "rebase-mcp-server", version: MCP_SERVER_VERSION });
+    const server = mcp.server;
+
+    // Tools are served from the static definitions above, with their JSON
+    // schemas as written, so they go through the low-level handlers.
+    server.registerCapabilities({ tools: {} });
+    server.setRequestHandler("tools/list", () => ({ tools: ALL_TOOLS }));
+    server.setRequestHandler("tools/call", (request) => callTool(request));
+
+    // Resources go through McpServer, which owns `resources/read` once the
+    // skills extension adds its `skill://` template.
+    mcp.registerResource(
+        "tables",
+        new ResourceTemplate("rebase://tables/{+name}", { list: () => listTableResources() }),
+        { description: "TypeScript table definitions (defineTable)", mimeType: "text/typescript" },
+        (uri, variables) => {
+            const name = variables.name;
+            if (typeof name !== "string") throw new Error(`Unknown resource: ${uri.href}`);
+            return readTableResource(uri.href, name);
+        }
+    );
+    mcp.registerResource(
+        "schema",
+        new ResourceTemplate("rebase://schema", { list: () => listSchemaResource() }),
+        { description: "Auto-generated Drizzle ORM schema from the tables in backend/schema", mimeType: "text/typescript" },
+        (uri) => readSchemaResource(uri.href)
+    );
+
+    server.oninitialized = () => { void refreshClientRoots(server); };
+    server.setNotificationHandler("notifications/roots/list_changed", async () => { await refreshClientRoots(server); });
+
+    skills?.attach(mcp);
+    return mcp;
+}
+
+/**
+ * A server instance from {@link createServer}, without skills. The process
+ * entry serves its own instances; this one exists to drive the handlers
+ * in-process.
+ */
+export const server: Server = createServer().server;
+
+/**
+ * Where `@rebasepro/agent-skills` keeps its skills: `<package>/skills`.
+ * Resolved like the CLI's `rebase skills` does, so it works from the
+ * workspace symlink and from an installed package.
+ */
+export function agentSkillsDir(): string {
+    const require = createRequire(import.meta.url);
+    return join(dirname(require.resolve("@rebasepro/agent-skills/package.json")), "skills");
+}
+
+/**
+ * The Rebase agent skills as a skills-extension catalog, or `undefined` when
+ * they cannot be loaded — the server then starts without the skills
+ * capability. Everything it reports goes to stderr: stdout is the protocol.
+ */
+export async function loadRebaseSkills(dir?: string): Promise<SkillCatalog | undefined> {
+    try {
+        return await loadSkills(dir ?? agentSkillsDir(), {
+            // The skills ship inside the installed package: the same for every
+            // caller, and fixed until the package is upgraded.
+            cacheHint: { ttlMs: 300_000, cacheScope: "public" },
+            onWarning: (warning) => process.stderr.write(`[rebase-mcp] skill ${warning.path}: ${warning.message}\n`)
         });
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`[rebase-mcp] serving without agent skills: ${msg}\n`);
+        return undefined;
     }
-
-    return { resources };
-});
-
-server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    const { uri } = request.params;
-
-    if (uri === "rebase://schema") {
-        const backendDir = findBackendDir();
-        if (!backendDir) {
-            throw new Error(
-                "No backend directory found. Looked for `backend/` and `app/backend/` under " +
-                `${getProjectDir()}.`
-            );
-        }
-        const schemaPath = resolve(backendDir, "src", "schema.generated.ts");
-        if (!existsSync(schemaPath)) {
-            // Naming the path matters: the previous message advised running a
-            // command the user had usually already run, because it was looking
-            // in a directory their project does not have.
-            throw new Error(`Generated schema not found at ${schemaPath}. Run \`rebase schema generate\` first.`);
-        }
-        return {
-            contents: [{
-                uri,
-                mimeType: "text/typescript",
-                text: readFileSync(schemaPath, "utf-8")
-            }]
-        };
-    }
-
-    const tableMatch = uri.match(/^rebase:\/\/tables\/(.+)$/);
-    if (tableMatch) {
-        const name = tableMatch[1];
-        const schemaDir = findSchemaDir();
-        if (!schemaDir) {
-            throw new Error(
-                `No schema directory found under ${getProjectDir()}: looked for the backend's "tables" in ` +
-                `rebase.json, else ${DEFAULT_TABLES_DIR}.`
-            );
-        }
-
-        const absoluteSchemaDir = resolve(schemaDir);
-        const filePath = resolve(absoluteSchemaDir, `${name}.ts`);
-        // With the separator: `…/schema_private/x.ts` starts with `…/schema` too.
-        if (!filePath.startsWith(absoluteSchemaDir + sep)) {
-            throw new Error("Access denied: path traversal detected");
-        }
-        if (!existsSync(filePath)) throw new Error(`Table module "${name}" not found in ${absoluteSchemaDir}.`);
-
-        return {
-            contents: [{
-                uri,
-                mimeType: "text/typescript",
-                text: readFileSync(filePath, "utf-8")
-            }]
-        };
-    }
-
-    throw new Error(`Unknown resource: ${uri}`);
-});
+}
 
 // ── Start ───────────────────────────────────────────────────────────────────
 
@@ -3619,8 +3688,10 @@ export function answerCliFlags(argv: string[] = process.argv.slice(2)): boolean 
 
 async function main() {
     if (answerCliFlags()) return;
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
+    const skills = await loadRebaseSkills();
+    serveStdio(() => createServer(skills), {
+        onerror: (error) => process.stderr.write(`[rebase-mcp] ${error.message}\n`)
+    });
 }
 
 if (process.env.NODE_ENV !== "test") {

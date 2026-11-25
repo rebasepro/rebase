@@ -979,23 +979,47 @@ export interface RebaseBackendOptions {
      */
     maxBodySize?: number;
     /**
-     * What `/mcp` serves, for a backend that brings its own tools instead of
-     * the data tools — the Rebase Cloud control plane serves its projects and
-     * their operations this way. The surface is still switched on by
-     * `REBASE_MCP_ENABLED` and `REBASE_PUBLIC_URL`; this only decides what is
-     * on it. Omitted, `/mcp` serves the data tools under `data:*` scopes.
+     * What `/mcp` serves. The surface is switched on by `REBASE_MCP_ENABLED`
+     * and `REBASE_PUBLIC_URL`; this only decides what is on it. Omitted,
+     * `/mcp` serves the data tools under `data:*` scopes and no skills.
      *
-     * The OAuth server, its consent screen and its token checks are the same
-     * either way: a tool runs as the account that consented, with the scopes
-     * it consented to (`McpToolContext.caller`).
+     * A backend may bring its own tools instead of the data tools — the
+     * Rebase Cloud control plane serves its projects and their operations
+     * this way — and may serve skills with either. The OAuth server, its
+     * consent screen and its token checks are the same in every case: a tool
+     * runs as the account that consented, with the scopes it consented to
+     * (`McpToolContext.caller`).
      */
     mcp?: {
-        /** The tools, in place of the data tools. Each is offered to a grant holding its `requiredScope`. */
-        tools: readonly McpToolDefinition[];
-        /** The scopes a grant may hold, with the consent screen's wording for each. */
-        scopes: McpScopeVocabulary;
-        /** What `initialize` tells the client about the tools. */
-        instructions: string;
+        /**
+         * The tools, in place of the data tools. Each is offered to a grant
+         * holding its `requiredScope`. Omitted, the data tools.
+         */
+        tools?: readonly McpToolDefinition[];
+        /** The scopes a grant may hold, with the consent screen's wording for each. The `data:*` scopes when omitted. */
+        scopes?: McpScopeVocabulary;
+        /** What `initialize` and `server/discover` tell the client about the tools. */
+        instructions?: string;
+        /**
+         * A folder of skills to serve over MCP (the
+         * `io.modelcontextprotocol/skills` extension), relative to the working
+         * directory: one folder per skill, each with a `SKILL.md` whose
+         * frontmatter has a `name` (the folder's name) and a `description`,
+         * plus any files it links to. A client on protocol revision
+         * 2026-07-28 or later — Claude Code, Claude — lists them and loads
+         * one when it needs it; Claude Code names each `<connector>:<skill>`.
+         *
+         * Every authenticated MCP caller can read them, whatever its scopes,
+         * so put nothing in them that is not for the people who connect.
+         * Read once, on the first request that needs them: a change takes
+         * effect at the next deploy or restart.
+         *
+         * @example
+         * ```ts
+         * mcp: { skills: "./skills" }   // skills/<name>/SKILL.md
+         * ```
+         */
+        skills?: string;
     };
     /**
      * Response compression for API routes. **Enabled by default.**

@@ -66,22 +66,16 @@ const dropdownNavLinks = [
                 heading: t("nav.col.admin"),
                 items: [
                     {
-                        href: translatePath("/cms"),
-                        label: t("nav.cms"),
-                        description: t("nav.cms.desc"),
-                        icon: "layout-dashboard"
-                    },
-                    {
                         href: translatePath("/studio"),
                         label: t("nav.studio"),
                         description: t("nav.studio.desc"),
                         icon: "square-terminal"
                     },
                     {
-                        href: translatePath("/ui"),
-                        label: t("nav.ui"),
-                        description: t("nav.ui.desc"),
-                        icon: "layers"
+                        href: translatePath("/cms"),
+                        label: t("nav.cms"),
+                        description: t("nav.cms.desc"),
+                        icon: "layout-dashboard"
                     },
                 ]
             },
@@ -169,6 +163,7 @@ const dropdownNavLinks = [
     },
 
 
+    { href: translatePath("/cloud"), label: t("nav.cloudShort") },
     { href: translatePath("/pricing"), label: t("nav.pricing") },
     { href: translatePath("/docs"), label: t("nav.docs") },
 ];
@@ -176,6 +171,7 @@ const dropdownNavLinks = [
 // Flat navigation links (flat-nav variant)
 const flatNavLinks = [
     { href: translatePath("/product"), label: t("nav.product") },
+    { href: translatePath("/cloud"), label: t("nav.cloudShort") },
     { href: translatePath("/developers"), label: t("nav.developers") },
     { href: translatePath("/pricing"), label: t("nav.pricing") },
 
@@ -273,13 +269,13 @@ const flatNavLinks = [
             </button>
             <GitHubStarButton class="hidden sm:inline-flex" />
             <a
-                    href={DEMO_URL} target="_blank" rel="noopener noreferrer"
+                    href={translatePath("/cloud")}
                     class="hidden sm:inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary border border-transparent px-4 py-0 min-h-(--control-medium) text-sm font-semibold text-white shadow-sm hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow"
                     transition:name="start-building-button"
                     data-track
                     id="header-start-building-desktop"
             >
-                {t("nav.tryDemo")}
+                {t("nav.startCloud")}
                 <svg
                   class="lucide lucide-arrow-right"
                   xmlns="http://www.w3.org/2000/svg"
@@ -370,12 +366,12 @@ const flatNavLinks = [
                     )
                 ))}
                 <a
-                        href={DEMO_URL} target="_blank" rel="noopener noreferrer"
+                        href={translatePath("/cloud")}
                         class="mt-8 w-full inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-4 text-xl font-semibold text-white shadow-lg hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow"
                         data-track
                         id="header-start-building-mobile-control"
                 >
-                    {t("nav.tryDemo")}
+                    {t("nav.startCloud")}
                     <svg
                       class="lucide lucide-arrow-right"
                       xmlns="http://www.w3.org/2000/svg"
@@ -418,12 +414,12 @@ const flatNavLinks = [
                     ))}
                 </div>
                 <a
-                        href={DEMO_URL} target="_blank" rel="noopener noreferrer"
+                        href={translatePath("/cloud")}
                         class="mt-8 w-full inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-4 text-xl font-semibold text-white shadow-lg hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow"
                         data-track
                         id="header-start-building-mobile-flat"
                 >
-                    {t("nav.tryDemo")}
+                    {t("nav.startCloud")}
                     <svg
                       class="lucide lucide-arrow-right"
                       xmlns="http://www.w3.org/2000/svg"

@@ -1,3 +1,5 @@
+import type { JSONValue } from "@modelcontextprotocol/server";
+
 /**
  * The Rebase Cloud tools past provisioning: status, deploy, logs, env,
  * deployment history and rollback.
@@ -36,7 +38,7 @@ export interface PropertySchema {
 /** A tool's input schema, as it is advertised in `tools/list`. */
 export interface ToolInputSchema {
     type: "object";
-    properties: Record<string, unknown>;
+    properties: Record<string, JSONValue>;
     required?: string[];
     additionalProperties?: boolean;
 }

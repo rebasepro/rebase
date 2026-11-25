@@ -1,5 +1,5 @@
 ---
-sourceHash: 527ed0c2f1a85b8e
+sourceHash: 03742ec4ecbebca1
 title: Rebase Storage
 sidebar_label: Rebase Storage
 description: "S3-kompatibler Objektspeicher in Rebase Cloud: der Endpunkt, Buckets und Schlüssel, die unterstützten S3-Operationen, Limits, Preise, Speicherort der Daten und wie Sie aws-cli, rclone, boto3 und das AWS SDK für JavaScript verbinden."
@@ -67,6 +67,11 @@ Die Plattform setzt diese Umgebungsvariablen für die App:
 | `S3_SECRET_ACCESS_KEY` | Das Secret der App |
 | `S3_FORCE_PATH_STYLE` | `true` |
 
+Ein Bucket, den der Code der App über den Standard-Bucket hinaus deklariert – `bucket("media")` in
+`backend/resources.ts` –, erhält beim nächsten Deploy einen eigenen Bucket und Schlüssel, gebunden mit
+denselben Variablen, ergänzt um seinen Schlüssel als Suffix: `S3_BUCKET__MEDIA`,
+`S3_ACCESS_KEY_ID__MEDIA` und so weiter. Ein Projekt kann bis zu 100 Buckets haben.
+
 Der Datenverkehr zwischen der App und Rebase Storage bleibt innerhalb des Clusters. Wie die
 App Dateien bereitstellt und autorisiert, wird unter
 [Dateispeicher](/docs/backend/storage/) und
@@ -120,7 +125,8 @@ woraufhin S3-Clients den Versuch mit Backoff wiederholen.
 ## Preise
 
 Jedes Projekt beinhaltet **10 GB**. Darüber hinaus kostet der Speicher **0,03 € pro
-GB-Monat**, wobei nur die jeweils aktuelle Version jedes Objekts gezählt wird.
+GB-Monat**, wobei nur die jeweils aktuelle Version jedes Objekts gezählt wird, und zwar über alle
+Buckets des Projekts hinweg.
 
 Gelöschte und überschriebene Dateien werden 30 Tage lang aufbewahrt und können während dieser
 Zeit vom Support wiederhergestellt werden. Sie werden nicht in Rechnung gestellt.

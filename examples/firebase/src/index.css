@@ -13,8 +13,11 @@
     --color-secondary: #FF5B79;
 }
 
+/* `min-h-dvh`, not `min-h-screen`: on phones `100vh` is the viewport with the
+   URL bar hidden, so the body outgrew the admin (`100dvh`), the page scrolled
+   under it and `justify-center` opened a gap above it. */
 body {
-    @apply w-full min-h-screen bg-surface-50 dark:bg-surface-900 flex flex-col items-center justify-center;
+    @apply w-full min-h-dvh bg-surface-50 dark:bg-surface-900 flex flex-col items-center justify-center;
 }
 
 a {

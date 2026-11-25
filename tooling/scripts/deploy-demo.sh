@@ -114,6 +114,16 @@ echo ""
 # is absent — which left the demo advertising "Sign in with Google" while
 # refusing to create the account behind it (403 REGISTRATION_DISABLED). Visitors
 # land on `defaultRole: viewer`, so an open demo is the intent.
+#
+# One instance and REBASE_DB_POOL_MAX=5 because the database is a db-f1-micro:
+# 25 connections in all, about 22 usable. Uncapped, one process can open ~28
+# (main pool 20, admin pool 5, boot session 3, realtime CDC), and measured it
+# peaks at 7 on boot and 11 under a 66-request burst. On 2026-11-24 autoscaling
+# started two instances in the same second next to the running one, the server
+# reached 26 connections, and the demo answered 53300 "no connection free".
+# REBASE_DB_POOL_MAX is a ceiling on every pool in the process. With it, one
+# instance stays near 12 and an old and a new revision overlapping during a
+# deploy still fit. Raise max-instances only together with a bigger tier.
 
 gcloud run deploy "$SERVICE" \
   --image="$IMAGE" \
@@ -124,9 +134,9 @@ gcloud run deploy "$SERVICE" \
   --memory=1Gi \
   --cpu=1 \
   --min-instances=1 \
-  --max-instances=3 \
+  --max-instances=1 \
   --add-cloudsql-instances="$SQL_INSTANCE" \
-  --set-env-vars="NODE_ENV=production,CORS_ORIGINS=*,FORCE_LOCAL_STORAGE=true,ALLOW_LOCALHOST_IN_PRODUCTION=true,REBASE_CRON_ALWAYS_ON=1,ALLOW_REGISTRATION=true" \
+  --set-env-vars="NODE_ENV=production,CORS_ORIGINS=*,FORCE_LOCAL_STORAGE=true,ALLOW_LOCALHOST_IN_PRODUCTION=true,REBASE_CRON_ALWAYS_ON=1,ALLOW_REGISTRATION=true,REBASE_DB_POOL_MAX=5" \
   --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,ADMIN_CONNECTION_STRING=ADMIN_CONNECTION_STRING:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest"
 
 echo ""

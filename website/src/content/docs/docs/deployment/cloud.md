@@ -234,6 +234,11 @@ mail for your app: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and
 app's own `GET /api/auth/config` (its `unavailable` field), and `deploy` says the
 same under its live check.
 
+## More than one database
+
+Declare each (`database("analytics")`) and deploy: it is made on the project's server as
+`DATABASE_URL__ANALYTICS`, sharing its resources and bill ([details](/docs/backend/multiple-sources/#on-rebase-cloud)).
+
 ## File storage
 
 A new project has no bucket: uploads are refused with `501 STORAGE_NOT_CONFIGURED`,
@@ -253,8 +258,10 @@ rebase cloud storage attach --bucket <name> \
 rebase cloud deploy
 ```
 
-`rebase cloud storage` lists the project's buckets. A project with several
-attaches each with `--source <key>`; one that configures storage in code needs neither.
+`rebase cloud storage` lists the project's buckets; each declared `bucket("media")`
+gets its own ([Multiple Databases and Buckets](/docs/backend/multiple-sources/#on-rebase-cloud)).
+With buckets of your own, attach
+each with `--source <key>`; one that configures storage in code needs neither.
 
 ## Preview a change
 
@@ -546,7 +553,7 @@ fails, `rebase cloud compute apply` tries it again.
 | `deploy-hooks` | Secret URLs a git host or CI calls to deploy the project: list, create (the URL is shown once), revoke. |
 | `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
 | `sleep` | Sleep when idle: `on [--after 15m\|30m\|1h\|4h]`, `off`, `wake`, and `status` (the default). Asleep, a project holds no CPU or memory and the next request wakes it; scheduled jobs and background work do not run meanwhile. Where a project cannot sleep, the control plane refuses and says why |
-| `start`, `stop`, `restart` | Pausing a project and bringing it back. A stopped project keeps its subscription, unless the platform bills stopped projects for storage and the platform fee only; the console's **Billing** row says so when it does |
+| `start`, `stop`, `restart` | Pausing a project and bringing it back. A stopped project keeps its subscription and pays only its disk, or the monthly minimum when the disk costs less; the console's **Billing** row says what it pays |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `alerts` | The project's open incidents, and acknowledging or snoozing one. |
 | `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |

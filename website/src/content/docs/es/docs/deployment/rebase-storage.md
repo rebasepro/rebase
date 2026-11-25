@@ -1,5 +1,5 @@
 ---
-sourceHash: 527ed0c2f1a85b8e
+sourceHash: 03742ec4ecbebca1
 title: Rebase Storage
 sidebar_label: Rebase Storage
 description: "Almacenamiento de objetos compatible con S3 en Rebase Cloud: el endpoint, buckets y claves, las operaciones S3 compatibles, límites, precios, dónde se almacenan los datos y cómo conectar aws-cli, rclone, boto3 y el AWS SDK para JavaScript."
@@ -57,6 +57,8 @@ Una aplicación Rebase desplegada en Rebase Cloud obtiene su bucket y una clave 
 | `S3_SECRET_ACCESS_KEY` | El secreto de la aplicación |
 | `S3_FORCE_PATH_STYLE` | `true` |
 
+Un bucket que el código de la aplicación declara además del predeterminado — `bucket("media")` en `backend/resources.ts` — obtiene un bucket y una clave propios en el siguiente despliegue, vinculados con las mismas variables con su clave como sufijo: `S3_BUCKET__MEDIA`, `S3_ACCESS_KEY_ID__MEDIA`, etc. Un proyecto puede tener hasta 100 buckets.
+
 El tráfico entre la aplicación y Rebase Storage permanece dentro del clúster. La forma en que la aplicación sirve y autoriza archivos se describe en [File storage](/docs/backend/storage/) y en [Managed backend runtime](/docs/deployment/managed-runtime/#storage-for-generated-files).
 
 ## Operaciones S3 admitidas
@@ -100,7 +102,7 @@ Cada proyecto también cuenta con un límite en la tasa de solicitudes. Las soli
 
 ## Precios
 
-Cada proyecto incluye **10 GB**. A partir de esa cantidad, el almacenamiento cuesta **0,03 € por GB al mes**, calculado únicamente sobre la versión actual de cada objeto.
+Cada proyecto incluye **10 GB**. A partir de esa cantidad, el almacenamiento cuesta **0,03 € por GB al mes**, calculado únicamente sobre la versión actual de cada objeto, en todos los buckets del proyecto.
 
 Los archivos eliminados y sobrescritos se conservan durante 30 días y el equipo de soporte puede restaurarlos durante ese período. No se facturan.
 

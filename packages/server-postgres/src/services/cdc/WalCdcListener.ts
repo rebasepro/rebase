@@ -223,6 +223,9 @@ export class WalCdcListener {
     async start(): Promise<void> {
         if (this.running) return;
         this.running = true;
+        // Not counted toward the process's connection demand
+        // (`connection-budget.ts`): since PostgreSQL 12 a WAL sender takes a
+        // `max_wal_senders` slot, not one of `max_connections`.
         try {
             await this.connect({ first: true });
         } catch (err) {

@@ -205,6 +205,8 @@ Tables and row-level-security policies are provisioned **per source**: a
 table routed to `analytics` gets its table, and its policies, in the
 analytics database.
 
+On Rebase Cloud you set none of this either: see [On Rebase Cloud](#on-rebase-cloud).
+
 ### Storage
 
 ```bash
@@ -409,3 +411,40 @@ stays unbound and answers 501.
 - [Backend Overview](/docs/backend/) — where each declaration lives
 - [Storage Configuration](/docs/backend/storage/) — the same shape for buckets
 - [Environment & Configuration](/docs/getting-started/configuration/) — the `__SUFFIX` convention that binds a source to its variables
+
+## On Rebase Cloud
+
+A project's managed PostgreSQL on [Rebase Cloud](/docs/deployment/cloud/) is a
+**database server**, and it holds every database the project declares. On the
+next deploy after `export const analytics = database("analytics")`, the platform
+creates a database named `analytics` on that server and binds it to your app as
+`DATABASE_URL__ANALYTICS`, the same variable a self-hosted backend reads.
+
+- **Billing.** Every database on the server shares its CPU, memory and disk,
+  which are what the project is billed for. A second database costs nothing by
+  itself; the data it holds grows the disk, and the disk is billed by size.
+  Size the server for all of them under **Compute**.
+- **Backups and recovery.** They are in the server's backups and move with it
+  in a point-in-time recovery. `rebase cloud db backup create --database analytics`
+  takes a dump of one, and restoring that dump writes back into the same database.
+- **Connecting.** `rebase cloud db list` shows them, and `db info`, `db connect`
+  and `db query` take `--database <key>`:
+
+  ```bash
+  rebase cloud db connect --database analytics
+  ```
+
+- **Removing.** A deploy never deletes a database. One your code stops declaring
+  stays on the server until you run `rebase cloud resources prune database analytics`.
+
+A variable you set yourself wins: with your own `DATABASE_URL__ANALYTICS` in the
+project's environment the platform creates nothing for that key. A project that
+brings its own database server gets no databases created on it; set a
+`DATABASE_URL__<KEY>` for each one instead.
+
+Buckets work the same way. Once the project's default bucket runs on
+[Rebase Storage](/docs/deployment/rebase-storage/), every `bucket("media")` gets
+a bucket and key of its own on the next deploy, bound as `S3_BUCKET__MEDIA` and
+the rest of its `__MEDIA` variables. Stored bytes are measured per project,
+across all of its buckets. With buckets of your own, attach each with
+`rebase cloud storage attach --source <key>`.

@@ -67,9 +67,12 @@ export const nextStepAfterDbGenerate = (migration: {
     wrote: boolean;
     /** Whether it is the project's first. */
     first: boolean;
+    /** What the printed commands need to reach the same database: `""`, or ` --database analytics`. */
+    commandSuffix?: string;
 }): string[] => {
     if (!migration.wrote) return [];
-    const apply = `  Apply it with ${chalk.bold.green("rebase db migrate")}.`;
+    const suffix = migration.commandSuffix ?? "";
+    const apply = `  Apply it with ${chalk.bold.green(`rebase db migrate${suffix}`)}.`;
     if (!migration.first) {
         return [`${apply} If boot has already made this change there, migrate stops and names the version to record.`];
     }
@@ -77,6 +80,6 @@ export const nextStepAfterDbGenerate = (migration: {
     return [
         apply,
         "  On a database boot has already set up, these tables exist: record this first migration as applied instead,",
-        `  with ${chalk.bold.green(`rebase db migrate --baseline ${version}`)}.`
+        `  with ${chalk.bold.green(`rebase db migrate${suffix} --baseline ${version}`)}.`
     ];
 };

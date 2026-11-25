@@ -956,7 +956,7 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
 }
 
 /**
- * The closing "AI Agent Skills" lines, each command one its reader can run.
+ * The closing "AI agents" lines about skills, each command one its reader can run.
  *
  * `rebase skills install` with no `--agent` prompts, and refuses without a
  * TTY — so printing it bare at the end of `rebase init --yes`, the agent and
@@ -988,6 +988,24 @@ export function agentNextSteps(agents: readonly AgentKey[], interactive: boolean
         chalk.gray(`  name it: ${AGENT_KEYS.join(", ")}, or all.`),
         "",
         both(["skills", "install", "--agent", "<agent>", "--mcp"])
+    ];
+}
+
+/**
+ * The closing lines about the app's own MCP server (`/mcp`), which `rebase
+ * dev` switches on: the second half of "AI agents", after the skills.
+ *
+ * Init cannot connect anything itself — there is no server running yet, and
+ * the URL is the one the server publishes once it is — so it names the one
+ * command that does, and when to run it.
+ */
+export function appMcpNextSteps(pm: PMCommands): string[] {
+    const both = `  ${chalk.cyan("rebase mcp connect")}  ${chalk.gray("or")}  ${chalk.cyan(pm.exec("rebase", ["mcp", "connect"]).join(" "))}`;
+    return [
+        chalk.gray("  Your app has an MCP server too: Claude Code, Cursor or VS Code can read and edit"),
+        chalk.gray(`  your data as you, under your permissions. With ${pm.run("dev").join(" ")} running:`),
+        "",
+        both
     ];
 }
 
@@ -1236,9 +1254,11 @@ async function createProject(options: InitOptions) {
     console.log("");
     console.log(`${chalk.green.bold("✓")} Project ${chalk.bold(options.projectName)} created successfully!`);
     console.log("");
-    console.log(chalk.bold("🤖 AI Agent Skills"));
+    console.log(chalk.bold("🤖 AI agents"));
     console.log("");
     for (const line of agentNextSteps(options.agents, options.interactive === true, pmCommands)) console.log(line);
+    console.log("");
+    for (const line of appMcpNextSteps(pmCommands)) console.log(line);
     console.log("");
     console.log(chalk.gray("Docs: https://rebase.pro/docs"));
     const repo = initRepoLine(hasSeenStarNudge(), { isTTY: Boolean(process.stdout.isTTY), env: process.env });

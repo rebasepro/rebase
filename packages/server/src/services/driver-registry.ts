@@ -22,6 +22,37 @@ import { logger } from "../utils/logger";
 export const DEFAULT_DRIVER_ID = "(default)";
 
 /**
+ * A database key that names no registered driver.
+ *
+ * Thrown rather than answered with the default driver. A table declared on
+ * `database("analytics")` that reaches the default database is read from and
+ * written to the wrong place — rows land where nothing routed to analytics
+ * will ever look for them, and reads come back empty instead of failing —
+ * which is the one outcome worse than an error. Storage refuses an unknown
+ * source the same way (`UnknownStorageSourceError`).
+ */
+export class UnknownDatabaseError extends Error {
+    constructor(public readonly databaseKey: string, public readonly knownKeys: string[]) {
+        super(
+            `[DriverRegistry] Database "${databaseKey}" is not registered. ` +
+            `Registered databases: ${knownKeys.length > 0 ? knownKeys.map(k => `"${k}"`).join(", ") : "(none)"}. ` +
+            `Declare it in backend/resources.ts — database("${databaseKey}") — and bind its connection string ` +
+            "(DATABASE_URL__<KEY>), or fix the table's `database`."
+        );
+        this.name = "UnknownDatabaseError";
+    }
+}
+
+/**
+ * The registry key an id means: omitted, empty or `(default)` is the default
+ * database; anything else is itself.
+ */
+function canonicalDriverId(id: string | undefined | null): string {
+    const trimmed = id?.trim();
+    return trimmed ? trimmed : DEFAULT_DRIVER_ID;
+}
+
+/**
  * Registry for managing multiple driver delegates
  */
 export interface DriverRegistry {
@@ -46,10 +77,13 @@ export interface DriverRegistry {
     get(id: string | undefined | null): DataDriver | undefined;
 
     /**
-     * Get a driver delegate by ID, with fallback to default
-     * @param id - Driver identifier, or undefined/null for default
-     * @returns The DataDriver (falls back to default if id not found)
-     * @throws Error if neither the specified nor default driver exists
+     * Get a driver delegate by ID: the default for an omitted, empty or
+     * `(default)` id, the named one otherwise.
+     * @param id - Driver identifier, or undefined/null/"" for default
+     * @returns The DataDriver
+     * @throws UnknownDatabaseError if `id` names a database that is not registered —
+     *   never the default in its place
+     * @throws Error if the default is asked for and none is registered
      */
     getOrDefault(id: string | undefined | null): DataDriver;
 
@@ -130,29 +164,23 @@ export class DefaultDriverRegistry implements DriverRegistry {
     }
 
     get(id: string | undefined | null): DataDriver | undefined {
-        if (id === undefined || id === null) {
-            return this.delegates.get(DEFAULT_DRIVER_ID);
-        }
-        return this.delegates.get(id);
+        // Canonicalized on the same rule as `getOrDefault`, so the two cannot
+        // disagree about which ids mean the default database.
+        return this.delegates.get(canonicalDriverId(id));
     }
 
     getOrDefault(id: string | undefined | null): DataDriver {
-        // If no ID specified, return default
-        if (id === undefined || id === null) {
+        const key = canonicalDriverId(id);
+        if (key === DEFAULT_DRIVER_ID) {
             return this.getDefault();
         }
 
-        // Try to get by ID
-        const delegate = this.delegates.get(id);
+        const delegate = this.delegates.get(key);
         if (delegate) {
             return delegate;
         }
 
-        // Fallback to default with warning
-        logger.warn(
-            `[DriverRegistry] Driver "${id}" not found, falling back to "${DEFAULT_DRIVER_ID}"`
-        );
-        return this.getDefault();
+        throw new UnknownDatabaseError(key, this.list());
     }
 
     has(id: string): boolean {

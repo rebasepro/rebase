@@ -1,7 +1,8 @@
 import {
     DriverRegistry,
     DefaultDriverRegistry,
-    DEFAULT_DRIVER_ID
+    DEFAULT_DRIVER_ID,
+    UnknownDatabaseError
 } from "../src/services/driver-registry";
 import { DataDriver } from "@rebasepro/types";
 
@@ -119,22 +120,40 @@ describe("DriverRegistry", () => {
                 expect(registry.getOrDefault(null)).toBe(defaultDelegate);
             });
 
-            it("should fallback to default when id not found", () => {
-                // This should log a warning and return the default
-                const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
-
-                expect(registry.getOrDefault("non-existent")).toBe(defaultDelegate);
-                expect(consoleSpy).toHaveBeenCalledWith(
-                    expect.stringContaining('Driver "non-existent" not found')
-                );
-
-                consoleSpy.mockRestore();
+            it("should return default when id is empty or (default)", () => {
+                expect(registry.getOrDefault("")).toBe(defaultDelegate);
+                expect(registry.getOrDefault("  ")).toBe(defaultDelegate);
+                expect(registry.getOrDefault(DEFAULT_DRIVER_ID)).toBe(defaultDelegate);
+                expect(registry.get("")).toBe(defaultDelegate);
             });
 
-            it("should throw when fallback fails (no default)", () => {
+            // A table on `database("analytics")` served by the default driver
+            // writes its rows where nothing routed to analytics will read them.
+            it("throws UnknownDatabaseError for a key that is not registered, never the default", () => {
+                let thrown: unknown;
+                try {
+                    registry.getOrDefault("analytcs");
+                } catch (err) {
+                    thrown = err;
+                }
+                expect(thrown).toBeInstanceOf(UnknownDatabaseError);
+                const error = thrown as UnknownDatabaseError;
+                expect(error.databaseKey).toBe("analytcs");
+                expect(error.knownKeys).toEqual([DEFAULT_DRIVER_ID, "analytics"]);
+                expect(error.message).toContain('Database "analytcs" is not registered');
+                expect(error.message).toContain('database("analytcs")');
+            });
+
+            it("throws UnknownDatabaseError for a named key on an empty registry", () => {
                 const emptyRegistry = new DefaultDriverRegistry();
 
-                expect(() => emptyRegistry.getOrDefault("anything")).toThrow();
+                expect(() => emptyRegistry.getOrDefault("anything")).toThrow(UnknownDatabaseError);
+            });
+
+            it("still throws the no-default error when the default is asked for and missing", () => {
+                const emptyRegistry = new DefaultDriverRegistry();
+
+                expect(() => emptyRegistry.getOrDefault(undefined)).toThrow("[DriverRegistry] No default driver registered.");
             });
         });
 

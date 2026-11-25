@@ -19,6 +19,7 @@ import path from "path";
 import { computeSchemaVersion, DEFAULT_DATA_SOURCE_KEY, type CompiledTable, type TableDescriptor } from "@rebasepro/types";
 import { compileLoadedSchema, loadBackendSchema } from "@rebasepro/server";
 import { outWarn } from "../cli-output";
+import { scopedDatabaseTarget, storedByDatabase, tablesStoredByDatabase } from "../database-target";
 
 /** Directories this process has already said are missing. See {@link loadTables}. */
 const warnedMissing = new Set<string>();
@@ -42,8 +43,18 @@ const warnedMissing = new Set<string>();
  *   and key that is wrong, or SchemaLoadError (from `@rebasepro/server`) naming
  *   the file that could not be read.
  */
-export async function loadTables(schemaDir: string): Promise<CompiledTable[]> {
-    return (await loadTableSchema(schemaDir)).tables;
+export async function loadTables(schemaDir: string, options: LoadTablesOptions = {}): Promise<CompiledTable[]> {
+    return (await loadTableSchema(schemaDir, options)).tables;
+}
+
+/** @group Schema */
+export interface LoadTablesOptions {
+    /**
+     * Every table the project declares, whatever database stores it, even
+     * inside a `db` command that acts on one database. For the Drizzle schema
+     * (`src/schema.generated.ts`), which the server reads for every database.
+     */
+    allDatabases?: boolean;
 }
 
 /**
@@ -65,9 +76,16 @@ export interface LoadedTables {
  * {@link loadTables}, with the descriptors beside the compiled tables — for a
  * command that compares the stamp the runtime wrote (the doctor).
  *
+ * Inside a `db push | generate | migrate` (`withDatabaseTarget`), only the
+ * tables the targeted database stores: a push to the default database that
+ * planned the analytics tables too created them there, and one to the
+ * analytics database would plan a DROP for nothing but would lock and police
+ * tables it does not hold. Every step of those commands reads its tables
+ * here, so filtering here is what keeps all of them on one database.
+ *
  * @param schemaDir the schema directory, resolved against the working directory.
  */
-export async function loadTableSchema(schemaDir: string): Promise<LoadedTables> {
+export async function loadTableSchema(schemaDir: string, options: LoadTablesOptions = {}): Promise<LoadedTables> {
     const resolved = path.resolve(schemaDir);
     if (!fs.existsSync(resolved) && !warnedMissing.has(resolved)) {
         // Once per directory per process: `db push` reads the tables from
@@ -85,9 +103,12 @@ export async function loadTableSchema(schemaDir: string): Promise<LoadedTables> 
     const loaded = await loadBackendSchema(resolved);
     const compiled = compileLoadedSchema(loaded);
     const bySlug = (a: { slug: string }, b: { slug: string }): number => a.slug.localeCompare(b.slug);
+    const target = options.allDatabases ? undefined : scopedDatabaseTarget();
+    const descriptors = target ? storedByDatabase(compiled.descriptors, target.key) : compiled.descriptors;
+    const tables = target ? tablesStoredByDatabase(compiled.tables, target.key) : compiled.tables;
     return {
-        descriptors: [...compiled.descriptors].sort(bySlug),
-        tables: [...compiled.tables].sort((a, b) => bySlug(a.descriptor, b.descriptor))
+        descriptors: [...descriptors].sort(bySlug),
+        tables: [...tables].sort((a, b) => bySlug(a.descriptor, b.descriptor))
     };
 }
 
@@ -104,6 +125,5 @@ export async function loadTableSchema(schemaDir: string): Promise<LoadedTables> 
  * @group Schema
  */
 export function defaultDatabaseSchemaVersion(loaded: LoadedTables): string {
-    return computeSchemaVersion(loaded.descriptors.filter(descriptor =>
-        !descriptor.database || descriptor.database === DEFAULT_DATA_SOURCE_KEY));
+    return computeSchemaVersion(storedByDatabase(loaded.descriptors, DEFAULT_DATA_SOURCE_KEY));
 }

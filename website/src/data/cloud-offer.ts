@@ -85,7 +85,7 @@ export const HOURS_IN_MONTH = prices.sleep.hoursInMonth;
 
 /** What one unit of each dial costs a month in the current region, read back out of the sizes (`cloud-unit-rates.mjs`). */
 export function dialRates(region: RegionId = CLOUD_FLAGS.region): {
-    platformEur: number;
+    minimumEur: number;
     appVcpuEur: number;
     appGbEur: number;
     databaseVcpuEur: number;
@@ -94,7 +94,7 @@ export function dialRates(region: RegionId = CLOUD_FLAGS.region): {
 } {
     const r = unitRates(regionPrices(region));
     return {
-        platformEur: prices.platformFeeEur,
+        minimumEur: prices.minimumEur,
         appVcpuEur: r.app.perMillicore * 1000,
         appGbEur: r.app.perMib * 1024,
         databaseVcpuEur: r.database.perMillicore * 1000,
@@ -110,7 +110,6 @@ export function dialRates(region: RegionId = CLOUD_FLAGS.region): {
  * show a receipt whose total disagrees with the console.
  */
 export function defaultProjectLines(region: RegionId = CLOUD_FLAGS.region): {
-    platform: number;
     app: number;
     database: number;
     disk: number;
@@ -124,7 +123,7 @@ export function defaultProjectLines(region: RegionId = CLOUD_FLAGS.region): {
     const app = priceAt(r.app, d.app.cpu, d.app.memory);
     const database = priceAt(r.database, d.database.cpu, d.database.memory);
     const disk = Math.round(d.diskGi * r.diskPerGib * 100) / 100;
-    const total = Math.round((prices.platformFeeEur + app + database + disk) * 100) / 100;
+    const total = Math.round((app + database + disk) * 100) / 100;
     if (total !== p.examples.default.monthlyEur) {
         throw new Error(`The default project's lines add up to €${total}, the export says €${p.examples.default.monthlyEur}; re-export cloud-prices.json`);
     }
@@ -132,7 +131,7 @@ export function defaultProjectLines(region: RegionId = CLOUD_FLAGS.region): {
     // copy of the volume are charged again (saas resource-pricing.ts: "Every
     // instance carries its own copy of the volume").
     const secondCopy = Math.round((database + disk) * 100) / 100;
-    return { platform: prices.platformFeeEur, app, database, disk, total, secondCopy, totalWithSecondCopy: Math.round((total + secondCopy) * 100) / 100 };
+    return { app, database, disk, total, secondCopy, totalWithSecondCopy: Math.round((total + secondCopy) * 100) / 100 };
 }
 
 /**

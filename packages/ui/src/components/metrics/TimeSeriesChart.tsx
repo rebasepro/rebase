@@ -303,23 +303,29 @@ function Plot({ series: parsed, times, values, width, height, variant, format, d
                     </div>
                 )}
             </div>
-            <Table className="sr-only">
-                <TableHeader>
-                    <TableCell>{xLabel}</TableCell>
-                    {parsed.map((s) => <TableCell key={s.id}>{s.label}</TableCell>)}
-                </TableHeader>
-                <TableBody>
-                    {times.map((time) => (
-                        <TableRow key={time}>
-                            <TableCell header scope="row">{dates.format(time)}</TableCell>
-                            {parsed.map((s) => {
-                                const value = valueAt(s, time);
-                                return <TableCell key={s.id}>{value === null ? "—" : formatNumber(value, format, locale)}</TableCell>;
-                            })}
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+            {/* `sr-only` on the <table> itself does not hide it: a table box ignores
+                `height: 1px` and `overflow: hidden`, so it kept its full height, and
+                as an absolute box with no positioned ancestor it made the whole
+                page scroll. A block wrapper clips. */}
+            <div className="sr-only">
+                <Table>
+                    <TableHeader>
+                        <TableCell>{xLabel}</TableCell>
+                        {parsed.map((s) => <TableCell key={s.id}>{s.label}</TableCell>)}
+                    </TableHeader>
+                    <TableBody>
+                        {times.map((time) => (
+                            <TableRow key={time}>
+                                <TableCell header scope="row">{dates.format(time)}</TableCell>
+                                {parsed.map((s) => {
+                                    const value = valueAt(s, time);
+                                    return <TableCell key={s.id}>{value === null ? "—" : formatNumber(value, format, locale)}</TableCell>;
+                                })}
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
         </>
     );
 }

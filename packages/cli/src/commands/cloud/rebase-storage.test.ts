@@ -77,7 +77,7 @@ const OVERVIEW: StorageOverview = {
 };
 
 const ISSUED = {
-    id: "k2", name: "ci", accessKeyId: "RKCI", secretAccessKey: "issued-secret", permission: "read",
+    id: "k2", name: "ci", accessKeyId: "RKCI", secretAccessKey: "issued-secret", permission: "read" as const,
     bucket: "shop-assets", endpoint: OVERVIEW.endpoint, region: OVERVIEW.region
 };
 
@@ -526,6 +526,14 @@ describe("helpers", () => {
         const lines = s3EnvLines({ ...ISSUED, permission: "read", bucket: null });
         expect(lines.some(l => l.startsWith("S3_BUCKET="))).toBe(false);
         expect(lines).toContain("S3_FORCE_PATH_STYLE=true");
+    });
+
+    it("suffixes every line for a declared bucket, so they never configure the default", () => {
+        const lines = s3EnvLines(ISSUED, "media");
+        expect(lines).toContain("STORAGE_TYPE__MEDIA=s3");
+        expect(lines.find(l => l.startsWith("S3_ACCESS_KEY_ID"))).toMatch(/^S3_ACCESS_KEY_ID__MEDIA=/);
+        expect(lines.every(l => l.split("=")[0].endsWith("__MEDIA"))).toBe(true);
+        expect(s3EnvLines(ISSUED).every(l => !l.includes("__"))).toBe(true);
     });
 
     it("accepts a bare array of rules", () => {

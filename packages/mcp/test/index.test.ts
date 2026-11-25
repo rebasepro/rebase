@@ -1183,14 +1183,25 @@ describe("table resources stay inside the schema directory", () => {
         await expect(read("rebase://tables/posts")).rejects.toThrow(/not found/);
     });
 
-    it("refuses a sibling directory whose name starts with the schema directory's", async () => {
-        // `startsWith(dir)` without a separator let `schema_private` through,
-        // because its path begins with `…/schema`.
-        await expect(read("rebase://tables/../schema_private/secrets")).rejects.toThrow(/path traversal/);
+    // The SDK parses the URI before dispatch, which removes its dot segments:
+    // `rebase://tables/../x` arrives as `rebase://tables/x`, a name inside the
+    // schema directory. The separator check behind it stays for any name that
+    // would still resolve outside.
+    it("never reads a sibling directory whose name starts with the schema directory's", async () => {
+        await expect(read("rebase://tables/../schema_private/secrets")).rejects.toThrow(/Table module "schema_private\/secrets" not found/);
     });
 
-    it("refuses a path that climbs out altogether", async () => {
-        await expect(read("rebase://tables/../../package")).rejects.toThrow(/path traversal/);
+    it("never reads a path that climbs out altogether", async () => {
+        await expect(read("rebase://tables/../../package")).rejects.toThrow(/Table module "package" not found/);
+    });
+
+    // An encoded separator survives URI parsing and is not decoded: the name
+    // is the literal `..%2Fschema_private%2Fsecrets`, a file inside the schema
+    // directory that does not exist. The secret is never read.
+    it("never reads through an encoded climb out of the schema directory", async () => {
+        const error = await read("rebase://tables/..%2Fschema_private%2Fsecrets").catch((caught: unknown) => caught);
+        expect(String(error)).toMatch(/Table module "\.\.%2Fschema_private%2Fsecrets" not found/);
+        expect(String(error)).not.toContain("sk_live");
     });
 });
 

@@ -573,6 +573,14 @@ so both the scaffolded layout and this monorepo's work, and a project laid out a
 third way, or one that has not run `rebase schema generate` yet, simply will not
 see the resource offered.
 
+## Skills
+
+The server also serves the 24 [Rebase agent skills](/docs/ai/skills/) through
+the MCP skills extension. A client on protocol revision 2026-07-28 or later
+loads one when it needs it. In Claude Code they are `/rebase:rebase-tables` and
+so on. Without `@rebasepro/agent-skills`, the server starts without them and
+says so on stderr.
+
 ## The remote endpoint
 
 A deployed backend can also serve MCP itself, at `/mcp`, to the people who use

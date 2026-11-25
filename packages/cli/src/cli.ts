@@ -55,7 +55,7 @@ export const ROOT_FLAGS = {
  * literal under this name: `help-coverage.test.ts`, `printed-commands.test.ts`
  * and the docs verifier read it out of this file's source.
  */
-const namespacedCommands = ["init", "schema", "db", "console", "dev", "build", "start", "auth", "doctor", "verify", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate", "generate-sdk", "telemetry", "resources", "status", "upgrade", "migrate", "normalize-imports", "api", "data", "users", "cron", "logs", "functions", "rls"];
+const namespacedCommands = ["init", "schema", "db", "console", "dev", "build", "start", "auth", "doctor", "verify", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate", "generate-sdk", "telemetry", "resources", "status", "upgrade", "migrate", "normalize-imports", "api", "data", "users", "cron", "logs", "functions", "rls", "mcp"];
 
 /** The words a command group dispatches, and the other spellings it accepts for them. */
 interface CommandVocabulary {
@@ -87,6 +87,7 @@ async function commandVocabulary(command: string): Promise<CommandVocabulary> {
         case "cron": return { subcommands: (await import("./commands/cron")).CRON_SUBCOMMANDS, aliases: {} };
         case "functions": return { subcommands: (await import("./commands/functions")).FUNCTIONS_SUBCOMMANDS, aliases: {} };
         case "rls": return { subcommands: (await import("./commands/rls")).RLS_SUBCOMMANDS, aliases: {} };
+        case "mcp": return { subcommands: (await import("./commands/mcp")).MCP_SUBCOMMANDS, aliases: {} };
         case "apps": return { subcommands: (await import("./commands/apps")).APPS_SUBCOMMANDS, aliases: {} };
         case "telemetry": return { subcommands: (await import("./commands/telemetry")).TELEMETRY_SUBCOMMANDS, aliases: {} };
         case "generate": return { subcommands: (await import("./commands/generate-view")).GENERATE_SUBCOMMANDS, aliases: {} };
@@ -531,6 +532,12 @@ async function dispatch(
             break;
         }
 
+        case "mcp": {
+            const { mcpCommand } = await import("./commands/mcp");
+            await mcpCommand(effectiveSubcommand, args);
+            break;
+        }
+
         default:
             // One line, with the correction, and no screen of help after it: the
             // sentence that says what happened must not scroll off the top of a
@@ -613,7 +620,8 @@ ${chalk.green.bold("Diagnostics")}
 ${chalk.green.bold("Take ownership")}
   ${chalk.blue.bold("eject")}                   Own the server process and the image ${chalk.gray("(one-way)")}
 
-${chalk.green.bold("AI Agent Skills")}
+${chalk.green.bold("AI agents")}
+  ${chalk.blue.bold("mcp connect")}             Connect Claude, Cursor or VS Code to the app's MCP server
   ${chalk.blue.bold("skills install")}          Install Rebase agent skills for your AI coding assistant
 
 ${chalk.green.bold("API Keys")}

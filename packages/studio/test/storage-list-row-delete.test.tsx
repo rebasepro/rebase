@@ -63,7 +63,7 @@ describe("the list view's row delete", () => {
         render(<StorageView/>);
         await waitFor(() => expect(defaultSource.listObjects).toHaveBeenCalled());
 
-        const listViewButton = within(screen.getByTitle("List view")).getByRole("button");
+        const listViewButton = screen.getByRole("button", { name: "List" });
         fireEvent.click(listViewButton);
         const row = (await screen.findByText("logo.png")).closest("tr");
         expect(row).not.toBeNull();

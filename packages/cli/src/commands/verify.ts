@@ -57,6 +57,7 @@ import { SCHEMA_DIR_FLAG_HELP, missingSchemaDir, refuseRemovedCollectionsFlag } 
 import { resolveSchemaDir } from "../utils/schema-dir";
 import { loadProjectSchema, type ModuleAliases, type ProjectSchema } from "../utils/project-schema";
 import { checkCmsCustomizations } from "./verify-cms";
+import { declaredAdditionalKeys } from "../dev-db/declared-databases";
 
 /** The flags `rebase verify` takes. */
 export const VERIFY_FLAGS = {
@@ -959,7 +960,8 @@ async function resolveLiveDatabase(
             flagUrl: options.flagUrl,
             flagDocker: options.flagDocker,
             quiet: options.quiet,
-            onProgress: options.quiet ? undefined : (line) => console.error(chalk.gray(`  ${line}`))
+            onProgress: options.quiet ? undefined : (line) => console.error(chalk.gray(`  ${line}`)),
+            additionalKeys: declaredAdditionalKeys(projectRoot)
         });
         return { databaseUrl: databaseUrlOf(prepared, readEnvFile(projectRoot)) };
     } catch (error) {

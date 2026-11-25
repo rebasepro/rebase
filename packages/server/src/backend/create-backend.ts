@@ -52,6 +52,8 @@ import nodePath from "node:path";
 import { readFileSync } from "node:fs";
 import { servedFrontendPaths } from "../serve-spa";
 import { PROJECT_VIEW_FILE, withProjectView, type McpAppCompiler, type McpAppResource } from "../mcp/mcp-apps";
+import type { McpSkillsSource } from "../mcp/mcp-skills";
+import { nodeSkillFiles } from "../mcp/mcp-skills-node";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createRebaseClient } from "@rebasepro/client";
@@ -73,6 +75,7 @@ import {
 } from "../boot/provision";
 import { enforceSchemaStamp, resolveSchemaMismatchPolicy } from "../boot/schema-stamp";
 import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "../services/driver-registry";
+import { createRequestDriverResolver } from "../services/request-driver";
 import { createRoutedRealtimeService } from "../services/routed-realtime-service";
 
 import { RestApiGenerator } from "../api/rest/api-generator";
@@ -166,6 +169,7 @@ import {
 } from "../storage/orphan-scans";
 import { supportsRlsScoping } from "../auth/rls-scope";
 import { createOAuthStore, type OAuthStore } from "../mcp/oauth-store";
+import { devLoopbackOrigin } from "../utils/dev-port";
 import { createDeviceLoginStore } from "../auth/device-login-store";
 import { createUiPreferencesStore } from "../ui-config/ui-preferences-store";
 import { createUiConfigRoutes, UI_CONFIG_FILE } from "../ui-config/ui-config-routes";
@@ -175,6 +179,7 @@ import { createOAuthRoutes, grantIdentityFromRepository } from "../mcp/oauth-rou
 import { createMcpRoutes, createMcpWellKnownRoutes } from "../mcp/mcp-routes";
 import type { McpCaller } from "../mcp/mcp-tools";
 import { createPlatformMcpRoutes, PLATFORM_MCP_PATH } from "../mcp/platform-mcp";
+import type { McpStorageAccess } from "../mcp/storage-tools";
 import { ADMIN_APPS_MCP_PATH, createAdminAppsMcpRoutes } from "../mcp/admin-apps-mcp";
 import {
     BackendStorageConfig,
@@ -183,6 +188,7 @@ import {
     createUploadPathResolver,
     DEFAULT_MAX_FILE_SIZE,
     DEFAULT_STORAGE_ID,
+    DefaultStorageRegistry,
     StorageController,
     StorageRegistry
 } from "../storage";
@@ -998,7 +1004,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         tableRegistry.replaceAll(introspectedTables);
     }
 
-    const defaultDriver = driverRegistry.getOrDefault(defaultDriverId);
+    // `get`, not `getOrDefault`: a default adapter that produced no driver is
+    // reported below by name, rather than as an unknown database.
+    const defaultDriver = driverRegistry.get(defaultDriverId);
     if (!defaultDriver || !defaultDriverResult) {
         // Named, because the reader's next question is "which one" and the
         // answer is not obvious from a multi-source configuration: the default
@@ -1032,10 +1040,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     };
 
     // ── Data-source misconfiguration check ────────────────────────────────
-    // A server-transport collection whose resolved data-source key has no
-    // registered driver delegate would silently fall back to the default
-    // driver — i.e. land in the wrong database. Warn loudly so this surfaces
-    // at boot rather than as mysterious data going to the wrong database.
+    // A table whose database has no registered driver is never served by the
+    // default driver in its place — that would put its rows in the wrong
+    // database — so its requests are answered 503 NOT_CONFIGURED, naming the
+    // database (`services/request-driver.ts`). Said at boot, by name, so the first
+    // sign is not a failing request.
     {
         const unresolved = new Map<string, string[]>();
         for (const table of tableRegistry.list()) {
@@ -1050,9 +1059,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         for (const [key, slugs] of unresolved) {
             logger.warn(
                 `[DataSource] No driver registered for database "${key}" ` +
-                `(used by: ${slugs.join(", ")}). These tables will fall back to the ` +
-                `default driver "${defaultDriverId}" — declare the database in backend/resources.ts ` +
-                `so a bootstrapper with this id is opened.`
+                `(used by: ${slugs.join(", ")}). Requests to these tables are answered ` +
+                "503 NOT_CONFIGURED — declare the database in backend/resources.ts " +
+                `(database("${key}")) and bind its connection string, so a bootstrapper with this id is opened.`
             );
         }
     }
@@ -1828,7 +1837,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     //     alternative — deriving the origin from the `Host` header — makes the
     //     issuer identity a thing the caller supplies, and a resource server
     //     whose audience check reads its expected value out of the request is
-    //     not performing an audience check. So: configured, or absent.
+    //     not performing an audience check. So: configured, or absent. The
+    //     one exception is a server `rebase dev` started, which names its own
+    //     loopback address (`devLoopbackOrigin`), never the request's.
     //  2. The driver must support `withAuth()`. `scopeDataDriver` returns the
     //     driver UNSCOPED when it does not, which `/api/data` tolerates for a
     //     custom test driver and which is catastrophic here, where
@@ -1843,9 +1854,18 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // Prepared here — the checks, and the tables — and mounted by `mount()`,
     // because its documents name the URLs of the auth and OAuth routes, and
     // only a mount knows where those are.
-    let mcpReady: { store: OAuthStore; publicUrl: string } | undefined;
+    let mcpReady: { store: OAuthStore; publicUrl: () => string; configured: boolean } | undefined;
     if (surfaces.mcp) {
-        const publicUrl = process.env.REBASE_PUBLIC_URL;
+        const configuredPublicUrl = process.env.REBASE_PUBLIC_URL;
+        // Under `rebase dev`, with no URL configured, the server's own loopback
+        // address: the one exception to precondition 1. The origin is not read
+        // from the request (that is what the rule forbids); it is the address
+        // this process bound, which `rebase dev` started on localhost. Read per
+        // request, because the port is only known once the server listens.
+        const devOrigin = configuredPublicUrl ? undefined : devLoopbackOrigin();
+        const publicUrl = configuredPublicUrl
+            ? () => configuredPublicUrl
+            : devOrigin ? () => devLoopbackOrigin() ?? devOrigin : undefined;
         const driver = defaultDriver;
         if (!publicUrl) {
             logger.warn("[mcp] Surface enabled but REBASE_PUBLIC_URL is not set — not mounting. " +
@@ -1876,7 +1896,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                     ready = false;
                     logger.error("[mcp] Could not prepare the OAuth tables — not mounting.", { error });
                 }
-                if (ready) mcpReady = { store, publicUrl };
+                if (ready) mcpReady = { store, publicUrl, configured: Boolean(configuredPublicUrl) };
             }
         }
     }
@@ -1888,7 +1908,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
      */
     const mountMcp = (app: Hono<HonoEnv>, basePath: string, announce: boolean): void => {
         if (!mcpReady) return;
-        const { store, publicUrl } = mcpReady;
+        const { store, publicUrl, configured } = mcpReady;
         const mcpPath = "/mcp";
         const oauthBasePath = `${basePath}/oauth`;
         // The repository the admin gate re-reads from, so a grant answers to
@@ -1900,7 +1920,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // Tokens this backend's OAuth server minted, with its own key.
             jwt,
             identity,
-            publicUrl,
+            get publicUrl() { return publicUrl(); },
             mcpPath,
             oauthBasePath,
             getDriver: () => defaultDriver,
@@ -1943,6 +1963,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             tools: config.mcp?.tools,
             instructions: config.mcp?.instructions,
             vocabulary: config.mcp?.scopes,
+            // The skills it serves, read from their folder on the first
+            // request that needs them. The adapter is Node's filesystem, so
+            // it is bound here, at boot, and not on the request path.
+            skills: mcpSkillsFrom(config.mcp?.skills),
             // A confirmed call is spent once across every replica.
             confirmations: store
         };
@@ -1958,7 +1982,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         app.route(oauthBasePath, group(createOAuthRoutes({
             store,
             jwt,
-            publicUrl,
+            get publicUrl() { return publicUrl(); },
             mcpPath,
             authBasePath: `${basePath}/auth`,
             // Open registration is what makes the Claude connector flow work at
@@ -1971,7 +1995,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             vocabulary: config.mcp?.scopes
         })));
 
-        if (announce) logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);
+        if (announce) {
+            logger.info(configured
+                ? `MCP endpoint mounted at ${publicUrl()}${mcpPath} (OAuth at ${oauthBasePath})`
+                // The port is not bound yet, so no URL to print: `rebase dev`
+                // prints it once the server is up, and `rebase mcp connect`
+                // reads it from the server.
+                : `MCP endpoint mounted at ${mcpPath} on this dev server's own address (OAuth at ${oauthBasePath})`);
+        }
     };
 
     /**
@@ -1999,6 +2030,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             getDriver: () => defaultDriver,
             getTables: () => tableRegistry.list(),
             getAuthAdapter: () => authAdapter,
+            // The storage tools read the sources the storage routes serve,
+            // under the rule those routes apply. Unset without storage.
+            getStorage: () => platformMcpStorage,
             serverInfo: {
                 name: "rebase",
                 version: readRuntimeVersion([process.cwd()]) ?? "unknown"
@@ -2652,6 +2686,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // it cannot import the server itself — it is declared in the project's
     // config package, which depends on `@rebasepro/types` alone.
     const storageAuthorizeData: { current?: import("@rebasepro/types").StorageAuthorizeData } = {};
+    /** What the platform MCP endpoint's storage tools read: set below when storage is on. */
+    let platformMcpStorage: McpStorageAccess | undefined;
 
     // The storage group (the routes, or the stub that says storage is off),
     // and the admin group's storage maintenance surface.
@@ -2740,6 +2776,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                     && config.storageInsecureAllowAnyAuthenticated !== true
             })
             : codeStorageAccessControl;
+        platformMcpStorage = {
+            registry: storageRegistry ?? DefaultStorageRegistry.create(storageController ?? {}),
+            authorize: storageAccessControl,
+            authorizeData: () => storageAuthorizeData.current
+        };
 
         assertStorageAccessControlConfigured(
             {
@@ -2970,26 +3011,19 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // entirely on Postgres RLS) must explicitly set `auth.requireAuth: false`.
         const dataRequireAuth = resolveRequireAuth(config.auth);
 
-        // Multi-data-source routing: when more than one Postgres database is
-        // registered (`database("analytics")` beside the default), resolve the
-        // delegate per request from the request's collection data source. The
-        // auth middleware then scopes that delegate under RLS into the request
-        // context. For a single-database backend this is omitted — behaviour
-        // is unchanged.
-        //
-        // The collection path is what follows the group's mount — wherever the
-        // application mounted it, which the group recorded on the request.
-        const resolveRequestDriver = (c: Context<HonoEnv>): DataDriver => {
-            const mountPath = c.get("mountPath") ?? "";
-            const collectionPath = c.req.path.startsWith(mountPath) ? c.req.path.slice(mountPath.length) : c.req.path;
-            const key = keyForCollectionPath(collectionPath);
-            // Use the authoritative default for the default key; otherwise the
-            // named delegate, falling back to default if it isn't registered.
-            if (!key || key === DEFAULT_DRIVER_ID) return defaultDriver;
-            return driverRegistry.get(key) ?? defaultDriver;
-        };
-        const multiDatabase = bootstrappers.length > 1;
-        const resolveDriver = multiDatabase ? resolveRequestDriver : undefined;
+        // Per-request routing: the delegate of the database the request's
+        // table is stored in (`database("analytics")` beside the default),
+        // which the auth middleware then scopes under RLS into the request
+        // context. A table on the default database gets the default driver,
+        // as it always did; one whose database has no driver here is answered
+        // 503 NOT_CONFIGURED instead of being served by the default
+        // driver. Resolved on a single-database backend too, which is where a
+        // table naming an undeclared database is likeliest.
+        const resolveDriver = createRequestDriverResolver({
+            registry: driverRegistry,
+            defaultDriver,
+            keyForCollectionPath
+        });
 
         // Use adapter middleware when an AuthAdapter is available,
         // falling back to the built-in JWT middleware otherwise.
@@ -5127,6 +5161,13 @@ export function realtimeSocketPath(basePath: string | undefined): string {
  * `initialize` or `tools/list` — not at boot: the HTML is large, and a
  * backend no MCP client calls never loads it.
  */
+/** The `mcp.skills` folder as the MCP endpoint reads it, resolved against the working directory. */
+function mcpSkillsFrom(folder: string | undefined): McpSkillsSource | undefined {
+    if (folder === undefined) return undefined;
+    const root = nodePath.resolve(process.cwd(), folder);
+    return async () => nodeSkillFiles(root);
+}
+
 async function loadMcpApps(): Promise<readonly McpAppResource[]> {
     const { MCP_APPS } = await import("@rebasepro/mcp-apps");
     const candidates = [

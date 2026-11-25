@@ -1,49 +1,231 @@
 ---
-sourceHash: c89ca78335485a65
+sourceHash: da06ce7daeaa1c32
 title: L'endpoint MCP remoto
 sidebar_label: Endpoint MCP remoto
-description: Esponi MCP da un backend distribuito su /mcp, in modo che gli utenti della tua app possano connettere Claude o Cursor a proprio nome — OAuth con schermata di consenso, diciassette tool distribuiti su tre scope, ogni chiamata regolata dalla propria row-level security.
+description: Esponi MCP da un backend distribuito su /mcp, così che le persone che usano la tua app possano connettere Claude o Cursor come se stesse — OAuth con schermata di consenso, diciassette tool sotto tre scope, ogni chiamata sotto la propria row-level security.
 ---
 
 :::tip[Stai connettendo Claude ai tuoi progetti?]
-In questo caso si usa il [connettore Rebase](/docs/ai/rebase-connector/): un unico connettore per tutti, a cui un server self-hosted si unisce tramite `rebase cloud connect`. Questa pagina è invece destinata a coloro che **utilizzano** la tua app.
+Quello è il [connettore Rebase](/docs/ai/rebase-connector/): un unico connettore per
+tutti loro, e un server self-hosted vi si collega con `rebase cloud connect`. Questa
+pagina è per le persone che **usano** la tua app.
 :::
 
-Il [server MCP](/docs/ai/mcp/) è uno strumento per sviluppatori: viene eseguito sulla tua macchina locale e detiene una chiave di servizio o una chiave API. Un backend distribuito può anche erogare MCP direttamente su `/mcp`, per gli utenti che utilizzano la tua applicazione. Un assistente connesso da uno di essi legge e scrive nel progetto **a nome di quella persona**, e ogni chiamata viene eseguita sotto la sua specifica row-level security.
+Il [server MCP](/docs/ai/mcp/) è uno strumento per sviluppatori: viene eseguito sulla tua macchina e contiene una chiave
+di servizio o una chiave API. Un backend distribuito può anche esporre MCP stesso, su `/mcp`, per
+le persone che utilizzano la tua applicazione. Un assistente collegato da una di esse legge e
+scrive nel progetto **come quella persona**, e ogni chiamata viene eseguita sotto la propria
+row-level security.
 
-È disattivato per impostazione predefinita e sono richieste entrambe le variabili:
+È disattivato a meno che non lo attivi tu, ed entrambe le variabili sono obbligatorie:
 
 ```bash
 REBASE_MCP_ENABLED=true
 REBASE_PUBLIC_URL=https://app.example.com   # this deployment's real origin
 ```
 
-Senza `REBASE_PUBLIC_URL`, un segreto JWT o un data driver in grado di circoscrivere una query a un singolo utente, l'endpoint rifiuta di avviarsi indicandone il motivo nel log di avvio. Nessun `REBASE_ROLE` può attivarlo.
+Senza `REBASE_PUBLIC_URL`, un segreto JWT o un data driver in grado di limitare l'ambito di una query
+a un singolo utente, l'endpoint rifiuta di montarsi e ne indica il motivo nel log di avvio. Nessun
+`REBASE_ROLE` lo attiva.
 
-- **OAuth, con una schermata di consenso.** Il client individua il server di autorizzazione tramite `/.well-known/oauth-protected-resource`, si registra (la registrazione dinamica è attiva di default; `REBASE_MCP_OPEN_REGISTRATION=false` la limita ai client registrati da te) e indirizza l'utente a una schermata di consenso che ne esegue l'autenticazione tramite il percorso `/auth/login` esistente. A un account con autenticazione a due fattori viene quindi richiesto il codice dell'autenticatore o un codice di recupero, attraverso le route `/auth/mfa/challenge` esistenti. Quando il frontend della tua app mantiene una sessione nello stesso browser, la schermata propone tale account e "Consenti" accorda l'accesso a suo nome senza richiedere la password; è così che si connette chi accede esclusivamente tramite Google, GitHub o un link via email. Negli altri casi si accede con password, e chi non ne possiede una deve prima impostarla tramite `/auth/forgot-password` ("Password dimenticata" della tua app); la schermata lo segnala chiaramente. Essa indica inoltre l'host a cui viene inviato il codice di autorizzazione, avvisando che l'host non è verificato: chiunque può registrare un client con qualsiasi nome, pertanto l'host rappresenta l'elemento che l'utente può verificare.
-- **Diciassette tool, tre scope.** Gli stessi [scope](/docs/backend/roles-and-scopes/) utilizzati da qualsiasi credenziale. `data:read` mette a disposizione `list_tables`, `describe_table`, `query_table`, `count_rows`, `aggregate_rows`, `get_row`, le tre viste `show_table`, `show_record` e `show_app`, `show_app_guide`, nonché gli sperimentali `list_apps` e `open_app`; `data:write` aggiunge `create_row`, `update_row` e gli sperimentali `save_app` e `delete_app`; `data:delete` aggiunge `delete_row`. Un client che non richiede alcuno scope riceve `data:read`. Ciascun permesso può essere ristretto a una tabella specifica: `data:read:posts` elenca, descrive e legge `posts` e nient'altro. Uno scope stabilisce quali tool vengono messi a disposizione e a quali tabelle possono accedere, non quali righe: un elenco vuoto può semplicemente indicare che la RLS è attiva, e `data:write` continua a non poter scrivere alcuna riga a cui l'utente non abbia accesso.
-- **Tre tool portano il tuo pannello di amministrazione direttamente all'utente.** Nei client in grado di renderizzare le MCP App, come Claude, questi tool aprono le viste native del pannello di amministrazione all'interno della conversazione, ricavate dai descrittori di tabella che il backend fornisce a questo utente — colonne, enum, validazione, relazioni — insieme alle preferenze di interfaccia (UI) composte dal pannello: il file `ui-config.json` fornito dal bundle, quello del workspace e le preferenze personali dell'utente (una chiave API non ne ha), garantendo che etichette, ordine delle colonne, colonne nascoste ed etichette degli enum corrispondano a quelle del pannello. Le personalizzazioni del pannello del tuo progetto compaiono ovunque il backend esponga la sua vista MCP.
-  - `show_table` accetta gli argomenti di `query_table`, più `view` (`table`, `list`, `cards` o `kanban`), e apre la vista della tabella: l'utente può cercare, filtrare, ordinare e impaginare, aprire il modulo di una riga e aggiungere nuove righe.
-  - `show_record` apre il form di una singola riga (`id`), oppure un form per una nuova riga precompilato con i `values` inseriti dal modello, affinché l'utente possa verificarli e salvarli autonomamente.
-  - `show_app` esegue un'applicazione scritta dal modello appositamente per l'attività in corso: un singolo componente React (`code`) e le `tables` che legge. Importa i pacchetti nativi di Rebase, quindi lo stesso codice funziona anche all'interno del tuo progetto:
-    - `@rebasepro/app`: `useRows`, `useRow`, `useRowCount`, `useAggregate` e `useRowWrites` sulle righe del progetto;
-    - `@rebasepro/cms`: i componenti del pannello di amministrazione `CollectionPanel` (con `CollectionToolbar` e i suoi elementi, e `onRowClick`, che passa all'app la riga selezionata così come viene letta da `useRows`), `RecordForm` e `FormField`, `RecordDetail`, `FieldValue` e `useSidePanel`, ciascuno specificando la tabella tramite percorso, con i tuoi campi, viste e azioni personalizzati;
-    - `@rebasepro/ui`: l'intero kit UI, inclusi `SplitView`, riquadri KPI e grafici.
+- **OAuth, con una schermata di consenso.** Un client trova il server di autorizzazione
+  tramite `/.well-known/oauth-protected-resource`, si registra (la registrazione
+  dinamica è attiva per impostazione predefinita; `REBASE_MCP_OPEN_REGISTRATION=false` la limita
+  ai client registrati da te) e invia l'utente a una schermata di consenso che ne esegue l'accesso
+  tramite il tuo `/auth/login` esistente. A un account con un secondo fattore
+  viene quindi richiesto il codice dell'autenticatore o un codice di recupero, tramite le
+  rotte `/auth/mfa/challenge` esistenti. Quando il frontend della tua app
+  mantiene una sessione nello stesso browser, la schermata propone quell'account e
+  Consenti (Allow) fornisce il consenso a suo nome senza password; è così che si connette chi effettua l'accesso solo
+  con Google, GitHub o un link e-mail. Altrimenti si accede con una
+  password, e chi non ne ha ne imposta prima una con `/auth/forgot-password`
+  ("Password dimenticata" della tua app); la schermata lo comunica all'utente. Indica inoltre l'host a cui viene inviato il codice di autorizzazione
+  e specifica che tale host non è verificato: chiunque può registrare un client con
+  qualsiasi nome, quindi l'host è la parte che una persona può verificare.
+- **Diciassette tool, tre scope.** Gli stessi [scope](/docs/backend/roles-and-scopes/)
+  utilizzati da ogni credenziale. `data:read` offre `list_tables`, `describe_table`,
+  `query_table`, `count_rows`, `aggregate_rows`, `get_row`, le tre viste,
+  `show_table`, `show_record` e `show_app`, `show_app_guide`, e gli sperimentali
+  `list_apps` e `open_app`; `data:write` aggiunge `create_row`, `update_row` e gli
+  sperimentali `save_app` e `delete_app`; `data:delete` aggiunge `delete_row`. Un client che non
+  richiede nulla ottiene `data:read`. Ciascuno scope può restringersi a una tabella: `data:read:posts`
+  elenca, descrive e legge `posts` e nient'altro. Uno scope decide quali tool vengono
+  offerti e quali tabelle raggiungono, non quali righe: un elenco vuoto può essere
+  dovuto al funzionamento di RLS, e `data:write` non può comunque scrivere una riga che la persona non potrebbe scrivere.
+- **Tre tool mostrano il tuo pannello di amministrazione alla persona.** In un client che
+  esegue il rendering delle MCP App, come Claude, aprono le viste proprietarie del pannello di amministrazione
+  nella conversazione, ricavate dai descrittori di tabella che il backend serve a questa
+  persona — colonne, enum, convalide, relazioni — con le preferenze di interfaccia utente composte dal
+  pannello: il file `ui-config.json` fornito con il bundle, quello del workspace e
+  quello dell'utente stesso (una chiave API non ne ha), così etichette, ordine delle colonne, colonne
+  nascoste ed etichette degli enum corrispondono al pannello. Le personalizzazioni del pannello
+  del tuo progetto vengono visualizzate nel punto in cui il backend serve la sua vista MCP.
+  - `show_table` accetta gli argomenti di `query_table`, più `view`
+    (`table`, `list`, `cards` o `kanban`), e apre la vista della tabella:
+    l'utente può cercare, filtrare, ordinare e impaginare, aprire il modulo di una riga e aggiungere righe.
+  - `show_record` apre il modulo di una singola riga (`id`), o un modulo per una nuova riga che
+    inizia con i `values` compilati dal modello, affinché la persona possa controllarli e
+    salvarli autonomamente.
+  - `show_app` esegue un'app scritta dal modello per l'attività corrente:
+    un componente React (`code`) e le `tables` che legge. Importa i pacchetti
+    proprietari di Rebase, quindi lo stesso codice funziona nel tuo progetto:
+    - `@rebasepro/app`: `useRows`, `useRow`, `useRowCount`, `useAggregate`
+      e `useRowWrites` sulle righe del progetto;
+    - `@rebasepro/cms`: il `CollectionPanel` del pannello di amministrazione (con
+      `CollectionToolbar` e i suoi elementi, e `onRowClick`, che passa
+      all'app la riga selezionata così come viene letta da `useRows`), `RecordForm` e `FormField`,
+      `RecordDetail`, `FieldValue` e `useSidePanel`, ciascuno che fa riferimento alla propria
+      tabella tramite percorso, con i tuoi campi, viste e azioni personalizzati;
+    - `@rebasepro/ui`, l'intero UI kit, inclusi `SplitView` e i riquadri KPI e
+      grafici.
 
-    Il server la compila prima dell'esecuzione, quindi un errore di sintassi, un modulo non fornito dalla vista o un nome non esportato da `@rebasepro/cms` o `@rebasepro/app` restituisce un errore di chiamata corredato dal numero di riga. Un eventuale errore durante l'esecuzione viene mostrato al suo posto e comunicato al modello con il messaggio successivo dell'utente. Un'app può utilizzare solo le tabelle che elenca esplicitamente. I suoi stili si basano sulle classi di utilità standard di Tailwind, compilate con la vista prima dell'arrivo di qualsiasi app: valori arbitrari come `h-[560px]` non avranno effetto, pertanto per dimensioni esatte è necessario ricorrere a `style`.
+    Il server la compila prima, quindi un errore di sintassi, un modulo che la vista
+    non fornisce o un nome che non esporta da `@rebasepro/cms` o
+    `@rebasepro/app` costituisce l'errore della chiamata, con l'indicazione della riga. Un errore durante l'esecuzione
+    viene mostrato al suo posto e comunicato al modello con il messaggio successivo
+    dell'utente. Un'app può utilizzare solo le tabelle che elenca. I suoi stili sono
+    le utilità standard di Tailwind, compilate con la vista prima dell'arrivo di qualsiasi
+    app: un valore arbitrario come `h-[560px]` non ha alcun effetto, quindi una
+    dimensione esatta deve essere impostata tramite `style`.
 
-    La descrizione di `show_app` include solo le informazioni essenziali, poiché un client potrebbe troncare descrizioni troppo lunghe dei tool (claude.ai lo fa intorno ai 4.000 caratteri). Essa istruisce il modello a invocare prima `show_app_guide`, che restituisce tutti gli hook, i componenti e le prop che un'app può utilizzare, accompagnati da un esempio pratico. `show_app_guide` viene offerto ovunque sia disponibile `show_app`.
+    La descrizione di `show_app` riporta solo l'essenziale, poiché un client
+    potrebbe troncare una descrizione troppo lunga del tool (claude.ai lo fa a circa 4.000
+    caratteri). Indica al modello di chiamare prima `show_app_guide`, che
+    restituisce ogni hook, componente e prop che un'app può utilizzare, corredato da un
+    esempio pratico. `show_app_guide` viene offerto ovunque sia disponibile `show_app`.
 
-  Ogni lettura e salvataggio nella vista corrisponde alla chiamata di uno dei tool di lettura e scrittura, eseguita a nome dell'utente e sotto la sua RLS; pertanto, un form mette a disposizione solo ciò per cui la connessione è stata autorizzata: senza `data:write` è in sola lettura, e un campo non leggibile dai suoi ruoli non sarà presente. Questo è il medesimo perimetro entro cui opera il codice dell'app: viene eseguito nella vista, quindi ogni chiamata effettuata corrisponde a uno di questi tool, agendo per conto dell'utente, e non può fare nulla che il modello non possa fare con gli stessi tool. Sul connettore hosted, ogni operazione di scrittura viene inoltre pianificata e confermata dal server. In questo contesto, `useRowWrites` richiede conferma all'utente prima di procedere alla scrittura, evitando modifiche senza un'azione esplicita di clic; i controlli nativi dell'amministrazione (il pulsante Salva di un form, un'eliminazione, la modifica di una tabella) si comportano esattamente come in una schermata `show_table`. Il modello viene informato su cosa è stato modificato. Legge le righe restituite da ciascun tool, non i descrittori usati dalla vista per il rendering. Un client privo del supporto a MCP Apps, come Claude Code o Cursor, non mostra alcunché e il modello legge le medesime righe che otterrebbe tramite `query_table`.
-- **Sperimentale: app salvate nel progetto.** `save_app` archivia un'app creata dal modello con `show_app` in modo da poterla riaprire: compila il codice come fa `show_app` e la memorizza insieme a `title`, `tables` e `visibility`, che può essere `personal` (il suo proprietario, valore predefinito), `roles` (chiunque possieda uno dei suoi `roles`) o `team` (tutti gli utenti che effettuano l'accesso). Il salvataggio per utenti diversi da sé stessi richiede il ruolo di amministratore, poiché un'app condivisa è codice scritto da un'IA eseguito per altre persone. Solo il proprietario o un amministratore può sostituire (`id`) o eliminare un'app, e ogni utente può conservarne al massimo 200. `list_apps` elenca le app che il chiamante può aprire, `open_app` ne apre una esattamente come farebbe `show_app`, e `delete_app` ne elimina una. La visibilità di un'app non implica l'accesso ai suoi dati: un'app aperta legge e scrive tramite i tool sopra descritti, per conto di chiunque la apra e sotto la sua RLS. Le app risiedono in `rebase.saved_apps`, che il backend crea la prima volta che un tool la utilizza e a cui nessun utente finale ha accesso diretto. Il pannello di amministrazione apre le medesime app: aggiungi `savedAppsView` da `@rebasepro/cms` alle tue `views`. Esegue l'app in un iframe sandbox privo di `allow-same-origin` e senza accesso autonomo alla rete, inoltrando le chiamate ai tool a `POST /api/admin/apps/mcp`, ovvero gli stessi tool disponibili per la sessione del pannello di amministrazione, montati con le route di amministrazione indipendentemente dall'impostazione di `REBASE_MCP_ENABLED`. I nomi e le strutture dei tool potrebbero subire modifiche.
-- **Le autorizzazioni concesse prima della versione 0.24 mantengono la loro portata.** `mcp:read` viene interpretato come `data:read`, e `mcp:write` come `data:write data:delete`, sia sulle autorizzazioni archiviate sia sui token già emessi.
-- **Funziona anche con una chiave API.** `/mcp` accetta anche l'header `Authorization: Bearer rk_…`, per i client configurati con un header anziché con un flusso OAuth. La chiave accede ai tool coperti dai suoi scope `data:*`, operando a nome dell'entità corrispondente: una [chiave personale](/docs/backend/api-keys/#personal-keys) per conto del suo proprietario, una chiave di servizio come `api-key:<id>`.
-- **Il vocabolario dell'SDK, le risposte di REST.** I tool accettano gli stessi parametri dell'SDK — `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` o `"created_at:desc"`), `limit`, `offset`, `searchString` e `data` per le operazioni di scrittura — e leggono tramite il percorso `GET /api/data/<table>`, in modo che una riga venga restituita nel formato REST (date ISO, relazioni `belongsTo` espresse come foreign key, ad es. `authorId`) e possa essere inviata nuovamente in un aggiornamento senza modifiche. `query_table` risponde con `{ data, meta }`, dove figurano `meta.total` e `meta.hasMore`, mentre `count_rows` restituisce `{ count }`; `tools/list` fornisce a entrambi, ad `aggregate_rows` e a `get_row` un `outputSchema`, flessibile laddove la risposta sia variabile. `aggregate_rows` corrisponde a `GET /api/data/<table>/aggregate`: `select` è un elenco conforme alla grammatica REST (`["count()", "sum(total)"]`), `groupBy` è un elenco di campi, e la risposta è `{ data }` con una riga per gruppo, oltre a `meta.hasMore` per le chiamate raggruppate, i cui gruppi sono impaginabili tramite `limit` e `offset` e ordinabili con `orderBy`. Su una tabella in cui un hook `afterRead` riscrive i dati, restituisce esclusivamente `count()`, come fa REST. Esattamente come in REST, un `limit` superiore a 1000, un argomento non dichiarato oppure la modifica o l'eliminazione di una riga già nel cestino (404) vengono rifiutati; reimpostare il campo di soft-delete su `null` ripristina la riga. Impostare `deleted: "only"` (o `"include"`) su `query_table`, `count_rows` e `aggregate_rows` legge gli elementi nel cestino, proprio come `?deleted=` in REST, consentendo di ritrovare e ripristinare una riga spostata nel cestino da `delete_row`. La sua descrizione informa il modello che l'eliminazione è definitiva solo nei casi in cui la tabella non disponga di un campo di soft-delete.
-- **L'elenco nomina le tabelle; `describe_table` ne fornisce lo schema.** `list_tables` risponde con `{ tables: [{ name, description, kind? }] }` — senza label — e `describe_table { table }` restituisce gli schemi OpenAPI `row` (le colonne restituite a questo chiamante) e `create` (quelle scrivibili) della tabella specificata, la sua `primaryKey`, le `relations` servite e la `rls` (SQL grezzo oscurato se privo di `schema:read`), oltre a `softDeleteField` nei casi in cui le righe vengano archiviate nel cestino, e la configurazione di visualizzazione definita dalle preferenze UI del chiamante: `title`, e per ogni colonna `label`, `valueLabels`, `hidden`, `hiddenInForm`, `readOnly`. Le informazioni che una connessione può ottenere sullo schema sono regolate dallo stesso serializzatore utilizzato da `GET /api/schema/tables`. Le descrizioni dei tool indicano al modello di descrivere una tabella prima di scrivervi. L'elenco di un progetto con 200 tabelle richiede circa 5.000 token, e ogni descrizione meno di 1.000; includendo tutti gli schemi nell'elenco complessivo, la dimensione raggiungeva circa 150.000 token.
-- **Un token riservato esclusivamente a questo endpoint.** Un token di accesso MCP viene rifiutato da `/api/data`, `/api/admin` e dal WebSocket, garantendo che la connessione di un assistente non equivalga alla cessione di una sessione utente.
+  Ogni lettura e salvataggio nella vista è una chiamata ai tool di lettura e scrittura,
+  eseguita come l'utente sotto la sua RLS, quindi un modulo offre solo ciò che è stato
+  concesso alla sua connessione: senza `data:write` è in sola lettura, e un campo
+  che i suoi ruoli non possono leggere non è presente. Questo è anche il confine entro cui
+  opera il codice di un'app: viene eseguito nella vista, quindi ogni chiamata effettuata corrisponde a uno di
+  quei tool, per conto dell'utente, e non può fare nulla che il modello non potrebbe fare
+  con gli stessi tool. Sul connettore hosted ogni scrittura è inoltre pianificata
+  e confermata dal server. All'interno di ciò, `useRowWrites` chiede conferma all'utente
+  prima di scrivere, in modo che un'app non scriva senza un suo clic; i
+  controlli proprietari di amministrazione (il pulsante Salva di un modulo, un'eliminazione, una modifica nella tabella) si comportano come farebbero
+  in una schermata `show_table`. Al modello viene comunicato ciò che è stato modificato. Legge le righe restituite da ciascun tool, non i descrittori con cui
+  la vista disegna. Un client senza MCP App, come Claude Code o Cursor, non mostra nulla
+  e il modello legge le stesse righe che leggerebbe da `query_table`.
+- **Sperimentale: app salvate nel progetto.** `save_app` conserva un'app creata
+  dal modello con `show_app` affinché possa essere riaperta: compila il codice come
+  fa `show_app` e lo memorizza con il suo `title`, `tables` e
+  `visibility`, che può essere `personal` (il suo proprietario, impostazione predefinita), `roles` (chiunque
+  abbia uno dei suoi `roles`) o `team` (tutti gli utenti che effettuano l'accesso). Il salvataggio per
+  altri oltre a se stessi richiede il ruolo admin, poiché un'app condivisa è codice scritto da un'IA
+  ed eseguito per altre persone. Solo il suo proprietario o un amministratore può sostituirne
+  (`id`) o eliminarne una, e una persona ne può conservare al massimo 200. `list_apps` elenca
+  le app che il chiamante può aprire, `open_app` ne apre una come farebbe `show_app` e
+  `delete_app` ne rimuove una. Vedere un'app non significa accedere ai suoi dati: un'app aperta
+  legge e scrive tramite i tool sopra descritti, agendo come chiunque la apra, sotto
+  la sua RLS. Le app risiedono in `rebase.saved_apps`, che il backend crea
+  la prima volta che un tool la utilizza e non concede a nessun utente finale.
+  Il pannello di amministrazione apre le stesse app: aggiungi `savedAppsView` da
+  `@rebasepro/cms` alle tue `views`. Esegue un'app in un iframe sandboxato
+  senza `allow-same-origin` e senza accesso di rete autonomo, e inoltra le sue
+  chiamate ai tool a `POST /api/admin/apps/mcp`, gli stessi tool per la sessione del pannello
+  di amministrazione, montata con le rotte admin indipendentemente dal fatto che
+  `REBASE_MCP_ENABLED` sia impostato o meno. I nomi e la struttura dei tool potrebbero ancora cambiare.
+- **I consensi (grant) creati prima della 0.24 mantengono la loro portata.** `mcp:read` viene interpretato come
+  `data:read` e `mcp:write` come `data:write data:delete`, sia sui grant archiviati che
+  sui token già emessi.
+- **Funziona anche una chiave API.** `/mcp` accetta anche `Authorization: Bearer rk_…`, per
+  un client configurato con un header anziché con un flusso OAuth. La chiave accede
+  ai tool coperti dai suoi scope `data:*`, agendo come il soggetto che rappresenta: una
+  [chiave personale](/docs/backend/api-keys/#personal-keys) come il suo proprietario, una chiave di servizio
+  come `api-key:<id>`.
+- **Il vocabolario dell'SDK, le risposte di REST.** I tool accettano ciò che accetta l'SDK —
+  `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` o
+  `"created_at:desc"`), `limit`, `offset`, `searchString` e `data` per
+  una scrittura — e leggono tramite il percorso di `GET /api/data/<table>`, quindi una riga viene
+  restituita esattamente come la serve REST (date ISO, una `belongsTo` come foreign key, ad es.
+  `authorId`) e può essere reinviata in un aggiornamento senza modifiche. `query_table`
+  risponde con `{ data, meta }` con `meta.total` e `meta.hasMore`, e `count_rows`
+  con `{ count }`; `tools/list` fornisce a entrambi, ad `aggregate_rows` e a `get_row`
+  un `outputSchema`, flessibile laddove una risposta possa variare. `aggregate_rows` corrisponde a `GET /api/data/<table>/aggregate`:
+  `select` è un elenco nella sintassi di REST (`["count()", "sum(total)"]`), `groupBy`
+  un elenco di campi, e risponde con `{ data }` con una riga per gruppo, più
+  `meta.hasMore` in una chiamata raggruppata, i cui gruppi sono impaginabili con `limit` e `offset`
+  e ordinabili con `orderBy`. Su una tabella riscritta da un hook `afterRead`
+  restituisce solo `count()`, come fa REST. Come in REST, un `limit` superiore a 1000, un argomento non dichiarato e la
+  modifica o l'eliminazione di una riga nel cestino (404) vengono rifiutati; impostando il campo di soft-delete
+  su `null` la si ripristina. `deleted: "only"` (o `"include"`) su
+  `query_table`, `count_rows` e `aggregate_rows` legge il cestino, come fa `?deleted=`
+  di REST, così che una riga cestinata da `delete_row` possa essere ritrovata per
+  essere ripristinata. La sua descrizione comunica al modello che l'eliminazione è permanente solo laddove
+  la tabella non dispone di un campo di soft-delete.
+- **L'elenco nomina le tabelle; `describe_table` ne fornisce lo schema.**
+  `list_tables` risponde con `{ tables: [{ name, description, kind? }] }` — nessuna etichetta —
+  e `describe_table { table }` con gli schemi OpenAPI `row` (le colonne servite a questo chiamante)
+  e `create` (quelle scrivibili) di quella tabella, la sua `primaryKey`, le `relations` servite e `rls` (SQL
+  grezzo oscurato senza `schema:read`), oltre a `softDeleteField` laddove le righe finiscano in un
+  cestino, e la presentazione definita dalle preferenze UI del chiamante: `title` e,
+  per colonna, `label`, `valueLabels`, `hidden`, `hiddenInForm`, `readOnly`. Ciò che una
+  connessione può apprendere sullo schema è deciso dallo stesso serializzatore
+  utilizzato da `GET /api/schema/tables`. Le descrizioni dei tool dicono al modello di
+  descrivere una tabella prima di scrivervi. L'elenco di un progetto con 200 tabelle richiede
+  circa 5k token e ogni descrizione
+  meno di 1k; includendo ogni schema nell'elenco si arrivava a circa 150k.
+- **Un token valido solo per questo endpoint.** Un token di accesso MCP viene rifiutato da
+  `/api/data`, `/api/admin` e dal WebSocket, quindi la connessione di un assistente non
+  gli assegna una sessione.
 
-Ogni richiesta a `/mcp` rilegge l'account dell'utente. Un account eliminato o disattivato, oppure un'azione di "disconnetti da tutti i dispositivi" o una modifica della password successiva all'emissione del token, blocca immediatamente il client connesso con un errore 401. Una revoca o riduzione dei privilegi si applica alla chiamata del tool successiva. Ogni refresh del token effettua i medesimi controlli e rifiuta definitivamente tali autorizzazioni. Una sessione ospite (guest) non può concedere alcun consenso.
+Ogni richiesta a `/mcp` rilegge l'account dell'utente. Un account eliminato o disabilitato,
+oppure una "disconnessione da tutti i dispositivi" o una modifica della password successiva all'emissione
+del token, blocca immediatamente un client connesso con un errore 401. Una retrocessione di privilegi si applica alla
+chiamata successiva del tool. Ogni refresh esegue gli stessi controlli e rifiuta definitivamente
+tale consenso. Una sessione ospite non può fornire alcun consenso.
 
-Un'unica limitazione: la disconnessione di un client (`DELETE /api/oauth/grants/:clientId`, effettuata con la sessione propria dell'utente) revoca immediatamente i suoi refresh token, ma un token di accesso già emesso continua a funzionare fino alla sua scadenza naturale, entro un'ora.
+Unica limitazione. La disconnessione di un client (`DELETE /api/oauth/grants/:clientId`, con la
+sessione propria dell'utente) revoca immediatamente i suoi refresh token, ma un token di accesso
+già emesso continua a funzionare fino alla sua scadenza, entro un'ora.
 
-Le route sono descritte in [Endpoint](/docs/backend/endpoints/#mcp-surface) e le variabili in [Configurazione](/docs/getting-started/configuration/#mcp-surface).
+## Skills
+
+L'endpoint può anche servire [Agent Skills](https://agentskills.io/specification)
+tramite MCP: istruzioni che un assistente carica quando l'attività lo richiede, come la procedura
+con cui il tuo team archivia un ordine o il significato di un campo. Inserisci ogni skill nella propria
+cartella, con un file `SKILL.md` il cui frontmatter abbia un `name` corrispondente alla cartella
+e una `description`, oltre a qualsiasi file a cui fa riferimento. Quindi specifica la cartella genitore
+nella configurazione del backend:
+
+```ts
+// skills/order-intake/SKILL.md, skills/order-intake/references/fields.md, …
+createRebaseBackend({
+    ...options, // the rest of your backend config
+    mcp: { skills: "./skills" }
+});
+```
+
+Il percorso è relativo alla directory di lavoro. I data tool rimangono invariati
+e `skills` si affianca a `tools` quando un backend ne fornisce di propri.
+
+- **Cosa vede un client.** I client con revisione del protocollo 2026-07-28 o successiva
+  (Claude Code, Claude) elencano le skill e ne caricano una quando è pertinente.
+  Claude Code le nomina ciascuna `<connector>:<skill>`. Queste vengono servite tramite
+  l'estensione MCP skills (`io.modelcontextprotocol/skills`): `skills/list`,
+  `skills/get` e `resources/read` di `skill://<name>/…`. Ogni skill è accompagnata
+  da un manifest SHA-256 dei suoi file. Il client verifica ogni file rispetto
+  a quel manifest e l'approvazione dell'utente è vincolata a esso.
+- **Chi può leggerle.** Qualsiasi connessione autenticata, indipendentemente dai suoi scope.
+  Non inserire in una skill nulla che non sia destinato a chiunque si connetta.
+- **Quando cambiano.** La cartella viene letta alla prima richiesta che ne ha bisogno,
+  quindi una modifica ha effetto al deploy o riavvio successivo. Un file che cambia su
+  disco prima di quel momento viene rifiutato, non servito a fronte di un manifest a cui non
+  corrisponde più.
+- **Cosa viene escluso.** Una skill che viola una regola viene ignorata e il log di avvio
+  ne indica il motivo. Le regole: assenza di frontmatter, un nome diverso da quello della cartella,
+  un symlink all'interno, oppure più di 512 file o 16 MiB. I file nascosti come
+  `.gitkeep` non vengono mai serviti. Una skill che supera i limiti specifici di Claude Code (100 KB
+  per file, 400 KB in totale) viene servita con un avviso, poiché Claude Code non
+  la caricherà.
+
+L'endpoint supporta entrambe le generazioni del protocollo. Un client della generazione 2025 si apre con
+`initialize`, come in precedenza. Un client 2026-07-28 non invia alcun handshake. Ogni richiesta
+trasmette la versione del protocollo e le capabilities in `params._meta`, oltre agli
+header `MCP-Protocol-Version`, `Mcp-Method` e `Mcp-Name`, che devono corrispondere
+al corpo della richiesta. Le sue capabilities provengono da `server/discover`. Le skill vengono
+dichiarate solo lì.
+
+Le rotte sono disponibili in [Endpoint](/docs/backend/endpoints/#mcp-surface) e le
+variabili in [Configurazione](/docs/getting-started/configuration/#mcp-surface).

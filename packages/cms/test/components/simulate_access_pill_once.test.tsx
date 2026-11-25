@@ -27,6 +27,7 @@ jest.mock("@rebasepro/app", () => ({
     RebaseLogo: () => <svg/>,
     LanguageToggle: () => <span/>,
     RlsSimulatorBar: () => <span data-testid={"simulate-access"}/>,
+    McpConnectButton: () => null,
     UserSettingsView: () => <span/>
 }));
 jest.mock("../../src/hooks/navigation/contexts/UrlContext", () => ({

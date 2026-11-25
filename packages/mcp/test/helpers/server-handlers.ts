@@ -1,12 +1,18 @@
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import {
+    InMemoryTransport,
+    isJSONRPCErrorResponse,
+    isJSONRPCResultResponse,
+    type JSONRPCMessage,
+    type Server
+} from "@modelcontextprotocol/server";
 
 /**
- * The server's request handlers, driven directly rather than over a transport.
+ * The server's request handlers, driven as a client drives them.
  *
- * The SDK keeps what `setRequestHandler` registered in a private map. Reading it
- * lets a test call `tools/call` as a client would, without connecting the
- * module-level server to anything, and every answer is checked against the
- * shape the tests read before it is handed back.
+ * Each server is connected once, over an in-memory transport, and opened with
+ * a 2025-era `initialize`. Every request then goes over the wire as JSON-RPC:
+ * a result is checked against the shape the tests read before it is handed
+ * back, and an error response is thrown with its message.
  */
 
 /** A request as a client sends it. */
@@ -31,14 +37,59 @@ export interface ReadResourceResult {
     contents: Array<{ uri: string; text: string }>;
 }
 
-function requestHandler(server: Server, method: string): (request: McpRequest) => Promise<unknown> {
-    const handlers: unknown = Reflect.get(server, "_requestHandlers");
-    if (!(handlers instanceof Map)) throw new Error("The server has no request handler map");
-    const handler: unknown = handlers.get(method);
-    if (typeof handler !== "function") throw new Error(`No handler is registered for ${method}`);
+/** A connected client end: sends one request and resolves with its result. */
+type Send = (request: McpRequest) => Promise<unknown>;
+
+const connections = new WeakMap<Server, Promise<Send>>();
+
+/** The protocol revision the helper's client opens with. */
+export const LEGACY_PROTOCOL_VERSION = "2025-11-25";
+
+async function connect(server: Server): Promise<Send> {
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+    let nextId = 1;
+    clientSide.onmessage = (message: JSONRPCMessage) => {
+        if (isJSONRPCResultResponse(message) && typeof message.id === "number") {
+            pending.get(message.id)?.resolve(message.result);
+            pending.delete(message.id);
+        } else if (isJSONRPCErrorResponse(message) && typeof message.id === "number") {
+            pending.get(message.id)?.reject(new Error(message.error.message));
+            pending.delete(message.id);
+        }
+    };
+    await server.connect(serverSide);
+    await clientSide.start();
+    const send: Send = (request) => new Promise((resolve, reject) => {
+        const id = nextId++;
+        pending.set(id, { resolve,
+reject });
+        clientSide.send({ jsonrpc: "2.0",
+id,
+method: request.method,
+params: request.params ?? {} }).catch(reject);
+    });
+    await send({
+        method: "initialize",
+        params: { protocolVersion: LEGACY_PROTOCOL_VERSION,
+capabilities: {},
+clientInfo: { name: "rebase-mcp-test",
+version: "0" } }
+    });
+    await clientSide.send({ jsonrpc: "2.0",
+method: "notifications/initialized" });
+    return send;
+}
+
+function requestHandler(server: Server): Send {
     return async (request) => {
-        const answer: unknown = await handler(request);
-        return answer;
+        let connection = connections.get(server);
+        if (!connection) {
+            connection = connect(server);
+            connections.set(server, connection);
+        }
+        const send = await connection;
+        return send(request);
     };
 }
 
@@ -68,7 +119,7 @@ function isReadResourceResult(value: unknown): value is ReadResourceResult {
 
 /** The `tools/call` handler. */
 export function toolCallHandler(server: Server): (request: McpRequest) => Promise<ToolCallResult> {
-    const handle = requestHandler(server, "tools/call");
+    const handle = requestHandler(server);
     return async (request) => {
         const answer = await handle(request);
         if (!isToolCallResult(answer)) throw new Error(`Not a tool result: ${JSON.stringify(answer)}`);
@@ -78,7 +129,7 @@ export function toolCallHandler(server: Server): (request: McpRequest) => Promis
 
 /** The `tools/list` handler. */
 export function listToolsHandler(server: Server): (request: McpRequest) => Promise<ListToolsResult> {
-    const handle = requestHandler(server, "tools/list");
+    const handle = requestHandler(server);
     return async (request) => {
         const answer = await handle(request);
         if (!isListToolsResult(answer)) throw new Error(`Not a tool list: ${JSON.stringify(answer)}`);
@@ -88,7 +139,7 @@ export function listToolsHandler(server: Server): (request: McpRequest) => Promi
 
 /** The `resources/read` handler. */
 export function readResourceHandler(server: Server): (request: McpRequest) => Promise<ReadResourceResult> {
-    const handle = requestHandler(server, "resources/read");
+    const handle = requestHandler(server);
     return async (request) => {
         const answer = await handle(request);
         if (!isReadResourceResult(answer)) throw new Error(`Not a resource: ${JSON.stringify(answer)}`);
@@ -107,10 +158,15 @@ function isListResourcesResult(value: unknown): value is ListResourcesResult {
 
 /** The `resources/list` handler. */
 export function listResourcesHandler(server: Server): (request: McpRequest) => Promise<ListResourcesResult> {
-    const handle = requestHandler(server, "resources/list");
+    const handle = requestHandler(server);
     return async (request) => {
         const answer = await handle(request);
         if (!isListResourcesResult(answer)) throw new Error(`Not a resource list: ${JSON.stringify(answer)}`);
         return answer;
     };
+}
+
+/** Any request, answered with its raw result. */
+export function rawHandler(server: Server): Send {
+    return requestHandler(server);
 }

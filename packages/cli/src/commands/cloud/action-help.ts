@@ -191,21 +191,24 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             + "deploy: there is nothing to poll before then, so --wait says so and returns rather "
             + "than looping.",
             "`rebase cloud db test` legitimately fails before the first deploy.",
-            "A project has exactly one database — attaching a second is refused, because the "
-            + "platform reads one row and it becomes undefined which it deploys against."
+            "A project has one database server — attaching a second is refused. For more databases, "
+            + "declare them in config/resources.ts (`export const analytics = database(\"analytics\")`) and "
+            + "deploy: each is made on the project's server, bound as DATABASE_URL__<KEY>, backed up with it, "
+            + "and listed by `rebase cloud db list`."
         ]
     },
 
     "db query": {
         command: "cloud db query",
-        usage: "cloud db query [sql] [--file <path>]",
+        usage: "cloud db query [sql] [--file <path>] [--database <key>]",
         summary:
             "Run SQL on the project's managed database and print what it answered. It opens the tunnel "
             + "`db connect` opens, for the length of one query, and connects with the CLI's own Postgres "
             + "driver, so nothing else needs to be installed. A file of several statements (functions, "
             + "triggers, DO blocks) runs as one script and stops at the first error.",
         flags: [
-            ["--file <path>", "Run the statements in a file instead of the argument"]
+            ["--file <path>", "Run the statements in a file instead of the argument"],
+            ["--database <key>", "One of the project's other databases (database(\"<key>\") in config/resources.ts). Default: the default database"]
         ],
         examples: [
             "rebase cloud db query \"select count(*) from rebase.users\"",
@@ -222,7 +225,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "db connect": {
         command: "cloud db connect",
-        usage: "cloud db connect [--port <n>] [--reveal]",
+        usage: "cloud db connect [--port <n>] [--reveal] [--database <key>]",
         summary:
             "Open a local port that is the project's managed database, and hold it open until Ctrl-C. "
             + "A managed database lives inside the platform's cluster, so the host `db info` reports is "
@@ -232,12 +235,14 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             + "credential.",
         flags: [
             ["--port <n>", "Local port to listen on. Default: 5432"],
-            ["--reveal", "Print the password inside the connection URL"]
+            ["--reveal", "Print the password inside the connection URL"],
+            ["--database <key>", "Connect to one of the project's other databases instead of the default. They share the server, so the tunnel and the password are the same"]
         ],
         examples: [
             "rebase cloud db connect",
             "rebase cloud db connect --port 6543",
-            "rebase cloud db connect --reveal --project shop"
+            "rebase cloud db connect --reveal --project shop",
+            "rebase cloud db connect --database analytics"
         ],
         notes: [
             "Requires the organization's owner or admin role — the same gate as the console's SQL "
@@ -539,7 +544,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         usage: "cloud resources prune database <key> [--yes]",
         summary:
             "Drop a platform-provisioned database that this project's code no longer declares. "
-            + "A deploy never removes one — it keeps, binds and bills it — so this is where it goes. "
+            + "A deploy never removes one — its data stays on the project's database server — so this is where it goes. "
             + "Only a database: a bucket and its files are removed in the project's storage settings.",
         flags: [],
         examples: ["rebase cloud resources prune database analytics --yes"],
@@ -578,21 +583,25 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "db backup": {
         command: "cloud db backup",
-        usage: "cloud db backup <list|create|restore|status|download> [filename] [--yes]",
+        usage: "cloud db backup <list|create|restore|status|download> [filename] [--database <key>] [--yes]",
         summary:
             "Take, list, inspect, download and restore this project's database backups. "
             + "`list` is the default when no action is given.",
-        flags: [],
+        flags: [
+            ["--database <key>", "With create: dump one of the project's other databases (database(\"<key>\")). Its file carries the database's name, and restoring it writes back into that database"]
+        ],
         examples: [
             "rebase cloud db backup",
             "rebase cloud db backup create",
+            "rebase cloud db backup create --database analytics",
             "rebase cloud db backup status",
             "rebase cloud db backup restore base-20260831 --yes",
             "rebase cloud db backup download base-20260831"
         ],
         notes: [
             "`restore` replaces the live database. Nothing about it is undoable from here — `--yes`, the global flag listed below, is what skips that confirmation.",
-            "Backups are the project's own: a base backup on a schedule, plus continuous WAL archiving for point-in-time recovery."
+            "Backups are the project's own: a base backup on a schedule, plus continuous WAL archiving for point-in-time recovery. Every database on the project's server is in them.",
+            "A manual dump (`create`) is of one database: the default unless --database names another."
         ]
     },
 
@@ -815,18 +824,20 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "storage keys create": {
         command: "cloud storage keys create",
-        usage: "cloud storage keys create [--name <name>] [--read-only] [--bucket <bucket>]",
+        usage: "cloud storage keys create [--name <name>] [--read-only] [--bucket <bucket>] [--source <key>]",
         summary:
             "Issue an S3 access key for Rebase Storage. The secret is printed ONCE, with the lines to paste into "
-            + "a .env (S3_ENDPOINT, S3_REGION, S3_BUCKET when scoped, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, "
+            + "a .env (STORAGE_TYPE, S3_ENDPOINT, S3_REGION, S3_BUCKET when scoped, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, "
             + "S3_FORCE_PATH_STYLE) and an aws-cli line to try it.",
         flags: [
             ["--name <name>", "What to call it. Default: key-<date>"],
             ["--read-only", "Read, never write. Default: read-write"],
-            ["--bucket <bucket>", "Only this bucket. Default: every bucket in the project"]
+            ["--bucket <bucket>", "Only this bucket. Default: every bucket in the project"],
+            ["--source <key>", "Print the .env lines for a declared bucket — bucket(\"<key>\") — with its suffix (S3_BUCKET__<KEY>). Default: the default bucket's plain names"]
         ],
         examples: [
             "rebase cloud storage keys create --name app --bucket shop-assets",
+            "rebase cloud storage keys create --bucket shop-media --source media",
             "rebase cloud storage keys create --read-only --json"
         ],
         notes: [
@@ -1237,7 +1248,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "Each database and bucket this project's deploys recorded: whether the last deploy's "
             + "code still declares it, and whether the platform made it. A deploy never removes a "
             + "provisioned database when its declaration goes — that would be data deleted by a "
-            + "push — so it keeps, binds and bills it until `prune` names it.",
+            + "push — so its data stays on the project's database server until `prune` names it.",
         flags: [],
         examples: [
             "rebase cloud resources",

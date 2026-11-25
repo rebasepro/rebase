@@ -54,6 +54,7 @@ jest.mock("@rebasepro/app", () => ({
     RebaseLogo: () => <svg/>,
     LanguageToggle: () => <span/>,
     RlsSimulatorBar: () => null,
+    McpConnectButton: () => null,
     UserSettingsView: () => <span/>,
     getIcon: () => <svg/>,
     getEntityFromCache: () => undefined,

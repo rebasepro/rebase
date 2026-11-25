@@ -1,6 +1,8 @@
 /**
  * `.br` and `.gz` beside a static build's content-hashed assets, written when
- * the build is folded into a bundle.
+ * the build is folded into a bundle. A Vite build with `rebasePrecompress()`
+ * (`@rebasepro/app/vitePlugin`) has written them already, by the same rule
+ * (`isPrecompressibleAsset`), and an existing sibling is never rewritten.
  *
  * The runtime serves a sibling when the browser accepts its encoding
  * (`serveSPA` turns `precompressed` on at mount when the build holds any), so a
@@ -24,21 +26,7 @@
 import fs from "fs";
 import path from "path";
 import zlib from "zlib";
-import { isContentHashedFileName } from "@rebasepro/types";
-
-/** Below this a compressed response saves less than its headers cost — the runtime's threshold. */
-const MIN_BYTES = 1024;
-
-/**
- * Extensions whose content type the runtime compresses (`COMPRESSIBLE_CONTENT_TYPE_REGEX`).
- * All of them, because a build with any sibling switches the runtime's cache of
- * gzipped hashed files off: a hashed type left out here would be compressed on
- * every request instead of once.
- */
-const COMPRESSIBLE = new Set([
-    "js", "mjs", "cjs", "css", "html", "htm", "txt", "csv", "md", "xml", "json", "webmanifest",
-    "svg", "wasm", "ttf", "otf", "eot", "ico", "bmp"
-]);
+import { isPrecompressibleAsset, PRECOMPRESS_MIN_BYTES } from "@rebasepro/types";
 
 export interface PrecompressOutcome {
     /** Files that got at least one sibling. */
@@ -63,9 +51,9 @@ export function precompressStaticAssets(dir: string): PrecompressOutcome {
                 pending.push(file);
                 continue;
             }
-            if (!entry.isFile() || !worthCompressing(entry.name)) continue;
+            if (!entry.isFile() || !isPrecompressibleAsset(entry.name)) continue;
             const source = fs.readFileSync(file);
-            if (source.byteLength < MIN_BYTES) continue;
+            if (source.byteLength < PRECOMPRESS_MIN_BYTES) continue;
 
             const brotli = writeSibling(`${file}.br`, source, () => zlib.brotliCompressSync(source, {
                 params: {
@@ -83,11 +71,6 @@ export function precompressStaticAssets(dir: string): PrecompressOutcome {
         }
     }
     return outcome;
-}
-
-function worthCompressing(fileName: string): boolean {
-    const extension = fileName.slice(fileName.lastIndexOf(".") + 1).toLowerCase();
-    return COMPRESSIBLE.has(extension) && isContentHashedFileName(fileName);
 }
 
 /** The sibling's size, or 0 when there already was one or it would not be smaller. */

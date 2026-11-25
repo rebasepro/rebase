@@ -1,5 +1,5 @@
 ---
-sourceHash: 27b170adac8e577c
+sourceHash: 26b5051f902a5fa7
 title: Múltiplos Bancos de Dados e Buckets
 sidebar_label: Múltiplas Fontes
 description: Direcione tabelas para diferentes bancos de dados e colunas de armazenamento para diferentes buckets, e configure cada um a partir do ambiente.
@@ -206,6 +206,8 @@ Tabelas e políticas de row-level-security são provisionadas **por fonte**: uma
 tabela direcionada para `analytics` obtém sua tabela, e suas políticas, no
 banco de dados analytics.
 
+No Rebase Cloud você também não define nada disso: consulte [No Rebase Cloud](#no-rebase-cloud).
+
 ### Armazenamento
 
 ```bash
@@ -410,3 +412,39 @@ permanece não vinculado e responde com 501.
 - [Visão Geral do Backend](/docs/backend/) — onde fica cada declaração
 - [Configuração de Armazenamento](/docs/backend/storage/) — o mesmo formato para buckets
 - [Ambiente e Configuração](/docs/getting-started/configuration/) — a convenção `__SUFFIX` que vincula uma fonte às suas variáveis
+
+## No Rebase Cloud
+
+O PostgreSQL gerenciado de um projeto no [Rebase Cloud](/docs/deployment/cloud/) é um **servidor de banco
+de dados**, e ele contém todos os bancos de dados que o projeto declara. No próximo deploy após
+`export const analytics = database("analytics")`, a plataforma cria um banco de dados chamado `analytics`
+nesse servidor e o vincula ao seu app como `DATABASE_URL__ANALYTICS`, a mesma variável que um backend
+auto-hospedado lê.
+
+- **Cobrança.** Todos os bancos de dados no servidor compartilham sua CPU, memória e disco,
+  que são o que é cobrado do projeto. Um segundo banco de dados não custa nada por si só; os dados
+  que ele armazena aumentam o disco, e o disco é cobrado pelo tamanho.
+  Dimensione o servidor para todos eles em **Compute**.
+- **Backups e recuperação.** Eles estão nos backups do servidor e o acompanham em uma recuperação
+  point-in-time. `rebase cloud db backup create --database analytics` gera um dump de um deles, e
+  restaurar esse dump grava de volta no mesmo banco de dados.
+- **Conexão.** `rebase cloud db list` os exibe, e `db info`, `db connect`
+  e `db query` aceitam `--database <key>`:
+
+  ```bash
+  rebase cloud db connect --database analytics
+  ```
+
+- **Remoção.** Um deploy nunca exclui um banco de dados. Um que seu código deixa de declarar
+  permanece no servidor até que você execute `rebase cloud resources prune database analytics`.
+
+Uma variável definida por você tem prioridade: com sua própria `DATABASE_URL__ANALYTICS` no
+ambiente do projeto, a plataforma não cria nada para essa chave. Em um projeto que traz seu próprio
+servidor de banco de dados, nenhum banco de dados é criado; em vez disso, defina uma
+`DATABASE_URL__<KEY>` para cada um.
+
+Os buckets funcionam da mesma forma. Assim que o bucket padrão do projeto roda no
+[Rebase Storage](/docs/deployment/rebase-storage/), cada `bucket("media")` recebe um bucket e uma chave
+próprios no próximo deploy, vinculados como `S3_BUCKET__MEDIA` e as demais variáveis `__MEDIA`. Os bytes
+armazenados são medidos por projeto, somando todos os seus buckets. Com buckets próprios, conecte cada um
+com `rebase cloud storage attach --source <key>`.

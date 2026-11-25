@@ -45,6 +45,7 @@ import {
 import { reportCallError, isRouteNotServed, type Unserved } from "./not-served";
 import { fmtDate } from "./projects";
 import { formatBytes } from "../storage";
+import { storageEnvSuffix } from "@rebasepro/types";
 
 /* ─── the wire ─────────────────────────────────────────────────── */
 
@@ -218,14 +219,22 @@ export function egressThisMonth(days: UsageDay[], now: Date = new Date()): numbe
 
 /* ─── credentials, printed once ────────────────────────────────── */
 
-/** The lines to paste into a `.env`, in the variable names Rebase's storage reads. */
-export function s3EnvLines(key: IssuedStorageKey): string[] {
-    const lines = [`S3_ENDPOINT=${key.endpoint}`, `S3_REGION=${key.region}`];
-    if (key.bucket) lines.push(`S3_BUCKET=${key.bucket}`);
+/**
+ * The lines to paste into a `.env`, in the variable names Rebase's storage reads.
+ *
+ * `source` is the storage source they configure: the default (plain `S3_*`)
+ * when absent, or a declared bucket — `bucket("media")` — whose variables carry
+ * its suffix (`S3_BUCKET__MEDIA`). Printing the plain names for a named bucket
+ * would configure the DEFAULT bucket with media's credentials, silently.
+ */
+export function s3EnvLines(key: IssuedStorageKey, source?: string): string[] {
+    const suffix = source ? storageEnvSuffix(source) : "";
+    const lines = [`STORAGE_TYPE${suffix}=s3`, `S3_ENDPOINT${suffix}=${key.endpoint}`, `S3_REGION${suffix}=${key.region}`];
+    if (key.bucket) lines.push(`S3_BUCKET${suffix}=${key.bucket}`);
     lines.push(
-        `S3_ACCESS_KEY_ID=${key.accessKeyId}`,
-        `S3_SECRET_ACCESS_KEY=${key.secretAccessKey}`,
-        "S3_FORCE_PATH_STYLE=true"
+        `S3_ACCESS_KEY_ID${suffix}=${key.accessKeyId}`,
+        `S3_SECRET_ACCESS_KEY${suffix}=${key.secretAccessKey}`,
+        `S3_FORCE_PATH_STYLE${suffix}=true`
     );
     return lines;
 }
@@ -237,7 +246,7 @@ export function awsCliExample(key: IssuedStorageKey): string {
         + `aws s3 ls ${target}--endpoint-url ${key.endpoint} --region ${key.region}`;
 }
 
-function printIssuedKey(key: IssuedStorageKey, headline: string): void {
+function printIssuedKey(key: IssuedStorageKey, headline: string, source?: string): void {
     emit(
         () => {
             success(headline);
@@ -254,8 +263,8 @@ function printIssuedKey(key: IssuedStorageKey, headline: string): void {
             console.log(chalk.yellow.bold("  The secret is shown ONCE. Copy it now: it cannot be displayed again."));
             console.log(chalk.gray("  Lost it? `rebase cloud storage keys rotate " + key.name + "` issues a new one."));
             noteBlank();
-            note(chalk.gray("For your .env:"));
-            for (const line of s3EnvLines(key)) console.log(`    ${line}`);
+            note(chalk.gray(source ? `For your .env, configuring bucket("${source}"):` : "For your .env:"));
+            for (const line of s3EnvLines(key, source)) console.log(`    ${line}`);
             noteBlank();
             note(chalk.gray("Try it with the aws cli:"));
             console.log(`    ${awsCliExample(key)}`);
@@ -265,7 +274,7 @@ function printIssuedKey(key: IssuedStorageKey, headline: string): void {
             success: true,
             ...key,
             bucket: key.bucket ?? null,
-            env: s3EnvLines(key),
+            env: s3EnvLines(key, source),
             awsCli: awsCliExample(key),
             warning: "The secret is returned once and cannot be displayed again."
         }
@@ -360,7 +369,7 @@ export async function storageDeleteBucket(rawArgs: string[]): Promise<void> {
 /** The action words `rebase cloud storage keys` dispatches. No word means `list`. */
 export const STORAGE_KEYS_ACTIONS = ["list", "create", "rotate", "revoke"] as const;
 
-const STORAGE_KEYS_CREATE_FLAGS = { "--name": String, "--read-only": Boolean, "--bucket": String } as const;
+const STORAGE_KEYS_CREATE_FLAGS = { "--name": String, "--read-only": Boolean, "--bucket": String, "--source": String } as const;
 
 /** The word after `storage keys`, read past any flag and its value. */
 function keysAction(rawArgs: string[]): string | undefined {
@@ -430,7 +439,7 @@ function printKeys(keys: StorageKey[]): void {
 
 async function storageKeysCreate(rawArgs: string[]): Promise<void> {
     const { flags } = parseCloudArgs({
-        spec: { "--name": String, "--read-only": Boolean, "--bucket": String },
+        spec: STORAGE_KEYS_CREATE_FLAGS,
         rawArgs,
         commandWords: 4, // cloud storage keys create
         command: "cloud storage keys create",
@@ -449,7 +458,13 @@ async function storageKeysCreate(rawArgs: string[]): Promise<void> {
     } catch (error) {
         storageError(error, "Failed to create the key");
     }
-    printIssuedKey(key, `Key ${key.name} created for ${displayProjectRef(rawArgs)}.`);
+    printIssuedKey(key, `Key ${key.name} created for ${displayProjectRef(rawArgs)}.`, sourceFlag(flags["--source"]));
+}
+
+/** `--source <key>`: the declared bucket the printed variables configure. `(default)` is the default's plain names. */
+function sourceFlag(value: string | undefined): string | undefined {
+    const key = value?.trim();
+    return key && key !== "(default)" ? key : undefined;
 }
 
 function requireKey(parsed: { flags: { "--yes"?: boolean }; positionals: string[] }, verb: "rotate" | "revoke"): { key: string; yes: boolean } {

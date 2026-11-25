@@ -401,8 +401,7 @@ export default defineConfig({
                 PageTitle: "./src/components/starlight/PageTitle.astro",
                 Header: "./src/components/starlight/Header.astro",
                 SiteTitle: "./src/components/starlight/SiteTitle.astro",
-                Head: "./src/components/starlight/Head.astro",
-                LanguageSelect: "./src/components/starlight/LanguageSelect.astro"
+                Head: "./src/components/starlight/Head.astro"
             }
         }),
         mdx(),
