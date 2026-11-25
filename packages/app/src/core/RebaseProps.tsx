@@ -327,9 +327,18 @@ export type RebaseProps<USER extends User, DB = unknown> = {
 
     /**
      * Override or extend any Rebase UI string, keyed by locale.
+     *
+     * A locale's table can be a loader instead, fetched the first time that
+     * language is shown — so an app's own languages cost nothing before the
+     * first paint, like the ones Rebase ships:
+     *
+     * @example
+     * ```tsx
+     * translations={{ en, es: () => import("./locales/es").then(m => m.es) }}
+     * ```
      */
     translations?: {
-        [locale: string]: DeepPartial<RebaseTranslations>;
+        [locale: string]: DeepPartial<RebaseTranslations> | (() => Promise<DeepPartial<RebaseTranslations>>);
     };
 
     /**

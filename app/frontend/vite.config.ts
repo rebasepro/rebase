@@ -4,7 +4,7 @@ import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import svgr from "vite-plugin-svgr";
 import tailwindcss from "@tailwindcss/vite";
-import { rebaseBackendGuard, rebaseMcpViewPlugin } from "@rebasepro/app/vitePlugin";
+import { rebaseBackendGuard, rebaseMcpViewPlugin, rebasePreloadFonts } from "@rebasepro/app/vitePlugin";
 import { visualizer } from "rollup-plugin-visualizer";
 
 const PACKAGES_DIR = path.resolve(__dirname, "../../packages");
@@ -222,6 +222,9 @@ export default defineConfig({
         // show_app), built from this app's `App` so its table customizations,
         // custom views and fields come along.
         rebaseMcpViewPlugin(),
+        // Inter, the body font, downloads alongside the JavaScript instead of
+        // after the first render.
+        rebasePreloadFonts(),
         visualizer({ filename: "stats.json",
 template: "raw-data" })
     ],

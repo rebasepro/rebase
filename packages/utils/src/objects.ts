@@ -1,4 +1,4 @@
-import hash from "object-hash";
+import { stableHash } from "./stable_hash";
 
 /** @private is the value an empty array? */
 export const isEmptyArray = (value?: unknown) =>
@@ -365,9 +365,9 @@ export function getHashValue<T>(v: T): string | null {
         else if (v instanceof Date)
             return v.toLocaleString();
         else if (isGeoPointLike(v))
-            return hash({ latitude: v.latitude, longitude: v.longitude });
+            return stableHash({ latitude: v.latitude, longitude: v.longitude });
     }
-    return hash(v as object, { ignoreUnknown: true });
+    return stableHash(v);
 }
 
 export function removeUndefined(value: unknown, removeEmptyStrings?: boolean): unknown {

@@ -1,23 +1,5 @@
 import React, { ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 
-/** Google Identity Services SDK — injected by the GIS <script> tag. */
-declare global {
-    interface Window {
-        google?: {
-            accounts: {
-                oauth2: {
-                    initCodeClient(config: {
-                        client_id: string;
-                        scope: string;
-                        ux_mode: "popup" | "redirect";
-                        callback: (response: { code?: string; error?: string }) => void;
-                    }): { requestCode(): void };
-                };
-            };
-        };
-    }
-}
-
 import {
     ArrowLeftIcon,
     Button,
@@ -52,6 +34,8 @@ import { appAddressOfEmailLink, readEmailLinkAction } from "./email-link";
 import { emailChangeErrorMessage } from "../email-change-message";
 import { canAnswerMfa, classifyMfaRefusal, PendingMfaSignIn, readMfaRequired } from "./mfa-required";
 import { isAppleCancellation, preloadAppleSdk } from "../../auth/apple-sign-in";
+import { loadGoogleIdentityServices } from "../../auth/google-sign-in";
+
 
 /**
  * Props for the generic LoginView.
@@ -479,8 +463,6 @@ export function LoginView({
             });
         }
     }, [authController]);
-
-
 
     let logoComponent;
     if (logo) {
@@ -980,9 +962,9 @@ function GoogleLoginButton({
     onErrorRef.current = onError;
 
     /**
-     * Build Google's code client, if its script has arrived. Google's script
-     * tag is `async`, so it routinely lands after this button has mounted:
-     * the click tries again rather than trusting whatever the mount saw.
+     * Build Google's code client, if its script has arrived. The script is
+     * fetched when this button mounts, so a fast click can beat it: the click
+     * tries again rather than trusting whatever the mount saw.
      */
     const ensureCodeClient = useCallback(() => {
         if (codeClientRef.current || !authController.googleLogin) return codeClientRef.current;
@@ -1027,12 +1009,23 @@ function GoogleLoginButton({
     }, [googleClientId, authController]);
 
     useEffect(() => {
-        ensureCodeClient();
-    }, [ensureCodeClient]);
+        if (!authController.googleLogin) return;
+        // Already on the page (a tag the app still carries, an earlier mount):
+        // built now, synchronously, as before.
+        if (ensureCodeClient()) return;
+        let cancelled = false;
+        loadGoogleIdentityServices().then(
+            () => { if (!cancelled) ensureCodeClient(); },
+            () => { /* reported on click, where the user is looking */ }
+        );
+        return () => { cancelled = true; };
+    }, [ensureCodeClient, authController.googleLogin]);
 
     const handleClick = () => {
         const codeClient = ensureCodeClient();
         if (!codeClient) {
+            // Still loading, or it failed: try again, for the next click.
+            void loadGoogleIdentityServices().then(() => ensureCodeClient(), () => undefined);
             console.error("Google Sign-In not loaded");
             onErrorRef.current?.("Google Sign-In could not be loaded. Check your connection or any script blockers, then try again.");
             return;

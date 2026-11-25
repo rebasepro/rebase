@@ -6,10 +6,8 @@ import * as ts from "typescript";
 /**
  * `package.json` declares `"sideEffects": false` for this package, and the
  * build emits one file per source module (`preserveModules`): a bundler may
- * drop any file of it whose exports nobody uses. That is what keeps
- * `object-hash` (only `getHashValue` in objects.ts imports it) out of a client
- * app that never hashes — the `sdk-minimal` target of
- * tooling/scripts/check-bundle-budget.mjs measures it.
+ * drop any file of it whose exports nobody uses — the `sdk-minimal` target of
+ * tooling/scripts/check-bundle-budget.mjs measures what a client app carries.
  *
  * The flag is a promise about every module, so this holds it: importing a
  * module must not DO anything another module relies on — register something,

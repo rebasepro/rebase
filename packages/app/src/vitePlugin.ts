@@ -4,7 +4,9 @@ import fs from "fs";
 import type { Plugin, ResolvedConfig } from "vite";
 export { BACKEND_GUARD_PLUGIN_NAME, rebaseBackendGuard } from "./backend_guard";
 export type { RebaseBackendGuardOptions } from "./backend_guard";
-import { MCP_VIEW_UTILITIES, mcpViewBoot, mcpViewDocument, mcpViewInlineIntoHtml, mcpViewOneChunk, mcpViewWithoutLazyExtras } from "./mcp_view_build.ts";
+export { rebasePrecompress } from "./precompress_plugin";
+export { rebasePreloadFonts } from "./preload_fonts_plugin";
+import { MCP_VIEW_BUILD, MCP_VIEW_UTILITIES, mcpViewBoot, mcpViewDocument, mcpViewInlineIntoHtml, mcpViewOneChunk, mcpViewWithoutLazyExtras } from "./mcp_view_build.ts";
 
 /**
  * How the admin's dependencies are split into cached chunks.
@@ -117,7 +119,6 @@ export interface RebaseMcpViewPluginOptions {
 }
 
 /** Set while the view's own build runs, so it does not build a view of itself. */
-const MCP_VIEW_BUILD = "REBASE_MCP_VIEW_BUILD";
 
 export function rebaseMcpViewPlugin(options: RebaseMcpViewPluginOptions = {}): Plugin {
     let config: ResolvedConfig;

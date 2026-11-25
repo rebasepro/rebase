@@ -34,3 +34,34 @@ export function isContentHashedFileName(fileName: string): boolean {
 function looksLikeHash(text: string): boolean {
     return /^[A-Za-z0-9_-]+$/.test(text) && /[0-9A-Z]/.test(text);
 }
+
+/**
+ * Below this many bytes a compressed response saves less than its headers
+ * cost: the runtime's on-the-fly compression threshold, and the floor under
+ * which a build writes no `.br`/`.gz` sibling.
+ */
+export const PRECOMPRESS_MIN_BYTES = 1024;
+
+/**
+ * Extensions whose content type the runtime compresses
+ * (`COMPRESSIBLE_CONTENT_TYPE_REGEX`). All of them, because a build with any
+ * sibling switches the runtime's cache of gzipped hashed files off: a hashed
+ * type left out here would be compressed on every request instead of once.
+ *
+ * A regex literal, not a `new Set(…)`: a call at module scope is a side
+ * effect to a bundler, so it would ride in every client app that imports
+ * this package, used or not.
+ */
+const PRECOMPRESSIBLE_EXTENSION = /\.(?:js|mjs|cjs|css|html|htm|txt|csv|md|xml|json|webmanifest|svg|wasm|ttf|otf|eot|ico|bmp)$/i;
+
+/**
+ * Whether a build writes `.br` and `.gz` beside this file: content-hashed (so
+ * the runtime serves it `immutable` and a sibling can never go stale) and of a
+ * type worth compressing. The size floor is {@link PRECOMPRESS_MIN_BYTES}.
+ *
+ * One rule for `rebase build` (`precompressStaticAssets` in the CLI) and the
+ * Vite plugin (`rebasePrecompress` in `@rebasepro/app/vitePlugin`).
+ */
+export function isPrecompressibleAsset(fileName: string): boolean {
+    return PRECOMPRESSIBLE_EXTENSION.test(fileName) && isContentHashedFileName(fileName);
+}

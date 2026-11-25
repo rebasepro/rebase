@@ -6,6 +6,9 @@
  */
 import type { Plugin } from "vite";
 
+/** Set while the MCP view's own build runs, so the plugins of the app's build can tell it apart. */
+export const MCP_VIEW_BUILD = "REBASE_MCP_VIEW_BUILD";
+
 /** The view's document: a root for the app, and storage that works in a frame with no origin of its own. */
 export function mcpViewDocument(entry = "./boot.tsx"): string {
     return `<!doctype html>

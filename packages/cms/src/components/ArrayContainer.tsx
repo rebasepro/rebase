@@ -62,8 +62,8 @@ export interface ArrayContainerProps<T> {
 
 /**
  * One internal id per item, keyed by the item's hash. Built once, at mount
- * (see the lazy initialiser below): it hashes every item, object-hash for
- * anything without an `id`.
+ * (see the lazy initialiser below): it hashes every item, by content
+ * (`stableHash` in @rebasepro/utils) for anything without an `id`.
  */
 const buildIdsMap = (value: unknown[]): Record<string, number> => {
     const ids: Record<string, number> = {};
