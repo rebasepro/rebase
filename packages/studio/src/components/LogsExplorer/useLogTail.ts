@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useApiBase, useApiConfig } from "@rebasepro/app";
+import { AdminRequestError } from "../../utils/adminFetch";
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 
 export interface LogEntry {
     id: string;
@@ -143,9 +145,22 @@ async function failureMessage(resp: { status: number; json?: () => Promise<unkno
         : `Could not load logs (HTTP ${resp.status}).`;
 }
 
+/**
+ * The failed response, classified with its status — a refusal, a server that
+ * does not serve logs (404, or 501 from the admin gate), or a failure to read.
+ */
+async function responseFailure(resp: { status: number; json?: () => Promise<unknown> }): Promise<LoadFailure> {
+    return classifyLoadFailure(new AdminRequestError(await failureMessage(resp), resp.status), { toolLevel: true });
+}
+
 export interface LogTail {
     logs: LogEntry[];
-    error: string | null;
+    /**
+     * Why the tail is not being fed, classified — see `load-failure.ts`. A
+     * `not_offered` failure is final: the hook stops asking until the
+     * connection is reopened (a filter change, or the tab coming back).
+     */
+    error: LoadFailure | null;
     transport: LogTransport;
     /**
      * Entries the server had to discard because this client was not draining the
@@ -182,7 +197,7 @@ export interface LogTail {
  */
 export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
     const [logs, setLogs] = useState<LogEntry[]>([]);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<LoadFailure | null>(null);
     const [transport, setTransport] = useState<LogTransport>("connecting");
     const [dropped, setDropped] = useState(0);
     const [instance, setInstance] = useState<string | null>(null);
@@ -235,7 +250,7 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
 
     useEffect(() => {
         if (!apiBase) {
-            setError("No API URL configured — cannot load logs.");
+            setError(classifyLoadFailure(new Error("No API URL configured — cannot load logs.")));
             return;
         }
         if (!visible) return;
@@ -270,7 +285,11 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
                 const resp = await fetch(`${apiBase}/admin/logs?${query}`, { headers: await authHeaders() });
                 if (cancelled) return;
                 if (!resp.ok) {
-                    setError(await failureMessage(resp));
+                    const failure = await responseFailure(resp);
+                    if (cancelled) return;
+                    setError(failure);
+                    // A server with no log route will not grow one between polls.
+                    if (failure.kind === "not_offered") return;
                 } else {
                     const data: { entries?: LogEntry[] } = await resp.json();
                     // The query returns newest-first; the view tails like a
@@ -280,7 +299,7 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
                     setError(null);
                 }
             } catch (e) {
-                if (!cancelled) setError(e instanceof Error ? e.message : "Could not load logs.");
+                if (!cancelled) setError(classifyLoadFailure(e instanceof Error ? e : new Error("Could not load logs.")));
             }
             if (!cancelled) timer = setTimeout(poll, POLL_MS);
         };
@@ -313,8 +332,12 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
                     return;
                 }
                 if (!resp.ok) {
-                    setError(await failureMessage(resp));
-                    retryLater();
+                    const failure = await responseFailure(resp);
+                    if (cancelled) return;
+                    setError(failure);
+                    // The admin gate's 501: logs are not served here, and a
+                    // backoff will not change that.
+                    if (failure.kind !== "not_offered") retryLater();
                     return;
                 }
 
@@ -344,7 +367,7 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
                         }
                         if (parsed.dropped) setDropped(n => n + parsed.dropped!);
                     } else if (frame.event === "error") {
-                        setError(frame.data);
+                        setError(classifyLoadFailure(new Error(frame.data)));
                     }
                 }
 
@@ -357,7 +380,7 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
             } catch (e) {
                 if (cancelled || (e instanceof Error && e.name === "AbortError")) return;
                 setTransport("connecting");
-                setError(e instanceof Error ? e.message : "Could not load logs.");
+                setError(classifyLoadFailure(e instanceof Error ? e : new Error("Could not load logs.")));
                 retryLater();
             }
         };

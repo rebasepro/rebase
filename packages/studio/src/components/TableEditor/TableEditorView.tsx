@@ -37,6 +37,8 @@ import { RelationsTab } from "./tabs/RelationsTab";
 import { StatsTab } from "./tabs/StatsTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import { SIGNED_IN_SQL } from "../RLSEditor/policy-presets";
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
 import {
     isInspectorTab,
     notServedReasonKey,
@@ -69,7 +71,8 @@ export function TableEditorView() {
 
     const [tables, setTables] = useState<DbTableInfo[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    /** Why the table listing failed, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
     const [search, setSearch] = useState("");
     const [createOpen, setCreateOpen] = useState(false);
     const [ddlOpen, setDdlOpen] = useState(false);
@@ -96,18 +99,18 @@ export function TableEditorView() {
     /** Reads the tables again; resolves to the list read, or `null` when the read failed. */
     const loadTables = useCallback(async (): Promise<DbTableInfo[] | null> => {
         setLoading(true);
-        setError(null);
+        setFailure(null);
         try {
             const list = parseTablesResponse(await requestJson("/admin/db/tables"));
             setTables(list);
             return list;
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : t("studio_tables_load_failed"));
+            setFailure(classifyLoadFailure(err, { toolLevel: true }));
             return null;
         } finally {
             setLoading(false);
         }
-    }, [requestJson, t]);
+    }, [requestJson]);
 
     useEffect(() => {
         void loadTables();
@@ -213,6 +216,24 @@ export function TableEditorView() {
     const schema = tables[0]?.schema ?? "public";
     const formatter = new Intl.NumberFormat(i18n?.language);
 
+    // Nothing was ever listed: the failure is the whole pane, with no empty
+    // list beside it offering to create a first table on a server that may
+    // not serve the route at all.
+    if (failure && tables.length === 0) {
+        return (
+            <div className="flex h-full w-full overflow-hidden bg-surface-card">
+                <LoadFailureView
+                    className="flex-1"
+                    failure={failure}
+                    title={t("studio_tables_load_failed")}
+                    deniedTitle={t("studio_tables_denied_title")}
+                    deniedHint={t("studio_tables_denied_hint")}
+                    onRetry={() => void loadTables()}
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="flex h-full w-full overflow-hidden bg-surface-card">
             <aside className={cls("w-60 shrink-0 flex flex-col border-r bg-surface-card", defaultBorderMixin)}>
@@ -301,7 +322,7 @@ export function TableEditorView() {
             </aside>
 
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                {error && <div className="p-4"><Alert color="error">{error}</Alert></div>}
+                {failure && <div className="p-4"><Alert color="error">{failure.detail}</Alert></div>}
 
                 {diagramMode ? (
                     <div className="flex-1 min-h-0">

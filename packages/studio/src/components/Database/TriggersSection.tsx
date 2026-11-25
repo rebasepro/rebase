@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
 import {
-    Alert,
     Button,
     cls,
     defaultBorderMixin,
@@ -24,7 +23,7 @@ import {
 import { useTranslation } from "@rebasepro/app";
 import { asBoolean, asString, asStringArray, isRecord } from "../../utils/adminFetch";
 import { sqlDraftLink, tableLink } from "./links";
-import { EmptyState, LoadingRow, SectionHeader } from "./shared";
+import { EmptyState, LoadingRow, SectionHeader, SectionLoadFailure } from "./shared";
 import { matches, useCatalogList } from "./useCatalogList";
 
 interface DbTrigger {
@@ -59,7 +58,7 @@ function parseTrigger(raw: unknown): DbTrigger | null {
 export function TriggersSection() {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const { items, error, reload } = useCatalogList("triggers", "triggers", parseTrigger);
+    const { items, failure, reload } = useCatalogList("triggers", "triggers", parseTrigger);
     const [search, setSearch] = useState("");
     const shown = (items ?? []).filter(trigger => matches(search, trigger.name, trigger.table, trigger.function));
 
@@ -77,8 +76,8 @@ export function TriggersSection() {
                     </Tooltip>
                 </>}
             />
-            {error && <Alert color="error">{error}</Alert>}
-            {items === null ? (error ? null : <LoadingRow/>) : shown.length === 0 ? (
+            {failure && <SectionLoadFailure failure={failure} stale={items !== null} onRetry={() => void reload()}/>}
+            {items === null ? (failure ? null : <LoadingRow/>) : shown.length === 0 ? (
                 <EmptyState icon={<ZapIcon size={iconSize.large}/>} message={t("studio_database_triggers_empty")}/>
             ) : (
                 <div className={cls("overflow-x-auto rounded-lg border", defaultBorderMixin)}>

@@ -186,7 +186,7 @@ export function BackupsView() {
             // empty — which is how a refused listing came to read "No backups
             // found yet" about a database that has backups. Keep the reason on
             // screen instead.
-            setFailure(classifyLoadFailure(e));
+            setFailure(classifyLoadFailure(e, { toolLevel: true }));
         } finally {
             setLoading(false);
         }

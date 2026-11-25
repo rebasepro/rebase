@@ -6,6 +6,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from "util";
 import { ReadableStream as NodeReadableStream } from "stream/web";
 import { FakeResponse } from "./helpers/fakeResponse";
+import type { LoadFailure } from "../src/components/load-failure";
 
 // jsdom ships none of the streaming primitives every browser has had for years.
 // Without these the hook cannot read a response body at all — which is most of
@@ -93,7 +94,7 @@ const allLevels = { level: "all",
 
 interface TailResult {
     logs: { id: string; message: string }[];
-    error: string | null;
+    error: LoadFailure | null;
     transport: string;
     dropped: number;
 }
@@ -245,7 +246,8 @@ total: 0 })]));
 
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
 
-        await waitFor(() => expect(result.current.error).toContain("admin role"));
+        await waitFor(() => expect(result.current.error?.detail).toContain("admin role"));
+        expect(result.current.error?.kind).toBe("denied");
         expect(result.current.transport).not.toBe("live");
     });
 
@@ -263,8 +265,29 @@ total: 0 })]));
 
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
 
-        await waitFor(() => expect(result.current.error).toBe(message));
+        await waitFor(() => expect(result.current.error?.detail).toBe(message));
+        // The server does not serve logs: said as such, not as a fault to retry.
+        expect(result.current.error?.kind).toBe("not_offered");
     });
+
+    it("stops polling a server that serves no log route at all", async () => {
+        // A backend that leaves logs out: no stream, and the query route 404s
+        // too. Polling it every 3 seconds would ask forever for a route that
+        // is not there.
+        const fetchMock = jest.fn<typeof fetch>(async () => new FakeResponse({
+            status: 404,
+            json: { error: { code: "NOT_FOUND", message: "Not found" } }
+        }));
+        global.fetch = fetchMock;
+
+        const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
+
+        await waitFor(() => expect(result.current.error?.kind).toBe("not_offered"));
+        expect(result.current.error?.detail).toBe("Not found");
+        const calls = fetchMock.mock.calls.length;
+        await new Promise(resolve => setTimeout(resolve, 3500));
+        expect(fetchMock.mock.calls.length).toBe(calls);
+    }, 10_000);
 
     it("carries the auth token — the stream is admin-only", async () => {
         const fetchMock = jest.fn<typeof fetch>(async () => sseResponse([frame("snapshot", { entries: [],
@@ -372,7 +395,7 @@ describe("useLogTail over a live connection", () => {
         await waitFor(() => expect(result.current.transport).toBe("live"));
 
         stream.push("event: error\ndata: the tail broke\n\n");
-        await waitFor(() => expect(result.current.error).toBe("the tail broke"));
+        await waitFor(() => expect(result.current.error?.detail).toBe("the tail broke"));
     });
 
     it("reconnects when the server closes the stream", async () => {

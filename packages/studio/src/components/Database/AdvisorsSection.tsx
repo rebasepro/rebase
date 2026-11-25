@@ -22,7 +22,8 @@ import { useTranslation } from "@rebasepro/app";
 import { asString, asStringArray, isRecord, useAdminFetch } from "../../utils/adminFetch";
 import { useSourcePath } from "./source";
 import { sqlDraftLink, tableLink } from "./links";
-import { EmptyState, LoadingRow, SectionHeader, SqlBlock } from "./shared";
+import { EmptyState, LoadingRow, SectionHeader, SectionLoadFailure, SqlBlock } from "./shared";
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 
 export type AdvisorSeverity = "critical" | "high" | "medium" | "low" | "info";
 
@@ -78,14 +79,15 @@ export function AdvisorsSection({ onCount }: { onCount?: (count: number) => void
     const [findings, setFindings] = useState<AdvisorFinding[] | null>(null);
     const [errors, setErrors] = useState<{ category: string; message: string }[]>([]);
     const [degraded, setDegraded] = useState<string[]>([]);
-    const [error, setError] = useState<string | null>(null);
+    /** Why the advisors could not be read, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<CategoryFilter>("all");
     const [open, setOpen] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
-        setError(null);
+        setFailure(null);
         try {
             const raw = await requestJson(sourcePath("/admin/db/insights/advisors"));
             const list = isRecord(raw) && Array.isArray(raw.findings) ? raw.findings : [];
@@ -97,11 +99,11 @@ export function AdvisorsSection({ onCount }: { onCount?: (count: number) => void
                 : []);
             setDegraded(isRecord(raw) ? asStringArray(raw.degraded) : []);
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : t("studio_database_load_failed"));
+            setFailure(classifyLoadFailure(err, { toolLevel: true }));
         } finally {
             setLoading(false);
         }
-    }, [requestJson, sourcePath, onCount, t]);
+    }, [requestJson, sourcePath, onCount]);
 
     useEffect(() => { void load(); }, [load]);
 
@@ -111,6 +113,8 @@ export function AdvisorsSection({ onCount }: { onCount?: (count: number) => void
         performance: findings?.filter(finding => finding.category === "performance").length ?? 0
     }), [findings]);
     const shown = (findings ?? []).filter(finding => filter === "all" || finding.category === filter);
+    /** Nothing was ever read: no tabs counting zero, and no "nothing needs attention" over a failure. */
+    const unread = failure !== null && findings === null;
 
     return (
         <div className="flex flex-col gap-4">
@@ -125,13 +129,13 @@ export function AdvisorsSection({ onCount }: { onCount?: (count: number) => void
                     </Tooltip>
                 }
             />
-            <Tabs value={filter} onValueChange={(value) => setFilter(value === "security" || value === "performance" ? value : "all")} variant="pill">
+            {!unread && <Tabs value={filter} onValueChange={(value) => setFilter(value === "security" || value === "performance" ? value : "all")} variant="pill">
                 <Tab value="all">{t("studio_database_advisors_all", { count: counts.all })}</Tab>
                 <Tab value="security">{t("studio_database_advisors_security", { count: counts.security })}</Tab>
                 <Tab value="performance">{t("studio_database_advisors_performance", { count: counts.performance })}</Tab>
-            </Tabs>
+            </Tabs>}
 
-            {error && <Alert color="error">{error}</Alert>}
+            {failure && <SectionLoadFailure failure={failure} stale={findings !== null} onRetry={() => void load()}/>}
             {errors.map(entry => (
                 <Alert key={entry.category} color="warning">
                     {t(entry.category === "security" ? "studio_database_advisors_security_failed" : "studio_database_advisors_performance_failed", { message: entry.message })}
@@ -141,7 +145,7 @@ export function AdvisorsSection({ onCount }: { onCount?: (count: number) => void
                 <Alert color="info">{t("studio_database_advisors_degraded", { what: degraded.join(", ") })}</Alert>
             )}
 
-            {loading && findings === null ? <LoadingRow/> : shown.length === 0 ? (
+            {unread ? null : loading && findings === null ? <LoadingRow/> : shown.length === 0 ? (
                 <EmptyState
                     icon={<CheckCircle2Icon size={iconSize.large}/>}
                     message={t("studio_database_advisors_empty")}

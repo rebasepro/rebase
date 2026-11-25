@@ -1500,6 +1500,8 @@ export interface RebaseTranslations {
     studio_database_engine_pglite?: string;
     studio_database_refresh_aria?: string;
     studio_database_load_failed?: string;
+    studio_database_denied_title?: string;
+    studio_database_denied_hint?: string;
     studio_database_action_failed?: string;
     studio_database_search?: string;
     studio_database_open_in_sql?: string;
@@ -1621,6 +1623,8 @@ export interface RebaseTranslations {
     studio_tool_webhooks_description?: string;
     studio_tool_users?: string;
     studio_tool_users_description?: string;
+    studio_tool_not_offered_title?: string;
+    studio_tool_not_offered_hint?: string;
     studio_enabled?: string;
     studio_save_changes?: string;
     studio_columns?: string;
@@ -1632,6 +1636,8 @@ export interface RebaseTranslations {
     studio_tables_preset_owner?: string;
     studio_tables_preset_admin_only?: string;
     studio_tables_load_failed?: string;
+    studio_tables_denied_title?: string;
+    studio_tables_denied_hint?: string;
     studio_tables_rows_load_failed?: string;
     studio_tables_not_served_rls_off?: string;
     studio_tables_not_served_not_exposed?: string;
@@ -1930,6 +1936,8 @@ export interface RebaseTranslations {
     studio_users_assignable_label?: string;
     studio_users_save_role?: string;
     studio_webhooks_load_failed?: string;
+    studio_webhooks_denied_title?: string;
+    studio_webhooks_denied_hint?: string;
     studio_webhooks_headers_not_object?: string;
     studio_webhooks_headers_invalid_json?: string;
     studio_webhooks_updated?: string;
@@ -2328,6 +2336,9 @@ export interface RebaseTranslations {
     studio_logs_entry_count?: string;
     studio_logs_dropped_one?: string;
     studio_logs_dropped?: string;
+    studio_logs_read_failed?: string;
+    studio_logs_denied_title?: string;
+    studio_logs_denied_hint?: string;
     studio_logs_empty?: string;
     studio_logs_new_entries_one?: string;
     studio_logs_new_entries?: string;

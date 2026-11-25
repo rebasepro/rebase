@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useTranslation } from "@rebasepro/app";
 import { isRecord, useAdminFetch } from "../../utils/adminFetch";
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 import { useSourcePath } from "./source";
 
 /**
@@ -8,26 +8,26 @@ import { useSourcePath } from "./source";
  * response, each parsed by `parse` (rows it cannot read are dropped).
  */
 export function useCatalogList<T>(path: string, key: string, parse: (raw: unknown) => T | null) {
-    const { t } = useTranslation();
     const { requestJson } = useAdminFetch();
     const sourcePath = useSourcePath();
     const [items, setItems] = useState<T[] | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    /** Why the listing failed, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
 
     const load = useCallback(async () => {
-        setError(null);
+        setFailure(null);
         try {
             const raw = await requestJson(sourcePath(`/admin/db/catalog/${path}`));
             const list = isRecord(raw) && Array.isArray(raw[key]) ? raw[key] : [];
             setItems(list.map(parse).filter((item): item is T => item !== null));
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : t("studio_database_load_failed"));
+            setFailure(classifyLoadFailure(err, { toolLevel: true }));
         }
-    }, [requestJson, sourcePath, path, key, parse, t]);
+    }, [requestJson, sourcePath, path, key, parse]);
 
     useEffect(() => { void load(); }, [load]);
 
-    return { items, error, reload: load, requestJson, sourcePath };
+    return { items, failure, reload: load, requestJson, sourcePath };
 }
 
 /** Whether `needle` occurs in any of `fields`, ignoring case. */

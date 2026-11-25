@@ -16,6 +16,12 @@ import { EndpointDetail } from "./EndpointDetail";
 import { TryItPanel } from "./TryItPanel";
 import type { OpenApiSpec, ParsedEndpoint } from "./types";
 import { parseOpenApiSpec } from "./parseSpec";
+import { AdminRequestError } from "../../utils/adminFetch";
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
+
+/** A response that parsed, but not into a specification: there is no server text to show. */
+const UNREADABLE_SPEC: LoadFailure = { kind: "unavailable", detail: "", retryable: true };
 
 /**
  * Custom-built API Explorer for Rebase Studio.
@@ -31,7 +37,10 @@ export function ApiExplorer() {
 
     const [spec, setSpec] = useState<OpenApiSpec | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    /** Why the spec could not be read, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
+    /** The status of a refused spec request: a 401 is a session to renew, not a broken spec. */
+    const [failedStatus, setFailedStatus] = useState<number | null>(null);
 
     const [selectedEndpoint, setSelectedEndpoint] = useState<ParsedEndpoint | null>(null);
     const [sidebarFilter, setSidebarFilter] = useState("");
@@ -52,7 +61,7 @@ export function ApiExplorer() {
                 const getAuthToken = apiConfig?.getAuthToken ?? authController.getAuthToken;
                 const token = getAuthToken ? await getAuthToken() : null;
                 const res = await fetch(specUrl, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
-                if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+                if (!res.ok) throw new AdminRequestError(`${res.status} ${res.statusText}`.trim(), res.status);
                 const data = await res.json();
                 if (!cancelled) {
                     setSpec(data);
@@ -60,7 +69,8 @@ export function ApiExplorer() {
                 }
             } catch (err: unknown) {
                 if (!cancelled) {
-                    setError(err instanceof Error ? err.message : "Failed to load API spec");
+                    setFailure(classifyLoadFailure(err, { toolLevel: true }));
+                    setFailedStatus(err instanceof AdminRequestError ? err.status : null);
                     setLoading(false);
                 }
             }
@@ -126,44 +136,22 @@ allEndpoints: [] };
         );
     }
 
-    if (error || !spec) {
-        // The API spec fetch rejects with whatever the transport says, and for
-        // an expired console session that is the string "401". Rendering it
-        // verbatim produced the worst screen in the console: a red box
-        // containing three digits, no title, no cause, no way out — on the same
-        // product whose storage browser writes four sentences explaining which
-        // authorization hook refused a listing.
-        //
-        // The raw text is kept, below the sentence, because it is what someone
-        // pastes into a bug report. It is just no longer the whole message.
-        const status = (error ?? "").trim();
-        const isAuth = /^(401|403)\b/.test(status) || /unauthori[sz]ed|forbidden/i.test(status);
+    if (failure || !spec) {
+        // The transport's own words ("401 Unauthorized") stay under the
+        // sentence, because they are what someone pastes into a bug report.
+        // They are just no longer the whole message.
+        const sessionRefused = failedStatus === 401;
         return (
-            <div className="flex items-center justify-center h-full w-full p-8">
-                <div className="max-w-md text-center">
-                    <Typography variant="subtitle2" className="block text-text-primary dark:text-text-primary-dark">
-                        {isAuth ? t("studio_api_explorer_spec_refused_title") : t("studio_api_explorer_spec_failed_title")}
-                    </Typography>
-                    <Typography variant="body2" className="block mt-2 text-text-secondary dark:text-text-secondary-dark">
-                        {isAuth
-                            ? t("studio_api_explorer_spec_refused_body")
-                            : t("studio_api_explorer_spec_failed_body")}
-                    </Typography>
-                    <Button
-                        variant="outlined"
-                        color="neutral"
-                        size="small"
-                        className="mt-4"
-                        onClick={() => window.location.reload()}
-                    >
-                        {t("retry")}
-                    </Button>
-                    {status && (
-                        <Typography variant="caption" className="block mt-4 font-mono text-text-disabled dark:text-text-disabled-dark">
-                            {status}
-                        </Typography>
-                    )}
-                </div>
+            <div className="flex h-full w-full">
+                <LoadFailureView
+                    className="flex-1"
+                    failure={failure ?? UNREADABLE_SPEC}
+                    title={sessionRefused ? t("studio_api_explorer_spec_refused_title") : t("studio_api_explorer_spec_failed_title")}
+                    hint={sessionRefused ? t("studio_api_explorer_spec_refused_body") : t("studio_api_explorer_spec_failed_body")}
+                    deniedTitle={t("studio_api_explorer_spec_refused_title")}
+                    deniedHint={t("studio_api_explorer_spec_refused_body")}
+                    onRetry={() => window.location.reload()}
+                />
             </div>
         );
     }

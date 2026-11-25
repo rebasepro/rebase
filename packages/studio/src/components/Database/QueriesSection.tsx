@@ -25,7 +25,8 @@ import { asBoolean, asNumber, asString, isRecord, useAdminFetch } from "../../ut
 import { useSourcePath } from "./source";
 import { sqlDraftLink } from "./links";
 import { formatCount, formatDuration } from "./format";
-import { EmptyState, LoadingRow, SectionHeader, statementsOf, useConfirmSql } from "./shared";
+import { EmptyState, LoadingRow, SectionHeader, SectionLoadFailure, statementsOf, useConfirmSql } from "./shared";
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 
 export type QueryStatsStatus = "ok" | "not_installed" | "not_preloaded" | "unavailable";
 type QuerySort = "total" | "mean" | "calls";
@@ -54,14 +55,15 @@ export function QueriesSection() {
     const [status, setStatus] = useState<QueryStatsStatus | null>(null);
     const [available, setAvailable] = useState(false);
     const [queries, setQueries] = useState<QueryStat[]>([]);
-    const [error, setError] = useState<string | null>(null);
+    /** Why the statistics could not be read, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
     const [loading, setLoading] = useState(true);
     const [installing, setInstalling] = useState(false);
     const [confirmDialog, confirm] = useConfirmSql();
 
     const load = useCallback(async () => {
         setLoading(true);
-        setError(null);
+        setFailure(null);
         try {
             const raw = await requestJson(sourcePath(`/admin/db/insights/queries?sort=${sort}`));
             if (!isRecord(raw)) throw new Error(t("studio_database_load_failed"));
@@ -77,7 +79,7 @@ export function QueriesSection() {
                 rows: asNumber(row.rows)
             })) : []);
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : t("studio_database_load_failed"));
+            setFailure(classifyLoadFailure(err, { toolLevel: true }));
         } finally {
             setLoading(false);
         }
@@ -138,7 +140,7 @@ export function QueriesSection() {
                 </>}
             />
 
-            {error && <Alert color="error">{error}</Alert>}
+            {failure && <SectionLoadFailure failure={failure} stale={status !== null} onRetry={() => void load()}/>}
             {status === "unavailable" && <Alert color="info">{t("studio_database_queries_unavailable")}</Alert>}
             {status === "not_preloaded" && <Alert color="warning">{t("studio_database_queries_not_preloaded")}</Alert>}
             {status === "not_installed" && (

@@ -24,7 +24,7 @@ import {
 } from "@rebasepro/ui";
 import { useSnackbarController, useTranslation } from "@rebasepro/app";
 import { asBoolean, asNullableString, asString, asStringArray, isRecord } from "../../utils/adminFetch";
-import { EmptyState, LoadingRow, SectionHeader, SqlBlock, statementsOf } from "./shared";
+import { EmptyState, LoadingRow, SectionHeader, SectionLoadFailure, SqlBlock, statementsOf } from "./shared";
 import { matches, useCatalogList } from "./useCatalogList";
 
 interface DbType {
@@ -60,7 +60,7 @@ const AT_END = "__end__";
 export function TypesSection() {
     const { t } = useTranslation();
     const snackbar = useSnackbarController();
-    const { items, error, reload, requestJson, sourcePath } = useCatalogList("types", "types", parseType);
+    const { items, failure, reload, requestJson, sourcePath } = useCatalogList("types", "types", parseType);
     const [search, setSearch] = useState("");
     const [adding, setAdding] = useState<DbType | null>(null);
     const [value, setValue] = useState("");
@@ -119,8 +119,8 @@ export function TypesSection() {
                     </Tooltip>
                 </>}
             />
-            {error && <Alert color="error">{error}</Alert>}
-            {items === null ? (error ? null : <LoadingRow/>) : shown.length === 0 ? (
+            {failure && <SectionLoadFailure failure={failure} stale={items !== null} onRetry={() => void reload()}/>}
+            {items === null ? (failure ? null : <LoadingRow/>) : shown.length === 0 ? (
                 <EmptyState icon={<ShapesIcon size={iconSize.large}/>} message={t("studio_database_types_empty")}/>
             ) : (
                 <div className={cls("rounded-lg border divide-y divide-hairline overflow-hidden", defaultBorderMixin)}>
