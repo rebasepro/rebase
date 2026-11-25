@@ -139,9 +139,11 @@ describe("WebSocket Server scopes from an auth adapter", () => {
         const executeSql = jest.fn(async () => [{ n: 1 }]);
         const base = fakeDataDriver();
         base.fetchCollection.mockResolvedValue([]);
-        base.save.mockResolvedValue({ id: "1", path: "projects", values: {} } as never);
-        const driver = { ...base, admin: { executeSql } } as SocketDataDriver;
-        driver.withAuth = async () => driver;
+        const driver: SocketDataDriver = {
+            ...base,
+            admin: { executeSql },
+            withAuth: async () => driver
+        };
         createPostgresWebSocket({} as Server, fakeSocketRealtime(), driver, { requireAuth: true },
             fakeAuthAdapter({ verifyToken: async () => adapterUser }));
         return { executeSql, save: base.save };
