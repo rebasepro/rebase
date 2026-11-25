@@ -686,37 +686,46 @@ function FilterBar({ columns, filters, onChange }: {
                     </Button>
                 }
             >
-                <div className="p-3 flex flex-col gap-2 w-72">
-                    <Select size="small" label={t("studio_branch_diff_object_column")} value={column} onValueChange={(next) => setColumn(String(next))}>
+                <div className="p-3 flex flex-col gap-3 w-80">
+                    <Select size="small" fullWidth label={t("studio_branch_diff_object_column")} value={column}
+                        onValueChange={(next) => setColumn(String(next))}>
                         {columns.map(candidate => (
-                            <SelectItem key={candidate.name} value={candidate.name}>{candidate.name}</SelectItem>
+                            <SelectItem key={candidate.name} value={candidate.name}>
+                                <span className="font-mono">{candidate.name}</span>
+                            </SelectItem>
                         ))}
                     </Select>
-                    <Select size="small" label={t("studio_tables_filter_operator")} value={op}
-                        onValueChange={(next) => {
-                            const found = ROW_FILTER_OPERATORS.find(candidate => candidate === next);
-                            if (found) setOp(found);
-                        }}>
-                        {ROW_FILTER_OPERATORS.map(candidate => (
-                            <SelectItem key={candidate} value={candidate}>{OPERATOR_LABEL[candidate]}</SelectItem>
-                        ))}
-                    </Select>
-                    {needsValue && (
-                        <TextField
-                            size="small"
-                            label={op === "in" ? t("studio_tables_filter_values") : t("studio_tables_filter_value")}
-                            value={value}
-                            onChange={(event) => setValue(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                    event.preventDefault();
-                                    add();
-                                }
-                            }}
-                        />
-                    )}
+                    {/* Operator beside the value, as the CMS filter lays them out: one reads "= 42", not two stacked fields. */}
+                    <div className="flex gap-2">
+                        <div className={needsValue ? "w-32 shrink-0" : "w-full"}>
+                            <Select size="small" fullWidth label={t("studio_tables_filter_operator")} value={op}
+                                onValueChange={(next) => {
+                                    const found = ROW_FILTER_OPERATORS.find(candidate => candidate === next);
+                                    if (found) setOp(found);
+                                }}>
+                                {ROW_FILTER_OPERATORS.map(candidate => (
+                                    <SelectItem key={candidate} value={candidate}>{OPERATOR_LABEL[candidate]}</SelectItem>
+                                ))}
+                            </Select>
+                        </div>
+                        {needsValue && (
+                            <TextField
+                                size="small"
+                                className="grow min-w-0"
+                                label={op === "in" ? t("studio_tables_filter_values") : t("studio_tables_filter_value")}
+                                value={value}
+                                onChange={(event) => setValue(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                        event.preventDefault();
+                                        add();
+                                    }
+                                }}
+                            />
+                        )}
+                    </div>
                     <div className="flex justify-end">
-                        <Button size="small" variant="outlined" onClick={add} disabled={!column || (needsValue && value === "")}>
+                        <Button size="small" onClick={add} disabled={!column || (needsValue && value === "")}>
                             {t("studio_tables_apply_filter")}
                         </Button>
                     </div>
