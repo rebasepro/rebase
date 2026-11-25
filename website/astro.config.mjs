@@ -236,6 +236,7 @@ export default defineConfig({
                         { label: "Push notifications", slug: "docs/backend/push-notifications" },
                         { label: "Custom Functions", slug: "docs/backend/custom-functions" },
                         { label: "Background Work", slug: "docs/backend/background-work" },
+                        { label: "Logging", slug: "docs/backend/logging" },
                         { label: "Rate limits in functions", slug: "docs/backend/function-rate-limits" },
                         { label: "SQL functions (RPC)", slug: "docs/backend/rpc" },
                         { label: "Runtime portability", slug: "docs/backend/runtime-portability" },

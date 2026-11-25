@@ -12,7 +12,8 @@
  * app.use("/*", requestLogger());
  * ```
  */
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
+import { routePath } from "hono/route";
 import type { HonoEnv } from "../api/types";
 import { logger as log } from "./logger";
 import { hostEnv } from "./host";
@@ -29,6 +30,20 @@ export interface RequestLoggerOptions {
 
 /** The latency from which a successful development request is worth a line. */
 const DEFAULT_SLOW_REQUEST_MS = 1000;
+
+/**
+ * The pattern of the handler that answered, or undefined when that was a
+ * catch-all (`/api/*`) or the request was re-dispatched into a router whose
+ * match this context does not hold.
+ */
+export function matchedRoute(c: Context<HonoEnv>): string | undefined {
+    try {
+        const route = routePath(c);
+        return route && !route.endsWith("*") ? route : undefined;
+    } catch {
+        return undefined;
+    }
+}
 
 export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler<HonoEnv> {
     const skipPaths = new Set(options?.skip ?? ["/health", "/favicon.ico"]);
@@ -56,11 +71,22 @@ export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler
         const contentLength = c.res.headers.get("content-length");
 
         const data: Record<string, unknown> = {
+            component: "http",
             method,
             path,
             status,
             latencyMs
         };
+
+        // The route template the request matched (`/api/data/:table/:id`), so
+        // lines can be counted by endpoint: `path` carries ids and is unique
+        // per row. Read after `next()`, when the last handler that ran is the
+        // one that answered; a catch-all middleware pattern says nothing and is
+        // left out.
+        const route = matchedRoute(c);
+        if (route) {
+            data.route = route;
+        }
 
         // Include request correlation ID if available
         const reqId = c.get("requestId");

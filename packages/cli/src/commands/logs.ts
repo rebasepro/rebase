@@ -30,6 +30,7 @@ import {
     stringOf
 } from "../utils/project-command";
 import { note } from "./cloud/context";
+import { clockTime, formatFields, requestHead } from "./cloud/runtime-logs";
 
 export const LOGS_FLAGS = {
     ...PROJECT_TARGET_FLAGS,
@@ -41,25 +42,57 @@ export const LOGS_FLAGS = {
     "--grep": "--search",
     "--since": String,
     "--limit": Number,
-    "-n": "--limit"
+    "-n": "--limit",
+    "--raw": Boolean
 } satisfies arg.Spec;
 
 const LEVELS = new Set(["debug", "info", "warn", "error"]);
 const SOURCES = new Set(["api", "auth", "storage", "realtime", "system"]);
 
-/** One line of the log, coloured by level. */
+/**
+ * One entry of the buffer as a person reads it, the way `rebase cloud logs
+ * --runtime` prints a record: `HH:MM:SS.mmm LEVEL  [source] message  key=value …`,
+ * coloured by level, with the metadata of every level on the same line. A
+ * request's message already says `GET /path 404 16ms`, so the fields it was
+ * built from are not repeated.
+ */
+export function renderBufferEntry(entry: Record<string, unknown>, now: Date = new Date()): string {
+    const level = stringOf(entry.level) ?? "info";
+    const paint = level === "error" ? chalk.red : level === "warn" ? chalk.yellow : level === "debug" ? chalk.gray : (s: string) => s;
+    const stamp = stringOf(entry.timestamp);
+    const time = (stamp !== undefined ? clockTime(stamp, now) : null) ?? stamp ?? "";
+    const source = stringOf(entry.source);
+    const message = stringOf(entry.message) ?? "";
+    const metadata = isRecord(entry.metadata) ? entry.metadata : {};
+    const skip: string[] = [];
+    const request = requestHead({ message, fields: metadata });
+    if (request && message.startsWith(request.head)) {
+        skip.push(...request.used);
+        // `… — CODE: message` is the failure, already in the message.
+        if (typeof metadata.errorCode === "string" && message.includes(metadata.errorCode)) skip.push("errorCode");
+        if (typeof metadata.errorMessage === "string" && message.includes(metadata.errorMessage)) skip.push("errorMessage");
+    }
+    if (metadata.component === source) skip.push("component");
+    const fields = formatFields(metadata, skip);
+    const head = [
+        time ? chalk.gray(time) : null,
+        `${paint(level.toUpperCase().padEnd(5))} `,
+        source ? chalk.cyan(`[${source}]`) : null,
+        paint(message)
+    ].filter((p): p is string => p !== null).join(" ");
+    return fields ? `${head}  ${chalk.gray(fields)}` : head;
+}
+
+/** One line of the log: the entry as JSON under --json, else read. */
+/** `--raw`: each entry as the buffer holds it, one JSON object per line, not the readable rendering. Set per run. */
+let rawEntries = false;
+
 function printEntry(entry: Record<string, unknown>): void {
-    if (isJsonMode()) {
+    if (isJsonMode() || rawEntries) {
         process.stdout.write(`${JSON.stringify(entry)}\n`);
         return;
     }
-    const level = stringOf(entry.level) ?? "info";
-    const paint = level === "error" ? chalk.red : level === "warn" ? chalk.yellow : level === "debug" ? chalk.gray : (s: string) => s;
-    const time = stringOf(entry.timestamp)?.replace("T", " ").replace(/\.\d+Z$/, "Z") ?? "";
-    console.log(`${chalk.gray(time)} ${paint(level.padEnd(5))} ${chalk.cyan((stringOf(entry.source) ?? "").padEnd(8))} ${paint(stringOf(entry.message) ?? "")}`);
-    if (isRecord(entry.metadata) && Object.keys(entry.metadata).length > 0 && level !== "info") {
-        console.log(chalk.gray(`    ${JSON.stringify(entry.metadata)}`));
-    }
+    console.log(renderBufferEntry(entry));
 }
 
 export async function logsCommand(rawArgs: string[]): Promise<void> {
@@ -91,6 +124,7 @@ export async function logsCommand(rawArgs: string[]): Promise<void> {
         return;
     }
 
+    rawEntries = flags["--raw"] === true;
     const target = await projectTarget(flags, { command: "logs" });
     const filter = { level: flags["--level"], source: flags["--source"], search: flags["--search"] };
 
@@ -185,6 +219,7 @@ async function cloudRuntimeLogs(flags: Record<string, unknown>): Promise<void> {
     if (typeof flags["--search"] === "string") argv.push("--grep", flags["--search"]);
     if (typeof flags["--level"] === "string") argv.push("--level", flags["--level"]);
     if (flags["--json"] === true) argv.push("--json");
+    if (flags["--raw"] === true) argv.push("--raw");
     if (typeof flags["--source"] === "string") {
         process.stderr.write(chalk.yellow("  ⚠ --source filters one server's own log buffer; the pods' output has no sources, so it is ignored.\n"));
     }
@@ -207,7 +242,8 @@ function printLogsHelp(): void {
                     ["--source <source>", "api, auth, storage, realtime or system"],
                     ["--search, --grep <text>", "Only entries whose message holds this"],
                     ["--since <iso>", "Only entries after this time"],
-                    ["--limit, -n <n>", "At most this many entries"]
+                    ["--limit, -n <n>", "At most this many entries"],
+                    ["--raw", "Each entry as stored (one JSON object per line), not the readable line; with --project, the pods' original lines"]
                 ]
             }
         ],

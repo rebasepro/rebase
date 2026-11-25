@@ -7,10 +7,16 @@
  * printing each line exactly once while pods restart, roll and drop off the
  * network.
  */
+import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it, vi } from "vitest";
 import {
     FollowCursor,
     backoffMs,
+    clockTime,
+    formatFieldValue,
+    parseStructured,
+    podShortName,
+    renderLine,
     filterThenTail,
     followRuntimeLogs,
     grepMatcher,
@@ -109,6 +115,90 @@ describe("--grep and --level", () => {
         const keep = recordFilter({ level: "error", grep: "db" });
         expect(keep(rec('{"severity":"ERROR","message":"db down"}'))).toBe(true);
         expect(keep(rec('{"severity":"ERROR","message":"cache down"}'))).toBe(false);
+    });
+});
+
+describe("renderLine: a structured record as a person reads it", () => {
+    // Local time is printed; the fixtures are built from local time so the
+    // suite passes in any zone.
+    const at = (h: number, m: number, sec: number, ms: number): string => new Date(2026, 10, 24, h, m, sec, ms).toISOString();
+    const now = new Date(2026, 10, 24, 18, 0, 0);
+    const kubelet = "2026-11-24T14:30:32.999999999Z";
+    const rec = (text: string, pod = "rebase-backend-7d9f8c6b5-x2k4p"): LogRecord => parseRecords(line(kubelet, pod, text))[0];
+    const plain = (r: LogRecord, opts: Parameters<typeof renderLine>[1] = {}): string =>
+        stripVTControlCharacters(renderLine(r, { now, ...opts }));
+
+    it("prints the record's own time, its level, component, message and fields", () => {
+        const text = JSON.stringify({ severity: "WARNING", message: "pool nearly exhausted", timestamp: at(14, 30, 32, 126), component: "db", used: 9, max: 10, note: "two words" });
+        expect(plain(rec(text))).toBe('14:30:32.126 WARN   [db] pool nearly exhausted  used=9 max=10 note="two words"');
+    });
+
+    it("prints a request line as method, path, status and latency, then what else it carries", () => {
+        const text = JSON.stringify({
+            severity: "WARNING", message: "request", timestamp: at(9, 1, 2, 3), component: "http",
+            method: "GET", path: "/api/data/rooms/abc", route: "/api/data/:table/:id", status: 404, latencyMs: 16,
+            requestId: "req-1", uid: null, errorCode: "NOT_FOUND", errorMessage: "Room abc was not found"
+        });
+        expect(plain(rec(text))).toBe(
+            '09:01:02.003 WARN   [http] GET /api/data/rooms/abc 404 16ms  route=/api/data/:table/:id requestId=req-1 uid=null errorCode=NOT_FOUND errorMessage="Room abc was not found"'
+        );
+        // A route that is the path says nothing more.
+        const same = JSON.stringify({ severity: "INFO", message: "request", timestamp: at(9, 1, 2, 3), method: "GET", path: "/health", route: "/health", status: 200, latencyMs: 1 });
+        expect(plain(rec(same))).toBe("09:01:02.003 INFO   GET /health 200 1ms");
+    });
+
+    it("names the pod by its short name only when the read spans several", () => {
+        const text = JSON.stringify({ severity: "INFO", message: "ready", timestamp: at(1, 2, 3, 4) });
+        expect(plain(rec(text), { showPod: true })).toBe("01:02:03.004 x2k4p INFO   ready");
+        expect(plain(rec(text))).toBe("01:02:03.004 INFO   ready");
+        expect(podShortName("rebase-backend-7d9f8c6b5-x2k4p")).toBe("x2k4p");
+        expect(podShortName("rebase-app-p1")).toBe("p1");
+        expect(podShortName("single")).toBe("single");
+    });
+
+    it("falls back to the kubelet's time, and dates a line from another day", () => {
+        const noTime = JSON.stringify({ severity: "ERROR", message: "boom" });
+        const kubeletLocal = new Date(Date.parse(kubelet));
+        expect(plain(rec(noTime), { now: kubeletLocal })).toMatch(/^\d\d:\d\d:\d\d\.999 ERROR {2}boom$/);
+        expect(clockTime(at(23, 59, 59, 1), new Date(2026, 10, 25, 1, 0, 0))).toBe("2026-11-24 23:59:59.001");
+        expect(clockTime("not a time")).toBeNull();
+    });
+
+    it("puts a stack trace on the lines below, not inside the line", () => {
+        const text = JSON.stringify({
+            severity: "ERROR", message: "Request failed", timestamp: at(1, 0, 0, 0), component: "http",
+            error: { name: "TypeError", message: "x is undefined", stack: "TypeError: x is undefined\n    at f (a.ts:1:2)" }
+        });
+        expect(plain(rec(text)).split("\n")).toEqual([
+            '01:00:00.000 ERROR  [http] Request failed  error={"name":"TypeError","message":"x is undefined"}',
+            "    TypeError: x is undefined",
+            "    at f (a.ts:1:2)"
+        ]);
+    });
+
+    it("colours by level and leaves a plain-text line exactly as it came", () => {
+        const plainText = rec("Server listening on 3000");
+        expect(stripVTControlCharacters(renderLine(plainText))).toBe(plainText.raw);
+        const notAnObject = rec("[1,2,3]");
+        expect(stripVTControlCharacters(renderLine(notAnObject))).toBe(notAnObject.raw);
+    });
+
+    it("quotes a value only when it has to", () => {
+        expect(formatFieldValue("abc-1")).toBe("abc-1");
+        expect(formatFieldValue("a b")).toBe('"a b"');
+        expect(formatFieldValue("")).toBe('""');
+        expect(formatFieldValue('say "hi"')).toBe('"say \\"hi\\""');
+        expect(formatFieldValue("k=v")).toBe('"k=v"');
+        expect(formatFieldValue(3)).toBe("3");
+        expect(formatFieldValue(false)).toBe("false");
+        expect(formatFieldValue({ a: [1] })).toBe('{"a":[1]}');
+    });
+
+    it("parses the severity spellings the level rules know, keeping the word as written", () => {
+        expect(parseStructured('{"severity":"WARNING","message":"m"}')).toMatchObject({ level: "warn", severity: "WARNING" });
+        expect(parseStructured('{"level":50,"msg":"m"}')).toMatchObject({ level: "error", severity: "50", message: "m" });
+        expect(parseStructured('{"message":"m"}')).toMatchObject({ level: "unknown", severity: null });
+        expect(parseStructured("plain")).toBeNull();
     });
 });
 

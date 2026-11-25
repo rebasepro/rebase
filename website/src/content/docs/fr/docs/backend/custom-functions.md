@@ -1,5 +1,5 @@
 ---
-sourceHash: adb0c8f318e1c09a
+sourceHash: 9240cd2dc83f4b7b
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Détectés automatiquement à partir d'un répertoire, avec un accès complet à l'instance backend.
@@ -552,10 +552,10 @@ declare function notifyFulfilment(url: string, session: Record<string, string>):
 
 ## Débogage
 
-Lorsque les fonctions se chargent, le démarrage consigne `Loaded custom functions` avec leur nombre. La ligne propre à chaque fonction est enregistrée au niveau `debug` (`LOG_LEVEL=debug`) :
+Journalisez depuis une fonction avec `logger` de `@rebasepro/server/functions`, pas avec `console.log` : voir [Logging](/docs/backend/logging/). Lorsque les fonctions se chargent, le démarrage consigne `Loaded custom functions` avec leur nombre. La ligne propre à chaque fonction est enregistrée au niveau `debug` (`LOG_LEVEL=debug`) :
 
 ```
-⚡ Loaded function route: hello
+Loaded function route: hello
 ```
 
 Si le chargement échoue, le chargeur fournit un résultat de diagnostic :

@@ -345,8 +345,11 @@ schedule: "30 2 * * 1" })]);
                 expect(store.logs[0].logs).toHaveLength(501);
                 expect(scheduler.getJobLogs("chatty")[0].logs).toHaveLength(501);
                 // Every line still reaches the server log.
-                expect(info.mock.calls.filter(([, meta]) => (meta as { cron?: string } | undefined)?.cron === "chatty"))
-                    .toHaveLength(10_000);
+                // (The run's own completion line carries `outcome`; it is not one of them.)
+                expect(info.mock.calls.filter(([, meta]) => {
+                    const m = meta as { cron?: string; outcome?: string } | undefined;
+                    return m?.cron === "chatty" && m.outcome === undefined;
+                })).toHaveLength(10_000);
             });
 
             it("stops at 64 KB when the lines are long", async () => {
@@ -454,11 +457,13 @@ schedule: "30 2 * * 1" })]);
                 }
             });
 
-            /** The JSON lines a job's `ctx.log` wrote, in order. */
-            const linesOf = (jobId: string): Array<Record<string, unknown>> => stdout
+            const allLines = (): Array<Record<string, unknown>> => stdout
                 .flatMap((chunk) => chunk.split("\n").filter(Boolean))
-                .map((line) => JSON.parse(line) as Record<string, unknown>)
-                .filter((entry) => entry.cron === jobId);
+                .map((line) => JSON.parse(line) as Record<string, unknown>);
+
+            /** The JSON lines a job's `ctx.log` wrote, in order (not the run's completion line). */
+            const linesOf = (jobId: string): Array<Record<string, unknown>> => allLines()
+                .filter((entry) => entry.cron === jobId && entry.outcome === undefined);
 
             it("writes each line at info, with the job it came from", async () => {
                 // A run's own explanation of itself — why a step fell back —
@@ -472,12 +477,31 @@ schedule: "30 2 * * 1" })]);
 
                 const log = await scheduler.triggerJob("enrich");
 
-                expect(linesOf("enrich").map((entry) => [entry.severity, entry.message])).toEqual([
-                    ["INFO", "model unavailable (quota_exhausted)"],
-                    ["INFO", 'scored {"leads":3}']
+                expect(linesOf("enrich").map((entry) => [entry.severity, entry.message, entry.component])).toEqual([
+                    ["INFO", "model unavailable (quota_exhausted)", "cron"],
+                    // Text then one object: the object's keys are fields, not JSON in the text.
+                    ["INFO", "scored", "cron"]
                 ]);
+                expect(linesOf("enrich")[1].leads).toBe(3);
                 // And the run's log entry is what it always was.
                 expect(log!.logs).toEqual(["model unavailable (quota_exhausted)", 'scored {"leads":3}']);
+            });
+
+            it("ends a run with one line that says the job, outcome and duration as fields", async () => {
+                scheduler.registerJobs([
+                    makeJob("tally", { handler: async () => ({ counted: 4 }) }),
+                    makeJob("broken", { handler: async () => { throw new Error("upstream 503"); } }),
+                ]);
+                await scheduler.triggerJob("tally");
+                await scheduler.triggerJob("broken");
+
+                const ends = allLines().filter((entry) => entry.outcome !== undefined);
+                expect(ends.map((e) => [e.severity, e.cron, e.outcome, e.component, typeof e.durationMs])).toEqual([
+                    ["INFO", "tally", "success", "cron", "number"],
+                ]);
+                expect(ends[0].result).toEqual({ counted: 4 });
+                expect(ends[0].message).toMatch(/^Cron job "tally" completed in \d+ms$/);
+                // "broken" failed: its line is an error, written to stderr, not stdout.
             });
 
             it("redacts what it logs on the way to stdout, and persists the line as before", async () => {

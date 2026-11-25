@@ -162,21 +162,8 @@ function normalizeLevel(value: unknown): LogLevel {
  */
 export function lineLevel(text: string): LogLevel {
     const body = text.trim();
-    if (body.startsWith("{") && body.endsWith("}")) {
-        try {
-            const parsed: unknown = JSON.parse(body);
-            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-                const obj = parsed as Record<string, unknown>;
-                const key = LEVEL_KEYS.find((k) => Object.prototype.hasOwnProperty.call(obj, k));
-                if (key) {
-                    const level = normalizeLevel(obj[key]);
-                    if (level !== "unknown") return level;
-                }
-            }
-        } catch {
-            // Not JSON after all: read it as text.
-        }
-    }
+    const structured = parseStructured(body);
+    if (structured && structured.level !== "unknown") return structured.level;
     const bare = BARE_LEVEL.exec(body);
     const level = bare ? normalizeLevel(bare[1]) : "unknown";
     if (level !== "unknown") return level;
@@ -447,7 +434,8 @@ export type FollowEvent =
     | { event: "reconnected" };
 
 export interface FollowSink {
-    line(rec: LogRecord): void;
+    /** `pods`: how many pods the poll that read the line saw, to say which one wrote it when there are several. */
+    line(rec: LogRecord, ctx: { pods: number }): void;
     event(e: FollowEvent): void;
 }
 
@@ -634,7 +622,7 @@ export async function followRuntimeLogs(deps: FollowDeps, opts: FollowOptions): 
         const fresh = cursor.admit(records).filter(opts.filter);
         const isFirstPage = q === opts.initial;
         for (const rec of isFirstPage && opts.initialTail !== undefined ? tailPerPod(fresh, opts.initialTail) : fresh) {
-            sink.line(rec);
+            sink.line(rec, { pods: pods.length });
         }
 
         // A follow poll cut short skipped lines: by a byte budget, or — after
@@ -657,12 +645,208 @@ export async function followRuntimeLogs(deps: FollowDeps, opts: FollowOptions): 
    Output
    ═══════════════════════════════════════════════════════════════ */
 
-/** Colour a line by its severity on a terminal; the text itself is never changed. */
+/** Colour a line by its severity on a terminal; the text itself is never changed. What `--raw` prints. */
 export function paintLine(rec: LogRecord): string {
-    const level = lineLevel(rec.text);
-    if (level === "error") return chalk.red(rec.raw);
-    if (level === "warn") return chalk.yellow(rec.raw);
-    return rec.raw;
+    return paintFor(lineLevel(rec.text))(rec.raw);
+}
+
+function paintFor(level: LogLevel): (s: string) => string {
+    if (level === "error") return chalk.red;
+    if (level === "warn") return chalk.yellow;
+    if (level === "debug") return chalk.gray;
+    return (s) => s;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Structured records
+   ═══════════════════════════════════════════════════════════════ */
+
+/** Payload keys that carry the human message, in the order they are trusted. */
+const MESSAGE_KEYS = ["message", "msg"];
+/** Payload keys that carry the event's own time. */
+const TIME_KEYS = ["timestamp", "time"];
+
+/**
+ * A JSON record a Rebase runtime prints:
+ * `{"severity":"INFO","message":"…","timestamp":"…","component":"http",…fields}`.
+ */
+export interface StructuredLog {
+    level: LogLevel;
+    /** The severity as the record wrote it (`"WARNING"`), or null when it named none. */
+    severity: string | null;
+    /** The record's own time, as written, or null. */
+    time: string | null;
+    component: string | null;
+    message: string;
+    /** Everything else the record carries, in its order. */
+    fields: Record<string, unknown>;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * A line's payload read as a structured record, or null when it is not a JSON
+ * object. The level is read by the same rules as {@link lineLevel}.
+ */
+export function parseStructured(text: string): StructuredLog | null {
+    const body = text.trim();
+    if (!body.startsWith("{") || !body.endsWith("}")) return null;
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(body);
+    } catch {
+        return null;
+    }
+    if (!isPlainObject(parsed)) return null;
+    const levelKey = LEVEL_KEYS.find((k) => Object.prototype.hasOwnProperty.call(parsed, k));
+    const messageKey = MESSAGE_KEYS.find((k) => typeof parsed[k] === "string");
+    const timeKey = TIME_KEYS.find((k) => typeof parsed[k] === "string");
+    const component = typeof parsed.component === "string" ? parsed.component : null;
+    const fields: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+        if (k === levelKey || k === messageKey || k === timeKey || (k === "component" && component !== null)) continue;
+        fields[k] = v;
+    }
+    const rawLevel = levelKey ? parsed[levelKey] : undefined;
+    return {
+        level: levelKey ? normalizeLevel(rawLevel) : "unknown",
+        severity: typeof rawLevel === "string" ? rawLevel : typeof rawLevel === "number" ? String(rawLevel) : null,
+        time: timeKey ? String(parsed[timeKey]) : null,
+        component,
+        message: messageKey ? String(parsed[messageKey]) : "",
+        fields
+    };
+}
+
+/**
+ * A request line's head, `GET /api/x 404 16ms`, and the fields it used up —
+ * or null for a record that is not a request. A runtime writes one per request
+ * it answers (`message: "request"`); `duration` is what a server's own log
+ * buffer calls the latency.
+ */
+export function requestHead(log: Pick<StructuredLog, "message" | "fields">): { head: string; used: string[] } | null {
+    const f = log.fields;
+    if (typeof f.method !== "string" || typeof f.path !== "string") return null;
+    const used = ["method", "path"];
+    const parts = [f.method, f.path];
+    if (typeof f.status === "number" || typeof f.status === "string") {
+        parts.push(String(f.status));
+        used.push("status");
+    }
+    const latency = typeof f.latencyMs === "number" ? { key: "latencyMs", ms: f.latencyMs }
+        : typeof f.duration === "number" ? { key: "duration", ms: f.duration }
+            : null;
+    if (latency) {
+        parts.push(`${latency.ms}ms`);
+        used.push(latency.key);
+    }
+    // The route template says something only when it differs from the path.
+    if (f.route === f.path) used.push("route");
+    return { head: parts.join(" "), used };
+}
+
+/**
+ * One field value as `key=value` writes it: bare when it is one word, quoted
+ * as JSON when it holds a space, a quote or an `=`, compact JSON when it is
+ * an object or a list.
+ */
+export function formatFieldValue(value: unknown): string {
+    if (typeof value === "string") return value !== "" && /^[^\s"=]+$/.test(value) ? value : JSON.stringify(value);
+    if (value === null || typeof value === "number" || typeof value === "boolean") return String(value);
+    try {
+        return JSON.stringify(value) ?? String(value);
+    } catch {
+        return String(value);
+    }
+}
+
+/** `key=value …` for every field, leaving out `skip`. */
+export function formatFields(fields: Record<string, unknown>, skip: readonly string[] = []): string {
+    return Object.entries(fields)
+        .filter(([k, v]) => v !== undefined && !skip.includes(k))
+        .map(([k, v]) => `${k}=${formatFieldValue(v)}`)
+        .join(" ");
+}
+
+/**
+ * The part of a pod name that tells its replicas apart: `x2k4p` of
+ * `rebase-backend-7d9f8c6b5-x2k4p`.
+ */
+export function podShortName(pod: string): string {
+    const at = pod.lastIndexOf("-");
+    return at === -1 || at === pod.length - 1 ? pod : pod.slice(at + 1);
+}
+
+const LEVEL_LABEL: Record<LogLevel, string> = { error: "ERROR", warn: "WARN ", info: "INFO ", debug: "DEBUG", unknown: "     " };
+
+/**
+ * `HH:MM:SS.mmm` in the local zone, with the date in front when it is not
+ * today's: a `--since 2d` read spans days.
+ */
+export function clockTime(iso: string, now: Date = new Date()): string | null {
+    const ms = Date.parse(iso);
+    if (Number.isNaN(ms)) return null;
+    const d = new Date(ms);
+    const pad = (n: number, w = 2): string => String(n).padStart(w, "0");
+    const clock = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+    const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    return sameDay ? clock : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${clock}`;
+}
+
+/** A stack trace pulled out of a field, to print under the line rather than inside it. */
+function splitStacks(fields: Record<string, unknown>): { fields: Record<string, unknown>; stacks: string[] } {
+    const out: Record<string, unknown> = {};
+    const stacks: string[] = [];
+    for (const [k, v] of Object.entries(fields)) {
+        if (k === "stack" && typeof v === "string" && v.includes("\n")) {
+            stacks.push(v);
+        } else if (isPlainObject(v) && typeof v.stack === "string" && v.stack.includes("\n")) {
+            const { stack, ...rest } = v;
+            stacks.push(String(stack));
+            out[k] = rest;
+        } else {
+            out[k] = v;
+        }
+    }
+    return { fields: out, stacks };
+}
+
+export interface RenderOptions {
+    /** Name the pod each line came from: when the read spans several. */
+    showPod?: boolean;
+    /** Today, for {@link clockTime}. */
+    now?: Date;
+}
+
+/**
+ * One line as a person reads it: a structured record becomes
+ * `HH:MM:SS.mmm LEVEL  [component] message  key=value …` — a request
+ * `GET /path 404 16ms  requestId=…` — coloured by its level, with the pod's
+ * short name after the time when the read spans several pods, and a stack
+ * trace on the lines below. A plain-text line is printed as it came.
+ */
+export function renderLine(rec: LogRecord, opts: RenderOptions = {}): string {
+    const log = parseStructured(rec.text);
+    if (!log) return paintLine(rec);
+    const paint = paintFor(log.level);
+    const at = (log.time !== null ? clockTime(log.time, opts.now) : null) ?? (rec.ts !== null ? clockTime(rec.ts, opts.now) : null);
+    const request = log.message === "request" || log.message === "" ? requestHead(log) : null;
+    const { fields, stacks } = splitStacks(log.fields);
+    const rest = formatFields(fields, request?.used ?? []);
+    const head = request?.head ?? log.message;
+    const parts = [
+        at !== null ? chalk.gray(at) : null,
+        opts.showPod && rec.pod !== null ? chalk.magenta(podShortName(rec.pod)) : null,
+        `${paint(LEVEL_LABEL[log.level])} `,
+        log.component !== null ? chalk.cyan(`[${log.component}]`) : null,
+        paint(head)
+    ].filter((p): p is string => p !== null);
+    const line = parts.join(" ") + (rest ? `  ${chalk.gray(rest)}` : "");
+    if (stacks.length === 0) return line;
+    const below = stacks.flatMap((s) => s.split("\n").map((l) => chalk.gray(`    ${l.trim()}`)));
+    return [line, ...below].join("\n");
 }
 
 /** The human sentence for an event, or null for one that needs none. */

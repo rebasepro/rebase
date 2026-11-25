@@ -155,6 +155,101 @@ function lineTaken(level: LogLevel, write: () => void): boolean {
     }
 }
 
+/**
+ * Fields every line logged inside the current unit of work carries — a request's
+ * `requestId` and caller — so a line a handler or a function writes can be
+ * joined to the request line without each call site passing the id by hand.
+ *
+ * Same shape as the line hook: the async context lives host-side
+ * (`utils/request-log-context.ts`), and this portable module only asks. A
+ * provider that throws contributes nothing.
+ */
+export type LogContextProvider = () => Record<string, unknown> | undefined;
+
+const CONTEXT_SLOT = Symbol.for("@rebasepro/server:log-context");
+
+type GlobalWithContext = typeof globalThis & { [CONTEXT_SLOT]?: LogContextProvider };
+
+/** Install the provider of per-unit-of-work fields. Internal: not exported from the package entry. */
+export function _setLogContextProvider(provider: LogContextProvider | undefined): LogContextProvider | undefined {
+    const global = globalThis as GlobalWithContext;
+    const previous = global[CONTEXT_SLOT];
+    global[CONTEXT_SLOT] = provider;
+    return previous;
+}
+
+function contextFields(): Record<string, unknown> | undefined {
+    const provider = (globalThis as GlobalWithContext)[CONTEXT_SLOT];
+    if (!provider) return undefined;
+    try {
+        return provider();
+    } catch {
+        return undefined;
+    }
+}
+
+// ── Message shape ───────────────────────────────────────────────────
+//
+// A line names its subsystem in the `component` field, not in its text. Call
+// sites across the runtime were written as `"📡 [ChannelBus] …"`, `"✅ [cron] …"`:
+// a reader filtering by subsystem had to grep a bracket out of prose, an agent
+// paid tokens for pictographs, and the development format put its own level
+// emoji in front of the call site's. The shape is fixed here, where every line
+// passes, so it holds for every call site at once — those in this repository
+// and those in a project's own code.
+
+/** Leading pictographs (with their variation selectors, joiners and skin tones) and the space after them. */
+const LEADING_PICTOGRAPHS = /^(?:[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}][\u{FE0F}\u{20E3}\u{200D}\u{1F3FB}-\u{1F3FF}\p{Extended_Pictographic}]*\s*)+/u;
+
+/** A leading `[Tag]` naming a subsystem: a word, possibly two, not a sentence. */
+const LEADING_TAG = /^\[([A-Za-z][\w.:/-]*(?: [\w.:/-]+){0,2})\]\s*/;
+
+/** A list bullet a multi-line report put at the start of a continuation line. */
+const LEADING_BULLET = /^\s*[\u2022\u00B7]\s+/;
+
+/** Tags that name the product or a class rather than a subsystem, and what they are. */
+const COMPONENT_ALIASES: Record<string, string | null> = {
+    rebase: null,
+    api: "http",
+    "websocket-server": "websocket",
+    realtimeservice: "realtime",
+};
+
+/** `"WebSocket Server"` → `"websocket"`, `"ChannelBus"` → `"channelbus"`. */
+function componentName(tag: string): string | null {
+    const key = tag.trim().toLowerCase().replace(/\s+/g, "-");
+    return key in COMPONENT_ALIASES ? COMPONENT_ALIASES[key] : key;
+}
+
+/**
+ * Split a message into its text and the component its leading tag named.
+ * Exported for tests.
+ */
+export function shapeMessage(message: string): { message: string; component: string | null } {
+    let text = message.replace(LEADING_PICTOGRAPHS, "");
+    let component: string | null = null;
+    const tag = LEADING_TAG.exec(text);
+    if (tag) {
+        component = componentName(tag[1]);
+        text = text.slice(tag[0].length).replace(LEADING_PICTOGRAPHS, "");
+    }
+    text = text.replace(LEADING_BULLET, "");
+    // Never shape a line down to nothing: a message that was only a tag keeps it.
+    return text.trim() === "" ? { message, component: null } : { message: text, component };
+}
+
+/** The keys the line itself owns; a data field by one of these names is kept beside it, not over it. */
+const RESERVED_KEYS = ["severity", "message", "timestamp"] as const;
+
+function withoutReservedKeys(data: Record<string, unknown>): Record<string, unknown> {
+    if (!RESERVED_KEYS.some((k) => k in data)) return data;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(data)) {
+        out[(RESERVED_KEYS as readonly string[]).includes(k) ? `data_${k}` : k] = v;
+    }
+    return out;
+}
+
 // ── Redaction ───────────────────────────────────────────────────────
 //
 // Drizzle builds every query failure as
@@ -483,9 +578,15 @@ function createLogger(rawDefaultFields: Record<string, unknown> = {}): Logger {
 
         // The message is redacted too, not just the data: several call sites
         // interpolate `error.message` straight into the line they log.
-        const safeMessage = redactSensitiveText(message);
-        const merged = { ...defaultFields,
-...formatData(data) };
+        const shaped = shapeMessage(redactSensitiveText(message));
+        const safeMessage = shaped.message;
+        const context = contextFields();
+        const merged = withoutReservedKeys({
+            ...(context ? formatData(context) : undefined),
+            ...(shaped.component ? { component: shaped.component } : undefined),
+            ...defaultFields,
+            ...formatData(data),
+        });
         // When it was said, not when it is written: a line a host held (see
         // `LogLineHook`) is ordered by an aggregator where it was logged.
         const timestamp = new Date().toISOString();
@@ -521,8 +622,10 @@ function createLogger(rawDefaultFields: Record<string, unknown> = {}): Logger {
                 : level === "warn" ? "⚠️"
                 : level === "info" ? "ℹ️"
                 : "🐛";
-            const extra = Object.keys(merged).length > 0 ? ` ${JSON.stringify(merged)}` : "";
-            const out = `${prefix} [${level.toUpperCase()}] ${safeMessage}${extra}`;
+            const { component, ...rest } = merged;
+            const tag = typeof component === "string" ? ` [${component}]` : "";
+            const extra = Object.keys(rest).length > 0 ? ` ${JSON.stringify(rest)}` : "";
+            const out = `${prefix} [${level.toUpperCase()}]${tag} ${safeMessage}${extra}`;
 
             if (level === "error" || everyLineToStderr) {
                 console.error(out);

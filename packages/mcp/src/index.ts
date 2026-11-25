@@ -16,6 +16,7 @@ import {
     CLOUD_LOGS_DEFAULT_TAIL,
     ToolArgumentError,
     cliRefusal,
+    cloudLogsBody,
     cloudRefusalNext,
     cloudSuccessNext,
     cloudToolCall,
@@ -26,6 +27,7 @@ import {
     validateToolArgs,
     withTailedLogs
 } from "./cloud-tools.js";
+import { compactOutputLines } from "./log-lines.js";
 
 /**
  * The server version advertised in the MCP `initialize` handshake — read from
@@ -1664,7 +1666,8 @@ properties: {} }
     },
     {
         name: "rebase_dev_logs",
-        description: "Read recent output from the running Rebase dev server.",
+        description: "Read recent output from the running Rebase dev server. A line that is a JSON log record comes back " +
+            "compact: `<time> <SEVERITY> [<component>] <message> key=value…`.",
         inputSchema: {
             type: "object",
             properties: {
@@ -1987,7 +1990,8 @@ const CLOUD_TOOLS: ToolDef[] = [
         description:
             "Read the linked Rebase Cloud project's log once, the running app's or the latest build's (`rebase cloud logs`). " +
             "`source: \"runtime\"` (the default) is what the app prints, `source: \"build\"` the latest deployment's build log. " +
-            "Never follows; pass `nextSinceTime` back as `since` to read on.",
+            "Never follows; pass `nextSinceTime` back as `since` to read on. The result is a JSON header (pods, state, " +
+            "nextSinceTime, filter), then one compact line per log line: `<time> <SEVERITY> [<pod>] [<component>] <message> key=value…`.",
         inputSchema: {
             type: "object",
             properties: {
@@ -2254,8 +2258,10 @@ async function runCloudTool(name: string, args: unknown) {
     if (name === "rebase_cloud_env_set") {
         return { ...jsonResult({ ...envSetResult(call, value), next }), ...(code !== 0 ? { isError: true } : {}) };
     }
+    const body = (name === "rebase_cloud_logs" ? cloudLogsBody(value, call) : null)
+        ?? JSON.stringify(withTailedLogs(value, call.tailLines));
     return {
-        ...textResult(`${next}\n\n${untrustedEnvelope(source, JSON.stringify(withTailedLogs(value, call.tailLines)))}`),
+        ...textResult(`${next}\n\n${untrustedEnvelope(source, body)}`),
         ...(code !== 0 ? { isError: true } : {})
     };
 }
@@ -3239,7 +3245,9 @@ roles });
                 if (devProcess) return textResult("No output captured yet.");
                 return textResult(describeForeignDevServer("logs") ?? "Dev server is not running.");
             }
-            return untrustedTextResult("the dev server's output", recent);
+            // A backend that logs JSON records (NODE_ENV=production) prints
+            // one object per line; compact, each costs a third of the tokens.
+            return untrustedTextResult("the dev server's output", compactOutputLines(recent));
         }
 
         case "rebase_dev_stop": {

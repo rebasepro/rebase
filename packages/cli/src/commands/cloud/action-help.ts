@@ -363,7 +363,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     logs: {
         command: "cloud logs",
-        usage: "cloud logs [--runtime] [--follow] [--preview [<name>]] [--since <t>] [--tail <n>] [--grep <text>] [--level <l>] [--previous]",
+        usage: "cloud logs [--runtime] [--follow] [--preview [<name>]] [--since <t>] [--tail <n>] [--grep <text>] [--level <l>] [--previous] [--raw]",
         summary: "The latest build log, or what the running app prints with --runtime — from every pod, followed live with -f.",
         flags: [
             ["--runtime", "The running app's log instead of the build log"],
@@ -373,7 +373,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--tail <n>", "With --runtime: at most this many lines per pod to start with (the control plane caps it at 2000); with --grep or --level, this many matching lines per pod, searched across the whole window"],
             ["--grep <text>", "With --runtime: only lines containing the text (any case); `/re/flags` for a regular expression"],
             ["--level <l>", "With --runtime: only lines at this severity or worse — error, warn, info or debug"],
-            ["--previous", "With --runtime: the last instance of a container that restarted, where a crash's reason usually is"]
+            ["--previous", "With --runtime: the last instance of a container that restarted, where a crash's reason usually is"],
+            ["--raw", "With --runtime: print each line as the control plane sent it, instead of read into time, level, component, message and fields"]
         ],
         examples: [
             "rebase cloud logs",
@@ -386,7 +387,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "rebase cloud logs --runtime --json -f | jq -r 'select(.type == \"line\") | .text'"
         ],
         notes: [
-            "Under --json a followed runtime log is NDJSON: one `{\"type\":\"line\",\"ts\",\"pod\",\"text\"}` per log line, "
+            "On a terminal a structured line reads `HH:MM:SS.mmm LEVEL  [component] message  key=value …`, a request "
+                + "`GET /path 404 16ms  requestId=…`, with the pod's short name when several run; --raw prints the lines as sent. "
+                + "--json always carries them as sent.",
+            "Under --json a followed runtime log is NDJSON: one `{\"type\":\"line\",\"ts\",\"pod\",\"text\",\"level\"}` per log line, "
                 + "and `{\"type\":\"event\",\"event\":…}` when a pod starts, restarts or goes, or the connection drops and comes back.",
             "A container that restarts while you follow has its previous instance's last lines printed — usually the crash's reason."
         ]

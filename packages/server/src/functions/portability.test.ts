@@ -372,6 +372,7 @@ describe("the portable surface keeps its shape", () => {
     const PUBLISHED = [
         "defineFunction",
         "rebase",
+        "logger",
         "getUser",
         "getUserProfile",
         "getUserId",

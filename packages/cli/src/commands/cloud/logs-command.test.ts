@@ -4,6 +4,7 @@
  * NDJSON under `--json`, and `--preview` reading the preview — never
  * production — for both the build and the runtime log.
  */
+import { stripVTControlCharacters } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 vi.mock("./context", async (importOriginal) => {
@@ -178,9 +179,34 @@ describe("rebase cloud logs", () => {
 
             const records = stdout.join("").trim().split("\n").map((l) => JSON.parse(l) as Record<string, unknown>);
             expect(records).toEqual([
-                { type: "line", ts: T(1), pod: "rebase-backend-a", text: '{"severity":"ERROR","message":"boom"}' },
-                { type: "line", ts: T(2), pod: "rebase-backend-a", text: "b" }
+                { type: "line", ts: T(1), pod: "rebase-backend-a", text: '{"severity":"ERROR","message":"boom"}', level: "error" },
+                { type: "line", ts: T(2), pod: "rebase-backend-a", text: "b", level: "unknown" }
             ]);
+        });
+
+        it("prints followed lines read, naming the pod once there are several", async () => {
+            const record = (pod: string, message: string): string =>
+                line(1, JSON.stringify({ severity: "INFO", message, timestamp: T(1), component: "cron" }), pod);
+            fakeControlPlane({
+                pages: [{
+                    ...page([record("rebase-backend-7f-aaaaa", "tick"), record("rebase-backend-7f-bbbbb", "tock")]),
+                    pods: [
+                        { pod: "rebase-backend-7f-aaaaa", state: "ok", lines: 1, message: null, hint: null, restarts: 0 },
+                        { pod: "rebase-backend-7f-bbbbb", state: "ok", lines: 1, message: null, hint: null, restarts: 0 }
+                    ]
+                }]
+            });
+
+            const done = logsCommand(argv("--runtime", "-f"), "shop");
+            await vi.advanceTimersByTimeAsync(1_000);
+            sigint?.();
+            await vi.advanceTimersByTimeAsync(2_000);
+            await done;
+
+            const out = stripVTControlCharacters(stdout.join(""));
+            expect(out).toMatch(/\d\d:\d\d:01\.000 aaaaa INFO {3}\[cron\] tick\n/);
+            expect(out).toMatch(/ bbbbb INFO {3}\[cron\] tock\n/);
+            expect(out).not.toContain('{"severity"');
         });
 
         it("asks for what --since and --tail say on the first poll, then follows the cursor", async () => {
@@ -294,6 +320,35 @@ describe("rebase cloud logs", () => {
             expect(out).toContain("1 matching line, from 2 searched.");
         });
 
+        it("prints a structured line read, and --raw prints it as the control plane sent it", async () => {
+            const text = JSON.stringify({
+                severity: "WARNING", message: "request", timestamp: T(5), component: "http",
+                method: "GET", path: "/api/x", status: 404, latencyMs: 16, requestId: "r-1"
+            });
+            fakeControlPlane({ pages: [page([line(5, text), line(6, "Server listening on 3000")])] });
+
+            await logsCommand(argv("--runtime"), "shop");
+            const read = stripVTControlCharacters(stdout.join(""));
+            expect(read).toMatch(/\d\d:\d\d:05\.000 WARN {3}\[http\] GET \/api\/x 404 16ms {2}requestId=r-1\n/);
+            // One pod: no pod name. A plain line: as it came.
+            expect(read).not.toContain("rebase-backend-a] {");
+            expect(read).toContain(line(6, "Server listening on 3000"));
+
+            stdout.length = 0;
+            await logsCommand(argv("--runtime", "--raw"), "shop");
+            expect(stripVTControlCharacters(stdout.join(""))).toContain(line(5, text));
+        });
+
+        it("keeps --json exact: the lines as sent, whatever --raw says", async () => {
+            context.setJsonModeForTest(true);
+            const text = JSON.stringify({ severity: "INFO", message: "ready", timestamp: T(1) });
+            fakeControlPlane({ pages: [page([line(1, text)])] });
+
+            await logsCommand(argv("--runtime", "--json"), "shop");
+
+            expect((JSON.parse(stdout.join("")) as { logs: string }).logs).toBe(line(1, text));
+        });
+
         it("still sends --tail as tailLines when nothing filters", async () => {
             const f = fakeControlPlane({ pages: [page([line(1, "a")])] });
             await logsCommand(argv("--runtime", "--tail", "40"), "shop");
@@ -317,6 +372,7 @@ describe("rebase cloud logs", () => {
         it("refuses runtime filters on the build log rather than ignoring them", async () => {
             expect(await refused("--grep", "x")).toContain("--runtime");
             expect(await refused("--since", "5m")).toContain("--runtime");
+            expect(await refused("--raw")).toContain("--runtime");
         });
 
         it("refuses following a stopped instance", async () => {

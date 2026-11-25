@@ -2044,6 +2044,7 @@ type RelativeTimeLabels { daysAgo, hoursAgo, inAMoment, inDays, inHours, inMinut
 
 ## @rebasepro/server/functions
 class ApiError { badRequest, code, conflict, databaseUnavailable, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
+const logger { child, debug, error, info, warn }
 const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, push, resolveToken, rpc, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, sqlAsAdmin, storage, storageRegistry, ws }
 const requireAdmin
 const requireAuth
@@ -2081,6 +2082,7 @@ interface CheckRateLimitOptions { key, limit, name, windowMs }
 interface DefineFunctionOptions { timeoutMs }
 interface FunctionRateLimit { limit, name, windowMs }
 interface FunctionUser { email, roles, uid }
+interface Logger { child, debug, error, info, warn }
 interface RateLimitDecision { allowed, remaining, retryAfterMs }
 interface RateLimitOptions { key, limit, message, name, windowMs }
 interface RebaseFunctionContext { rebase }

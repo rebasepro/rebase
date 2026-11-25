@@ -6,6 +6,7 @@ import { HonoEnv } from "../api/types";
 import { responseCompression } from "../utils/compression";
 import { requestId } from "../utils/request-id";
 import { requestLogger } from "../utils/request-logger";
+import { requestLogContext } from "../utils/request-log-context";
 import { logger } from "../utils/logger";
 import { logMiddleware } from "../api/logs-routes";
 import { ApiError, errorHandler, honoHttpExceptionStatus } from "../api/errors";
@@ -80,6 +81,8 @@ export function configureMiddlewares(
 
     // Request ID (correlation)
     app.use(`${basePath}/*`, requestId());
+    // Every line logged while the request runs carries its id and caller.
+    app.use(`${basePath}/*`, requestLogContext());
 
     // Response Compression — registered early so it wraps the final response of
     // every downstream handler, including error responses. Bodies under 1 KB

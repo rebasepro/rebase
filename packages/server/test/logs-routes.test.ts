@@ -142,6 +142,74 @@ total: 0 });
         expect(search.entries[0].message).toContain("avatar.png");
     });
 
+    it("reads `level` as a floor: warn is warnings and errors", async () => {
+        // An exact match hid every error from somebody who asked for
+        // warnings, and the CLI's `--level` — which passes this parameter —
+        // is a floor everywhere else it is read.
+        addLog("debug", "system", "a debug line");
+        addLog("info", "system", "an info line");
+        addLog("warn", "system", "a warning");
+        addLog("error", "system", "an error");
+
+        const app = buildApp();
+        // `source=system`: the reads themselves are recorded, as `api`.
+        const messages = async (level: string) =>
+            (await (await app.request(`/api/logs?source=system&level=${level}`)).json() as { entries: { message: string }[] })
+                .entries.map(e => e.message);
+
+        expect(await messages("warn")).toEqual(["an error", "a warning"]);
+        expect(await messages("error")).toEqual(["an error"]);
+        expect(await messages("info")).toEqual(["an error", "a warning", "an info line"]);
+        expect(await messages("debug")).toHaveLength(4);
+        // The stdout record's spelling, and any case.
+        expect(await messages("WARNING")).toEqual(["an error", "a warning"]);
+    });
+
+    it("refuses a level it does not know rather than answering an empty log", async () => {
+        addLog("error", "system", "an error");
+        const app = buildApp();
+
+        const res = await app.request("/api/logs?level=warnings");
+        expect(res.status).toBe(400);
+        const body = await res.json() as { error: { code: string; message: string } };
+        expect(body.error.code).toBe("INVALID_PARAM");
+        expect(body.error.message).toContain("debug, info, warn or error");
+        expect((await app.request("/api/logs/stream?level=loud")).status).toBe(400);
+    });
+
+    it("finds an entry by a metadata value, not only by its message", async () => {
+        // The id somebody has in hand — from a client's error report, a job,
+        // a user — is in a field, not in the message.
+        addLog("error", "system", "Function threw", { requestId: "req-7f3a", jobId: "nightly", attempt: 3, detail: { table: "Invoices" } });
+        addLog("error", "system", "Another failure", { requestId: "req-0000" });
+
+        const app = buildApp();
+        const find = async (search: string) =>
+            (await (await app.request(`/api/logs?search=${encodeURIComponent(search)}`)).json() as { entries: { message: string }[] })
+                .entries.map(e => e.message);
+
+        expect(await find("REQ-7F3A")).toEqual(["Function threw"]);
+        // A number, and a value inside a nested object, as their JSON text.
+        expect(await find("invoices")).toEqual(["Function threw"]);
+        // Keys are not searched: every entry has a `requestId`.
+        expect(await find("requestid")).toEqual([]);
+    });
+
+    it("finds a request entry by its request id", async () => {
+        const app = new Hono<HonoEnv>();
+        app.use("/api/*", async (c, next) => {
+            c.set("requestId", "rid-42abc");
+            await next();
+        });
+        app.use("/api/*", logMiddleware({ ignorePaths: ["/api/logs/stream"] }));
+        app.get("/api/ping", (c) => c.json({ ok: true }));
+        app.route("/api/logs", logsRoutes);
+
+        await app.request("/api/ping");
+        const body = await (await app.request("/api/logs?search=rid-42")).json() as { entries: { message: string }[] };
+        expect(body.entries.map(e => e.message)).toEqual([expect.stringMatching(/^GET \/api\/ping 200/)]);
+    });
+
     it("returns the newest entries first and honours limit", async () => {
         addLog("info", "system", "first");
         addLog("info", "system", "second");
@@ -341,6 +409,51 @@ describe("logs stream", () => {
             .toEqual(["backlog error"]);
         expect((append.data as { entries: { message: string }[] }).entries.map(e => e.message))
             .toEqual(["live error"]);
+    });
+
+    it("reads `level` as the same floor live as in the backlog", async () => {
+        addLog("warn", "system", "backlog warning");
+        addLog("info", "system", "backlog info");
+
+        const app = buildApp();
+        const controller = new AbortController();
+        const res = await app.request("/api/logs/stream?level=warn", { signal: controller.signal });
+
+        const reading = readFrames(res, 2);
+        await new Promise(resolve => setTimeout(resolve, 50));
+        addLog("info", "system", "live info");
+        addLog("error", "system", "live error");
+        addLog("warn", "system", "live warning");
+
+        const [snapshot, append] = await reading;
+        controller.abort();
+
+        expect((snapshot.data as { entries: { message: string }[] }).entries.map(e => e.message))
+            .toEqual(["backlog warning"]);
+        expect((append.data as { entries: { message: string }[] }).entries.map(e => e.message))
+            .toEqual(["live error", "live warning"]);
+    });
+
+    it("searches metadata live as well as in the backlog", async () => {
+        addLog("error", "system", "backlog failure", { requestId: "req-abc" });
+        addLog("error", "system", "backlog other", { requestId: "req-xyz" });
+
+        const app = buildApp();
+        const controller = new AbortController();
+        const res = await app.request("/api/logs/stream?search=req-abc", { signal: controller.signal });
+
+        const reading = readFrames(res, 2);
+        await new Promise(resolve => setTimeout(resolve, 50));
+        addLog("info", "system", "live other", { requestId: "req-xyz" });
+        addLog("info", "system", "live match", { requestId: "req-abc" });
+
+        const [snapshot, append] = await reading;
+        controller.abort();
+
+        expect((snapshot.data as { entries: { message: string }[] }).entries.map(e => e.message))
+            .toEqual(["backlog failure"]);
+        expect((append.data as { entries: { message: string }[] }).entries.map(e => e.message))
+            .toEqual(["live match"]);
     });
 
     it("drops its subscription when the client goes away", async () => {

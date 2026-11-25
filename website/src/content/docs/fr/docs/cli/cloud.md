@@ -1,5 +1,5 @@
 ---
-sourceHash: 21c6a414fb5571e4
+sourceHash: 2455a5d25bcb60fd
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Les groupes de commandes pour Rebase Cloud dans la CLI — auth, liaison de projet, déploiements, notifications, config, organisations, bases de données, ressources, compute, stockage, clusters, facturation et utilisation.
@@ -188,13 +188,14 @@ Voir [Preview a change](/docs/deployment/cloud/#preview-a-change).
 
 `rebase cloud logs` affiche les derniers journaux de build, et `-f` suit en direct un build qui
 est encore en cours d'exécution. `--runtime` lit plutôt ce que l'application affiche, depuis chaque pod
-sous-jacent, chaque ligne étant étiquetée avec son pod :
+sous-jacent, chaque ligne nommant son pod quand plusieurs ont écrit :
 
 ```bash
 rebase cloud logs --runtime -f                    # follow until Ctrl-C (exits 0)
 rebase cloud logs --runtime --since 15m --grep timeout
 rebase cloud logs --runtime -f --level error      # errors only
 rebase cloud logs --runtime --previous            # a restarted container's last run
+rebase cloud logs --runtime --raw
 ```
 
 - `--since` accepte une durée (`30s`, `5m`, `1h`) ou un horodatage RFC3339.
@@ -209,6 +210,7 @@ rebase cloud logs --runtime --previous            # a restarted container's last
 - `--level error|warn|info|debug` conserve les lignes ayant ce niveau de gravité ou supérieur. Il lit
   la `severity` structurée enregistrée par un backend Rebase, un mot de niveau au début d'une
   ligne de texte brut, ou une structure d'erreur telle que `TypeError:`. Les lignes sans indication sont ignorées.
+- Une ligne structurée s'affiche lisiblement : `14:30:32.126 WARN  [boot] Driver version skew …  fix="bump …"`, et une requête comme `GET /api/data/rooms/RCTF 404 16ms  requestId=…`. `--raw` affiche plutôt chaque ligne telle que le pod l'a écrite ; les lignes en texte brut s'affichent inchangées dans les deux cas, et `--json` porte toujours les lignes d'origine.
 
 Un suivi (follow) interroge toutes les deux secondes et affiche chaque ligne une seule fois. Il annonce les pods
 qui démarrent, s'arrêtent ou redémarrent. Lorsqu'un conteneur redémarre, il affiche également les dernières

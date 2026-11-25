@@ -341,16 +341,18 @@ export function warnOnGeneratedSchemaDrift(differences: SchemaDifference[]): voi
     if (differences.length === 0) return;
 
     logger.warn(
-        `📄 [schema] schema.generated.ts and the database disagree (${differences.length} difference` +
+        `schema.generated.ts and the database disagree (${differences.length} difference` +
         `${differences.length === 1 ? "" : "s"}). Boot applies only additive changes; these are the ones it ` +
         "left for you. Run `rebase db push` to apply them (it shows the plan and asks before anything " +
         "destructive), or `rebase db generate` for a migration. A NOT NULL to relax or a column to drop " +
         "can also be applied through the running backend, Rebase Cloud included: `rebase schema reconcile`. " +
-        "If backend/schema changed since schema.generated.ts was written, run `rebase schema generate` first."
+        "If backend/schema changed since schema.generated.ts was written, run `rebase schema generate` first.",
+        { component: "schema", differences: differences.length, fix: "rebase db push" }
     );
 
     for (const difference of differences) {
-        logger.warn(`   • ${describeSchemaDifference(difference)}`, {
+        logger.warn(describeSchemaDifference(difference), {
+            component: "schema",
             schemaDrift: {
                 kind: difference.kind,
                 table: difference.table,

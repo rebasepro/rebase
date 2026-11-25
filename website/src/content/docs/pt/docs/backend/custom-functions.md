@@ -1,5 +1,5 @@
 ---
-sourceHash: adb0c8f318e1c09a
+sourceHash: 9240cd2dc83f4b7b
 title: Funções Personalizadas
 sidebar_label: Funções Personalizadas
 description: Adicione endpoints de API Hono personalizados junto às suas rotas CRUD do Rebase. Descoberta automática a partir de um diretório, com acesso total à instância do backend.
@@ -560,10 +560,10 @@ declare function notifyFulfilment(url: string, session: Record<string, string>):
 
 ## Depuração
 
-Quando as funções carregam, a inicialização registra nos logs `Loaded custom functions` com a contagem delas. A linha de cada função é registrada em nível `debug` (`LOG_LEVEL=debug`):
+Registre a partir de uma função com `logger` de `@rebasepro/server/functions`, não com `console.log`: veja [Logging](/docs/backend/logging/). Quando as funções carregam, a inicialização registra nos logs `Loaded custom functions` com a contagem delas. A linha de cada função é registrada em nível `debug` (`LOG_LEVEL=debug`):
 
 ```
-⚡ Loaded function route: hello
+Loaded function route: hello
 ```
 
 Se o carregamento falhar, o carregador fornecerá uma saída de diagnóstico:

@@ -187,13 +187,14 @@ See [Preview a change](/docs/deployment/cloud/#preview-a-change).
 
 `rebase cloud logs` prints the latest build log, and `-f` tails a build that is
 still running. `--runtime` reads what the app prints instead, from every pod
-behind it, each line tagged with its pod:
+behind it, each line naming its pod when more than one wrote:
 
 ```bash
 rebase cloud logs --runtime -f                    # follow until Ctrl-C (exits 0)
 rebase cloud logs --runtime --since 15m --grep timeout
 rebase cloud logs --runtime -f --level error      # errors only
 rebase cloud logs --runtime --previous            # a restarted container's last run
+rebase cloud logs --runtime --raw                 # the lines exactly as the pods wrote them
 ```
 
 - `--since` takes a duration (`30s`, `5m`, `1h`) or an RFC3339 time.
@@ -208,6 +209,7 @@ rebase cloud logs --runtime --previous            # a restarted container's last
 - `--level error|warn|info|debug` keeps lines at that severity or worse. It reads
   the structured `severity` a Rebase backend logs, a level word at the start of a
   plain line, or an error shape such as `TypeError:`. Lines with none are left out.
+- A structured line prints readably: `14:30:32.126 WARN  [boot] Driver version skew …  fix="bump …"`, and a request as `GET /api/data/rooms/RCTF 404 16ms  requestId=…`. `--raw` prints each line as the pod wrote it instead; plain-text lines print unchanged either way, and `--json` always carries the original lines.
 
 A follow polls every two seconds and prints each line once. It announces pods
 that start, stop or restart. When a container restarts it also prints the last

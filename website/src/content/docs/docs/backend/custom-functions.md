@@ -559,10 +559,10 @@ declare function notifyFulfilment(url: string, session: Record<string, string>):
 
 ## Debugging
 
-When functions load, the boot logs `Loaded custom functions` with their count. Each function's own line is logged at `debug` (`LOG_LEVEL=debug`):
+Log from a function with `logger` from `@rebasepro/server/functions`, not `console.log`: see [Logging](/docs/backend/logging/). When functions load, the boot logs `Loaded custom functions` with their count. Each function's own line is logged at `debug` (`LOG_LEVEL=debug`):
 
 ```
-⚡ Loaded function route: hello
+Loaded function route: hello
 ```
 
 If loading fails, the loader provides diagnostic output:

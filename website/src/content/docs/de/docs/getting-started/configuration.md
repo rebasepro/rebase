@@ -1,5 +1,5 @@
 ---
-sourceHash: 9acb2b3f441697d7
+sourceHash: 45d6fa4b1ef2c72a
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -258,6 +258,7 @@ stattdessen im eigenen Code.
 | `REBASE_VAPID_SUBJECT` | Eine `mailto:`-Adresse oder `https://`-URL, über die die Push-Dienste Kontakt aufnehmen können. Standardmäßig die Origin einer `https`-`REBASE_PUBLIC_URL`. | — |
 | `REBASE_MAX_BODY_SIZE` | Maximale Größe des Request-Bodys **in Bytes** (`10485760`, nicht `10MB` – ein Wert, der keine Zahl ist, bricht den Start ab, anstatt das Limit stillschweigend aufzuheben). `0` schaltet das Limit aus. | `10485760` (10 MiB) |
 | `REBASE_ENABLE_SWAGGER` | Die OpenAPI-Oberfläche. Drei Zustände möglich: Nicht gesetzt in jeder Umgebung: `/api/docs` wird den Aufrufern bereitgestellt, für die `GET /api/schema/tables` Tabellen beschreibt, jeweils mit den für sie sichtbaren Tabellen, und es gibt keine Swagger-UI. `true` veröffentlicht das gesamte Dokument für alle, mit der Swagger-**UI** unter `/api/swagger` außerhalb der Produktion (niemals in Produktion). `false` hält das Dokument hinter der Admin-Schranke. | — |
+| `REBASE_DEPLOYMENT_ID` | Das Deployment, das dieser Prozess ausführt, wie die Plattform es benennt; wird in der Zeile genannt, die sagt, dass die Runtime lauscht. Rebase Cloud setzt sie. | — |
 | `REBASE_METRICS` | Prometheus-Metriken unter `/metrics` bereitstellen. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Fügt `includeSubDomains` zum `Strict-Transport-Security`-Header hinzu, sodass Browser reines HTTP auf jeder Subdomain des Hosts für sechs Monate verweigern – einschließlich Hosts, die dieser Prozess nicht bedient. Nur aktivieren, wenn ausnahmslos jede Subdomain der Domain ausschließlich HTTPS verwendet. Jeder andere Wert als `true`/`false` verweigert den Start. Siehe [Sicherheits-Header](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Bearer-Token zum Schutz von `/metrics`. Wenn nicht gesetzt, bleibt der Endpunkt für jeden zugänglich, der den Port erreichen kann – in einem privaten Netzwerk in Ordnung, in einem öffentlichen nicht (der Start protokolliert dies entsprechend). | — |

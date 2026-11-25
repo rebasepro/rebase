@@ -10,6 +10,7 @@ import type { RebaseServerClient } from "@rebasepro/types";
 import { hostname } from "node:os";
 import { randomUUID } from "node:crypto";
 import type { LoadedCronJob } from "./cron-loader";
+import { processTimeZone } from "./process-time-zone";
 import type { CronJobRunSummary, CronStore } from "./cron-store";
 import { logger, redactSensitiveText, stringifyForLog } from "../utils/logger.js";
 import { buildScaleToZeroWarning } from "./scale-to-zero.js";
@@ -840,7 +841,7 @@ export class CronScheduler {
             this.claimSweepTimer.unref?.();
         }
 
-        logger.info(`⏰ Cron scheduler started with ${this.jobs.size} job(s)`);
+        logger.info(`Cron scheduler started with ${this.jobs.size} job(s)`, { component: "cron", jobs: this.jobs.size, timezone: processTimeZone() });
     }
 
     /** Delete slot claims past retention. Failures are logged; the next hour tries again. */
@@ -1719,10 +1720,23 @@ export class CronScheduler {
                 // stringified object reaches the logger as text, and the
                 // logger's own pass over the message only removes `Failed
                 // query:` spans from it.
-                logger.info(
-                    args.map((a) => typeof a === "string" ? a : stringifyForLog(a)).join(" "),
-                    { cron: job.id }
-                );
+                //
+                // `ctx.log("scored", { leads: 3 })` — text, then one object —
+                // is a message with fields: the object's keys become fields
+                // of the process log line, where a filter can read them, not
+                // JSON inside its text. Any other mix is joined as before.
+                const fields = trailingFields(args);
+                if (fields) {
+                    logger.info(
+                        args.slice(0, -1).map((a) => typeof a === "string" ? a : stringifyForLog(a)).join(" "),
+                        { ...fields, component: "cron", cron: job.id }
+                    );
+                } else {
+                    logger.info(
+                        args.map((a) => typeof a === "string" ? a : stringifyForLog(a)).join(" "),
+                        { component: "cron", cron: job.id }
+                    );
+                }
             },
             // `rebase`, and only `rebase`: it matches the singleton import and
             // `defineFunction`'s context. The old `client` alias re-exposed
@@ -1820,10 +1834,23 @@ export class CronScheduler {
             }));
         }
 
+        // The run's outcome as fields — job, duration, outcome, and the
+        // handler's result when it is small — so "which runs failed" and "how
+        // long does this job take" are filters, not text searches.
+        const runFields: Record<string, unknown> = {
+            component: "cron",
+            cron: job.id,
+            outcome: success ? "success" : "failure",
+            durationMs,
+            ...(manual ? { manual: true } : undefined),
+            ...(slot ? { scheduledAt: slot.toISOString() } : undefined),
+        };
+        const resultField = smallResult(result);
+        if (resultField !== undefined) runFields.result = resultField;
         if (success) {
-            logger.info(`✅ [cron] "${job.id}" completed in ${durationMs}ms`);
+            logger.info(`Cron job "${job.id}" completed in ${durationMs}ms`, runFields);
         } else {
-            logger.error(`❌ [cron] "${job.id}" failed in ${durationMs}ms: ${error}`);
+            logger.error(`Cron job "${job.id}" failed in ${durationMs}ms: ${error}`, { ...runFields, error });
         }
 
         return logEntry;
@@ -1858,5 +1885,31 @@ export class CronScheduler {
             totalRuns: summary ? summary.totalRuns : job.totalRuns,
             totalFailures: summary ? summary.totalFailures : job.totalFailures
         };
+    }
+}
+
+/**
+ * The fields of a `ctx.log` call written as text then one plain object, or
+ * undefined for any other mix. Exported for tests.
+ */
+export function trailingFields(args: unknown[]): Record<string, unknown> | undefined {
+    if (args.length < 2) return undefined;
+    const last = args[args.length - 1];
+    if (!last || typeof last !== "object" || Array.isArray(last) || last instanceof Error) return undefined;
+    if (Object.getPrototypeOf(last) !== Object.prototype && Object.getPrototypeOf(last) !== null) return undefined;
+    if (!args.slice(0, -1).every((a) => typeof a === "string")) return undefined;
+    return Object.fromEntries(Object.entries(last));
+}
+
+/** Results up to this size (as JSON) ride on the run's log line; larger ones stay in `cron_logs`. */
+const MAX_RESULT_FIELD_BYTES = 2048;
+
+function smallResult(result: unknown): unknown {
+    if (result === undefined || result === null) return undefined;
+    try {
+        const json = JSON.stringify(result);
+        return json !== undefined && json.length <= MAX_RESULT_FIELD_BYTES ? result : undefined;
+    } catch {
+        return undefined;
     }
 }

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9acb2b3f441697d7
+sourceHash: 45d6fa4b1ef2c72a
 title: Environnement & Configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -260,6 +260,7 @@ Un projet qui s'est éjecté gère ces décisions dans son propre code.
 | `REBASE_VAPID_SUBJECT` | Une adresse `mailto:` ou une URL `https://` que les services push peuvent contacter. Par défaut, l'origine d'un `REBASE_PUBLIC_URL` en `https`. | — |
 | `REBASE_MAX_BODY_SIZE` | Taille maximale du corps de requête, **en octets** (`10485760`, et non `10MB` — une valeur qui n'est pas un nombre refuse de démarrer au lieu de supprimer silencieusement la limite). `0` désactive la limite. | `10485760` (10 Mio) |
 | `REBASE_ENABLE_SWAGGER` | L'exposition OpenAPI. À trois états. Non défini, dans chaque environnement : `/api/docs` est servi aux appelants auxquels `GET /api/schema/tables` décrit les tables, chacun recevant le document des tables qui lui sont décrites, et il n'y a pas d'interface Swagger UI. `true` publie l'intégralité du document à tout le monde, avec l'**interface** Swagger UI à `/api/swagger` hors production (jamais en production). `false` maintient le document derrière le contrôle d'accès administrateur. | — |
+| `REBASE_DEPLOYMENT_ID` | Le déploiement que ce processus exécute, tel que la plateforme le nomme ; cité sur la ligne qui dit que le runtime écoute. Rebase Cloud la définit. | — |
 | `REBASE_METRICS` | Exposer les métriques Prometheus à `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Ajoute `includeSubDomains` à l'en-tête `Strict-Transport-Security`, de sorte que les navigateurs refusent le HTTP simple sur chaque sous-domaine de l'hôte pendant six mois — y compris les hôtes non servis par ce processus. Ne l'activez que si chaque sous-domaine du domaine est exclusivement en HTTPS. Toute valeur autre que `true`/`false` refuse de démarrer. Voir [En-têtes de sécurité](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Jeton Bearer protégeant `/metrics`. Non défini laisse le point de terminaison ouvert à tout ce qui peut joindre le port — acceptable sur un réseau privé, pas sur un réseau public, et les logs de démarrage le signalent. | — |

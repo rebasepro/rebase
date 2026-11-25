@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { EnvValidationError, loadEnv, numericEnvVar, optionalNumericEnvVar, type RebaseEnv } from "../env";
 import { BundleError } from "./bundle";
+import { logger } from "../utils/logger";
 
 /**
  * The environment a bundle-booted runtime understands.
@@ -108,6 +109,12 @@ export const bootEnvExtension = z.object({
      * `createRebaseBackend`.
      */
     REBASE_REQUIRE_FILES_LOADED: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    /**
+     * The deployment this process runs, as the platform that started it names
+     * it. Only logged — on the line that says the runtime is listening — so a
+     * log can be tied to the deploy that printed it.
+     */
+    REBASE_DEPLOYMENT_ID: z.string().optional(),
     /** Expose Prometheus metrics at `/metrics`. Off unless asked for. */
     REBASE_METRICS: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     /**
@@ -518,11 +525,11 @@ function refusalReporter(explain: (origin: string) => string): (origin: string) 
         if (named.has(origin) || saturated) return;
         if (named.size >= MAX_NAMED_REFUSALS) {
             saturated = true;
-            console.warn(`[Rebase] Refused cross-origin requests from ${MAX_NAMED_REFUSALS} distinct origins; not naming any more.`);
+            logger.warn(`Refused cross-origin requests from ${MAX_NAMED_REFUSALS} distinct origins; not naming any more.`, { component: "cors" });
             return;
         }
         named.add(origin);
-        console.warn(explain(origin));
+        logger.warn(explain(origin), { component: "cors", origin });
     };
 }
 
@@ -554,9 +561,10 @@ export function resolveCorsOrigin(env: CorsEnv): CorsOriginResolver {
     // worked yesterday should not stop over it — but said, once, at boot.
     for (const entry of entries) {
         if (entry !== "*" && !/^[a-z][a-z0-9+.-]*:\/\//i.test(entry)) {
-            console.warn(
-                `[Rebase] ${source} entry "${entry}" is not an origin and will never match one. ` +
-                "Browsers send scheme://host[:port] — write it as e.g. https://" + entry + "."
+            logger.warn(
+                `${source} entry "${entry}" is not an origin and will never match one. ` +
+                "Browsers send scheme://host[:port] — write it as e.g. https://" + entry + ".",
+                { component: "cors", variable: source, entry, fix: `write it as https://${entry}` }
             );
         }
     }
@@ -578,7 +586,7 @@ export function resolveCorsOrigin(env: CorsEnv): CorsOriginResolver {
         // Once per origin: a refused preflight is retried on every request,
         // and the message is a fix, not an incident.
         const refused = refusalReporter(origin =>
-            `[Rebase] Refused a cross-origin request from ${origin}. ` +
+            `Refused a cross-origin request from ${origin}. ` +
             "In development only localhost is allowed by default. " +
             `To allow it, set CORS_ORIGINS=${origin} (comma-separated for several).`
         );
@@ -613,7 +621,7 @@ export function resolveCorsOrigin(env: CorsEnv): CorsOriginResolver {
     // log clean. Same once-per-origin line as development, minus the localhost
     // advice.
     const refused = refusalReporter(origin =>
-        `[Rebase] Refused a cross-origin request from ${origin}: it is not in ${source}. ` +
+        `Refused a cross-origin request from ${origin}: it is not in ${source}. ` +
         `If it is your frontend, add it (comma-separated for several).`
     );
     return (origin: string) => {

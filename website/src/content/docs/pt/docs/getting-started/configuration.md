@@ -1,5 +1,5 @@
 ---
-sourceHash: 9acb2b3f441697d7
+sourceHash: 45d6fa4b1ef2c72a
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -260,6 +260,7 @@ publicada. Um projeto que executou o eject gerencia essas decisões diretamente 
 | `REBASE_VAPID_SUBJECT` | Um endereço `mailto:` ou URL `https://` que os serviços de push podem contatar. O padrão é a origem de uma `REBASE_PUBLIC_URL` em `https`. | — |
 | `REBASE_MAX_BODY_SIZE` | Corpo máximo da requisição, **em bytes** (`10485760`, não `10MB` — um valor que não seja um número recusa a inicialização em vez de remover silenciosamente o limite). `0` desativa o limite. | `10485760` (10 MiB) |
 | `REBASE_ENABLE_SWAGGER` | A superfície OpenAPI. Tri-estado. Quando não definido, em qualquer ambiente: `/api/docs` é servido aos chamadores para os quais `GET /api/schema/tables` descreve tabelas, cada um recebendo o documento das tabelas descritas para si, e não há UI do Swagger. `true` publica todo o documento para todos, com a **UI** do Swagger em `/api/swagger` fora de produção (nunca em produção). `false` mantém o documento protegido pelo gate de admin. | — |
+| `REBASE_DEPLOYMENT_ID` | O deploy que este processo executa, como a plataforma o nomeia; aparece na linha que diz que o runtime está ouvindo. O Rebase Cloud a define. | — |
 | `REBASE_METRICS` | Expõe métricas do Prometheus em `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Adiciona `includeSubDomains` ao cabeçalho `Strict-Transport-Security`, fazendo com que os navegadores recusem HTTP não criptografado em todos os subdomínios do host por seis meses — incluindo hosts não atendidos por este processo. Ative apenas quando todos os subdomínios do domínio forem exclusivos em HTTPS. Qualquer valor diferente de `true`/`false` recusa a inicialização. Consulte [Cabeçalhos de segurança](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Bearer token de proteção para `/metrics`. Se não definido, deixa o endpoint aberto para qualquer um que alcance a porta — adequado em uma rede privada, não em uma pública, e os logs de boot alertam sobre isso. | — |

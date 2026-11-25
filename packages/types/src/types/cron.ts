@@ -122,6 +122,11 @@ export interface CronJobContext<DB = RegisteredDatabase> {
      * server log at `info`, with a `cron` field holding the job ID, and kept
      * with the run's log entry — the first 500 lines or 64 KB of them,
      * whichever comes first, then one line saying how many more there were.
+     *
+     * Text followed by one plain object — `ctx.log("scored", { leads: 3 })` —
+     * writes the text as the message and the object's keys as fields of the
+     * server log line, so they can be filtered on. The kept run log shows the
+     * line as `scored {"leads":3}`.
      */
     log: (...args: unknown[]) => void;
 
