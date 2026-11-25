@@ -20,6 +20,11 @@
  * grants it to the same people: the project's organization owners and admins,
  * with Studio switched on for the project.
  *
+ * Beside the data tools it serves the read-only storage tools
+ * (`storage-tools.ts`) to a token holding `storage:read`, through the
+ * deployment's storage sources and its storage rules. The public `/mcp` does
+ * not offer them.
+ *
  * Independent of `REBASE_MCP_ENABLED`: that is the app owner's decision to
  * hand credentials to third-party software, and turning this on hands none.
  *
@@ -36,7 +41,8 @@ import {
     type PlatformTokenConfig
 } from "../auth/platform-token.js";
 import { createMcpRoutes, type McpRoutesConfig } from "./mcp-routes.js";
-import type { McpCaller } from "./mcp-tools.js";
+import { MCP_TOOLS, type McpCaller } from "./mcp-tools.js";
+import { MCP_STORAGE_READ_TOOLS } from "./storage-tools.js";
 
 /** Where it is mounted, under `basePath`. */
 export const PLATFORM_MCP_PATH = "/admin/mcp";
@@ -51,6 +57,9 @@ export type PlatformMcpConfig = Omit<McpRoutesConfig, "authenticate" | "resolveA
 export function createPlatformMcpRoutes(config: PlatformMcpConfig): Hono<HonoEnv> {
     return createMcpRoutes({
         ...config,
+        // The default data tools, and the storage reads. `MCP_TOOLS` already
+        // refuse undeclared arguments; the routes wrap them again, harmlessly.
+        tools: [...MCP_TOOLS, ...MCP_STORAGE_READ_TOOLS],
         async authenticate(request): Promise<McpCaller | { refusal: string }> {
             const token = extractBearerToken(request.header("authorization"));
             if (token === undefined || !isPlatformToken(token)) {

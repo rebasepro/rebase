@@ -70,7 +70,7 @@ a project's data does. `rebase cloud connect --list` shows the ones you added.
 
 ## What Claude can do with it
 
-Thirteen tools. The first nine only read:
+Sixteen tools. The first twelve only read:
 
 | Tool | What it does |
 |---|---|
@@ -79,6 +79,9 @@ Thirteen tools. The first nine only read:
 | `logs` | The running app's output, a deployment's build log, or a cron job's runs |
 | `schema` | A project's tables, or one table's columns, relations and security rules |
 | `query` | Reads rows: one by id, a filtered page, or a count |
+| `storage_list` | Lists one folder of a project's file storage, a page at a time, and names its storage sources and the bucket each serves |
+| `storage_head` | Says whether a file is there, and its size, type and last change. It takes the key, or the `s3://bucket/key` value a row stores |
+| `storage_get` | Reads a file: its content when it is text (the first 64 KB by default), or its size and type when it is binary |
 | `show_table` | Opens a table in your admin panel's own view, in the conversation: a table, list, cards or kanban board you can search, filter and page, where a row opens its form |
 | `show_record` | Opens one row's form, or a form for a new row Claude filled in, for you to check and save |
 | `show_app` | Builds a small app for the task at hand, such as a triage queue or a dashboard, and runs it on your data in the conversation. It can use your admin panel's views and forms, and asks you before it changes anything |
@@ -128,18 +131,20 @@ conversation.
 - **Projects and cloud operations**: what the console allows you. A member of an
   organization can read status and logs and, as in the console, deploy and set
   variables.
-- **Data, schemas and cron jobs**: what Studio in the console allows you. That
+- **Data, files, schemas and cron jobs**: what Studio in the console allows you. That
   is an owner or admin of the organization, on a project whose Studio access is
   switched on, or on a self-hosted instance the organization connected. Calls run inside the project, under its row-level security, with
-  the admin role Studio has. Turning Studio access off for a project turns this
-  off too.
+  the admin role Studio has. Files are read through the project's own storage
+  sources (Rebase storage, or the bucket its `S3_*` variables configure) under
+  its storage rules, and never written or deleted. Turning Studio access off
+  for a project turns this off too.
 - **What you granted.** You can grant the connector less than your account
   holds: only reading, or only one project. It never asks for backups,
   restores, database credentials or project settings.
 
 A project reaches its data through the connector once it runs a runtime that
-takes the connector's calls. Until its next deploy or platform rollout, those
-tools say so.
+takes the connector's calls, and its files once that runtime has the storage
+tools. Until its next deploy or platform rollout, those tools say so.
 
 ## Disconnecting
 

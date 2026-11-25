@@ -228,6 +228,8 @@ export type { ApiKeyIdentity, ApiKeyRefusal } from "./auth/api-keys";
 // extend or replace.
 export { McpToolError } from "./mcp/mcp-tools";
 export type { McpToolDefinition, McpToolContext, McpCaller, McpToolAnnotations } from "./mcp/mcp-tools";
+// What a tool context's `storage` holds: the storage tools' sources and rule.
+export type { McpStorageAccess } from "./mcp/storage-tools";
 // For a server that relays the view tools to an app's own `/mcp` (the hosted
 // connector): the view they open, which they are, their arguments, and what
 // show_app teaches about the code it runs — so the two never disagree.

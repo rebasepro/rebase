@@ -179,6 +179,7 @@ import { createOAuthRoutes, grantIdentityFromRepository } from "../mcp/oauth-rou
 import { createMcpRoutes, createMcpWellKnownRoutes } from "../mcp/mcp-routes";
 import type { McpCaller } from "../mcp/mcp-tools";
 import { createPlatformMcpRoutes, PLATFORM_MCP_PATH } from "../mcp/platform-mcp";
+import type { McpStorageAccess } from "../mcp/storage-tools";
 import { ADMIN_APPS_MCP_PATH, createAdminAppsMcpRoutes } from "../mcp/admin-apps-mcp";
 import {
     BackendStorageConfig,
@@ -187,6 +188,7 @@ import {
     createUploadPathResolver,
     DEFAULT_MAX_FILE_SIZE,
     DEFAULT_STORAGE_ID,
+    DefaultStorageRegistry,
     StorageController,
     StorageRegistry
 } from "../storage";
@@ -2028,6 +2030,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             getDriver: () => defaultDriver,
             getTables: () => tableRegistry.list(),
             getAuthAdapter: () => authAdapter,
+            // The storage tools read the sources the storage routes serve,
+            // under the rule those routes apply. Unset without storage.
+            getStorage: () => platformMcpStorage,
             serverInfo: {
                 name: "rebase",
                 version: readRuntimeVersion([process.cwd()]) ?? "unknown"
@@ -2681,6 +2686,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // it cannot import the server itself — it is declared in the project's
     // config package, which depends on `@rebasepro/types` alone.
     const storageAuthorizeData: { current?: import("@rebasepro/types").StorageAuthorizeData } = {};
+    /** What the platform MCP endpoint's storage tools read: set below when storage is on. */
+    let platformMcpStorage: McpStorageAccess | undefined;
 
     // The storage group (the routes, or the stub that says storage is off),
     // and the admin group's storage maintenance surface.
@@ -2769,6 +2776,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                     && config.storageInsecureAllowAnyAuthenticated !== true
             })
             : codeStorageAccessControl;
+        platformMcpStorage = {
+            registry: storageRegistry ?? DefaultStorageRegistry.create(storageController ?? {}),
+            authorize: storageAccessControl,
+            authorizeData: () => storageAuthorizeData.current
+        };
 
         assertStorageAccessControlConfigured(
             {

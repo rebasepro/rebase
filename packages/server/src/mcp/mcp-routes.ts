@@ -57,6 +57,7 @@ import {
     type McpScopeVocabulary
 } from "./oauth-metadata.js";
 import { toolsForScopes, declaredArgumentsOnly, McpToolError, MCP_TOOLS, type McpCaller, type McpToolDefinition } from "./mcp-tools.js";
+import type { McpStorageAccess } from "./storage-tools.js";
 import type { McpViewPreferences } from "./mcp-view.js";
 import { memoryConfirmationStore, withConfirmation, type McpConfirmationStore } from "./confirmation.js";
 import {
@@ -206,6 +207,11 @@ export interface McpRoutesConfig {
      * does. Without one, those rows are written like any table's.
      */
     getAuthAdapter?(): AuthAdapter | undefined;
+    /**
+     * The deployment's file storage, for the storage tools an endpoint serves
+     * (`storage-tools.ts`). Read per call. Absent, those tools refuse.
+     */
+    getStorage?(): McpStorageAccess | undefined;
     /** The server's own name and version, for `initialize`. */
     serverInfo: { name: string; version: string };
     /**
@@ -834,12 +840,14 @@ error });
         }
 
         const getUiPreferences = config.getUiPreferences;
+        const storage = config.getStorage?.();
         try {
             const result = await tool.run(args, {
                 driver,
                 tables: config.getTables(),
                 authAdapter: config.getAuthAdapter?.(),
                 caller,
+                ...(storage && { storage }),
                 ...(compileApp && { compileApp }),
                 ...(getUiPreferences && { uiPreferences: () => getUiPreferences(caller) })
             });
@@ -852,7 +860,7 @@ error });
             // and every character of it is a token the model pays for.
             const source = typeof args.table === "string"
                 ? `${name} on table ${JSON.stringify(args.table)}`
-                : name;
+                : typeof args.path === "string" ? `${name} on file ${JSON.stringify(args.path)}` : name;
             const read = tool.modelResult ? tool.modelResult(result) : result;
             if (tool.ownText && typeof read === "string") {
                 return rpcResult(id, { content: [{ type: "text", text: read }] });

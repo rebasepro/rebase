@@ -74,11 +74,14 @@ export const PLATFORM_TOKEN_SCOPES: readonly AdminScope[] = ["cron:read", "cron:
 
 /**
  * What a platform token can be granted on the platform's MCP endpoint, and
- * only there: the app's own MCP data tools. Never on `/api/data`, the socket,
- * the public `/mcp`, or an admin surface. Added with the hosted connector, in
- * the same review as `cron:write`.
+ * only there: the app's own MCP data tools, and the read-only storage tools
+ * (`mcp/storage-tools.ts`). Never on `/api/data`, `/api/storage`, the socket,
+ * the public `/mcp`, or an admin surface. The data scopes were added with the
+ * hosted connector, in the same review as `cron:write`; `storage:read` so the
+ * connector can tell whether the file a row names is in the bucket. No storage
+ * write or delete: the connector changes no file.
  */
-export const PLATFORM_MCP_SCOPES: readonly string[] = ["data:read", "data:write", "data:delete"];
+export const PLATFORM_MCP_SCOPES: readonly string[] = ["data:read", "data:write", "data:delete", "storage:read"];
 
 /**
  * What a platform token can be granted at the sign-in door, and only there:
