@@ -452,6 +452,35 @@ runtime or proxy in front:
   Each entry is exactly one origin (`https://host[:port]`, or `http://` for
   localhost) — no wildcard, no path; anything else is refused before deploy.
 
+### Redirects and clean URLs on a static app
+
+```jsonc
+"site": {
+  "type": "static", "root": "site", "output": "site",
+  "path": "https://www.example.com",
+  "cleanUrls": true,
+  "redirects": [
+    { "from": "/blog/:slug", "to": "/posts/:slug", "status": 301 },
+    { "from": "/docs/:path*", "to": "https://docs.example.com/:path*" }
+  ]
+}
+```
+
+- `cleanUrls` serves `x.html` at `/x`.
+- In `from`, `:name` matches one segment and a trailing `:name*` the rest of
+  the path. `to` is a path on the same address or an absolute URL. `status` is
+  `301`, `302`, `307` or `308`; left out, `308`.
+- `host`, `notHost` and `query` narrow a redirect to one hostname, every
+  hostname but one, or a query string holding exact values.
+- Redirects are checked in order, before any file of the build. A `routes`
+  path stays the function's, and `/api`, `/health` and the backend's other
+  paths are never redirected.
+- `rebase.json` is refused when a redirect could never match, when two match
+  the same requests, or when one loops onto its own `from`.
+- `rebase dev` serves them too for a static app with no build step.
+
+Do not write a custom function or a proxy to redirect a path.
+
 ---
 
 ## Diagnosing a failed deploy
@@ -690,6 +719,7 @@ out.
 | `rebase cloud claim` | That link again, and how long is left |
 | `rebase cloud projects list` / `create` / `info` / `delete` | Projects |
 | `rebase cloud db list` / `create` / `info` / `connect` / `test` | Databases (`connect` tunnels a local port to it; owner or admin) |
+| `rebase cloud db query [sql] [--file <path>]` | Run SQL on the managed database with no local `psql`; a file runs as one script and stops at the first error. Owner or admin. `COPY … FROM STDIN` is refused |
 | `rebase cloud db backup list` / `create` / `restore` / `status` / `download` | Backups |
 | `rebase cloud db pitr status` / `restore` / `cutover` / `discard` | Point-in-time recovery |
 | `rebase cloud deploy` / `logs` / `deployments list` | Ship and observe |
@@ -699,6 +729,7 @@ out.
 | `rebase cloud previews` / `previews delete <name>` | Builds served at their own address by `deploy --preview` |
 | `rebase cloud rollback` / `cancel` | Recover |
 | `rebase cloud start` / `stop` / `restart` / `status` / `metrics` / `debug` | Operate; `metrics --runtime` is requests, errors and latency per surface, `--history` over time |
+| `rebase cloud sleep` / `sleep on [--after 15m\|30m\|1h\|4h]` / `off` / `wake` | Sleep when idle. Asleep, the project holds no CPU or memory, scheduled jobs and background work do not run, and the next request wakes it (up to about a minute) |
 | `rebase cloud cron` | The deployed app's cron jobs and their runs. Read-only |
 | `rebase cloud env list` / `set` / `unset` / `reset` / `reveal` / `pull` | Configuration |
 | `rebase cloud domains list` / `add` / `verify` / `remove` / `primary <domain>` / `redirect <domain> [--off]` | Custom domains; `primary` makes a verified one canonical, `redirect` answers another with a 308 to it |
@@ -709,6 +740,7 @@ out.
 | `rebase cloud storage` / `storage create <bucket>` / `delete <bucket>` / `keys [create\|rotate\|revoke]` / `usage` / `limit [GB]` / `cors <bucket>` / `import` / `attach` | Rebase Storage (S3-compatible buckets and keys; a key's secret is printed once), and your own bucket with `attach` |
 | `rebase cloud notifications` / `add <url>` / `test <id>` / `remove <id>` | Deploy, backup, billing and usage events to Slack, Discord or any URL |
 | `rebase cloud orgs list` / `create` / `rename` / `delete` / `members` | Organizations |
+| `rebase cloud access` / `invite <email> --role admin\|developer\|viewer` / `role` / `remove` / `invites` | Who reaches one project, and whether the role comes from the organization or the project |
 | `rebase cloud billing` / `billing setup` / `billing checkout` / `billing email <address>` | Card on file, and where invoices go |
 | `rebase cloud usage` / `usage org` | Requests used this month against the allowance, and the overage so far |
 | `rebase cloud activity` | The organization's audit log, newest first |

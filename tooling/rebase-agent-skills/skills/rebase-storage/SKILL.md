@@ -99,6 +99,7 @@ These options are set internally when mounting routes but are derived from the b
 >
 > - `storageAuthorize` — a hook, per object. Recommended.
 > - `storagePolicies` — declarative path patterns (`{ path: "users/:uid/**", allow: ({ params, user }) => user?.uid === params.uid }`). A key no policy matches is refused unless a `storageAuthorize` hook allows it. Ejected-only.
+> - `STORAGE_POLICIES` — the same rules as JSON in an environment variable, for the managed runtime and for a project with no code of its own (see below).
 > - `storagePublicRead: true` — the bucket genuinely is a public read-only CDN.
 > - `storageInsecureAllowAnyAuthenticated: true` — a single-tenant app where every signed-in user is trusted with every file. Named to be read twice.
 >
@@ -129,13 +130,40 @@ await initializeRebaseBackend({
 
 Return `false` to deny with a **403**. Throwing also denies — an ownership lookup that fails does not fall open.
 
+### Rules as data: `STORAGE_POLICIES`
+
+The managed runtime cannot read a predicate from your code, so the same
+deny-by-default rules can be set as JSON:
+
+```bash
+STORAGE_POLICIES='[
+  { "path": "public/**", "operations": ["read"], "allow": "public" },
+  { "path": "users/:uid/**", "allow": "owner" },
+  { "path": "**", "allow": { "roles": ["admin"] } }
+]'
+```
+
+| `allow` | Grants |
+|---|---|
+| `"public"` | anyone the route lets in |
+| `"authenticated"` | any signed-in caller |
+| `"owner"` | the signed-in caller whose uid is the key's `:uid` segment — the `path` must capture one |
+| `{ "roles": [...] }` | a signed-in caller holding any of these roles |
+
+They compile to `storagePolicies`: a key no rule covers is asked of
+`storageAuthorize` if the project has one, and refused if not. An invalid list
+refuses the boot, naming each problem. On Rebase Cloud the console edits the
+list under **File storage → Access rules**. Reach for the hook when the answer
+lives in a row (team membership, a document's owner); the rules cover paths,
+sign-in and roles.
+
 Notes:
 
 - **`GET /metadata/*` is the important one.** It mints the short-lived path-scoped download token that `GET /file/*` trusts, so it is where read access is really decided. The hook gates it.
 - Two reads **skip** the hook: one carrying a valid scoped download token (the token was minted under the hook and is valid only for its own path and source, until it expires), and a read of a key under `public/` by a caller with **no** credential. A signed-in caller's read of a `public/` key is still asked about, so a hook cannot make a `public/` key private — store it outside `public/`.
 - `list` is gated on the *prefix*. Listing is how you discover keys nobody told you about.
 - TUS resumable uploads are gated at create time, so a denied upload leaves no temp file behind.
-- Omitting the hook (and `storagePolicies`) leaves no per-object check — so production refuses to boot unless `storagePublicRead` or `storageInsecureAllowAnyAuthenticated` is set (see above).
+- Omitting the hook (and `storagePolicies`, and `STORAGE_POLICIES`) leaves no per-object check — so production refuses to boot unless `storagePublicRead` or `storageInsecureAllowAnyAuthenticated` is set (see above).
 
 ## Storage Providers
 

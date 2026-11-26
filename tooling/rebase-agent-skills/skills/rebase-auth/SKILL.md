@@ -187,6 +187,45 @@ The `find-user` endpoint is authenticated-only and returns just the minimal
 public profile. It is off by default because it enables user enumeration by any
 signed-in user.
 
+### Creating accounts from the CLI, and importing them
+
+```bash
+rebase users create ada@example.com --role admin   # emails an invitation
+rebase users create ada@example.com --no-invite    # no password, no email
+rebase users import users.csv --dry-run
+rebase users import users.csv --password-hashes bcrypt
+```
+
+- `create` emails an invitation, or prints a temporary password once when no
+  mail can be sent. `--no-invite` creates the account with no password and
+  sends nothing, for an app that signs in by magic link, an email code or a
+  provider (`POST /api/admin/users` with `invite: false`).
+- `import` brings accounts from another system and **keeps their ids**, so
+  rows that point at a user still do. It reads CSV, JSON or NDJSON with the
+  columns `id`, `email` (required), `display_name`, `photo_url`, `created_at`,
+  `email_verified`, `roles`, `password_hash`. It sends no email, and an id or
+  email already taken is skipped, never updated, so a file can be run again.
+- A `password_hash` column is read only with `--password-hashes bcrypt`;
+  without the flag a file that has one is refused. An imported hash signs the
+  account in with the password it had, and the first sign-in replaces it with
+  Rebase's own. A plain password is never imported.
+- The route is `POST /api/admin/users/import` (`users:write`), 100 accounts per
+  request from the CLI; `rebase.admin.importUsers(...)` is the SDK call. Both
+  commands take `--project <slug>` for a Rebase Cloud project.
+
+### Where a magic link points: `MAGIC_LINK_URL`
+
+An emailed magic link is `<base>/auth/magic-link?token=…`, where the base is
+`MAGIC_LINK_URL`, else `FRONTEND_URL`. A frontend that does not serve that
+path sets the whole link as a template with `{token}`:
+
+```bash
+MAGIC_LINK_URL="https://app.example.com/app.html#ml={token}"
+```
+
+Quote it: an unquoted `#` starts a comment in `.env`, and the backend warns at
+boot about a value with a hash or a file path and no `{token}`.
+
 ---
 
 ## OAuth Providers

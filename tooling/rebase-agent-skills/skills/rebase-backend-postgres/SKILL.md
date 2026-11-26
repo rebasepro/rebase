@@ -553,6 +553,50 @@ A project has no `drizzle.config.ts` and runs no `drizzle-kit`: do not create on
   touched. If the database cannot be read to build that list, the command fails
   rather than plan without it.
 
+### SQL a table cannot express: `backend/sql/`
+
+Functions, triggers, CHECK constraints and grants go in `backend/sql/*.sql`.
+Do not run them by hand, and do not put them in a boot hook:
+
+- `rebase db push` applies the files in name order, after the tables and views
+  and before the policies. `rebase dev` applies them at boot, and so does a
+  deploy: `rebase build` carries them in the bundle.
+- Each file runs in its own transaction and is recorded by hash in
+  `rebase.sql_files`, so it runs again only when its content changes. **Write
+  every file so it is safe to run again** (`CREATE OR REPLACE FUNCTION`,
+  `DROP TRIGGER IF EXISTS` before `CREATE TRIGGER`, `ADD CONSTRAINT` guarded).
+- A failing file is rolled back and stops the push, or the boot, naming the
+  file and Postgres' error.
+- A file whose name starts with `_` is a draft and is skipped.
+- Nothing is applied under `REBASE_PROVISION=false` or
+  `REBASE_MIGRATE_ON_BOOT=none`. A backend that builds its own adapter names
+  the directory: `createPostgresAdapter({ sqlDir: "backend/sql" })`.
+
+`rebase schema introspect` writes what it could not carry into table files
+(functions, triggers, extensions, CHECKs, composite or cross-schema foreign
+keys) to `backend/sql/_introspected-left-behind.sql`. Review it, make it safe
+to run again, and rename it without the leading `_` to have it applied.
+
+### Adopting a Supabase database
+
+`rebase schema introspect --from supabase` translates Supabase's conventions
+for a database you are leaving: an `auth.uid()` default becomes
+`.onCreateUser()`, a column holding a Supabase user id becomes
+`col.text().userId()` (`rebase.users.id` and `rebase.uid()` are text), and a
+policy `TO authenticated` / `TO anon` becomes a signed-in / signed-out
+condition; a `service_role`-only policy is dropped. Leave the flag off when
+Rebase runs beside Supabase on the same database. Accounts come over with
+`rebase users import --password-hashes bcrypt` (see the **`rebase-auth`** skill).
+
+### Policies the tables no longer declare
+
+`rebase db push` lists policies on your tables that no table declares as "left
+in force" and leaves them: after a table moves to `rls: "admin-only"`, its old
+policies still grant access. `rebase db push --prune-policies` drops them in
+the transaction that applies the declared ones, gated like a dropped column (a
+prompt on a terminal, `--allow-destructive` elsewhere). Tables `backend/schema`
+does not declare, and the `rebase` schema, are never touched.
+
 ## Entity History (Audit Trail)
 
 Enable audit logging for all entity mutations by setting `history: true` in the backend config:

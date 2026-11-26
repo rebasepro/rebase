@@ -28,6 +28,7 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `/api/auth/scopes` | Every scope the backend knows, and the ones the caller holds |
 | `/api/storage/*` | File uploads and downloads |
 | `/api/functions/{name}` | Custom backend functions |
+| `/api/rpc/{name}` | `POST` only: a Postgres function declared with `defineRpc`, its named arguments as the JSON body, run as the caller under RLS. Undeclared: `404 RPC_NOT_FOUND` |
 | `/api/admin/schema-editor/*` | Source-only schema editor: `TablePatch` edits written into `backend/schema` (dev only; `/api/schema-editor/*` is a deprecated alias) |
 | `/api/docs` | OpenAPI 3.0.3 JSON spec — by default for the callers `GET /api/schema/tables` describes tables to, each the tables they may see; everyone with `enableSwagger: true`; admins with `false` |
 | `/api/swagger` | Swagger UI — only with `enableSwagger: true` (`REBASE_ENABLE_SWAGGER=true`), never in production |

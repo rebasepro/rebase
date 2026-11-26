@@ -180,12 +180,13 @@ booting and prints that line.
 | `--force` | — | Overwrite table modules that are already there |
 | `--data-inference` / `--no-data-inference` | — | Sample up to 100 rows per table to detect formats, or read the structure only. Without either it asks; with no terminal, structure only |
 | `--database-url` / `--docker` | — | Read that database, or the compose one, instead of the one `rebase db url` prints |
+| `--from supabase` | — | Translate Supabase's conventions (`auth.uid()` defaults, `auth.users` foreign keys, `TO anon` / `TO authenticated`). Leave it off when Rebase runs beside Supabase on the same database |
 
 ### Database Commands
 
 | Command | Description |
 |---------|-------------|
-| `rebase db push` | Apply schema directly to database (development only). `--dry-run` prints the SQL; a change that drops data needs `--allow-destructive` |
+| `rebase db push` | Apply schema directly to database (development only), then the `backend/sql/*.sql` files that changed. `--dry-run` prints the SQL; a change that drops data needs `--allow-destructive`; `--prune-policies` also drops policies on your tables that no table declares |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending SQL migrations. `--refuse-destructive` applies nothing when a pending file drops or narrows data; `--baseline <version>` for a database boot already created |
 | `rebase db branch` | Database branching (create, list, switch, delete, info, diff, merge, prune) — needs a real PostgreSQL. `merge <name>` shows the diff, asks, and writes the branch's row changes onto its parent (`--on-conflict abort\|branch\|target`, `--skip-blocked`); `delete`, `merge` and `prune` ask first, and with no terminal they need `--yes` |
@@ -304,7 +305,7 @@ Act on a running app through its own API, so row-level security, field access, h
 | `rebase data import <table> --file rows.csv` | Bulk writes from JSON, NDJSON or CSV; `--upsert <column>` |
 | `rebase data history\|revert\|watch <table>` | Row history and revert (history on); `watch` tails changes over the realtime socket |
 | `rebase schema show [table] [--remote]` | The tables and their columns: from `backend/schema`, or as the server serves them. Read this before `data query` |
-| `rebase users list\|get\|create\|update\|delete\|reset-password\|mfa-reset\|roles\|guests` | Accounts; `create <email> --role admin`, `update <email> --add-role editor`, `guests prune --older-than 30d --yes` |
+| `rebase users list\|get\|create\|import\|update\|delete\|reset-password\|mfa-reset\|roles\|guests` | Accounts; `create <email> --role admin` (`--no-invite`: no password, no email), `import users.csv [--dry-run] [--password-hashes bcrypt]` keeps the ids another system gave them, `update <email> --add-role editor`, `guests prune --older-than 30d --yes` |
 | `rebase cron list\|get\|logs\|run\|enable\|disable\|reset` | Scheduled jobs; on Cloud, reads need log access and the rest owner/admin with Studio on |
 | `rebase logs [-f]` | The server's log buffer (`--level`, `--source`, `--search`); on `--project` it is `rebase cloud logs --runtime` |
 | `rebase functions list\|invoke <name> [path]` | Your `backend/functions` routes; `invoke` takes `rebase api`'s flags. `--anon` shows what a visitor gets |
@@ -348,10 +349,30 @@ Act on a running app through its own API, so row-level security, field access, h
 | `rebase skills install` | Install these skills for your AI coding assistant. `--agent claude,cursor` (or `all`) skips detection, and is required without a TTY. `--mcp` also registers the MCP server, `--hooks` the Claude Code `rebase verify` hook; `--force` replaces edited files |
 | `rebase skills --hooks` | Install only the Claude Code hook that runs `rebase verify --quiet` after each edit under `backend/schema/` or `frontend/src/cms/` |
 
+### Connecting an AI client to the app (`rebase mcp`)
+
+| Command | Description |
+|---------|-------------|
+| `rebase mcp connect` | Connect an AI client to the running app's own `/mcp` endpoint, where an agent signs in as a person under that person's RLS. Picks from a list; `--client claude-code,cursor,vscode,claude,chatgpt` (or `all`) skips it; `--print` prints the URL, the `claude mcp add` command and the install links and changes nothing; `--name <name>` (default: the project's name, `-local` on a dev server) |
+| `rebase mcp url` | Print the endpoint's URL, read from the server |
+
+Both ask the project's own server (`REBASE_BASE_URL`, else the running
+`rebase dev`), `--cloud` the linked Rebase Cloud project, `--url <server>` any
+backend. `rebase dev` serves `/mcp` with nothing to configure, unless
+`REBASE_MCP_ENABLED` is set in the shell or `.env`; a deployed server needs
+`REBASE_MCP_ENABLED=true` and `REBASE_PUBLIC_URL`. Claude and ChatGPT connect
+from their own servers and cannot reach `localhost`.
+
+> **IMPORTANT FOR AGENTS:** This is not the `@rebasepro/mcp` server in
+> `.mcp.json`, the developer tool that drives the CLI for a coding agent
+> (`rebase skills install --mcp`). Never register the app's endpoint under the
+> name `rebase`: it would hide that one.
+
 ### Other commands
 
 | Command | Description |
 |---------|-------------|
+| `rebase apps add admin` | Add the admin panel to a headless or ported project, as `rebase init` would have written it: at `/`, or at `/admin` when another app is at `/`; `--path /console` or an https URL puts it elsewhere |
 | `rebase generate view <slug>` | Scaffold a custom admin screen; `--collection <slug>` makes it a record tab (`--name`, `--icon`, `--dry-run`, `--force`) |
 | `rebase storage orphans` | List the stored files no row names (`--delete` to delete them) |
 | `rebase storage move` | Copy a folder of files to another storage source (`--from`, `--to`, `--prefix`, `--delete-source`, which asks first) |

@@ -925,6 +925,21 @@ await rebase.functions.invoke('my-function', payload, {
 });
 ```
 
+### SQL functions (`rebase.rpc`)
+
+A Postgres function the backend declares with `defineRpc` is called by name,
+as the caller, under row-level security (`POST /api/rpc/<name>`):
+
+```typescript
+const trips = await rebase.rpc<Trip[]>("my_trips", { limit: 20 });
+const proposal = await rebase.rpc<Proposal | null>("get_public_proposal", { token });
+```
+
+The answer follows the function's return type: an array for `SETOF` / `TABLE`,
+the row (or `null`) for a row type, the value for a scalar, `null` for `void`.
+A name the backend did not declare is `404 RPC_NOT_FOUND`. Declaring one is in
+the **`rebase-custom-functions`** skill.
+
 ## Admin Operations
 
 > **IMPORTANT FOR AGENTS:** Admin operations require a service key or admin-level JWT token. These should only be used in server-side scripts or admin panels — never expose them in client-side code.

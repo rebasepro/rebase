@@ -553,6 +553,78 @@ const result = await client.functions.invoke('extract-job', { url });
 - **Data export** — CSV/Excel downloads of collection data
 - **Health checks** — Custom readiness/liveness probes
 
+## Timeouts
+
+A request to a function has 30 seconds, then answers `504 FUNCTION_TIMEOUT`
+(the handler keeps running; pass `getSignal(c)` to `fetch` so outbound calls
+stop). `functionsTimeoutMs` / `REBASE_FUNCTIONS_TIMEOUT_MS` changes it for
+every function, and `0` disables it. A function that waits on a slow service
+declares its own, as the second argument of `defineFunction`:
+
+```typescript no-verify
+export default defineFunction((app) => {
+    app.post("/", async (c) => c.json(await summarize(await c.req.json(), getSignal(c))));
+}, { timeoutMs: 150_000 });
+```
+
+It replaces the server-wide timeout for that function only, longer or shorter,
+and applies even where the server-wide one is `0`. The server caps it at
+`REBASE_FUNCTIONS_MAX_TIMEOUT_MS` (5 minutes by default); a function that asks
+for more gets the cap.
+
+## Logging
+
+Import `logger` from `@rebasepro/server/functions`, not `console`:
+
+```typescript no-verify
+import { logger } from "@rebasepro/server/functions";
+
+logger.info("charged", { orderId, amountCents });
+```
+
+It is the runtime's structured logger: one JSON line in production, carrying
+the request's `requestId` and `uid` without passing them, and filtered by
+`LOG_LEVEL`. `logger.child({ component: "billing" })` names a subsystem on
+every line it writes. Methods: `debug`, `info`, `warn`, `error`.
+
+## A SQL function is not a custom function — `defineRpc`
+
+When the endpoint is one Postgres function, do not write a handler for it.
+Declare it in `backend/schema/` and it is served at `POST /api/rpc/<name>`,
+run as the caller under row-level security:
+
+```typescript no-verify
+// backend/schema/rpc.ts — exported from backend/schema/index.ts
+import { defineRpc, json } from "@rebasepro/server/schema";
+
+export const myTrips = defineRpc("my_trips", {
+    access: "authenticated",                       // or "public": anyone, always rate-limited
+    args: { limit: json.number().validate({ integer: true, max: 100 }) }
+});
+
+export const bookTrip = defineRpc("book_trip", {
+    access: "authenticated",
+    write: true,                                   // without it the call is read-only
+    args: { trip_id: json.number().required() }
+});
+```
+
+- The first argument is the function's name as Postgres stores it. `schema`
+  defaults to `"public"`. The SQL function itself is yours to create, in a file
+  under `backend/sql/` (see the **`rebase-backend-postgres`** skill).
+- Only declared functions are callable; anything else answers `404 RPC_NOT_FOUND`.
+  A declaration in `backend/schema/` that `index.ts` does not export stops the boot.
+- `access` is required. `"authenticated"` is any caller with an identity (a
+  session, a guest, an API key, the service key); an anonymous one gets `401`.
+- The body is validated against `args` before the database sees it: an unknown
+  key, a missing `.required()` argument or a wrong type is `400 VALIDATION_CONSTRAINT`.
+- A function that writes without `write: true` fails with `500 RPC_READ_ONLY`.
+- A `public` RPC is held to 120 calls a minute per caller unless it declares
+  `rateLimit: { limit, windowMs }`.
+- `RAISE EXCEPTION '…'` in the function answers `400 RPC_EXCEPTION` with that message.
+- Call it with `rebase.rpc<T>("my_trips", { limit: 20 })`. Type the arguments
+  with `RpcArgs<typeof myTrips>`, importing the declaration as a type only.
+
 ## File Discovery Rules
 
 - Files must be `.ts` or `.js` (not `.d.ts`, not `.test.*`)
