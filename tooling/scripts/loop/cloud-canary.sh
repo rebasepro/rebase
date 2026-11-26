@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # The documented path from nothing to a live Rebase Cloud project, timed step by
-# step: scaffold → link → deploy → verify what is actually serving.
+# step: create → scaffold → link → deploy → verify what is actually serving →
+# delete the project again.
 #
 #   tooling/scripts/loop/cloud-canary.sh <scratch-dir> [options]
 #
@@ -8,12 +9,16 @@
 #                        globally installed one)
 #     --keep             leave the scaffold on disk (default: only logs/ is kept)
 #
-# It deploys to ONE project, the Cloud project whose slug is `loop-canary`, and
-# to nothing else: the slug is not an option. It never creates a project (that
-# was done once, by hand: `rebase cloud projects create --name loop-canary
-# --subdomain loop-canary --org <Rebase Team> --link --yes`), never sets env or
-# cron, never deletes. It refuses when the project is missing, when the link
-# that `cloud link` wrote names another project, or when nobody is signed in.
+# It leaves nothing behind in the cloud. Each run creates its own project,
+# `loop-canary-<UTC date>`, in the Rebase Team organization, and deletes it when
+# the script exits, however it exits (an EXIT trap: a failed step, Ctrl-C, a
+# kill). A new slug per run because a deleted project's subdomain cannot be
+# used again. On the way out it also deletes any other `loop-canary` /
+# `loop-canary-<8 digits>` project a crashed run left, and fails if one is
+# still listed afterwards. The slug is not an option: this script cannot name,
+# deploy to or delete a project outside that pattern. It never sets env or
+# cron. It refuses when nobody is signed in, when there is no Rebase Team
+# organization, or when the link that `cloud link` wrote names another project.
 #
 # "Live" is checked from outside, because the platform's own status can say
 # healthy while the old version serves: the page, /health, an asset whose bytes
@@ -25,7 +30,9 @@
 # Exit status is non-zero when any step fails; the last lines are a table.
 set -uo pipefail
 
-SLUG="loop-canary"   # the only project this script may touch
+SLUG="loop-canary-$(date -u +%Y%m%d)"   # this run's project; created and deleted here
+CANARY_SLUG_RE='^loop-canary(-[0-9]{8})?$'   # the only slugs this script may touch
+ORG_NAME="Rebase Team"                      # test projects go here, never in a client's org
 HOST="https://$SLUG.rebase.website"
 
 DIR="${1:-}"
@@ -76,6 +83,45 @@ finish() {
     [ "$KEEP" = 1 ] || rm -rf "$APP"
     exit "$FAILED"
 }
+# Slugs of every project, in any organization, that matches the canary pattern.
+canary_slugs() { "$CLI" cloud projects list --all-orgs --json 2>/dev/null | python3 -c '
+import json, re, sys
+pat = re.compile(sys.argv[1])
+def walk(x):
+    if isinstance(x, dict):
+        s = x.get("slug")
+        if isinstance(s, str) and x.get("id") and pat.match(s): print(s)
+        for v in x.values(): walk(v)
+    elif isinstance(x, list):
+        for v in x: walk(v)
+try: walk(json.load(sys.stdin))
+except json.JSONDecodeError: pass' "$CANARY_SLUG_RE" | sort -u; }
+# Runs on every exit. Deletes this run's project and any canary an earlier run
+# left, then reads the list back: a canary still there turns the exit red.
+TEARDOWN_DONE=0
+teardown() {
+    local status=$? left s
+    [ "$TEARDOWN_DONE" = 0 ] || return
+    TEARDOWN_DONE=1
+    trap - EXIT INT TERM
+    for s in $(canary_slugs); do
+        [[ "$s" =~ $CANARY_SLUG_RE ]] || continue
+        echo "── teardown: deleting $s"
+        ( cd "$DIR" && "$CLI" cloud projects delete "$s" --yes ) >> "$LOGS/teardown.log" 2>&1
+    done
+    left="$(canary_slugs | tr '\n' ' ')"
+    if [ -n "$left" ]; then
+        echo "── teardown: FAILED, still listed: $left(log: $LOGS/teardown.log)" >&2
+        echo "   delete by hand: rebase cloud projects delete <slug> --yes" >&2
+        status=1
+    else
+        echo "── teardown: ok, no canary project is left"
+    fi
+    exit "$status"
+}
+trap teardown EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 # run_step <name> <command…>: run in $APP (or $DIR before init), log, time.
 run_step() {
     local name="$1"; shift
@@ -92,11 +138,17 @@ cloud() { ( cd "$APP" && "$CLI" cloud "$@" 2>>"$LOGS/cloud.stderr.log" ); }
 
 echo "CLI: $CLI $("$CLI" --version 2>/dev/null | tail -1) ($(command -v "$CLI"))"
 
-# ── 0. signed in, and the one project exists ──────────────────────────────
+# ── 0. signed in, and this run's project exists (created here) ────────────
 start=$(date +%s)
 who="$("$CLI" cloud whoami 2>/dev/null | jget user.email)"
+ORG_ID="$("$CLI" cloud orgs list --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    for o in json.load(sys.stdin).get("organizations", []):
+        if o.get("name") == sys.argv[1]: print(o["id"]); break
+except Exception: pass' "$ORG_NAME")"
 # Every organization: the canary lives in Rebase Team whatever org is selected.
-PROJECT_ID="$("$CLI" cloud projects list --all-orgs --json 2>/dev/null | python3 -c '
+project_id() { "$CLI" cloud projects list --all-orgs --json 2>/dev/null | python3 -c '
 import json, sys
 def walk(x):
     if isinstance(x, dict):
@@ -106,14 +158,21 @@ def walk(x):
     elif isinstance(x, list):
         for v in x: walk(v)
 try: walk(json.load(sys.stdin))
-except json.JSONDecodeError: pass' "$SLUG")"
+except json.JSONDecodeError: pass' "$SLUG"; }
 if [ -z "$who" ]; then
     record preflight "$(( $(date +%s) - start ))" "FAIL(not signed in: rebase cloud login)"; finish
-elif [ -z "$PROJECT_ID" ]; then
-    record preflight "$(( $(date +%s) - start ))" "FAIL(no project with slug $SLUG; this script never creates one)"; finish
+elif [ -z "$ORG_ID" ]; then
+    record preflight "$(( $(date +%s) - start ))" "FAIL(no organization named $ORG_NAME; nothing created)"; finish
 fi
 record preflight "$(( $(date +%s) - start ))" ok
-echo "── preflight: signed in, $SLUG is $PROJECT_ID"
+PROJECT_ID="$(project_id)"
+if [ -z "$PROJECT_ID" ]; then
+    # --org is explicit: the selected organization can be a client's.
+    run_step create "$CLI" cloud projects create --name "$SLUG" --subdomain "$SLUG" --org "$ORG_ID" --yes || finish
+    PROJECT_ID="$(project_id)"
+    [ -n "$PROJECT_ID" ] || { record created 0 "FAIL(create said ok, but no project with slug $SLUG is listed)"; finish; }
+fi
+echo "── preflight: signed in, $SLUG is $PROJECT_ID in $ORG_NAME"
 
 # ── 1. scaffold, as the quickstart does without a terminal ────────────────
 rm -rf "$APP"
