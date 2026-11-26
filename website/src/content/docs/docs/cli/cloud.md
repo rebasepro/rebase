@@ -134,6 +134,7 @@ rebase cloud deployments list [--limit N|--all]
 rebase cloud rollback [id] [-y]          # back to a successful deploy
 rebase cloud cancel [-y]                 # cancel the in-flight build
 rebase cloud start | stop | restart [-y] # stop and restart need -y
+rebase cloud sleep [status|on|off|wake]  # sleep when idle; `on --after 15m|30m|1h|4h`
 rebase cloud status                      # one-glance project status
 rebase cloud metrics                     # live CPU / memory / disk, realtime per instance
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
@@ -369,12 +370,24 @@ shows the same log.
 
 ```bash
 rebase cloud db list | create | info | connect | test
+rebase cloud db query [sql] [--file <path>]
 rebase cloud db backup list | create | restore | status | download
 rebase cloud db pitr status | restore | cutover | discard
 ```
 
 `db connect` opens a local port that *is* the managed database (no public
 endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
+
+`db query` runs SQL on the managed database and prints each statement's
+result, with no local `psql`: it opens the same tunnel for the length of one
+query. A file of several statements runs as one script and stops at the first
+error; no transaction is added, so wrap the file in `BEGIN`/`COMMIT` to make it
+all-or-nothing. `COPY … FROM STDIN` is refused. Owner or admin only. With
+`--json` it prints `{ projectId, results: [{ command, rowCount, rows }] }`.
+
+`db connect`, `db query` and `db backup` take `--database <key>` for one of
+the project's [other databases](/docs/backend/multiple-sources/), the `key` of
+a `database("<key>")` declaration. Without it they act on the default one.
 
 ## Guests
 
