@@ -9,6 +9,7 @@ import { useNavigationStateController } from "../hooks/navigation/contexts/Navig
 import {
     cls,
     Dialog,
+    iconSize,
     isKeyHandled,
     MoonIcon,
     SearchIcon,
@@ -86,7 +87,7 @@ export function CommandPalette({ extraItems }: CommandPaletteProps = {}) {
                 label: entry.name,
                 group: entry.type === "collection" ? "Collections" : "Navigation",
                 hint: entry.slug,
-                icon: <TableIcon size="small" className="text-surface-500" />,
+                icon: <TableIcon size={iconSize.small} className="text-surface-500 shrink-0" />,
                 onSelect: () => {
                     navigate(entry.url);
                     close();
@@ -102,7 +103,7 @@ export function CommandPalette({ extraItems }: CommandPaletteProps = {}) {
                 label: nextMode === "studio" ? "Switch to Studio mode" : "Switch to CMS mode",
                 group: "Actions",
                 hint: nextMode.toUpperCase(),
-                icon: <SlidersHorizontalIcon size="small" className="text-surface-500" />,
+                icon: <SlidersHorizontalIcon size={iconSize.small} className="text-surface-500 shrink-0" />,
                 onSelect: () => {
                     adminMode.setMode(nextMode);
                     navigate(nextMode === "studio" ? "/s" : "/");
@@ -117,8 +118,8 @@ export function CommandPalette({ extraItems }: CommandPaletteProps = {}) {
             label: nextTheme === "dark" ? "Switch to Dark theme" : "Switch to Light theme",
             group: "Actions",
             icon: nextTheme === "dark"
-                ? <MoonIcon size="small" className="text-surface-500" />
-                : <SunIcon size="small" className="text-surface-500" />,
+                ? <MoonIcon size={iconSize.small} className="text-surface-500 shrink-0" />
+                : <SunIcon size={iconSize.small} className="text-surface-500 shrink-0" />,
             onSelect: () => {
                 themeMode.setMode(nextTheme);
                 close();
@@ -171,7 +172,7 @@ export function CommandPalette({ extraItems }: CommandPaletteProps = {}) {
         >
             <div className="flex flex-col overflow-hidden bg-surface-card rounded-xl">
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-hairline">
-                    <SearchIcon size="small" className="text-surface-500 shrink-0" />
+                    <SearchIcon size={iconSize.small} className="text-surface-500 shrink-0" />
                     <input
                         ref={inputRef}
                         type="text"
