@@ -22,6 +22,7 @@ import path from "path";
 import { durationBucket, recordEvent } from "../../telemetry";
 import {
     requireClient,
+    projectLabel,
     resolveProjectRef,
     parseCloudArgs,
     colorStatus,
@@ -666,8 +667,8 @@ async function uploadAndTrigger(opts: {
     if (!isJsonMode()) {
         console.log("");
         console.log(opts.preview
-            ? `  🔍 Triggering a preview of ${chalk.bold(projectRef)}${opts.preview.name ? ` named ${chalk.bold(opts.preview.name)}` : ""} (schema ${manifest.schemaVersion}) — production is not touched...`
-            : `  🚀 Triggering managed deployment for ${chalk.bold(projectRef)} (schema ${manifest.schemaVersion})...`);
+            ? `  🔍 Triggering a preview of ${chalk.bold(projectLabel(projectRef))}${opts.preview.name ? ` named ${chalk.bold(opts.preview.name)}` : ""} (schema ${manifest.schemaVersion}) — production is not touched...`
+            : `  🚀 Triggering managed deployment for ${chalk.bold(projectLabel(projectRef))} (schema ${manifest.schemaVersion})...`);
     }
 
     // Tell the platform about every app this repo declares, not only the one
@@ -879,7 +880,7 @@ async function reportDeployed(o: {
     emit(
         () => {
             const lines = deploySummaryLines({
-                projectRef: o.projectRef,
+                projectRef: projectLabel(o.projectRef),
                 deploymentId: o.deploymentId,
                 elapsedMs,
                 apps,
@@ -1925,7 +1926,7 @@ export async function deployCommand(rawArgs: string[], target: string | (() => P
     // of it and broke every parser reading the result.
     if (!isJsonMode()) {
         console.log("");
-        console.log(`  🚀 Triggering deployment for project ${chalk.bold(projectRef)}${source ? " from uploaded source" : ""}...`);
+        console.log(`  🚀 Triggering deployment for project ${chalk.bold(projectLabel(projectRef))}${source ? " from uploaded source" : ""}...`);
     }
 
     const body: Record<string, unknown> = { projectId };
@@ -2092,7 +2093,7 @@ async function deployFromGit(rawArgs: string[], projectRef: string, startedAt: n
         console.log(chalk.gray(`  Building from git: ${repo ?? "the connected repository"}${builds ? ` (${builds})` : ""}.`));
         console.log(chalk.gray("  This directory is NOT uploaded — the control plane clones the repository."));
         console.log("");
-        console.log(`  🚀 Triggering deployment for project ${chalk.bold(projectRef)} from git...`);
+        console.log(`  🚀 Triggering deployment for project ${chalk.bold(projectLabel(projectRef))} from git...`);
     }
 
     const body: Record<string, unknown> = { projectId, client: "cli" };

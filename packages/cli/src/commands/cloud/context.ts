@@ -1223,6 +1223,20 @@ permissive: true });
     return link?.slug || link?.projectId || "";
 }
 
+/**
+ * How to name the project `ref` to a person. A linked directory resolves by the
+ * id in its link file ({@link projectRefIfAny}), which finds the project in any
+ * organization — and is a UUID nobody recognises in "✓ Deployed …". When `ref`
+ * is that id, this answers the link's slug; any other ref (a `--project` slug,
+ * an id from a link that predates `slug`) is returned as given.
+ *
+ * For human output only: `--json` keeps the ref it always carried.
+ */
+export function projectLabel(ref: string): string {
+    const link = readLink();
+    return link?.slug && link.projectId === ref ? link.slug : ref;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    Machine-readable output mode
    ═══════════════════════════════════════════════════════════════

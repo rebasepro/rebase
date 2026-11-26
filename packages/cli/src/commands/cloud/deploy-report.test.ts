@@ -170,6 +170,40 @@ describe("a followed deploy that succeeded", () => {
         ]));
     });
 
+    // The dispatcher hands `deploy` the linked project's id, which is what
+    // resolves in any organization. A person reads the slug: a first deploy
+    // from a fresh scaffold ended on "✓ Deployed 657f9e9b-1991-…".
+    it("names a linked project by its slug, not by the id the link resolves with", async () => {
+        write(project, ".rebase/cloud.json", JSON.stringify({ url: "https://cp.example",
+projectId: "657f9e9b-1991-4e28-83d8-cc2e8e033cf2",
+slug: "songbuzz" }));
+
+        await deployCommand(
+            ["node", "rebase", "cloud", "deploy", "--bundle-dir", bundleDir, "--no-source"],
+            "657f9e9b-1991-4e28-83d8-cc2e8e033cf2"
+        );
+
+        const out = plain(stdout.join("\n"));
+        expect(out).toMatch(/✓ Deployed songbuzz in \d+s/);
+        expect(out).toContain("Triggering managed deployment for songbuzz");
+        expect(out).not.toMatch(/(Deployed|deployment for) 657f9e9b/);
+    });
+
+    it("keeps the id in --json, where a script reads it", async () => {
+        write(project, ".rebase/cloud.json", JSON.stringify({ url: "https://cp.example",
+projectId: "657f9e9b-1991-4e28-83d8-cc2e8e033cf2",
+slug: "songbuzz" }));
+        context.setJsonModeForTest(true);
+
+        await deployCommand(
+            ["node", "rebase", "cloud", "deploy", "--bundle-dir", bundleDir, "--no-source"],
+            "657f9e9b-1991-4e28-83d8-cc2e8e033cf2"
+        );
+
+        const result = JSON.parse(stdout.filter(l => l.trim().startsWith("{")).at(-1) ?? "{}") as { project?: string };
+        expect(result.project).toBe("657f9e9b-1991-4e28-83d8-cc2e8e033cf2");
+    });
+
     it("says it could not confirm, without failing a deploy that succeeded", async () => {
         health = () => new Response(JSON.stringify({ status: "degraded" }), { status: 503 });
 
