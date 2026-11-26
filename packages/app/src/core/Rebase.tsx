@@ -4,7 +4,7 @@ import type { CustomizationController, RebasePlugin, AnySlotContribution } from 
 import type { ComponentOverrideMap } from "@rebasepro/cms-types";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CenteredView, TooltipProvider, Typography } from "@rebasepro/ui";
+import { buildThemeStyleSheet, CenteredView, deriveRebaseTheme, TooltipProvider, Typography } from "@rebasepro/ui";
 import { AccessSimulation, User, DataDriver, DataSourceDefinition, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { RebaseContext, UNRENDERED_SLOTS, CollectionRegistryController, CollectionRegistry, collectionEntityDataOptions, buildRebaseData, wrapAsEntityData, RebaseData } from "@rebasepro/cms-types";
 import { PluginProviderStack } from "./PluginProviderStack";
@@ -110,6 +110,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         effectiveRoleController,
         simulateAccess = false,
         modeController: modeControllerProp,
+        theme: themeConfig,
         apiUrl,
         translations,
         components: componentsProp
@@ -646,6 +647,24 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
     );
 
     const resolvedApiUrl = apiUrl || client?.baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+
+    const themeCss = useMemo(() => {
+        if (!themeConfig || (!themeConfig.accent && !themeConfig.background && !themeConfig.contrast)) {
+            return null;
+        }
+        return buildThemeStyleSheet(deriveRebaseTheme(themeConfig));
+    }, [themeConfig]);
+
+    useEffect(() => {
+        if (!themeCss || typeof document === "undefined") return;
+        const styleEl = document.createElement("style");
+        styleEl.setAttribute("data-rebase-theme", "true");
+        styleEl.textContent = themeCss;
+        document.head.appendChild(styleEl);
+        return () => {
+            styleEl.remove();
+        };
+    }, [themeCss]);
 
     if (resolvedApiUrl) {
         return (

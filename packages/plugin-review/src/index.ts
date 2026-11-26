@@ -13,6 +13,8 @@ export { ReviewQueueButton } from "./components/ReviewQueueButton";
 export { ReviewQueueView, ReviewQueueList, StagedChangeHeader } from "./components/ReviewQueueView";
 export type { ReviewQueueItem } from "./components/ReviewQueueView";
 export { StagedChangeDiff, formatReviewValue } from "./components/StagedChangeDiff";
+export { ReviewUpdateComposer } from "./components/ReviewUpdateComposer";
+export type { ReviewUpdateComposerProps, ReviewUpdateStatus } from "./components/ReviewUpdateComposer";
 export { useReviewApi, readStagedChange, ReviewRequestError } from "./hooks/useReviewApi";
 export type { ReviewApi, ReviewRow } from "./hooks/useReviewApi";
 export { useReviewTranslation, REVIEW_TRANSLATIONS } from "./i18n";

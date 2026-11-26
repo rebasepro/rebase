@@ -1,9 +1,44 @@
 "use client";
 import React from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { ChevronRightIcon } from "lucide-react";
 import { focusedDisabled, paperMixin } from "../styles";
 import { cls } from "../util";
+import { useInjectStyles } from "../hooks";
 import { usePortalContainer } from "../hooks/PortalContainerContext";
+import { iconSize } from "../icons/Icon";
+
+const menuStyles = `
+.MenuContent,
+.MenuSubContent {
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+  animation-duration: 120ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+.MenuContent[data-state='open'],
+.MenuSubContent[data-state='open'] {
+  animation-name: menuDirectionalIn;
+}
+
+@keyframes menuDirectionalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .MenuContent[data-state],
+  .MenuSubContent[data-state] {
+    animation: none;
+  }
+}
+`;
 
 export type MenuProps = {
     children: React.ReactNode;
@@ -36,6 +71,8 @@ const Menu = React.forwardRef<
        sideOffset = 4,
        className
    }, ref) => {
+    useInjectStyles("Menu", menuStyles);
+
     // Get the portal container from context
     const contextContainer = usePortalContainer();
 
@@ -65,7 +102,7 @@ const Menu = React.forwardRef<
                     // overlay, and unclickable. Peers on this tier stack by mount
                     // order, which is what puts a menu above the dialog holding
                     // its trigger, and a dialog that menu opens above them both.
-                    className={cls(paperMixin, focusedDisabled, "py-2 z-50", className)}>
+                    className={cls("MenuContent", paperMixin, focusedDisabled, "py-2 z-50", className)}>
                     {children}
                 </DropdownMenu.Content>
             </DropdownMenu.Portal>
@@ -112,3 +149,84 @@ export const MenuItem = React.memo(({
 });
 
 MenuItem.displayName = "MenuItem";
+
+/**
+ * Nested submenu inside a {@link Menu}. Uses Radix `DropdownMenu.Sub`, which
+ * includes safe-triangle pointer tolerance so diagonal cursor travel toward
+ * a lower submenu item does not accidentally close the submenu.
+ */
+export type MenuSubProps = {
+    children: React.ReactNode;
+    open?: boolean;
+    defaultOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
+};
+
+export function MenuSub({ children, open, defaultOpen, onOpenChange }: MenuSubProps) {
+    return (
+        <DropdownMenu.Sub open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
+            {children}
+        </DropdownMenu.Sub>
+    );
+}
+
+export type MenuSubTriggerProps = {
+    children: React.ReactNode;
+    dense?: boolean;
+    disabled?: boolean;
+    className?: string;
+};
+
+export const MenuSubTrigger = React.memo(({
+    children,
+    dense = false,
+    disabled = false,
+    className
+}: MenuSubTriggerProps) => {
+    const classNames = cls(
+        !disabled && "cursor-pointer",
+        disabled && "opacity-50 cursor-not-allowed",
+        "rounded-md text-sm font-medium text-surface-accent-700 dark:text-surface-accent-300 flex items-center justify-between gap-4 transition-colors duration-150 outline-none",
+        !disabled && "hover:bg-surface-hover data-[state=open]:bg-surface-hover",
+        dense ? "px-4 py-1.5" : "px-4 py-2",
+        className
+    );
+    return (
+        <DropdownMenu.SubTrigger className={classNames} disabled={disabled}>
+            <span className="flex items-center gap-4">{children}</span>
+            <ChevronRightIcon size={iconSize.small} className="opacity-60" aria-hidden="true" />
+        </DropdownMenu.SubTrigger>
+    );
+});
+MenuSubTrigger.displayName = "MenuSubTrigger";
+
+export type MenuSubContentProps = {
+    children: React.ReactNode;
+    sideOffset?: number;
+    alignOffset?: number;
+    portalContainer?: HTMLElement | null;
+    className?: string;
+};
+
+export function MenuSubContent({
+    children,
+    sideOffset = 4,
+    alignOffset = -4,
+    portalContainer,
+    className
+}: MenuSubContentProps) {
+    const contextContainer = usePortalContainer();
+    const finalContainer = (portalContainer ?? contextContainer ?? undefined) as HTMLElement | undefined;
+
+    return (
+        <DropdownMenu.Portal container={finalContainer}>
+            <DropdownMenu.SubContent
+                sideOffset={sideOffset}
+                alignOffset={alignOffset}
+                className={cls("MenuSubContent", paperMixin, focusedDisabled, "py-2 z-50 min-w-[160px]", className)}
+            >
+                {children}
+            </DropdownMenu.SubContent>
+        </DropdownMenu.Portal>
+    );
+}

@@ -11,6 +11,7 @@ import { Drawer } from "./app/Drawer";
 import { DefaultAppBar } from "./DefaultAppBar";
 import { SideDialogs } from "./SideDialogs";
 import { AdminModeSyncer } from "./AdminModeSyncer";
+import { CommandPalette } from "./CommandPalette";
 import type { AppView } from "@rebasepro/cms-types";
 
 export interface RebaseLayoutProps {
@@ -98,6 +99,7 @@ export function RebaseLayout(props: RebaseLayoutProps) {
             {ActiveDrawer}
             <Outlet/>
             <SideDialogs/>
+            <CommandPalette/>
         </Scaffold>
     );
 }

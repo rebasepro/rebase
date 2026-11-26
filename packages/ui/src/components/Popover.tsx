@@ -100,64 +100,23 @@ export function Popover({
 
 const popoverStyles = `
 .PopoverContent {
-  animation-duration: 400ms;
+  transform-origin: var(--radix-popover-content-transform-origin);
+  animation-duration: 120ms;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform, opacity;
 }
-.PopoverContent[data-state='open'][data-side='top'] {
-  animation-name: popoverSlideDownAndFade;
-}
-.PopoverContent[data-state='open'][data-side='right'] {
-  animation-name: popoverSlideLeftAndFade;
-}
-.PopoverContent[data-state='open'][data-side='bottom'] {
-  animation-name: popoverSlideUpAndFade;
-}
-.PopoverContent[data-state='open'][data-side='left'] {
-  animation-name: popoverSlideRightAndFade;
+.PopoverContent[data-state='open'] {
+  animation-name: popoverDirectionalIn;
 }
 
-@keyframes popoverSlideUpAndFade {
+@keyframes popoverDirectionalIn {
   from {
     opacity: 0;
-    transform: translateY(2px);
+    transform: scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes popoverSlideRightAndFade {
-  from {
-    opacity: 0;
-    transform: translateX(-2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes popoverSlideDownAndFade {
-  from {
-    opacity: 0;
-    transform: translateY(-2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes popoverSlideLeftAndFade {
-  from {
-    opacity: 0;
-    transform: translateX(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
+    transform: scale(1);
   }
 }
 

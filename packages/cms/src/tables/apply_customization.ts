@@ -254,7 +254,7 @@ function overridesOf(overrides: Omit<TableCustomizationOptions, "fields">, where
 
 /** The options every field takes, each with the key the view model reads. */
 const COMMON_FIELD_KEYS: ReadonlySet<string> = new Set([
-    "name", "description", "hidden", "hiddenInForm", "disabled", "readOnly", "Field", "Preview", "Filter",
+    "name", "description", "hidden", "hiddenInForm", "secondary", "disabled", "readOnly", "Field", "Preview", "Filter",
     "columnWidth", "filledByServer", "span", "customProps", "filterOperators", "propertyConfig", "conditions",
     "dynamicProps", "metadata", "referenceTo"
 ]);
@@ -286,6 +286,7 @@ function warnInapplicable(property: Property, field: AnyFieldCustomization, wher
 function commonAdmin(existing: AdminPropertyOptions | undefined, field: AnyFieldCustomization): AdminPropertyOptions {
     const admin: AdminPropertyOptions = { ...existing };
     set(admin, "hideFromCollection", field.hidden);
+    set(admin, "secondary", field.secondary);
     set(admin, "disabled", field.disabled);
     if (field.hiddenInForm !== undefined) {
         const disabled = admin.disabled;

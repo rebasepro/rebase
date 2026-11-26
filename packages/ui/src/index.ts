@@ -32,6 +32,8 @@ export { SERIES_COLORS } from "./util/series_colors";
 export type { SeriesColor } from "./util/series_colors";
 export { formatNumber, compactFormat, describeChange, niceTicks } from "./util/numbers";
 export type { Change, ChangeDirection, ChangeTone } from "./util/numbers";
+export { deriveRebaseTheme, buildThemeStyleSheet, contrastRatio } from "./theme/deriveTheme";
+export type { RebaseThemeConfig, RebaseThemeContrast, DerivedRebaseTheme } from "./theme/deriveTheme";
 
 // =============================================================================
 // Public Hooks

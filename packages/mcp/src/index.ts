@@ -2684,7 +2684,36 @@ async function handleToolCall(request: CallToolRequest) {
 
         const { output, code } = await runRebaseCmd(cmdArgs);
         const hint = destructiveRefusalHint(name, output);
-        return untrustedTextResult(`the "${name}" CLI command`, output + (hint ?? ""), code !== 0);
+        let summaryPrefix = "";
+        if (name === "rebase_db_branch_diff" && code === 0) {
+            try {
+                const parsed: unknown = JSON.parse(output);
+                if (typeof parsed === "object" && parsed !== null) {
+                    const schemaArr = "schema" in parsed && Array.isArray(parsed.schema) ? parsed.schema : [];
+                    const dataArr = "data" in parsed && Array.isArray(parsed.data) ? parsed.data : [];
+                    let destructive = 0;
+                    let access = 0;
+                    let additive = 0;
+                    for (const entry of schemaArr) {
+                        if (typeof entry !== "object" || entry === null) continue;
+                        const obj = "object" in entry && typeof entry.object === "string" ? entry.object : "";
+                        const chg = "change" in entry && typeof entry.change === "string" ? entry.change : "";
+                        if (obj === "policy" || obj === "rls") access++;
+                        else if (chg === "dropped" || chg === "altered") destructive++;
+                        else if (chg === "added") additive++;
+                    }
+                    const parts: string[] = [];
+                    if (destructive > 0) parts.push(`${destructive} breaking/altered`);
+                    if (access > 0) parts.push(`${access} access/RLS`);
+                    if (additive > 0) parts.push(`${additive} additive`);
+                    if (dataArr.length > 0) parts.push(`${dataArr.length} table(s) with row changes`);
+                    summaryPrefix = `Intent Summary: ${parts.length > 0 ? parts.join(" · ") : "no schema or data changes"}\n\n`;
+                }
+            } catch {
+                // Non-JSON output; leave prefix empty.
+            }
+        }
+        return untrustedTextResult(`the "${name}" CLI command`, summaryPrefix + output + (hint ?? ""), code !== 0);
     }
 
     // ── Project management tools ────────────────────────────────────────

@@ -365,7 +365,18 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
         .map(key => available.get(key))
         .filter((f): f is ResolvedFormField => Boolean(f));
 
-    if (leftovers.length) {
+    const primaryLeftovers: ResolvedFormField[] = [];
+    const secondaryLeftovers: ResolvedFormField[] = [];
+    for (const field of leftovers) {
+        const prop = collection.properties?.[field.key] as Property | undefined;
+        if (prop?.admin?.secondary) {
+            secondaryLeftovers.push(field);
+        } else {
+            primaryLeftovers.push(field);
+        }
+    }
+
+    if (primaryLeftovers.length) {
         // Always a trailing group, never merged into an existing section. Folding
         // them into the first untitled section put `created_at`/`updated_at`
         // between the product's images and its pricing — the reader cannot tell
@@ -375,7 +386,17 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
             key: sections.length ? "__other" : "__main",
             collapsible: false,
             collapsed: false,
-            fields: leftovers
+            fields: primaryLeftovers
+        });
+    }
+
+    if (secondaryLeftovers.length) {
+        sections.push({
+            key: "__secondary",
+            title: "More properties",
+            collapsible: true,
+            collapsed: true,
+            fields: secondaryLeftovers
         });
     }
 

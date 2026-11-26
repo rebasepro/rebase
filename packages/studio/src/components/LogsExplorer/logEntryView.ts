@@ -120,3 +120,23 @@ export function entryToJson(entry: LogEntry): string {
 export function entriesToJsonLines(entries: LogEntry[]): string {
     return entries.map(entryToJson).join("\n");
 }
+
+const NOISE_PATH_PATTERNS = [
+    /^\/health\/?$/,
+    /^\/api\/health\/?$/,
+    /^\/favicon\.ico$/,
+    /^\/api\/admin\/logs(?:\/|$)/
+];
+
+/**
+ * Whether an entry is routine probe/polling noise (2xx health checks,
+ * favicons, or the log-explorer's own polling requests) that can be
+ * collapsed by default to keep the log stream focused on meaningful traffic.
+ */
+export function isNoisyLogEntry(entry: Pick<LogEntry, "level" | "metadata">): boolean {
+    if (entry.level === "error" || entry.level === "warn") return false;
+    const req = requestSummary(entry);
+    if (!req) return false;
+    if (req.status >= 400) return false;
+    return NOISE_PATH_PATTERNS.some((pattern) => pattern.test(req.path));
+}

@@ -98,6 +98,7 @@ export const ADMIN_PROPERTY_KEYS = [
     "previewProperties",
     "readOnly",
     "renderInForm",
+    "secondary",
     "sortable",
     "span",
     "spreadChildren",

@@ -53,6 +53,7 @@ export * from "./SideDialogs";
 export * from "./app/useApp";
 export * from "./RebaseCMS";
 export * from "./RebaseShell";
+export * from "./CommandPalette";
 
 // Composable shell layers — each independently usable
 export * from "./RebaseAuthGate";

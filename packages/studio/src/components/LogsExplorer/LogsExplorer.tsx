@@ -24,7 +24,7 @@ import { idNum, useLogTail } from "./useLogTail";
 import type { LogEntry, LogTransport } from "./useLogTail";
 import { useTranslation } from "@rebasepro/app";
 import { LoadFailureView } from "../load-failure-view";
-import { entriesToJsonLines, entryToJson, formatFieldValue, hasMetadata, pillFields, requestSummary, statusTone } from "./logEntryView";
+import { entriesToJsonLines, entryToJson, formatFieldValue, hasMetadata, isNoisyLogEntry, pillFields, requestSummary, statusTone } from "./logEntryView";
 
 const LEVEL_COLORS: Record<string, string> = {
     debug: "text-surface-500",
@@ -112,6 +112,7 @@ export function LogsExplorer() {
     const [searchInput, setSearchInput] = useState("");
     const [search, setSearch] = useState("");
     const [autoScroll, setAutoScroll] = useState(true);
+    const [hideNoise, setHideNoise] = useState(true);
     // Entries that arrived while the user was scrolled away from the bottom.
     const [newCount, setNewCount] = useState(0);
     const [atBottom, setAtBottom] = useState(true);
@@ -134,6 +135,12 @@ export function LogsExplorer() {
     const { logs, error, transport, dropped, instance } = useLogTail({ level,
         source,
         search });
+
+    const visibleLogs = React.useMemo(
+        () => (hideNoise ? logs.filter((entry) => !isNoisyLogEntry(entry)) : logs),
+        [logs, hideNoise]
+    );
+    const hiddenNoiseCount = logs.length - visibleLogs.length;
 
     // A filter change replaces the window wholesale — "new since you looked
     // away" stops meaning anything, so the counter starts over. So does a
@@ -262,6 +269,24 @@ export function LogsExplorer() {
                         {t("studio_logs_auto_scroll")}
                     </Label>
                 </div>
+                <div className="flex items-center gap-1.5 cursor-pointer ml-2">
+                    <Checkbox
+                        id="hide-log-noise"
+                        checked={hideNoise}
+                        onCheckedChange={(checked: boolean) => setHideNoise(checked)}
+                        size="small"
+                        padding={false}
+                    />
+                    <Label
+                        htmlFor="hide-log-noise"
+                        className="text-xs select-none cursor-pointer text-surface-600 dark:text-surface-400"
+                    >
+                        Hide noise
+                    </Label>
+                    {hiddenNoiseCount > 0 && (
+                        <Chip size="smallest">{`-${hiddenNoiseCount} filtered`}</Chip>
+                    )}
+                </div>
                 {/* Whether the tail is actually attached. A log view with
                     nothing in it is ambiguous — quiet server, or a stream that
                     dropped — and this is the difference. */}
@@ -277,7 +302,7 @@ export function LogsExplorer() {
                         </Typography>
                     </div>
                     <Typography variant="caption" color="secondary">
-                        {t("studio_logs_entry_count", { count: logs.length })}
+                        {t("studio_logs_entry_count", { count: visibleLogs.length })}
                     </Typography>
                     {/* JSON lines of what is on screen: what a bug report or an
                         agent reads, with the fields the rows only summarise. */}
@@ -285,8 +310,8 @@ export function LogsExplorer() {
                         <IconButton
                             size="small"
                             aria-label={t("studio_logs_copy_visible")}
-                            disabled={logs.length === 0}
-                            onClick={() => copyVisible(entriesToJsonLines(logs))}
+                            disabled={visibleLogs.length === 0}
+                            onClick={() => copyVisible(entriesToJsonLines(visibleLogs))}
                         >
                             {copiedVisible
                                 ? <CheckIcon size={iconSize.smallest} className="text-emerald-500"/>
@@ -320,7 +345,7 @@ export function LogsExplorer() {
                     onScroll={handleScroll}
                     className="h-full overflow-auto py-2"
                 >
-                    {logs.map(log => (
+                    {visibleLogs.map(log => (
                         <LogRow
                             key={log.id}
                             entry={log}

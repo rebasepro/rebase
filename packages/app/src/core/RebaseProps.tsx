@@ -1,4 +1,5 @@
 import React from "react";
+import type { RebaseThemeConfig } from "@rebasepro/ui";
 import { User, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, DatabaseAdmin, RebaseClient } from "@rebasepro/types";
 import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, AnySlotContribution, PropertyConfig, EntityCustomView, CollectionCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap, CollectionRegistryController } from "@rebasepro/cms-types";
 
@@ -324,6 +325,13 @@ export type RebaseProps<USER extends User, DB = unknown> = {
      * ```
      */
     modeController?: ModeController;
+
+    /**
+     * Three-variable math-derived white-label theme (`accent`, `background`,
+     * `contrast`). Derives the full Graphite ramp, semantic surface ladder,
+     * hairlines, and accessible `--color-on-primary` ink in OKLCH.
+     */
+    theme?: RebaseThemeConfig;
 
     /**
      * Override or extend any Rebase UI string, keyed by locale.

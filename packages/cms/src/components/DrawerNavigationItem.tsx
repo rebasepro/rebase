@@ -23,6 +23,11 @@ export type DrawerNavigationItemProps = {
     url: string,
     onClick?: () => void,
     /**
+     * Optional prefetch callback invoked on pointer enter / keyboard focus so
+     * switching collections feels instantaneous.
+     */
+    onPrefetch?: () => void,
+    /**
      * Drop the row's icon and indent the label into the space it occupied, so the
      * row reads as a child of the group header above it.
      *
@@ -39,6 +44,7 @@ export function DrawerNavigationItem({
     drawerOpen,
     url,
     onClick,
+    onPrefetch,
     indented = false
 }: DrawerNavigationItemProps) {
 
@@ -89,6 +95,8 @@ export function DrawerNavigationItem({
     const listItem = <div>
         <NavLink
             onClick={onClick}
+            onPointerEnter={onPrefetch}
+            onFocus={onPrefetch}
             // The label below is `hidden` (display:none) while the rail is
             // collapsed, which takes it out of the accessibility tree along with
             // the row's only text — a collapsed rail was a column of links with no
@@ -143,6 +151,7 @@ export function DrawerNavigationItem({
         open={!labelShown && wantsTooltip}
         onOpenChange={setWantsTooltip}
         side="right"
+        familiarity="high"
         title={name}>
         {listItem}
     </Tooltip>;

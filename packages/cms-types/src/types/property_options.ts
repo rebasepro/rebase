@@ -37,6 +37,13 @@ export interface AdminPropertyOptions<CustomProps = unknown> {
      */
     hideFromCollection?: boolean;
     /**
+     * Tuck this field into a collapsible "More properties" section at the
+     * bottom of the record form by default (collapsed unless it has a
+     * validation error or is explicitly placed in a custom form section).
+     * Keeps daily editing forms focused on primary fields.
+     */
+    secondary?: boolean;
+    /**
      * Render the **value**, not a control. Defaults to `false`.
      *
      * The distinction from {@link disabled} is what the field looks like and

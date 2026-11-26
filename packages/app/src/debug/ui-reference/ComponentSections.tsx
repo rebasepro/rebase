@@ -37,6 +37,11 @@ import {
     InputLabel,
     Label,
     Markdown,
+    Menu,
+    MenuItem,
+    MenuSub,
+    MenuSubContent,
+    MenuSubTrigger,
     Menubar,
     MenubarCheckboxItem,
     MenubarContent,
@@ -115,15 +120,27 @@ export function OverlaysSection() {
                     </Sheet>
                 </div>
                 <div className="col-span-12 sm:col-span-6">
-                    <SpecimenLabel>Popover</SpecimenLabel>
-                    <Popover trigger={<Button variant="outlined">Show details</Button>}>
-                        <div className="p-4 flex flex-col gap-2 max-w-[260px]">
-                            <Typography variant="subtitle2">Last published</Typography>
-                            <Typography variant="body2" color="secondary">
-                                Yesterday at 18:04 by Alice Johnson.
-                            </Typography>
-                        </div>
-                    </Popover>
+                    <SpecimenLabel>Popover · Menu &amp; MenuSub</SpecimenLabel>
+                    <div className="flex flex-wrap gap-2">
+                        <Popover trigger={<Button variant="outlined">Show details</Button>}>
+                            <div className="p-4 flex flex-col gap-2 max-w-[260px]">
+                                <Typography variant="subtitle2">Last published</Typography>
+                                <Typography variant="body2" color="secondary">
+                                    Yesterday at 18:04 by Alice Johnson.
+                                </Typography>
+                            </div>
+                        </Popover>
+                        <Menu trigger={<Button variant="outlined">Actions</Button>}>
+                            <MenuItem onClick={() => {}}>Duplicate</MenuItem>
+                            <MenuSub>
+                                <MenuSubTrigger>More actions</MenuSubTrigger>
+                                <MenuSubContent>
+                                    <MenuItem onClick={() => {}}>Copy Row ID</MenuItem>
+                                    <MenuItem onClick={() => {}}>Export JSON</MenuItem>
+                                </MenuSubContent>
+                            </MenuSub>
+                        </Menu>
+                    </div>
                 </div>
                 <div className="col-span-12 sm:col-span-6">
                     <SpecimenLabel>Menubar · items, submenu, checkbox, radio, shortcut</SpecimenLabel>

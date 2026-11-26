@@ -53,10 +53,18 @@ export type TooltipProviderProps = {
  * page of table rows — and the skip-delay between neighbouring tooltips never
  * applied, since each provider timed only its own tooltip.
  */
+export type TooltipFamiliarity = "high" | "normal" | "low";
+
+const FAMILIARITY_DELAY_MS: Record<TooltipFamiliarity, number> = {
+    high: 950,
+    normal: 650,
+    low: 350
+};
+
 export function TooltipProvider({
     children,
-    delayDuration = 200,
-    skipDelayDuration = 300
+    delayDuration = 650,
+    skipDelayDuration = 400
 }: TooltipProviderProps) {
     return (
         <TooltipPrimitive.Provider delayDuration={delayDuration} skipDelayDuration={skipDelayDuration}>
@@ -75,7 +83,23 @@ export type TooltipProps = {
     align?: "start" | "center" | "end",
     sideOffset?: number,
     title?: string | React.ReactNode,
+    /**
+     * Explicit hover delay in ms. Overrides `familiarity` and the ancestor
+     * `TooltipProvider`'s `delayDuration`.
+     */
     delayDuration?: number;
+    /**
+     * Tunes the hover delay by how familiar the trigger is to a daily user:
+     * - `"high"` (950 ms) — persistent sidebar/rail items the user already knows
+     * - `"normal"` (650 ms) — standard toolbar controls
+     * - `"low"` (350 ms) — contextual or unfamiliar Studio/table icons
+     */
+    familiarity?: TooltipFamiliarity;
+    /**
+     * Optional keyboard shortcut hint rendered as quiet keycaps beside `title`
+     * (e.g. `"⌘K"` or `["⌘", "K"]`).
+     */
+    shortcut?: string | string[];
     asChild?: boolean;
     tooltipClassName?: string,
     tooltipStyle?: React.CSSProperties;
@@ -89,7 +113,9 @@ export const Tooltip = ({
                             open,
                             defaultOpen,
                             side = "bottom",
-                            delayDuration = 200,
+                            delayDuration,
+                            familiarity,
+                            shortcut,
                             sideOffset,
                             align,
                             onOpenChange,
@@ -118,6 +144,14 @@ export const Tooltip = ({
 
     children = nameFromTitle(children, title);
 
+    const resolvedDelay = delayDuration !== undefined
+        ? delayDuration
+        : (familiarity !== undefined ? FAMILIARITY_DELAY_MS[familiarity] : undefined);
+
+    const shortcutKeys = shortcut === undefined
+        ? []
+        : (Array.isArray(shortcut) ? shortcut : [shortcut]);
+
     const trigger = asChild
         ? <TooltipPrimitive.Trigger asChild={true}>
             {children}
@@ -129,20 +163,35 @@ export const Tooltip = ({
         </TooltipPrimitive.Trigger>;
 
     const root = (
-        <TooltipPrimitive.Root {...(open !== undefined ? { open,
-onOpenChange } : {})} defaultOpen={defaultOpen} delayDuration={delayDuration}>
+        <TooltipPrimitive.Root
+            {...(open !== undefined ? { open, onOpenChange } : {})}
+            defaultOpen={defaultOpen}
+            delayDuration={resolvedDelay}>
             {trigger}
             <TooltipPrimitive.Portal container={finalContainer}>
                 <TooltipPrimitive.Content
                     className={cls("TooltipContent",
                         "max-w-lg leading-relaxed",
-                        "z-50 rounded-md px-3 py-2 text-xs leading-none bg-surface-800/95 dark:bg-surface-raised-hover font-medium text-white shadow-2xl select-none duration-400 ease-in transform opacity-100",
+                        "z-50 rounded-md px-3 py-2 text-xs leading-none bg-surface-800/95 dark:bg-surface-raised-hover font-medium text-white shadow-2xl select-none",
+                        shortcutKeys.length > 0 ? "inline-flex items-center gap-2" : "",
                         tooltipClassName)}
                     style={tooltipStyle}
                     sideOffset={sideOffset === undefined ? 4 : sideOffset}
                     align={align}
                     side={side}>
-                    {title}
+                    <span>{title}</span>
+                    {shortcutKeys.length > 0 && (
+                        <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+                            {shortcutKeys.map((key, idx) => (
+                                <kbd
+                                    key={`${key}-${idx}`}
+                                    className="rounded px-1 py-0.5 text-[10px] leading-none font-mono bg-white/15 text-white/90"
+                                >
+                                    {key}
+                                </kbd>
+                            ))}
+                        </span>
+                    )}
                 </TooltipPrimitive.Content>
             </TooltipPrimitive.Portal>
         </TooltipPrimitive.Root>
@@ -152,7 +201,7 @@ onOpenChange } : {})} defaultOpen={defaultOpen} delayDuration={delayDuration}>
     // brings its own, as every tooltip used to.
     if (sharedProvider) return root;
     return (
-        <TooltipPrimitive.Provider delayDuration={delayDuration}>
+        <TooltipPrimitive.Provider delayDuration={resolvedDelay ?? 650} skipDelayDuration={400}>
             {root}
         </TooltipPrimitive.Provider>
     );

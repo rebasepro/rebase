@@ -420,6 +420,12 @@ export interface FieldOptions<Row = Record<string, unknown>> {
     hidden?: boolean;
     /** Kept off the record (its form and its read view): the field cannot be edited there. Still in the views. */
     hiddenInForm?: boolean;
+    /**
+     * Tuck this field into a collapsed "More properties" section by default
+     * so daily editing stays focused on primary fields. Automatically expands
+     * if the field has a validation error.
+     */
+    secondary?: boolean;
     /** The control is drawn greyed out. An object says why. */
     disabled?: boolean | FieldDisabled;
     /** The value is drawn as text, with no control. */
@@ -1228,6 +1234,7 @@ export const FIELD_CUSTOMIZATION_KEYS = [
     "readOnly",
     "referenceTo",
     "renderInForm",
+    "secondary",
     "sortable",
     "span",
     "spreadChildren",

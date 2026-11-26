@@ -34,6 +34,7 @@ import type { BranchDiff, BranchInfo, BranchMergeResult, BranchReferencingRows, 
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 import { LoadFailureView } from "../load-failure-view";
 import { splitLineDiff } from "./split-line-diff";
+import { formatSchemaTarget, summarizeBranchSchemaDiff } from "./summarizeBranchDiff";
 
 /**
  * What a database branch changed, the way a pull request shows it — and the
@@ -257,6 +258,9 @@ export function BranchDiffView({ branch, details, onMerged }: BranchDiffViewProp
 
 function SchemaChanges({ diff }: { diff: BranchDiff }) {
     const { t } = useTranslation();
+    const [showMechanical, setShowMechanical] = useState(false);
+    const guide = useMemo(() => summarizeBranchSchemaDiff(diff.schema), [diff.schema]);
+
     if (diff.schema.length === 0) {
         return <EmptyState text={t("studio_branch_diff_schema_empty", { target: diff.targetDatabase })}/>;
     }
@@ -277,10 +281,78 @@ function SchemaChanges({ diff }: { diff: BranchDiff }) {
         dropped: t("studio_branch_diff_change_dropped"),
         altered: t("studio_branch_diff_change_altered")
     };
+
+    const visibleChanges = showMechanical || guide.mechanical.length === 0
+        ? diff.schema
+        : diff.schema.filter((c) => !guide.mechanical.includes(c));
+
     return (
         <div className="space-y-3">
+            <div className={cls("rounded-xl border bg-surface-card p-4 space-y-3", defaultBorderMixin)}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Typography variant="subtitle2">Change Guide</Typography>
+                        <Typography variant="caption" color="secondary">{guide.headline}</Typography>
+                    </div>
+                    {guide.mechanical.length > 0 && (
+                        <Button
+                            size="small"
+                            variant="text"
+                            onClick={() => setShowMechanical((prev) => !prev)}
+                        >
+                            {showMechanical
+                                ? `Hide ${guide.mechanical.length} index/trigger changes`
+                                : `Show ${guide.mechanical.length} filtered index/trigger changes`}
+                        </Button>
+                    )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {guide.destructive.length > 0 && (
+                        <div className="space-y-1">
+                            <Chip size="smallest" colorScheme="red">{`Breaking / Altered (${guide.destructive.length})`}</Chip>
+                            <ul className="space-y-0.5 pl-1">
+                                {guide.destructive.slice(0, 5).map((c, idx) => (
+                                    <li key={idx}>
+                                        <Typography variant="caption" className="font-mono block truncate">
+                                            {`${c.change} ${c.object} ${formatSchemaTarget(c)}`}
+                                        </Typography>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {guide.access.length > 0 && (
+                        <div className="space-y-1">
+                            <Chip size="smallest" colorScheme="yellow">{`Access & RLS (${guide.access.length})`}</Chip>
+                            <ul className="space-y-0.5 pl-1">
+                                {guide.access.slice(0, 5).map((c, idx) => (
+                                    <li key={idx}>
+                                        <Typography variant="caption" className="font-mono block truncate">
+                                            {`${c.change} ${c.object} ${formatSchemaTarget(c)}`}
+                                        </Typography>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {guide.additive.length > 0 && (
+                        <div className="space-y-1">
+                            <Chip size="smallest" colorScheme="green">{`Additive (${guide.additive.length})`}</Chip>
+                            <ul className="space-y-0.5 pl-1">
+                                {guide.additive.slice(0, 5).map((c, idx) => (
+                                    <li key={idx}>
+                                        <Typography variant="caption" className="font-mono block truncate">
+                                            {`${c.change} ${c.object} ${formatSchemaTarget(c)}`}
+                                        </Typography>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+            </div>
             <Typography variant="body2" color="secondary">{t("studio_branch_diff_schema_not_merged")}</Typography>
-            {diff.schema.map((change, index) => (
+            {visibleChanges.map((change, index) => (
                 <div key={index} className={cls("rounded-xl border bg-surface-card overflow-hidden", defaultBorderMixin)}>
                     <div className="flex items-center gap-2 px-3 py-2 min-w-0">
                         <Chip size="smallest" colorScheme={CHANGE_COLOR[change.change]}>{changeLabel[change.change]}</Chip>

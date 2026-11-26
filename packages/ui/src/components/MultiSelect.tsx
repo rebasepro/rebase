@@ -146,6 +146,12 @@ export const MultiSelect = React.forwardRef<
         const [isMounted, setIsMounted] = useState(false);
         const [isPopoverOpen, setIsPopoverOpen] = useState(open ?? false);
         const [selectedValues, setSelectedValues] = useState<string[]>(value ?? []);
+        // Snapshot of selected values captured when the popover opens.
+        // Selected items float to the top based on this snapshot so clicking
+        // an item never jumps it away from the cursor mid-selection; ordering
+        // updates only when the menu is closed and reopened.
+        const [openSelectedSnapshot, setOpenSelectedSnapshot] = useState<string[]>(() => value ?? []);
+        const searchInputRef = React.useRef<HTMLInputElement | null>(null);
 
         // Get the portal container from context
         const contextContainer = usePortalContainer();
@@ -157,14 +163,42 @@ export const MultiSelect = React.forwardRef<
             setIsMounted(true);
         }, []);
 
-        const onPopoverOpenChange = (open: boolean) => {
-            setIsPopoverOpen(open);
-            onOpenChange?.(open);
+        const onPopoverOpenChange = (nextOpen: boolean) => {
+            if (nextOpen) {
+                setOpenSelectedSnapshot([...selectedValues]);
+            }
+            setIsPopoverOpen(nextOpen);
+            onOpenChange?.(nextOpen);
         }
 
         useEffect(() => {
+            if (open) {
+                setOpenSelectedSnapshot((prev) => (isPopoverOpen ? prev : [...selectedValues]));
+            }
             setIsPopoverOpen(open ?? false);
+            // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [open]);
+
+        // Reorder children stably: items that were selected when the popover
+        // opened appear first, preserving original relative order within each
+        // group. Toggling an item during an open session does NOT move it.
+        const orderedChildren = React.useMemo(() => {
+            if (openSelectedSnapshot.length === 0) return children;
+            const snapshotSet = new Set(openSelectedSnapshot.map(String));
+            const selectedNodes: React.ReactNode[] = [];
+            const unselectedNodes: React.ReactNode[] = [];
+            Children.forEach(children, (child) => {
+                if (React.isValidElement<MultiSelectItemProps>(child)
+                    && child.props.value !== undefined
+                    && child.props.value !== null
+                    && snapshotSet.has(String(child.props.value))) {
+                    selectedNodes.push(child);
+                } else {
+                    unselectedNodes.push(child);
+                }
+            });
+            return [...selectedNodes, ...unselectedNodes];
+        }, [children, openSelectedSnapshot]);
 
         // Every option's value, as the strings an option click reports. Not
         // filtered through `Boolean`: an option whose value is "" is an option.
@@ -255,9 +289,29 @@ export const MultiSelect = React.forwardRef<
         // the page — the relation and user selectors set their own height on
         // the list and got a second, competing scroll container inside it.
         useInjectStyles("MultiSelect", `
+[data-multi-select-content] {
+  transform-origin: var(--radix-popover-content-transform-origin);
+  animation: multiSelectDirectionalIn 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
 [data-multi-select-content] [cmdk-group] {
   max-height: 45vh;
   overflow-y: auto;
+}
+@keyframes multiSelectDirectionalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-multi-select-content] {
+    animation: none;
+  }
 } `)
 
         const contextValue = React.useMemo(() => ({
@@ -388,11 +442,18 @@ export const MultiSelect = React.forwardRef<
                             className={cls("z-50 overflow-hidden border bg-surface-card rounded-lg w-[400px]", defaultBorderMixin)}
                             align="start"
                             sideOffset={8}
+                            onOpenAutoFocus={(event) => {
+                                if (searchInputRef.current) {
+                                    event.preventDefault();
+                                    searchInputRef.current.focus();
+                                }
+                            }}
                             onEscapeKeyDown={() => onPopoverOpenChange(false)}
                         >
                             <CommandPrimitive>
                                 <div className={"flex flex-row items-center"}>
                                     <CommandPrimitive.Input
+                                        ref={searchInputRef}
                                         className={cls(focusedDisabled, "bg-transparent outline-none flex-1 h-full w-full m-4 flex-grow text-surface-accent-900 dark:text-white")}
                                         placeholder="Search..."
                                         onKeyDown={handleInputKeyDown}
@@ -429,7 +490,7 @@ export const MultiSelect = React.forwardRef<
                                             <InnerCheckBox checked={allSelected}/>
                                             <span className={"text-sm text-text-secondary dark:text-text-secondary-dark"}>(Select All)</span>
                                         </CommandPrimitive.Item>}
-                                        {children}
+                                        {orderedChildren}
                                     </CommandPrimitive.Group>
                                 </CommandPrimitive.List>
                             </CommandPrimitive>
