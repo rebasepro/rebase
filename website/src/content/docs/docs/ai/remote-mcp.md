@@ -27,6 +27,61 @@ Without `REBASE_PUBLIC_URL`, a JWT secret, or a data driver that can scope a que
 to one user, the endpoint declines to mount and says why in the boot log. No
 `REBASE_ROLE` turns it on.
 
+`rebase dev` is the one exception: it switches `/mcp` on for the server it
+starts, and that server names its own address, `http://localhost:<port>`, as
+the public URL, so there is nothing to configure. A `REBASE_MCP_ENABLED` line
+in the shell or in `.env` still decides, `false` included. The dev banner
+prints the endpoint on an `MCP:` line once it has mounted.
+
+## Connecting a client
+
+```bash
+rebase mcp connect            # pick the clients to connect, from a list
+rebase mcp connect --client claude-code,cursor
+rebase mcp connect --print    # the URL, the command and the install links; changes nothing
+rebase mcp url                # the URL alone
+```
+
+`rebase mcp connect` asks the server where `/mcp` is, by reading the document it
+publishes at `/.well-known/oauth-protected-resource/mcp`, so the URL is right
+behind a proxy, under `REBASE_PUBLIC_URL`, and on a dev port that moved. Then it
+connects each client you pick:
+
+| Client | `--client` | What happens |
+|---|---|---|
+| Claude Code | `claude-code` | Runs `claude mcp add --transport http <name> <url>` |
+| Cursor | `cursor` | Opens Cursor's install link |
+| VS Code | `vscode` | Opens VS Code's install link |
+| Claude (claude.ai, desktop, mobile) | `claude` | Prints the steps for Settings → Connectors, with the URL to paste |
+| ChatGPT | `chatgpt` | Prints the steps for its connector settings |
+
+The clients it finds installed are ticked already. Claude and ChatGPT connect
+from their own servers, which cannot reach `localhost`, so against a dev server
+they are listed as needing a deployed project. `--client all` names every one.
+With no terminal, or under `--json`, and no `--client`, the command prints what
+`--print` does and connects nothing.
+
+The server it asks is the project's own: `REBASE_BASE_URL`, else the running
+`rebase dev`. `--cloud` asks the Rebase Cloud project the directory is linked
+to, and `--url <server>` any backend. A server with `/mcp` off answers nothing
+there, and the command says how to switch it on.
+
+The server is registered as the project's name, with `-local` for one on this
+machine, so a local and a deployed project can both be connected; `--name`
+changes it. It is never `rebase`, the name of the [developer MCP
+server](/docs/ai/mcp/) in a project's `.mcp.json`, which a second server of the
+same name would hide.
+
+The admin panel offers the same steps. Its drawer has a **Connect AI** button
+that shows the URL the server publishes, the `claude mcp add` command, the
+Cursor and VS Code install links and, on a deployed project, the connector
+steps for Claude and ChatGPT. Below them it lists the agents the signed-in
+person has connected, each with a way to disconnect it. Everyone signed in
+sees the button while `/mcp` is on. While it is off, only an administrator
+does, with how to turn it on.
+
+## What a connection gets
+
 - **OAuth, with a consent screen.** A client finds the authorization server
   through `/.well-known/oauth-protected-resource`, registers itself (dynamic
   registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it

@@ -203,6 +203,32 @@ rebase auth keys revoke <id> --yes
 
 `auth emails` reads the development mailbox a server with no `SMTP_HOST` keeps instead of sending; `--clear` empties it. An empty mailbox is answered with the server that was asked (`The development mailbox at http://localhost:3082 (rebase dev) is empty.`, and `server` in the JSON), since an empty answer from another backend reads exactly like mail that was never sent. `auth keys` manages your own `rk_` keys, which act as you, narrowed to the scopes named; the server answers it only when the auth table sets `auth.personalKeys: true`. Service keys are `rebase api-keys`, which also gained `update <id>`.
 
+## `rebase mcp`
+
+Connect an AI client to a running app's own MCP endpoint (`/mcp`), where an
+agent signs in as a person and is held to that person's row-level security:
+
+```bash
+rebase mcp connect                        # pick the clients from a list
+rebase mcp connect --client claude-code   # or name them: claude-code, cursor, vscode, claude, chatgpt, all
+rebase mcp connect --print                # print every way to connect, change nothing
+rebase mcp url                            # the endpoint's URL
+```
+
+| Flag | Description |
+|------|-------------|
+| `--client <names>` | Skip the picker. Comma-separated, or `all` |
+| `--name <name>` | The name to register the server under. Default: the project's name, with `-local` for a dev server |
+| `--print` | Print the URL, the Claude Code command and the install links, and change nothing |
+| `--url <server>` | The backend at this address. Default: `REBASE_BASE_URL`, else the running `rebase dev` |
+| `--cloud` | The Rebase Cloud project this directory is linked to |
+| `--json` | Machine-readable output |
+
+`rebase mcp url` takes `--url`, `--cloud` and `--json`. What each client does
+with the URL is in [Connecting a client](/docs/ai/remote-mcp/#connecting-a-client).
+This is not the developer MCP server in `.mcp.json`, which
+`rebase skills install --mcp` sets up.
+
 ## Next steps
 
 - [Endpoint index](/docs/backend/endpoints/) — every route these commands reach, and the scope each needs

@@ -323,6 +323,11 @@ process shape, while this one is a decision to hand credentials to third-party
 software, and it should be made by a person rather than inherited from a
 container's job title.
 
+`rebase dev` sets `REBASE_MCP_ENABLED=true` for the backend it starts, unless
+the shell or `.env` already has a line for it, and that backend names its own
+`http://localhost:<port>` as the public URL when `REBASE_PUBLIC_URL` is unset.
+Nothing else does either: a production process needs both variables.
+
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `REBASE_MCP_ENABLED` | Mount the MCP surface. Requires `REBASE_PUBLIC_URL`; without it the surface declines to mount and says so in the boot log. | `false` |

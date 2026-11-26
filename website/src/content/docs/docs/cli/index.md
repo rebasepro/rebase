@@ -54,7 +54,7 @@ Start the development server:
 rebase dev
 ```
 
-Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every save under `backend/schema/`.
+Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every save under `backend/schema/`. The backend it starts also serves the [remote MCP endpoint](/docs/ai/remote-mcp/) at `/mcp` with nothing to configure, unless a `REBASE_MCP_ENABLED` line in the shell or in `.env` decides otherwise; the banner's `MCP:` line prints its URL, and [`rebase mcp connect`](/docs/cli/project/#rebase-mcp) connects an AI client to it.
 
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
