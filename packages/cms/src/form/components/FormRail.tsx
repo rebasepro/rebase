@@ -1,8 +1,8 @@
 import type { Entity } from "@rebasepro/cms-types";
 import type { ResolvedFormField } from "@rebasepro/app";
 import React from "react";
-import { CheckIcon, cls, CopyIcon, IconButton, iconSize, Tooltip, Typography } from "@rebasepro/ui";
-import { useFormFieldsContext } from "../FormFieldsContext";
+import { CheckIcon, cls, CopyIcon, defaultBorderMixin, IconButton, iconSize, Tooltip, Typography } from "@rebasepro/ui";
+import { FormDensityContext, useFormFieldsContext } from "../FormFieldsContext";
 
 export interface FormRailProps {
     fields: ResolvedFormField[];
@@ -61,16 +61,26 @@ export function FormRail({
             // `@container/form`, so a panel that never gets that wide keeps 304.
             // No left rule: the rail is sheet beside the form's card, and that
             // step is the separation. Regions meet with a step, not a line.
-            "flex flex-col gap-6 shrink-0 w-76 @7xl/form:w-84 overflow-y-auto",
-            "px-5 py-6 bg-surface-sheet"
+            "flex flex-col gap-5 shrink-0 w-76 @7xl/form:w-84 overflow-y-auto",
+            "px-4 py-5 bg-surface-sheet"
         )}>
             {fields.length > 0 && (
-                <div className={"flex flex-col gap-5"}>
-                    {render && fields.map(render)}
-                </div>
+                <FormDensityContext.Provider value="inspector">
+                    <div className={"flex flex-col gap-3"}>
+                        <Typography variant={"caption"}
+                            className={"text-[11px] font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark"}>
+                            Properties
+                        </Typography>
+                        {render && fields.map(render)}
+                    </div>
+                </FormDensityContext.Provider>
             )}
 
-            {showRecordMeta && entity && <RecordMeta entity={entity}/>}
+            {showRecordMeta && entity && (
+                <div className={cls(fields.length > 0 && "pt-4 border-t", fields.length > 0 && defaultBorderMixin)}>
+                    <RecordMeta entity={entity}/>
+                </div>
+            )}
         </aside>
     );
 }

@@ -58,6 +58,17 @@ export interface FormFieldsContextValue {
     register: (key: string) => () => void;
 }
 
+export type FormDensity = "default" | "inspector";
+
+/**
+ * Controls field density for a region of a record form without altering the
+ * global design system. `"default"` keeps the main column's FireCMS field
+ * density (`size="large"`, inside-box labels on one-line controls);
+ * `"inspector"` switches a rail or property inspector to compact `size="small"`
+ * controls with uniform muted labels above.
+ */
+export const FormDensityContext = React.createContext<FormDensity>("default");
+
 export const FormFieldsContext = React.createContext<FormFieldsContextValue | undefined>(undefined);
 
 export function useFormFieldsContext(): FormFieldsContextValue | undefined {
@@ -105,6 +116,8 @@ const FormFieldCell = React.memo(function FieldCell({ field }: { field: Resolved
 
     const fields = useContext(FormFieldsContext);
     if (!fields) throw new Error("INTERNAL: a form field rendered outside its form");
+    const density = useContext(FormDensityContext);
+    const isInspector = density === "inspector";
 
     const authController = useAuthController();
     const customizationController = useCustomizationController();
@@ -202,7 +215,8 @@ const FormFieldCell = React.memo(function FieldCell({ field }: { field: Resolved
     // so they all stand the same height. Everything else — multi-selects,
     // uploads, markdown, relations — is labelled above by FieldBlock.
     const selfLabelling = isSelfLabellingProperty(property);
-    const labelInside = !selfLabelling
+    const labelInside = !isInspector
+        && !selfLabelling
         && labelsInsideControl(property, customizationController.propertyConfigs);
 
     const bindingProps: PropertyFieldBindingProps<Values> = {
@@ -222,8 +236,8 @@ const FormFieldCell = React.memo(function FieldCell({ field }: { field: Resolved
         // defaults, a text field came out 48px, a select 44 and a switch 64.
         // `large`: the record-form density — a 64px box with the label inside
         // and a 16px value, or a 48px box under a label. See DESIGN.md "Form
-        // density". A compact form takes `medium`.
-        size: fields.fieldSize,
+        // density". A compact form takes `medium`; an inspector rail takes `small`.
+        size: isInspector ? "small" : fields.fieldSize,
         autoFocus: autoFocusKey === field.key
     };
 
@@ -232,7 +246,8 @@ const FormFieldCell = React.memo(function FieldCell({ field }: { field: Resolved
             <FieldBlock propertyKey={field.key}
                 property={property}
                 showLabel={!selfLabelling && !labelInside}
-                labelInside={labelInside}>
+                labelInside={labelInside}
+                density={density}>
                 <PropertyFieldBinding {...bindingProps}/>
             </FieldBlock>
         </div>

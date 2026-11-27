@@ -19,6 +19,14 @@ import {
     Typography
 } from "@rebasepro/ui";
 
+export const OPEN_COMMAND_PALETTE_EVENT = "rebase:open-command-palette";
+
+export function openCommandPalette(): void {
+    if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT));
+    }
+}
+
 export interface CommandPaletteItem {
     id: string;
     label: string;
@@ -73,8 +81,13 @@ export function CommandPalette({ extraItems }: CommandPaletteProps = {}) {
                 });
             }
         };
+        const handleOpenEvent = () => setOpen(true);
         window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
+        window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, handleOpenEvent);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+            window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, handleOpenEvent);
+        };
     }, []);
 
     const items = useMemo<CommandPaletteItem[]>(() => {
@@ -144,6 +157,19 @@ export function CommandPalette({ extraItems }: CommandPaletteProps = {}) {
         );
     }, [items, query]);
 
+    const grouped = useMemo(() => {
+        const order: CommandPaletteItem["group"][] = ["Collections", "Navigation", "Actions"];
+        const map = new Map<CommandPaletteItem["group"], Array<{ item: CommandPaletteItem; flatIndex: number }>>();
+        filtered.forEach((item, flatIndex) => {
+            const list = map.get(item.group) ?? [];
+            list.push({ item, flatIndex });
+            map.set(item.group, list);
+        });
+        return order
+            .filter((group) => (map.get(group)?.length ?? 0) > 0)
+            .map((group) => ({ group, entries: map.get(group)! }));
+    }, [filtered]);
+
     const safeActiveIndex = filtered.length === 0 ? 0 : Math.min(activeIndex, filtered.length - 1);
 
     const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -182,7 +208,7 @@ export function CommandPalette({ extraItems }: CommandPaletteProps = {}) {
                             setActiveIndex(0);
                         }}
                         onKeyDown={handleInputKeyDown}
-                        placeholder="Jump to collection or run action…"
+                        placeholder="Type a command or jump to collection…"
                         aria-label="Command palette search"
                         className="w-full bg-transparent text-sm text-text-primary dark:text-text-primary-dark placeholder:text-surface-500 outline-none"
                     />
@@ -193,50 +219,72 @@ export function CommandPalette({ extraItems }: CommandPaletteProps = {}) {
                 <div
                     role="listbox"
                     aria-label="Command results"
-                    className="max-h-[340px] overflow-y-auto p-1.5"
+                    className="max-h-[340px] overflow-y-auto p-1.5 space-y-2"
                 >
                     {filtered.length === 0 ? (
-                        <div className="px-3 py-6 text-center">
+                        <div className="px-3 py-8 text-center">
                             <Typography variant="body2" color="secondary">
                                 No matching collections or actions.
                             </Typography>
                         </div>
                     ) : (
-                        filtered.map((item, index) => {
-                            const selected = index === safeActiveIndex;
-                            return (
-                                <button
-                                    key={item.id}
-                                    type="button"
-                                    role="option"
-                                    aria-selected={selected}
-                                    onMouseEnter={() => setActiveIndex(index)}
-                                    onClick={item.onSelect}
-                                    className={cls(
-                                        "w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-left transition-colors duration-100",
-                                        selected ? "bg-surface-active" : "hover:bg-surface-hover"
-                                    )}
-                                >
-                                    <span className="flex items-center gap-2.5 min-w-0">
-                                        {item.icon}
-                                        <Typography variant="body2" className="truncate font-medium">
-                                            {item.label}
-                                        </Typography>
-                                    </span>
-                                    <span className="flex items-center gap-2 shrink-0">
-                                        {item.hint && (
-                                            <Typography variant="caption" color="secondary" className="font-mono">
-                                                {item.hint}
-                                            </Typography>
-                                        )}
-                                        <Typography variant="caption" color="secondary">
-                                            {item.group}
-                                        </Typography>
-                                    </span>
-                                </button>
-                            );
-                        })
+                        grouped.map(({ group, entries }) => (
+                            <div key={group} className="space-y-0.5">
+                                <div className="px-2.5 pt-1 pb-0.5">
+                                    <Typography
+                                        variant="caption"
+                                        className="text-[11px] font-medium uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark"
+                                    >
+                                        {group}
+                                    </Typography>
+                                </div>
+                                {entries.map(({ item, flatIndex }) => {
+                                    const selected = flatIndex === safeActiveIndex;
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            role="option"
+                                            aria-selected={selected}
+                                            onMouseEnter={() => setActiveIndex(flatIndex)}
+                                            onClick={item.onSelect}
+                                            className={cls(
+                                                "w-full h-[34px] flex items-center justify-between gap-3 px-2.5 rounded-lg text-left transition-colors duration-100",
+                                                selected ? "bg-surface-active" : "hover:bg-surface-hover"
+                                            )}
+                                        >
+                                            <span className="flex items-center gap-2.5 min-w-0">
+                                                {item.icon}
+                                                <Typography variant="body2" className="text-[13px] truncate font-medium">
+                                                    {item.label}
+                                                </Typography>
+                                            </span>
+                                            <span className="flex items-center gap-2 shrink-0">
+                                                {item.hint && (
+                                                    <Typography variant="caption" color="secondary" className="font-mono text-[11px]">
+                                                        {item.hint}
+                                                    </Typography>
+                                                )}
+                                                {selected && (
+                                                    <kbd className="rounded px-1 py-0.5 text-[10px] leading-none font-mono bg-surface-raised text-surface-500">
+                                                        ↵
+                                                    </kbd>
+                                                )}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ))
                     )}
+                </div>
+                <div className="flex items-center justify-between px-3.5 py-2 border-t border-hairline bg-surface-sheet">
+                    <Typography variant="caption" color="secondary" className="text-[11px]">
+                        ↑↓ navigate · ↵ open · esc close
+                    </Typography>
+                    <Typography variant="caption" color="secondary" className="text-[11px] font-mono">
+                        ⌘K
+                    </Typography>
                 </div>
             </div>
         </Dialog>

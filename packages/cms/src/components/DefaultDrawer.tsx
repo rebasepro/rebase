@@ -21,6 +21,7 @@ import {
     Menu,
     MenuItem,
     MoonIcon,
+    SearchIcon,
     Separator,
     SettingsIcon,
     Skeleton,
@@ -31,6 +32,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { DrawerNavigationGroup } from "./DrawerNavigationGroup";
+import { openCommandPalette } from "./CommandPalette";
 import { DrawerExpansionContext, useDrawerExpansion } from "./drawer_expansion";
 import { LanguageToggle, McpConnectButton, RebaseLogo, RlsSimulatorBar, useCanConnectMcp, useCanSimulateAccess } from "@rebasepro/app";
 import { useApp } from "./app/useApp";
@@ -318,16 +320,16 @@ export function DrawerLogo({
                 }
             </Link>
 
-            {/* Title (fades in when expanded or hovered) */}
+            {/* Title + quick search trigger (fades in when expanded or hovered) */}
             <div
                 className={cls(
-                    "flex flex-row items-center overflow-hidden transition-all duration-200 ease-in-out",
-                    showFullContent ? "opacity-100 w-full ml-1" : "opacity-0 w-0 ml-0"
+                    "flex flex-row items-center justify-between gap-1 overflow-hidden transition-all duration-200 ease-in-out",
+                    showFullContent ? "opacity-100 w-full ml-1 pr-1" : "opacity-0 w-0 ml-0"
                 )}
             >
-                {title && (
+                {title ? (
                     <Link
-                        className="visited:text-inherit dark:visited:text-inherit block truncate"
+                        className="visited:text-inherit dark:visited:text-inherit block truncate min-w-0"
                         to={logoDestination}
                     >
                         {typeof title === "string"
@@ -335,7 +337,17 @@ export function DrawerLogo({
                             : title
                         }
                     </Link>
-                )}
+                ) : <span />}
+                <Tooltip title={t("search", { defaultValue: "Search" })} shortcut={["⌘", "K"]} side="bottom">
+                    <IconButton
+                        size="small"
+                        aria-label={t("search", { defaultValue: "Search" })}
+                        onClick={openCommandPalette}
+                        className="shrink-0 text-surface-500 hover:text-text-primary dark:hover:text-text-primary-dark"
+                    >
+                        <SearchIcon size={iconSize.smallest} />
+                    </IconButton>
+                </Tooltip>
             </div>
         </div>
     );

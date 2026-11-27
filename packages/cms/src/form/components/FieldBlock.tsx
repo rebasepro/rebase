@@ -1,6 +1,6 @@
 import type { PropertySpan, Property } from "@rebasepro/cms-types";
 import React from "react";
-import { cls, ErrorBoundary, Typography } from "@rebasepro/ui";
+import { cls, ErrorBoundary, Tooltip, Typography } from "@rebasepro/ui";
 import { isReadOnly } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { PropertyKeyHint } from "../../components/PropertyKeyHint";
@@ -117,6 +117,12 @@ export interface FieldBlockProps {
     label?: string;
     /** Type icon, when there is no property to derive one from. */
     icon?: React.ReactNode;
+    /**
+     * `"inspector"` renders a tighter, quieter label (12px secondary ink) with
+     * helper descriptions tucked into a label tooltip instead of stacking multi-
+     * line helper copy underneath controls in a narrow rail.
+     */
+    density?: "default" | "inspector";
     children: React.ReactNode;
 }
 
@@ -140,10 +146,12 @@ export function FieldBlock({
     mode = "edit",
     label,
     icon,
+    density = "default",
     children
 }: FieldBlockProps) {
 
     const reading = mode === "read";
+    const isInspector = density === "inspector";
     const description = property?.description?.trim();
     // Only where someone can supply the value: on a read-only field the marker
     // asks for input nobody can give, and `validation.required` there states
@@ -151,6 +159,24 @@ export function FieldBlock({
     const required = Boolean(property?.validation?.required) && !(property && isReadOnly(property));
     const footed = labelInside && !reading;
     const domScope = useFormDomScope();
+
+    const labelRow = showLabel ? (
+        <div className={cls(
+            "group/label flex items-center gap-1.5 min-w-0 font-medium leading-tight",
+            isInspector
+                ? "mb-1 text-xs text-text-secondary dark:text-text-secondary-dark"
+                : "mb-1.5 text-[13px] text-text-primary dark:text-text-primary-dark"
+        )}>
+            {(property || icon) && (
+                <span className={"shrink-0 text-text-disabled dark:text-text-disabled-dark"}>
+                    {property ? getIconForProperty(property, isInspector ? 13 : LABEL_ICON_SIZE) : icon}
+                </span>
+            )}
+            <span className={"truncate"}>{property?.name ?? label ?? propertyKey}</span>
+            {required && <span className={"text-red-500 dark:text-red-500 -ml-1"}>*</span>}
+            {property && <PropertyKeyHint propertyKey={propertyKey}/>}
+        </div>
+    ) : null;
 
     return (
         // Top-aligned: with the description below the control, every label is a
@@ -163,32 +189,9 @@ export function FieldBlock({
             // for the key; the whole field reveals it instead.
             className={cls("relative flex flex-col min-w-0", footed && "group/label")}>
 
-            {showLabel && (
-                <div className={cls(
-                    "group/label flex items-center gap-1.5 min-w-0 font-medium leading-tight mb-1.5",
-                    // Primary, not secondary: the label names the field and the
-                    // reference sets its labels in the primary ink; the type icon
-                    // beside it stays muted so the name carries the row.
-                    "text-[13px] text-text-primary dark:text-text-primary-dark"
-                )}>
-                    {/* Small and quiet: enough to tell a number from a
-                        relation at a glance, not enough to compete with the
-                        field name. Matched to the label's 13px rather than
-                        left at the 16px `smallest` token, which put the
-                        heaviest mark on the row on the least important
-                        thing in it. */}
-                    {(property || icon) && (
-                        <span className={"shrink-0 text-text-disabled dark:text-text-disabled-dark"}>
-                            {property ? getIconForProperty(property, LABEL_ICON_SIZE) : icon}
-                        </span>
-                    )}
-                    <span className={"truncate"}>{property?.name ?? label ?? propertyKey}</span>
-                    {required && <span className={"text-red-500 dark:text-red-500 -ml-1"}>*</span>}
-                    {/* In the row, not over it. This was a tooltip on the
-                        label and on the control, which opened whenever a
-                        field took focus and covered the label being read. */}
-                    {property && <PropertyKeyHint propertyKey={propertyKey}/>}
-                </div>
+            {labelRow && (isInspector && description && !reading
+                ? <Tooltip title={description} side="left" familiarity="low">{labelRow}</Tooltip>
+                : labelRow
             )}
 
             {/* `data-field-control` names the slot for anything measuring the
@@ -201,8 +204,10 @@ export function FieldBlock({
             </div>
 
             {/* Under the control, where it reads as a note about the thing you
-                just filled in rather than a subtitle of the next label. */}
-            {showLabel && description && !reading && (
+                just filled in rather than a subtitle of the next label. In
+                inspector density, the description lives in the label tooltip so
+                the rail stays scannable. */}
+            {showLabel && description && !reading && !isInspector && (
                 <Typography variant={"caption"}
                     color={"disabled"}
                     className={"mt-1.5 ml-0.5 leading-snug"}>
