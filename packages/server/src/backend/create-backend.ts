@@ -60,6 +60,7 @@ import { createRebaseClient } from "@rebasepro/client";
 
 import { TableRegistry } from "../schema/table-registry";
 import { resolveDeclaredTables } from "../schema/declared-tables";
+import { compileImplicitAuthTable, withImplicitAuthTable } from "../schema/implicit-auth-table";
 import {
     logUnprovisionedTables,
     tablesStoredBy,
@@ -236,7 +237,7 @@ import type { MetricsHistory } from "../metrics/history-recorder.js";
 import type { ProvisionOptions, RebaseAuthConfig, RebaseBackendOptions } from "./options";
 import type { BackendServices } from "./services";
 import { runInBackendScope, type BackendScope } from "./scope";
-import { noCollectionsCause } from "./no-collections";
+import { noCollectionsCause, unprotectedTableAnswer } from "./no-collections";
 
 /**
  * A backend's HTTP surface, one route group at a time.
@@ -498,6 +499,31 @@ export function isDatabaseAdapter(db: unknown): db is DatabaseAdapter {
 }
 
 /**
+ * The bootstrapper built-in auth runs on: the default source's. The same
+ * choice the boot makes once the drivers are open (`defaultBootstrapper`),
+ * made from the list alone.
+ */
+function authBootstrapperOf(bootstrappers: readonly BackendBootstrapper[]): BackendBootstrapper | undefined {
+    return bootstrappers.find(b => b.isDefault)
+        ?? bootstrappers.find(b => b.id === DEFAULT_DRIVER_ID || b.type === DEFAULT_DRIVER_ID)
+        ?? bootstrappers[0];
+}
+
+/**
+ * Built-in auth's own table, compiled — the auth table of a project that
+ * declares none. `undefined` when auth is an `AuthAdapter` (it owns its
+ * users), when there is no auth, and when the database has no table of its
+ * own to offer.
+ */
+function resolveImplicitAuthTable(config: RebaseBackendOptions): CompiledTable | undefined {
+    if (!config.auth || isAuthAdapter(config.auth)) return undefined;
+    const definition = config.database
+        ? config.database.defaultAuthTable
+        : authBootstrapperOf(config.bootstrappers ?? [])?.defaultAuthTable;
+    return definition ? compileImplicitAuthTable(definition) : undefined;
+}
+
+/**
  * Present a `DatabaseAdapter` as a `BackendBootstrapper`.
  *
  * The `database` convenience path — one adapter, no explicit source keys —
@@ -525,6 +551,7 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
                 dbAdapter.initializeRealtime!(driverResult)
             : undefined,
         initializeAuth: dbAdapter.initializeAuth,
+        defaultAuthTable: dbAdapter.defaultAuthTable,
         initializeHistory: dbAdapter.initializeHistory,
         initializeWebsockets: dbAdapter.initializeWebsockets,
         verifyConnection: dbAdapter.verifyConnection
@@ -739,10 +766,26 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         defaultRls: config.defaultRls,
         schemaDir: config.schemaDir
     });
+    // Built-in auth always has exactly one auth table: the declared
+    // `defineAuthTable`, or — when none is declared — the auth bootstrapper's
+    // own (`rebase.users`), so a project's users are a collection whoever
+    // wrote the declaration. An `AuthAdapter` owns its users: nothing is added.
+    const implicitAuthTable = resolveImplicitAuthTable(config);
+    /**
+     * The declared tables as served: with the implicit auth table when it
+     * applies. What the drivers open with, what boot provisions and what the
+     * registry serves; `declaredTables` stays what the source declares.
+     */
+    const servedDeclaredTables = withImplicitAuthTable(declaredTables, implicitAuthTable, message => logger.warn(message));
+    if (servedDeclaredTables !== declaredTables) {
+        logger.debug("No table is declared with defineAuthTable — serving built-in auth's table as the auth table", {
+            slug: implicitAuthTable?.descriptor.slug
+        });
+    }
     const tableRegistry = new TableRegistry();
-    tableRegistry.replaceAll(declaredTables.tables);
+    tableRegistry.replaceAll(servedDeclaredTables.tables);
     /** The declared tables whose compiled policies are served; replaced by a live schema apply. */
-    let servedPolicyTables: readonly TableDescriptor[] = declaredTables.descriptors;
+    let servedPolicyTables: readonly TableDescriptor[] = servedDeclaredTables.descriptors;
     /** The compiled tables served — what a live schema edit plans against; replaced by a live schema apply. */
     let servedCompiledTables: readonly CompiledTable[] = declaredTables.tables;
     if (declaredTables.source === "schemaDir") {
@@ -855,7 +898,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     const provisionTargets = provisionTargetsFor(bootstrappers, config.database, config.provisioningDriverResult);
     const provisionTarget = provisionTargets[0];
     const sourceShapes = provisionTargets.map(t => ({ key: t.key ?? DEFAULT_DRIVER_ID, engine: t.engine }));
-    const declaredDescriptors = declaredTables.descriptors;
+    const declaredDescriptors = servedDeclaredTables.descriptors;
     const provisionableBy = new Map<ProvisionTarget, TableDescriptor[]>();
     const storedBySome = new Set<string>();
     for (const target of provisionTargets) {
@@ -866,7 +909,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     logUnprovisionedTables(declaredDescriptors, storedBySome, sourceShapes);
     const provisionable = provisionableBy.get(provisionTarget) ?? [];
     // What the boot appliers plan from: the compiled tables themselves.
-    const compiledBySlug = new Map(declaredTables.tables.map(table => [table.descriptor.slug, table]));
+    const compiledBySlug = new Map(servedDeclaredTables.tables.map(table => [table.descriptor.slug, table]));
+    // Nothing declared, and built-in auth's own table served beside what the
+    // driver derives: still the framework's to provision, as the auth tables
+    // beside it are. Its policies are what let the request role read it at
+    // all — `rebase.users` with RLS off is withheld from it.
+    const introspectedAuthTables = introspectCollections && implicitAuthTable ? [implicitAuthTable.descriptor] : [];
+    if (introspectCollections && implicitAuthTable) compiledBySlug.set(implicitAuthTable.descriptor.slug, implicitAuthTable);
     const compiledOf = (slug: string) => compiledBySlug.get(slug);
 
     // Before that first query: ask the database whether it is there at all. The
@@ -881,6 +930,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         provision: provision.tables,
         skipReason: provisionSkipReason
     });
+    if (introspectedAuthTables.length > 0) {
+        await provisionTableSchema(introspectedAuthTables, compiledOf, provisionTarget, {
+            provision: provision.tables,
+            skipReason: provisionSkipReason
+        });
+    }
     for (const target of provisionTargets.slice(1)) {
         const mine = provisionableBy.get(target) ?? [];
         if (mine.length === 0) continue;
@@ -908,8 +963,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
 
         const driverResult = await bootstrapper.initializeDriver({
-            tables: declaredTables.tables,
+            tables: servedDeclaredTables.tables,
             introspectCollections,
+            // Nothing declared: the driver derives the tables, and built-in
+            // auth's own table is served beside them — by the source auth
+            // lives on, the default.
+            ...(introspectCollections && implicitAuthTable && bootstrapper === authBootstrapperOf(bootstrappers)
+                ? { authTable: implicitAuthTable }
+                : {}),
             dataSourceKey: b.id || DEFAULT_DRIVER_ID,
             baas: config.baas,
             // So the driver's drift check can say something true about WHY a
@@ -1201,6 +1262,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         provision: provision.tables,
         skipReason: provisionSkipReason
     });
+    if (introspectedAuthTables.length > 0) {
+        await provisionTablePolicies(introspectedAuthTables, compiledOf, initializedTarget(provisionTarget), {
+            provision: provision.tables,
+            skipReason: provisionSkipReason
+        });
+    }
     for (const source of provisionTargets.slice(1)) {
         const mine = provisionableBy.get(source) ?? [];
         if (mine.length === 0) continue;
@@ -2991,6 +3058,18 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // First, so everything after it knows where the group is mounted.
         dataRouter.use("/*", recordMountPath());
 
+        // A table the driver skipped for having RLS off is not served, and
+        // says so — with the fix — instead of falling through to the generic
+        // answers. Ahead of the auth gate, as the empty data API's answer is:
+        // the boot log already names these tables. A served table of the same
+        // name wins.
+        dataRouter.use("/:table/*", async (c, next) => {
+            const segment = c.req.param("table");
+            if (unprotectedTables.length === 0 || tableRegistry.named(segment)) return next();
+            const answer = unprotectedTableAnswer(segment, unprotectedTables);
+            return answer ? c.json({ error: answer }, 404) : next();
+        });
+
         // Read `x-rebase-schema`, which a generated SDK has been sending for a
         // while and nothing has ever read. It refuses nothing — see
         // `createSchemaDriftDetector` — it only lets the error handler say
@@ -3190,6 +3269,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             const hooks = attached.get(table.descriptor.slug);
             return hooks ? { ...table, hooks } : table;
         });
+        // As boot serves them: with built-in auth's own table while the edited
+        // schema still declares no auth table. `servedCompiledTables` below
+        // stays the declarations alone — what the next edit plans against.
+        const served = withImplicitAuthTable({ tables, descriptors: schema.descriptors }, implicitAuthTable, message => logger.warn(message));
 
         const stale: string[] = [];
         for (const [bootstrapper, driverResult] of driverResults) {
@@ -3201,7 +3284,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 continue;
             }
             try {
-                const outcome = await driverResult.refreshTables(tables);
+                const outcome = await driverResult.refreshTables(served.tables);
                 if (outcome.status === "restart") stale.push(outcome.reason);
             } catch (err) {
                 const error = err instanceof Error ? err.message : String(err);
@@ -3210,13 +3293,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             }
         }
 
-        tableRegistry.replaceAll(tables);
+        tableRegistry.replaceAll(served.tables);
         // The drivers that refreshed hold these hooks already; one that could
         // not still runs the edited hooks of the tables it serves.
         for (const registry of hookTargets()) {
-            for (const table of tables) registry.setTableHooks(table.descriptor.slug, table.hooks ?? {});
+            for (const table of served.tables) registry.setTableHooks(table.descriptor.slug, table.hooks ?? {});
         }
-        servedPolicyTables = schema.descriptors;
+        servedPolicyTables = served.descriptors;
         servedCompiledTables = schema.tables;
         serverSlugs.splice(0, serverSlugs.length, ...servedOverServer(tableRegistry.list()));
         restRoutes.replace(tableRegistry.list().length > 0 ? buildActiveDataRouter() : buildEmptyDataStub());

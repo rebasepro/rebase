@@ -1,5 +1,5 @@
 ---
-sourceHash: 61a4474d68248a58
+sourceHash: 8ad9100fe30397b6
 title: Executando em um banco de dados existente ou compartilhado
 sidebar_label: Banco de dados existente ou compartilhado
 description: Execute o Rebase em um banco de dados PostgreSQL que ele não possui — um cluster compartilhado com outros aplicativos, um segundo projeto Rebase, Supabase ou um banco de dados bloqueado por um DBA — com as configurações de rls, rebase doctor --database e rebase db request-role migrate.
@@ -266,6 +266,12 @@ para toda a instrução não pode usar um índice: a listagem ou contagem com es
 proprietário de um usuário faria uma varredura completa da tabela (table scan). Portanto,
 as políticas que apenas o contexto do servidor ou um administrador podem satisfazer são
 escritas com `TO rebase_admin`, e nunca chegam ao plano de consulta de um usuário.
+
+A tabela de usuários é a exceção. A autenticação a lê e grava no contexto do
+servidor com o próprio papel da conexão, que não é trocado para `rebase_admin`,
+então suas políticas ficam `TO public` qualquer que seja a configuração: por trás
+de um papel de conexão que não é dono da tabela, cadastro e login funcionam do
+mesmo jeito.
 
 O `rebase_admin` não possui privilégios e não pode fazer login. Um chamador que possui
 a role `admin`, incluindo `rebase.dataAsAdmin`, executa como `<request role>_admin`

@@ -275,22 +275,25 @@ describe("rebase.sqlAsAdmin in a function, on a backend with auth (E2E)", () => 
 
     const run = async (sql: string) => (await app.request(`/api/functions/probe?sql=${encodeURIComponent(sql)}`)).json();
 
-    it("runs as the service identity, and nobody's SQL reads the auth store", async () => {
+    it("runs as the service identity, and no SQL reads a password hash from the auth store", async () => {
         expect(await run("SELECT rebase.uid() AS uid, rebase.roles() AS roles")).toEqual({ rows: [{ uid: "service", roles: "admin" }] });
         expect(await run("SELECT count(*)::int AS n FROM public.tickets")).toEqual({ rows: [{ n: 0 }] });
-        // The auth store is not the service identity's to read.
+        // Built-in auth always has a users table: with none declared, the
+        // server serves `rebase.users` as the auth table, under its admin-only
+        // policies — the posture of a declared one (the next describe).
         const opened = await openRebase({ databaseUrl: container.connectionString, tables: tablesFromCollections([tickets]).tables });
         const plain = await opened.withAuth({ uid: "00000000-0000-4000-8000-000000000001", roles: [] });
         const anon = await opened.withAuth({ uid: "anon", roles: ["anonymous"] });
-        const seen = { plain: await plain.sql("SELECT email, password_hash FROM rebase.users").catch((e: { cause?: { code?: string } }) => e.cause?.code),
-            anon: await anon.sql("SELECT email, password_hash FROM rebase.users").catch((e: { cause?: { code?: string } }) => e.cause?.code) };
+        const seen = { plain: await plain.sql("SELECT email, password_hash FROM rebase.users"),
+            anon: await anon.sql("SELECT email, password_hash FROM rebase.users") };
         await opened.close();
-        // 42501: permission denied. With no users collection to apply its
-        // admin-only policies, the auth user table is withheld from the
-        // request role: SQL run as anyone (the caller, or the service) cannot
-        // read the addresses and password hashes.
-        expect(seen).toEqual({ plain: "42501", anon: "42501" });
-        expect(await run("SELECT email, password_hash FROM rebase.users")).toEqual({ code: "42501" });
+        // Anyone but an admin reads no row of it.
+        expect(seen).toEqual({ plain: [], anon: [] });
+        // The service identity is an admin, so it reads the rows — and never
+        // the hash, which no SQL result carries.
+        const asService = await run("SELECT email, password_hash FROM rebase.users") as { rows: Record<string, unknown>[] };
+        expect(Array.isArray(asService.rows)).toBe(true);
+        for (const row of asService.rows) expect(row).not.toHaveProperty("password_hash");
         expect(await run("RESET ROLE")).toEqual({ code: "SQL_NOT_ALLOWED" });
     });
 });

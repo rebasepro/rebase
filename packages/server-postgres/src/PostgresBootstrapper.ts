@@ -34,7 +34,7 @@ import { buildTableRegistry } from "./model/build-registry";
 import { refreshRelationalSchema } from "./model/refresh-relational-schema";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
-import { createEmailService, type EmailConfig, type EmailService, logger } from "@rebasepro/server";
+import { createEmailService, type EmailConfig, type EmailService, implicitAuthTableClash, implicitAuthTableClashMessage, logger } from "@rebasepro/server";
 import { declaredSchemaOf, sqlRows } from "@rebasepro/common";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
 import { assertAuthSchemaCompatible, probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
@@ -253,6 +253,7 @@ export interface PostgresDriverInternals {
 import { closedDatabaseName, deepestErrorMessage, diagnoseDbError, isEconnrefused, isUntrustedServerCertificate, parseHostInfo } from "./cli-errors";
 import { classifyConnectFailure, extractPgError } from "./utils/pg-error-utils";
 import type { OpenIndexBuildSession, ScheduledIndexBuild } from "./schema/deferred-index-build";
+import { defaultAuthTable } from "./schema/default-auth-table";
 
 /**
  * How long after the policies step the deferred index builds start: past the
@@ -685,6 +686,50 @@ export function postgresDriverConfigFromEnv(
     };
 }
 
+/** What an introspecting driver serves: descriptors, compiled tables and the drizzle schema under them. */
+interface DerivedTables {
+    descriptors: TableDescriptor[];
+    compiled: CompiledTable[];
+    tables: Record<string, PgTable>;
+    relations: Record<string, Relations>;
+}
+
+/**
+ * `derived` with built-in auth's own table added (`DatabaseAdapterInitConfig.authTable`),
+ * read back from the catalogue like a declared table. Unchanged when there is
+ * none, when a derived table takes its name (said, with the way out), and when
+ * the database has no such table yet — auth creates it, and the next start or
+ * reload serves it.
+ */
+async function serveAuthTableBeside(
+    client: import("pg").Pool,
+    authTable: CompiledTable | undefined,
+    defaultSchema: string,
+    derived: DerivedTables
+): Promise<DerivedTables> {
+    if (!authTable) return derived;
+    const clash = implicitAuthTableClash(authTable.descriptor, derived.descriptors);
+    if (clash) {
+        logger.warn(implicitAuthTableClashMessage(authTable.descriptor, clash));
+        return derived;
+    }
+    const catalogue = await readCatalogueSchema({ client, tables: [authTable.descriptor], defaultSchema });
+    if (catalogue.missing.length > 0) {
+        logger.info(
+            `[PostgresRegistry] The auth table ${catalogue.missing.join(", ")} does not exist yet; ` +
+            "users are served as a table from the next start or schema reload."
+        );
+        return derived;
+    }
+    patchPgNumericToNumber(catalogue.tables);
+    return {
+        descriptors: [...derived.descriptors, authTable.descriptor],
+        compiled: [...derived.compiled, authTable],
+        tables: { ...derived.tables, ...catalogue.tables },
+        relations: { ...derived.relations, ...catalogue.relations }
+    };
+}
+
 /**
  * Open the Postgres data driver from explicit settings.
  *
@@ -829,6 +874,17 @@ export async function openPostgresDriver(
         ({ tables: introspectedTables, relations: introspectedRelations } =
             buildBaasSchema(schema.tablesMap, pgSchemaName, introspectedDescriptors));
         if (introspectedTables) patchPgNumericToNumber(introspectedTables);
+
+        // Built-in auth's own table, which lives outside the derived schema:
+        // served beside what the database describes, so users are a table
+        // here as in a project that declares them.
+        const withAuth = await serveAuthTableBeside(rawClient, config.authTable, pgSchemaName, {
+            descriptors: introspectedDescriptors,
+            compiled: introspectedCompiled,
+            tables: introspectedTables,
+            relations: introspectedRelations
+        });
+        ({ descriptors: introspectedDescriptors, compiled: introspectedCompiled, tables: introspectedTables, relations: introspectedRelations } = withAuth);
         logger.info(
             `🔍 [PostgresRegistry] BaaS mode: derived ${servable.tables.length} tables from schema "${pgSchemaName}" [${servable.tables.map(t => t.slug).join(", ")}]`
         );
@@ -2001,11 +2057,17 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         for (const table of [...schema.tablesMap.keys()]) {
             if (!keep.has(table)) schema.tablesMap.delete(table);
         }
-        const { tables: nextTables, relations: nextRelations } =
-            buildBaasSchema(schema.tablesMap, pgSchemaName, servable.tables);
-        patchPgNumericToNumber(nextTables);
+        const derived = buildBaasSchema(schema.tablesMap, pgSchemaName, servable.tables);
+        patchPgNumericToNumber(derived.tables);
+        const { descriptors: nextDescriptors, compiled: nextCompiled, tables: nextTables, relations: nextRelations } =
+            await serveAuthTableBeside(rawClient, config.authTable, pgSchemaName, {
+                descriptors: servable.tables,
+                compiled: servable.compiled,
+                tables: derived.tables,
+                relations: derived.relations
+            });
         const next = buildTableRegistry({
-            compiledTables: servable.compiled,
+            compiledTables: nextCompiled,
             tables: nextTables,
             relations: nextRelations
         });
@@ -2053,12 +2115,12 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         if (readDb) refreshRelationalSchema(readDb, relational);
         realtimeService.refreshTableMaps();
         logger.info(
-            `🔍 [PostgresRegistry] BaaS live reload on "${sourceKey}": serving ${servable.tables.length} table(s) [${servable.tables.map(t => t.slug).join(", ")}]`
+            `🔍 [PostgresRegistry] BaaS live reload on "${sourceKey}": serving ${nextDescriptors.length} table(s) [${nextDescriptors.map(t => t.slug).join(", ")}]`
         );
         return {
             status: "served",
-            tables: servable.compiled,
-            descriptors: servable.tables,
+            tables: nextCompiled,
+            descriptors: nextDescriptors,
             unprotectedTables: nextUnprotected
         };
     };
@@ -2283,6 +2345,10 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
     return {
         type: "postgres",
+
+        // `rebase.users`, which `initializeAuth` creates: the auth table of a
+        // project on built-in auth that declares none.
+        defaultAuthTable,
 
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
             const init = config as DatabaseAdapterInitConfig;

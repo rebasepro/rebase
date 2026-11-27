@@ -1,5 +1,5 @@
 ---
-sourceHash: 61a4474d68248a58
+sourceHash: 8ad9100fe30397b6
 title: Ejecución en una base de datos existente o compartida
 sidebar_label: Base de datos existente o compartida
 description: Ejecuta Rebase en una base de datos PostgreSQL de la que no es propietario (un clúster compartido con otras aplicaciones, un segundo proyecto de Rebase, Supabase o una base de datos bloqueada por un DBA) con las configuraciones de rls, rebase doctor --database y rebase db request-role migrate.
@@ -281,6 +281,12 @@ conteo con alcance de propietario de un usuario realizaría un escaneo completo 
 la tabla. Por lo tanto, las políticas que solo el contexto del servidor o un
 administrador pueden cumplir se escriben `TO rebase_admin` y nunca llegan al
 plan de consulta de un usuario.
+
+La tabla de usuarios es la excepción. Auth la lee y la escribe en el contexto
+del servidor con el propio rol de la conexión, que no cambia a `rebase_admin`,
+así que sus políticas quedan `TO public` sea cual sea el ajuste: detrás de un rol
+de conexión que no es dueño de la tabla, el registro y el inicio de sesión
+funcionan igual.
 
 `rebase_admin` no posee privilegios y no puede iniciar sesión. Quien realice una
 llamada y posea el rol `admin`, incluido `rebase.dataAsAdmin`, se ejecuta como

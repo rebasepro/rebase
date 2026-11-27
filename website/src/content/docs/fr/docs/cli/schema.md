@@ -1,5 +1,5 @@
 ---
-sourceHash: a1e48da6a746fb71
+sourceHash: 0201dc1a9ce575f7
 title: Génération de schéma
 sidebar_label: Génération de schéma
 description: Générez des schémas Drizzle ORM à partir des tables dans backend/schema, créez des migrations SQL, introspectez une base de données existante dans des fichiers defineTable, et maintenez votre base de données synchronisée avec la CLI Rebase.
@@ -176,7 +176,7 @@ rebase schema introspect
 | `--docker` | Lire la base de données Compose, en la démarrant si nécessaire |
 | `--from supabase` | Convertir les conventions de Supabase (valeurs par défaut `auth.uid()`, clés étrangères `auth.users`, `TO anon` / `TO authenticated`) pour une base de données Rebase. Laissez désactivé lorsque Rebase s'exécute sur la même base de données aux côtés de Supabase |
 | `--data-inference` / `--no-data-inference` | Échantillonner jusqu'à 100 lignes par table pour détecter les formats, contraintes et réglages de panneau, ou lire uniquement la structure. Sans l'un ni l'autre, la commande pose la question, et sans terminal, elle lit uniquement la structure |
-| `--users` | Écrire également `users.ts` pour `rebase.users`, sous forme d'un `defineAuthTable` qui correspond à la table créée par auth. Cela affiche Utilisateurs dans l'administration comme une table à laquelle vous pouvez ajouter des colonnes. Sans cette option, les comptes sont gérés dans Users & Roles du Studio |
+| `--users` | Écrire également `users.ts` pour `rebase.users`, sous forme d'un `defineAuthTable` qui correspond à la table créée par auth : le fichier pour ajouter des colonnes, des rôles et des hooks à la table d'utilisateurs. Sans cette option, `rebase.users` est servie telle quelle comme table d'utilisateurs |
 
 Cela est utile lors de l'adoption de Rebase sur une base de données existante — introspectez
 d'abord, puis modifiez les tables générées. Une table dont la sécurité au niveau des lignes est désactivée est

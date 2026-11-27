@@ -11,6 +11,15 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ## [Unreleased]
 
+### Changed
+
+- **A project on built-in auth always has a users table.** With no `defineAuthTable`, the server serves `rebase.users`, the table auth keeps its users in, as the auth table. Users are then a collection in the admin like any other table, with the actions a declared users table gets, readable and writable by admins only. This holds whether the project declares its tables or they are read from the database. Before, such a project served no users table, and its accounts could be managed only in Studio's Users & roles. A project table called `users` that is not the auth table keeps the name: `rebase.users` is then not served as a table, and the boot says how to declare the users table under another slug. A backend whose `auth` is an `AuthAdapter` serves no users table of its own. `rebase schema introspect --users` still writes `backend/schema/users.ts`, now as the way to add columns, roles and hooks to it.
+
+### Fixed
+
+- **Sign-up and sign-in work behind a connection role that does not own the users table.** Auth reads and writes the users table in the server context on the connection's own role, and the server-or-admin policies that let it were written `TO rebase_admin`, which that role is not. A deployment serving through such a role (one whose schema another process owns, with `REBASE_PROVISION=false`) had every sign-up refused with `DB_PERMISSION_DENIED`. The users table's policies now stay `TO public`; every other table keeps `TO rebase_admin`.
+- **A request for a table skipped because row-level security is off says so when other tables are served.** The answer is `404 TABLE_NOT_FOUND`, naming the table and the `ENABLE ROW LEVEL SECURITY` fix, as the empty data API's `NO_TABLES` answer does. It fell through to the data API's generic answers, and the reason was only in the boot log.
+
 ## [0.38.1] - 2026-11-25
 
 ### Fixed

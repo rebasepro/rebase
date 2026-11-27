@@ -1,5 +1,5 @@
 ---
-sourceHash: 61a4474d68248a58
+sourceHash: 8ad9100fe30397b6
 title: Esecuzione su un database esistente o condiviso
 sidebar_label: Database esistente o condiviso
 description: Esegui Rebase su un database PostgreSQL di cui non è proprietario — un cluster condiviso con altre app, un secondo progetto Rebase, Supabase o un database bloccato da un DBA — con le impostazioni rls, rebase doctor --database e rebase db request-role migrate.
@@ -269,6 +269,12 @@ per l'intera istruzione non può utilizzare un indice: una ricerca o un conteggi
 risorse del proprietario eseguito da un utente comporterebbe una scansione completa della tabella.
 Pertanto, le policy superabili esclusivamente dal contesto server o da un admin vengono
 scritte `TO rebase_admin`, non entrando mai nel piano di esecuzione delle query di un utente.
+
+La tabella degli utenti fa eccezione. Auth la legge e la scrive nel contesto
+del server con il ruolo stesso della connessione, che non passa a `rebase_admin`,
+quindi le sue policy restano `TO public` qualunque sia l'impostazione: dietro un
+ruolo di connessione che non possiede la tabella, registrazione e accesso
+funzionano lo stesso.
 
 `rebase_admin` non detiene alcun privilegio e non può effettuare l'accesso. Un chiamante in
 possesso del ruolo `admin`, compreso `rebase.dataAsAdmin`, viene eseguito come

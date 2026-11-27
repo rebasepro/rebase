@@ -1,5 +1,5 @@
 ---
-sourceHash: a1e48da6a746fb71
+sourceHash: 0201dc1a9ce575f7
 title: Geração de Schema
 sidebar_label: Geração de Schema
 description: Gere schemas Drizzle ORM a partir das tabelas em backend/schema, crie migrações SQL, faça introspecção de um banco de dados existente em arquivos defineTable e mantenha seu banco de dados sincronizado com a Rebase CLI.
@@ -173,7 +173,7 @@ rebase schema introspect
 | `--docker` | Lê o banco de dados do compose, iniciando-o se necessário |
 | `--from supabase` | Converte convenções do Supabase (padrões `auth.uid()`, chaves estrangeiras para `auth.users`, `TO anon` / `TO authenticated`) para um banco Rebase. Omita se o Rebase for operar no mesmo banco paralelamente ao Supabase |
 | `--data-inference` / `--no-data-inference` | Amostra até 100 linhas por tabela para inferir formatos, restrições e ajustes de painel, ou lê somente a estrutura. Sem a flag, o comando pergunta interativamente; fora de um terminal, lê somente a estrutura |
-| `--users` | Grava também `users.ts` para `rebase.users`, como um `defineAuthTable` correspondente à tabela criada pela autenticação. Isso exibe Usuários no admin como uma tabela passível de receber novas colunas. Sem isso, contas são administradas em Usuários e Papéis no Studio |
+| `--users` | Grava também `users.ts` para `rebase.users`, como um `defineAuthTable` correspondente à tabela criada pela autenticação: o arquivo para adicionar colunas, papéis e hooks à tabela de usuários. Sem isso, `rebase.users` é servida como a tabela de usuários tal como está |
 
 Isso é útil ao adotar o Rebase em um banco de dados existente — faça a introspecção
 primeiro e depois ajuste as tabelas geradas. Tabelas sem RLS são

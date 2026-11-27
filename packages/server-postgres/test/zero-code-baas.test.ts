@@ -396,11 +396,11 @@ describe("Zero-code BaaS foundation (PGlite)", () => {
         });
 
         try {
-            // 1. Fresh zero-code server has 0 user tables -> /api/data/* answers 404 NO_TABLES
-            const emptyRes = await app.request("/api/data/tasks");
-            expect(emptyRes.status).toBe(404);
-            const emptyBody = await emptyRes.json() as { error?: { code?: string } };
-            expect(emptyBody.error?.code).toBe("NO_TABLES");
+            // 1. Fresh zero-code server has no tables of its own, but built-in
+            //    auth's table is served as the auth table — so the data API is
+            //    mounted and an anonymous caller is asked to sign in.
+            const anonymousRes = await app.request("/api/data/tasks");
+            expect(anonymousRes.status).toBe(401);
 
             // 2. Register first user -> promoted to admin during bootstrap window
             const regAdminRes = await app.request("/api/auth/register", {
@@ -419,6 +419,19 @@ describe("Zero-code BaaS foundation (PGlite)", () => {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${adminAuth.tokens.accessToken}`
             };
+
+            // 2b. Users are a table like any other: `rebase.users`, described as
+            //     the auth table, and readable by an admin through the data API.
+            const bootSchemaRes = await app.request("/api/schema/tables", { headers: authHeaders });
+            expect(bootSchemaRes.status).toBe(200);
+            const bootSchema = await bootSchemaRes.json() as TableDescriptor[];
+            const usersDesc = bootSchema.find(t => t.slug === "users");
+            expect(usersDesc?.auth).toBeDefined();
+            expect(usersDesc?.schema).toBe("rebase");
+            const usersRes = await app.request("/api/data/users", { headers: authHeaders });
+            expect(usersRes.status).toBe(200);
+            const usersBody = await usersRes.json() as { data: Array<{ email: string }> };
+            expect(usersBody.data.map(u => u.email)).toContain("founder@rebase.pro");
 
             // 3. Create `tasks` table with RLS + policy + table_meta via POST /api/admin/db/tables
             const createTableRes = await app.request("/api/admin/db/tables", {
@@ -457,6 +470,8 @@ describe("Zero-code BaaS foundation (PGlite)", () => {
             expect(tasksDesc).toBeDefined();
             expect(tasksDesc?.description).toBe("Zero-code tasks");
             expect(tasksDesc?.softDelete).toEqual({ field: "deletedAt" });
+            // The live reload derived the tables again and kept the auth table beside them.
+            expect(schemaBody.find(t => t.slug === "users")?.auth).toBeDefined();
 
             // 5. Immediately insert & query rows over the hot-swapped `/api/data/tasks` REST endpoint!
             const insertRowRes = await app.request("/api/data/tasks", {

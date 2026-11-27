@@ -53,3 +53,34 @@ export function noCollectionsCause(unprotected: readonly { schema: string; table
         "which takes `rebase eject`: the managed runtime does not read it from config/ or the environment. " +
         SCHEMA_RELOAD_HINT;
 }
+
+/**
+ * The answer for a request to one of the tables the driver skipped, when the
+ * project does serve others — built-in auth's users table, say, which every
+ * project on built-in auth serves. Without it the request fell through to the
+ * data API's generic answers and the reason, with its fix, was only in the
+ * boot log. `undefined` when `segment` names no skipped table.
+ *
+ * @param segment the path's first segment: a table name, or its kebab-case spelling.
+ * @param unprotected tables the driver skipped for having RLS disabled.
+ */
+export function unprotectedTableAnswer(
+    segment: string,
+    unprotected: readonly { schema: string; table: string }[]
+): { message: string; code: "TABLE_NOT_FOUND"; details: { unprotectedTables: string[] } } | undefined {
+    const name = segment.replace(/-/g, "_");
+    const skipped = unprotected.find(({ table }) => table === segment || table === name);
+    if (!skipped) return undefined;
+    const qualified = `"${skipped.schema}"."${skipped.table}"`;
+    return {
+        message: `The table ${skipped.schema}.${skipped.table} is not served: row-level security is disabled on it, ` +
+            "so nothing decides who may read which rows. Enable it — " +
+            `\`ALTER TABLE ${qualified} ENABLE ROW LEVEL SECURITY;\` — and add a policy that opens the rows each user ` +
+            "may see. A table with RLS and no policy is served and returns no rows. " +
+            "To serve it without RLS anyway, pass `baas: { unprotectedTables: \"serve\" }` to the server entry, " +
+            "which takes `rebase eject`: the managed runtime does not read it from config/ or the environment. " +
+            SCHEMA_RELOAD_HINT,
+        code: "TABLE_NOT_FOUND",
+        details: { unprotectedTables: unprotected.map(({ schema, table }) => `${schema}.${table}`) }
+    };
+}

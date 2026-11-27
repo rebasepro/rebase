@@ -265,6 +265,11 @@ list or count would scan the table. So policies that only the server context
 or an admin can pass are written `TO rebase_admin`, and never reach a user's
 query plan.
 
+The users table is the exception. Auth reads and writes it in the server
+context on the connection's own role, which is not switched to `rebase_admin`,
+so its policies stay `TO public` whatever the setting: behind a connection role
+that does not own the table, sign-up and sign-in work all the same.
+
 `rebase_admin` holds no privileges and cannot log in. A caller holding the
 `admin` role, `rebase.dataAsAdmin` included, runs as `<request role>_admin`
 (`rebase_user_admin` by default), which inherits the request role and

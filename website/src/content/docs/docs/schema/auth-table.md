@@ -68,16 +68,32 @@ the users table itself may also name every auth column, declared or not.
 
 ## Without a users table
 
-Declaring one is optional. Auth runs either way: with no `defineAuthTable`,
-it keeps its users in `rebase.users`, and accounts and roles are managed in the
-Studio's **Users & Roles**. The admin shows Users as a table only when the
-project declares one, so leaving the file out keeps it out of the admin.
+Declaring one is optional. Built-in auth always has exactly one users table:
+with no `defineAuthTable`, auth keeps its users in `rebase.users` and the
+server serves that table as the auth table. Users are then a collection in the
+admin like any other table, with the actions a declared users table gets, and
+only admins can read or write it. This holds for a project that declares its
+tables and for one whose tables are read from the database.
 
-To declare it, start from the scaffold's `backend/schema/users.ts`, or run
-`rebase schema introspect --users` against a database that already has
-`rebase.users`. Both match the table auth creates (a `text` key and every
-auth column), so `db push` changes nothing in it, and a migration from
-`db generate` creates it with `IF NOT EXISTS`. Then add your own columns.
+If the project already has a table called `users` (in any schema) that is not
+its auth table, `rebase.users` is not served as a table, and the boot says so.
+Sign-in still works; declare the users table yourself, under another slug, to
+manage users as a collection.
+
+To add columns, roles or hooks, declare it: start from the scaffold's
+`backend/schema/users.ts`, or run `rebase schema introspect --users` against a
+database that already has `rebase.users`. Both match the table auth creates (a
+`text` key and every auth column), so `db push` changes nothing in it, and a
+migration from `db generate` creates it with `IF NOT EXISTS`. Then add your own
+columns.
+
+## Users managed outside Rebase
+
+A backend whose `auth` is an [`AuthAdapter`](/docs/backend/auth-adapters/)
+serves no users table of its own: the adapter owns its users, and its
+`userManagement` answers `/api/admin/users`. To show them in the admin, declare
+the table they live in with `defineTable`, mapped onto whatever columns it has,
+like any other table.
 
 ## The `auth` block
 

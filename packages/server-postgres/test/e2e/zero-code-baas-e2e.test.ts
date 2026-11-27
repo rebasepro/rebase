@@ -128,8 +128,9 @@ describe("Zero-code BaaS over real PostgreSQL (E2E)", () => {
     });
 
     it("propagates live DDL + table_meta + column changes from replica A to replica B via Postgres LISTEN/NOTIFY", async () => {
-        // 1. Replica B initially has 0 tables
-        const initialB = await appB.request("/api/data/projects");
+        // 1. Replica B initially serves no `projects` — only built-in auth's
+        //    users table, which every project on built-in auth serves.
+        const initialB = await appB.request("/api/data/projects", { headers: authHeaders });
         expect(initialB.status).toBe(404);
 
         // 2. Replica A creates `projects` with RLS + policy + historyEnabled: true

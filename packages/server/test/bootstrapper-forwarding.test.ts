@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import type { BackendBootstrapper, CompiledTable, DatabaseAdapter, InitializedDriver } from "@rebasepro/types";
+import { col, defineAuthTable } from "@rebasepro/types";
 import { adapterToBootstrapper } from "../src/boot/driver";
 import { wrapDatabaseAdapter } from "../src/backend/create-backend";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
@@ -148,6 +149,18 @@ describe.each(WRAPPERS)("%s", (_name, wrap) => {
         // always installed a function would make a schemaless driver claim
         // capabilities it does not have, and the skip path would never run.
         expect(wrap(minimalAdapter())[capability]).toBeUndefined();
+    });
+
+    it("forwards defaultAuthTable, the one value on the optional surface", () => {
+        // A value, not a method, so the sweep above does not see it — and
+        // dropped, a project that declares no auth table would serve no users.
+        const definition = defineAuthTable("users", {
+            schema: "rebase",
+            columns: { id: col.text().primaryKey(), email: col.text() },
+            rls: [{ operation: "select", roles: ["admin"] }]
+        });
+        expect(wrap({ ...minimalAdapter(), defaultAuthTable: definition }).defaultAuthTable).toBe(definition);
+        expect(wrap(minimalAdapter()).defaultAuthTable).toBeUndefined();
     });
 
     it("keeps the required surface intact", () => {

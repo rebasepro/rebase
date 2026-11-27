@@ -207,6 +207,8 @@ function honoHttpExceptionStatus
 function html
 function httpMethodToOperation
 function identityResolved
+function implicitAuthTableClash
+function implicitAuthTableClashMessage
 function implicitDeclaration
 function initializeDataSource
 function initializeDataSources
@@ -906,7 +908,7 @@ interface AuthUserListResult { limit, offset, total, users }
 interface AuthenticatedPolicyExpression { kind }
 interface AuthenticatedSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface AuthenticatedUser { claims, displayName, email, isAdmin, isAnonymous, photoUrl, rawToken, roles, scopes, uid }
-interface BackendBootstrapper { ensureRlsRuntime, ensureSqlFiles, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readTablesSchemaVersion, runMigrations, stampTablesSchemaVersion, type, verifyConnection }
+interface BackendBootstrapper { defaultAuthTable, ensureRlsRuntime, ensureSqlFiles, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readTablesSchemaVersion, runMigrations, stampTablesSchemaVersion, type, verifyConnection }
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider, tableRegistry }
 interface BackendLifecycle { destroy, healthCheck, initialize }
@@ -994,8 +996,8 @@ interface DataRateLimitCaller { apiKey, header, socketAddress, uid }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 interface DataSourceDefinition { databaseId, engine, key, label, transport }
-interface DatabaseAdapter { destroy, ensureRlsRuntime, ensureSqlFiles, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readTablesSchemaVersion, stampTablesSchemaVersion, type, verifyConnection }
-interface DatabaseAdapterInitConfig { baas, dataSourceKey, introspectCollections, provision, realtime, schemaProvisioning, tables }
+interface DatabaseAdapter { defaultAuthTable, destroy, ensureRlsRuntime, ensureSqlFiles, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readTablesSchemaVersion, stampTablesSchemaVersion, type, verifyConnection }
+interface DatabaseAdapterInitConfig { authTable, baas, dataSourceKey, introspectCollections, provision, realtime, schemaProvisioning, tables }
 interface DatabaseConnection { close, isConnected, type }
 interface DatabaseHealthSample { connections, maxConnections, replicaLagSeconds, sizeBytes }
 interface DatabaseOptions { databaseId, engine, extensions, label, migrations, rls, transport }

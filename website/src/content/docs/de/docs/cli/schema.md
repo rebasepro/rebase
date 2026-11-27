@@ -1,5 +1,5 @@
 ---
-sourceHash: a1e48da6a746fb71
+sourceHash: 0201dc1a9ce575f7
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus den Tabellen in backend/schema, erstellen Sie SQL-Migrationen, introspektieren Sie eine bestehende Datenbank in defineTable-Dateien und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -169,7 +169,7 @@ rebase schema introspect
 | `--docker` | Die Compose-Datenbank lesen und bei Bedarf starten |
 | `--from supabase` | Supabase-Konventionen (`auth.uid()`-Defaults, `auth.users`-Fremdschlüssel, `TO anon` / `TO authenticated`) für eine Rebase-Datenbank übersetzen. Weglassen, wenn Rebase auf derselben Datenbank neben Supabase läuft |
 | `--data-inference` / `--no-data-inference` | Bis zu 100 Zeilen pro Tabelle stichprobenartig untersuchen, um Formate, Constraints und Panel-Einstellungen zu erkennen, oder nur die Struktur lesen. Ohne Angabe erfolgt eine Abfrage, und ohne Terminal wird nur die Struktur gelesen |
-| `--users` | Zusätzlich `users.ts` für `rebase.users` als `defineAuthTable` schreiben, das der von Auth erstellten Tabelle entspricht. Dies zeigt Benutzer im Admin als Tabelle an, der Sie Spalten hinzufügen können. Ohne dieses Flag werden Konten in Studio unter Users & Roles verwaltet |
+| `--users` | Zusätzlich `users.ts` für `rebase.users` als `defineAuthTable` schreiben, das der von Auth erstellten Tabelle entspricht: die Datei, mit der Sie der Benutzertabelle Spalten, Rollen und Hooks hinzufügen. Ohne dieses Flag wird `rebase.users` unverändert als Benutzertabelle bereitgestellt |
 
 Dies ist nützlich bei der Einführung von Rebase auf einer bestehenden Datenbank — führen Sie zuerst Introspect aus und bearbeiten Sie dann die generierten Tabellen. Eine Tabelle mit deaktivierter Row-Level-Security wird wie jede andere geschrieben, mit ihrem `rls`; der Push schaltet RLS ein, und der Probelauf weist darauf hin. Ein Backend, das ganz ohne `backend/schema` läuft, bedient die Datenbank stattdessen direkt — siehe [Backend only](/docs/getting-started/headless/). Sie wechseln von Supabase? Siehe [Migrating from Supabase](/docs/recipes/migrate-from-supabase/).
 

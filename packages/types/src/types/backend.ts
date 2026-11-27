@@ -1596,6 +1596,17 @@ export interface BackendBootstrapper {
     initializeAuth?(config: unknown, driverResult: InitializedDriver): Promise<BootstrappedAuth | undefined>;
 
     /**
+     * The table {@link initializeAuth} stores users in, as a `defineAuthTable`.
+     *
+     * Built-in auth always has exactly one auth table. A project that declares
+     * one with `defineAuthTable` serves that; one that declares none is served
+     * this, so its users are a collection like any other table. A backend
+     * whose `auth` is an `AuthAdapter` serves neither: the adapter owns its
+     * users.
+     */
+    defaultAuthTable?: import("../schema/table").AnyTableDef;
+
+    /**
      * Initialize history tables / services if this driver supports them.
      * Return undefined if history is not supported by this backend.
      */

@@ -108,8 +108,15 @@ export function compileTableRulePolicies(
     // reason above: the rule, and so the policy's name, stays as written. Never
     // for a rule naming its own `pgRoles`, and never for a restrictive policy —
     // narrowing whom a restriction applies to would widen everyone else.
+    //
+    // Never on the auth table either. Auth reads and writes it in the server
+    // context (sign-up, sign-in, sessions) on the connection's own role, not
+    // switched to `rebase_admin`: a server-or-admin grant written `TO
+    // rebase_admin` applies to that role only when it owns the table and
+    // skips RLS anyway. Behind a role that does not (a deployment whose schema
+    // another process owns), sign-up was refused and sign-in found no one.
     const adminOnly = mode === "permissive" && !rule.pgRoles && options?.adminRole === true
-        && shape.adminPolicies === "adminRole";
+        && shape.adminPolicies === "adminRole" && !table.auth;
 
     return ops.flatMap((operation, index): CompiledRulePolicy[] => {
         const needsUsing = operation !== "insert";

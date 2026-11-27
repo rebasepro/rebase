@@ -1,5 +1,5 @@
 ---
-sourceHash: a7b5b5daa103ef94
+sourceHash: 6d0133e3a1068d99
 title: La tabella utenti
 sidebar_label: Tabella utenti
 description: "defineAuthTable dichiara la tabella in cui auth memorizza gli utenti: le colonne necessarie ad auth, un criterio di auto-lettura, colonne di privilegio per soli amministratori e il modello di accesso — ruoli, ambiti dell'app, chiavi personali e hook del ciclo di vita dell'utente."
@@ -71,16 +71,34 @@ riferimento a ciascuna colonna di auth, dichiarata o meno.
 
 ## Senza una tabella utenti
 
-Dichiararne una è facoltativo. Auth funziona in entrambi i casi: in assenza di `defineAuthTable`,
-mantiene i suoi utenti in `rebase.users`, mentre account e ruoli vengono gestiti
-nella sezione **Users & Roles** dello Studio. L'interfaccia di amministrazione mostra Users
-come tabella solo se il progetto ne dichiara una, quindi omettere il file impedisce che compaia nell'admin.
+Dichiararne una è facoltativo. L'autenticazione integrata ha sempre esattamente
+una tabella utenti: in assenza di `defineAuthTable`, auth mantiene i suoi utenti
+in `rebase.users` e il server serve quella tabella come tabella di auth. Gli
+utenti sono quindi una collection nell'admin come qualsiasi altra tabella, con
+le azioni di una tabella utenti dichiarata, e solo gli admin possono leggerla o
+scriverla. Vale sia per un progetto che dichiara le sue tabelle sia per uno le
+cui tabelle vengono lette dal database.
 
-Per dichiararla, parti dal file `backend/schema/users.ts` dello scaffold oppure esegui
+Se il progetto ha già una tabella chiamata `users` (in qualsiasi schema) che non
+è la sua tabella di auth, `rebase.users` non viene servita come tabella e
+l'avvio lo segnala. L'accesso funziona comunque; dichiara tu la tabella utenti,
+con un altro slug, per gestire gli utenti come collection.
+
+Per aggiungere colonne, ruoli o hook, dichiarala: parti dal file
+`backend/schema/users.ts` dello scaffold oppure esegui
 `rebase schema introspect --users` su un database che contiene già
-`rebase.users`. Entrambi corrispondono alla tabella creata da auth (una chiave `text` e
-tutte le colonne di auth), quindi `db push` non vi apporta modifiche e una migrazione
-generata con `db generate` la crea con `IF NOT EXISTS`. Dopodiché, puoi aggiungere le tue colonne personalizzate.
+`rebase.users`. Entrambi corrispondono alla tabella creata da auth (una chiave
+`text` e tutte le colonne di auth), quindi `db push` non vi apporta modifiche e
+una migrazione generata con `db generate` la crea con `IF NOT EXISTS`.
+Dopodiché, aggiungi le tue colonne.
+
+## Utenti gestiti fuori da Rebase
+
+Un backend il cui `auth` è un [`AuthAdapter`](/docs/backend/auth-adapters/)
+non serve una propria tabella utenti: gli utenti appartengono all'adapter, e il
+suo `userManagement` risponde a `/api/admin/users`. Per mostrarli nell'admin,
+dichiara la tabella in cui vivono con `defineTable`, mappata sulle colonne che
+ha, come qualsiasi altra tabella.
 
 ## Il blocco `auth`
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: a7b5b5daa103ef94
+sourceHash: 6d0133e3a1068d99
 title: Die Benutzertabelle
 sidebar_label: Benutzertabelle
 description: "defineAuthTable deklariert die Tabelle, in der die Authentifizierung Benutzer speichert: die Spalten, die Auth benötigt, eine Self-Read-Policy, Admin-exklusive Berechtigungsspalten und das Zugriffsmodell – Rollen, App-Scopes, persönliche Schlüssel und die Benutzer-Lifecycle-Hooks."
@@ -52,9 +52,35 @@ Regeln für andere Tabellen können wie gewohnt Spalten der Benutzertabelle refe
 
 ## Ohne eine Benutzertabelle
 
-Die Deklaration einer solchen Tabelle ist optional. Auth funktioniert in beiden Fällen: Ohne `defineAuthTable` werden die Benutzer in `rebase.users` gespeichert, und Konten sowie Rollen werden im Studio unter **Users & Roles** verwaltet. Das Admin-Panel zeigt Benutzer nur dann als Tabelle an, wenn das Projekt eine deklariert; das Weglassen der Datei hält sie also aus dem Admin-Panel heraus.
+Eine zu deklarieren ist optional. Die eingebaute Authentifizierung hat immer
+genau eine Benutzertabelle: Ohne `defineAuthTable` speichert Auth seine Benutzer
+in `rebase.users`, und der Server stellt diese Tabelle als Auth-Tabelle bereit.
+Benutzer sind dann im Admin eine Collection wie jede andere Tabelle, mit den
+Aktionen einer deklarierten Benutzertabelle, und nur Admins können sie lesen
+oder schreiben. Das gilt für ein Projekt, das seine Tabellen deklariert, ebenso
+wie für eines, dessen Tabellen aus der Datenbank gelesen werden.
 
-Um sie zu deklarieren, beginnen Sie mit der Datei `backend/schema/users.ts` des Scaffolds oder führen Sie `rebase schema introspect --users` für eine Datenbank aus, die `rebase.users` bereits enthält. Beide stimmen mit der Tabelle überein, die Auth erstellt (ein `text`-Schlüssel und jede Auth-Spalte), sodass `db push` daran nichts ändert und eine Migration von `db generate` sie mit `IF NOT EXISTS` erstellt. Fügen Sie anschließend Ihre eigenen Spalten hinzu.
+Hat das Projekt bereits eine Tabelle namens `users` (in einem beliebigen
+Schema), die nicht seine Auth-Tabelle ist, wird `rebase.users` nicht als Tabelle
+bereitgestellt, und der Start meldet das. Die Anmeldung funktioniert weiterhin;
+deklarieren Sie die Benutzertabelle selbst unter einem anderen Slug, um Benutzer
+als Collection zu verwalten.
+
+Um Spalten, Rollen oder Hooks hinzuzufügen, deklarieren Sie sie: Beginnen Sie
+mit `backend/schema/users.ts` aus dem Scaffold oder führen Sie
+`rebase schema introspect --users` gegen eine Datenbank aus, die bereits
+`rebase.users` hat. Beide entsprechen der Tabelle, die Auth anlegt (ein
+`text`-Schlüssel und jede Auth-Spalte), daher ändert `db push` nichts daran, und
+eine Migration aus `db generate` legt sie mit `IF NOT EXISTS` an. Fügen Sie dann
+Ihre eigenen Spalten hinzu.
+
+## Benutzer, die außerhalb von Rebase verwaltet werden
+
+Ein Backend, dessen `auth` ein [`AuthAdapter`](/docs/backend/auth-adapters/)
+ist, stellt keine eigene Benutzertabelle bereit: Die Benutzer gehören dem
+Adapter, und sein `userManagement` beantwortet `/api/admin/users`. Um sie im
+Admin anzuzeigen, deklarieren Sie die Tabelle, in der sie liegen, mit
+`defineTable`, abgebildet auf die Spalten, die sie hat, wie jede andere Tabelle.
 
 ## Der `auth`-Block
 

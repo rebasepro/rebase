@@ -201,8 +201,8 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
                 + "--no-data-inference reads the structure only. Without either it asks, and without a terminal "
                 + "it reads the structure only.",
             "--users also writes backend/schema/users.ts for rebase.users, as a defineAuthTable that matches it: "
-                + "Users then shows in the admin as a table you can add columns to. Without it, accounts are "
-                + "managed in the Studio's Users & Roles.",
+                + "the file to add columns, roles and hooks to the users table. Without it, rebase.users is "
+                + "served as the users table as it is.",
             "Reads this project's database, the one `rebase db url` prints: --database-url <url> names another; "
                 + "--docker uses the compose one, starting it if needed."
         ]

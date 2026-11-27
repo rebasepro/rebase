@@ -9,9 +9,10 @@ import { col, defineAuthTable, json, sql } from "@rebasepro/types";
  * definition: the same columns, types, nullability and defaults, so a project
  * that declares it plans no change against a database auth has provisioned.
  *
- * Nothing serves it. A project shows Users in the admin by declaring its own
- * auth table, and accounts are managed in the Studio's Users & Roles whether
- * or not it does. This is what that declaration has to match:
+ * It is also what a project on built-in auth that declares no auth table is
+ * served as its auth table (`BackendBootstrapper.defaultAuthTable`), so its
+ * users are a collection like any other table. A project that wants to
+ * customise it declares its own, which has to match this:
  * `schema introspect --users` writes it out for an existing `rebase.users`,
  * and the scaffold's `users.ts` is held to it
  * (`test/default-auth-table.test.ts`). An old scaffold that declared a `uuid`

@@ -72,6 +72,13 @@ export interface DatabaseAdapter {
     ): Promise<BootstrappedAuth | undefined>;
 
     /**
+     * The table {@link initializeAuth} stores users in, as a `defineAuthTable`:
+     * served as the auth table of a project on built-in auth that declares
+     * none. See `BackendBootstrapper.defaultAuthTable`.
+     */
+    defaultAuthTable?: import("../schema/table").AnyTableDef;
+
+    /**
      * Initialize entity history tracking.
      *
      * Return `undefined` if the database does not support history.
@@ -290,6 +297,15 @@ export interface DatabaseAdapterInitConfig {
      * empty before acting on it, so the flag could only ever agree or contradict.
      */
     introspectCollections?: boolean;
+    /**
+     * The auth table to serve beside the tables an introspecting driver
+     * derives: built-in auth's own table (`BackendBootstrapper.defaultAuthTable`),
+     * which lives outside the introspected schema. The driver reads it back
+     * from the catalogue and serves it with the rest. Absent when the project
+     * declares its tables (the auth table is then one of `tables`) or
+     * authenticates through an `AuthAdapter`.
+     */
+    authTable?: import("../schema/compiled").CompiledTable;
     /**
      * Options for an introspecting driver — see `RebaseBackendConfig.baas`.
      * Drivers that introspect should honour `unprotectedTables`.

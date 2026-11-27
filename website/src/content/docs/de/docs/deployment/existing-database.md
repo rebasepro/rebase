@@ -1,5 +1,5 @@
 ---
-sourceHash: 61a4474d68248a58
+sourceHash: 8ad9100fe30397b6
 title: Ausführen auf einer bestehenden oder gemeinsam genutzten Datenbank
 sidebar_label: Bestehende oder geteilte Datenbank
 description: Führen Sie Rebase auf einer PostgreSQL-Datenbank aus, die es nicht selbst besitzt – einem mit anderen Apps geteilten Cluster, einem zweiten Rebase-Projekt, Supabase oder einer von einem DBA gesperrten Datenbank – mit den rls-Einstellungen, rebase doctor --database und rebase db request-role migrate.
@@ -258,6 +258,12 @@ gesamte Statement konstant ist, kann keinen Index verwenden: Das Auflisten oder 
 im Gültigkeitsbereich des Benutzers (Owner-Scope) würde die gesamte Tabelle scannen. Daher werden
 Policies, die nur der Serverkontext oder ein Admin erfüllen kann, `TO rebase_admin` geschrieben und
 erreichen niemals den Ausführungsplan eines regulären Benutzers.
+
+Die Benutzertabelle ist die Ausnahme. Auth liest und schreibt sie im
+Serverkontext mit der eigenen Rolle der Verbindung, die nicht zu `rebase_admin`
+wechselt, daher bleiben ihre Richtlinien unabhängig von der Einstellung
+`TO public`: Hinter einer Verbindungsrolle, der die Tabelle nicht gehört,
+funktionieren Registrierung und Anmeldung trotzdem.
 
 `rebase_admin` besitzt keine Privilegien und kann sich nicht anmelden. Ein Aufrufer mit der
 `admin`-Rolle, einschließlich `rebase.dataAsAdmin`, läuft als `<request role>_admin`

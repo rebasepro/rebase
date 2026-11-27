@@ -47,6 +47,10 @@
 -- now (`rebase.cron_jobs`, `roles`, `storage_policies`, `table_meta`,
 -- `webhooks`) and, as a role that may, the DDL event trigger that reloads the
 -- schema (`rebase_schema_change_ddl`). Roles unchanged.
+-- Users policies re-dumped 2026-11-27 against main, PostgreSQL 18, after the
+-- auth table's grants stopped being written `TO rebase_admin` (auth reads and
+-- writes it on the connection's own role): its policies are `TO public` and
+-- have no `rebase_admin_request` companions. Everything else is unchanged.
 
 -- Boot creates these; they are cluster objects, so `pg_dump` of one database
 -- does not carry them.
@@ -841,46 +845,30 @@ COMMENT ON POLICY tags_update_3561e70_1 ON public.tags IS 'rebase:ae223749f45834
 CREATE POLICY tags_update_3561e70_1_ar_f575070b ON public.tags FOR UPDATE TO rebase_admin_request USING (true) WITH CHECK (true);
 COMMENT ON POLICY tags_update_3561e70_1_ar_f575070b ON public.tags IS 'rebase:7b59a49186557c9e3ef38e5c28cbd148b87466e7ce0acc06ec8db309490be533';
 ALTER TABLE rebase.users ENABLE ROW LEVEL SECURITY;
-CREATE POLICY users_default_admin_read ON rebase.users FOR SELECT TO rebase_admin USING (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))));
-COMMENT ON POLICY users_default_admin_read ON rebase.users IS 'rebase:795c494aae0848de2e536f72921a989b006c5889fe0c0bb8dea29e4d3c4bf214';
-CREATE POLICY users_default_admin_read_ar_b3a52ae4 ON rebase.users FOR SELECT TO rebase_admin_request USING (true);
-COMMENT ON POLICY users_default_admin_read_ar_b3a52ae4 ON rebase.users IS 'rebase:c0652d11741207c90f18910ae23366aaca4c906ec9ae4734255b28932c2d5fdc';
-CREATE POLICY users_default_admin_write_delete ON rebase.users FOR DELETE TO rebase_admin USING (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))));
-COMMENT ON POLICY users_default_admin_write_delete ON rebase.users IS 'rebase:c1cffad17e4b4d47af48e05a1cb60988203db1e4c3e56c2c64fc4e878fa2d687';
-CREATE POLICY users_default_admin_write_delete_ar_7e609e9b ON rebase.users FOR DELETE TO rebase_admin_request USING (true);
-COMMENT ON POLICY users_default_admin_write_delete_ar_7e609e9b ON rebase.users IS 'rebase:d95bfdef2fd9f90a79783bdac224c267a549d67d811a6601c989a0286c6600b7';
-CREATE POLICY users_default_admin_write_insert ON rebase.users FOR INSERT TO rebase_admin WITH CHECK (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))));
-COMMENT ON POLICY users_default_admin_write_insert ON rebase.users IS 'rebase:ea486f3e687ee4d61aea69bb96ad6ff7370eb63d1e1c8103811cd6ea857d4b75';
-CREATE POLICY users_default_admin_write_insert_ar_f5b0fae5 ON rebase.users FOR INSERT TO rebase_admin_request WITH CHECK (true);
-COMMENT ON POLICY users_default_admin_write_insert_ar_f5b0fae5 ON rebase.users IS 'rebase:ca351329d087d5db3975a2f8ebc5fd88b891426c3bd76bb66b2a73a22fbb2150';
-CREATE POLICY users_default_admin_write_update ON rebase.users FOR UPDATE TO rebase_admin USING (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])))) WITH CHECK (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))));
-COMMENT ON POLICY users_default_admin_write_update ON rebase.users IS 'rebase:0c198fe78e4b663ef56e7698c52cc53bf75a74c8ebc08b0bfdce8ccc4fababd2';
-CREATE POLICY users_default_admin_write_update_ar_687e5ca3 ON rebase.users FOR UPDATE TO rebase_admin_request USING (true) WITH CHECK (true);
-COMMENT ON POLICY users_default_admin_write_update_ar_687e5ca3 ON rebase.users IS 'rebase:0d5532de1931beca11f2ae5ddb8a9627460d04e0800af1012f1c3f2789462a4f';
+CREATE POLICY users_default_admin_read ON rebase.users FOR SELECT USING (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))));
+COMMENT ON POLICY users_default_admin_read ON rebase.users IS 'rebase:97138605cd47fa750ffd5fd0277ae9b86fe19e5d8f9d8b60b1b0204d8b83a9a7';
+CREATE POLICY users_default_admin_write_delete ON rebase.users FOR DELETE USING (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))));
+COMMENT ON POLICY users_default_admin_write_delete ON rebase.users IS 'rebase:0a62f60f28c78769f2deaf7bd97ca4346eafb75ab59a50b267a272eda7d4ede4';
+CREATE POLICY users_default_admin_write_insert ON rebase.users FOR INSERT WITH CHECK (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))));
+COMMENT ON POLICY users_default_admin_write_insert ON rebase.users IS 'rebase:14642f3c8fbc2b86d67f9d147749e40d94b00df16f8dbbb8a1494c52f6ee480c';
+CREATE POLICY users_default_admin_write_update ON rebase.users FOR UPDATE USING (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])))) WITH CHECK (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))));
+COMMENT ON POLICY users_default_admin_write_update ON rebase.users IS 'rebase:9e07f09e146e8703eefa26d22e89dbc718fdd189de8d6373352f21debe8339eb';
 CREATE POLICY users_default_self_read ON rebase.users FOR SELECT USING ((id = ( SELECT rebase.uid() AS uid)));
 COMMENT ON POLICY users_default_self_read ON rebase.users IS 'rebase:2135ca4c19b1891442097a9fd222f0a5710d4edd7f7dd47156ccef430f38e3c0';
-CREATE POLICY users_delete_3561e70_2 ON rebase.users FOR DELETE TO rebase_admin USING (( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])));
-COMMENT ON POLICY users_delete_3561e70_2 ON rebase.users IS 'rebase:d97d18944f79442d8a3fef6c40cf5093a99c0ad11b666fb0597bcb4361334f45';
-CREATE POLICY users_delete_3561e70_2_ar_40c56324 ON rebase.users FOR DELETE TO rebase_admin_request USING (true);
-COMMENT ON POLICY users_delete_3561e70_2_ar_40c56324 ON rebase.users IS 'rebase:e1d5cb889978f686877eb77bcffa834042bc6ced959dce1abc1399c0b21a5524';
-CREATE POLICY users_insert_3561e70_0 ON rebase.users FOR INSERT TO rebase_admin WITH CHECK (( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])));
-COMMENT ON POLICY users_insert_3561e70_0 ON rebase.users IS 'rebase:6074f0a311fcca6fcb196d68f642ac9342e1806d8499dd4ba23705bf3d79da5a';
-CREATE POLICY users_insert_3561e70_0_ar_256f49d5 ON rebase.users FOR INSERT TO rebase_admin_request WITH CHECK (true);
-COMMENT ON POLICY users_insert_3561e70_0_ar_256f49d5 ON rebase.users IS 'rebase:9ba41573b02ae7059be426a2fbaa97d9f048c1ba1032394f61957920b0340fe9';
+CREATE POLICY users_delete_3561e70_2 ON rebase.users FOR DELETE USING (( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])));
+COMMENT ON POLICY users_delete_3561e70_2 ON rebase.users IS 'rebase:46870c1b8d391e7c0d3534f098d8e21ad2b9e22c45e3dfa40bb14435a0e3dbaf';
+CREATE POLICY users_insert_3561e70_0 ON rebase.users FOR INSERT WITH CHECK (( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])));
+COMMENT ON POLICY users_insert_3561e70_0 ON rebase.users IS 'rebase:c2a833080e348472f73cfcec076635206eb45dfbc8e81301f03dbe52b00618f7';
 CREATE POLICY users_require_admin_write_delete ON rebase.users AS RESTRICTIVE FOR DELETE USING (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))));
 COMMENT ON POLICY users_require_admin_write_delete ON rebase.users IS 'rebase:eef67ebf8d9a42362d73b9225df0ada34caf41f997a29de9f377196b36736895';
 CREATE POLICY users_require_admin_write_insert ON rebase.users AS RESTRICTIVE FOR INSERT WITH CHECK (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))));
 COMMENT ON POLICY users_require_admin_write_insert ON rebase.users IS 'rebase:fd72784d960397f9467cb14f11902f07b4d894e86dec117da2f894f61c0b653e';
 CREATE POLICY users_require_admin_write_update ON rebase.users AS RESTRICTIVE FOR UPDATE USING (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])))) WITH CHECK (( SELECT ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))));
 COMMENT ON POLICY users_require_admin_write_update ON rebase.users IS 'rebase:e72a46f49fd6e93e383cb54ac54935cc3b7071c1b5f530896dc1cd04d2a8f8fa';
-CREATE POLICY users_select_5f32f06 ON rebase.users FOR SELECT TO rebase_admin USING (( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])));
-COMMENT ON POLICY users_select_5f32f06 ON rebase.users IS 'rebase:82db1682240cea6ea1fcbfc8fa84cea2d0146a2db923cb5aa2a71047eedb5eab';
-CREATE POLICY users_select_5f32f06_ar_c118f1a5 ON rebase.users FOR SELECT TO rebase_admin_request USING (true);
-COMMENT ON POLICY users_select_5f32f06_ar_c118f1a5 ON rebase.users IS 'rebase:41573f7643177f0d16358d37685b6025d0cd74de4aa37b58cacb6b2dfb43a4ca';
-CREATE POLICY users_update_3561e70_1 ON rebase.users FOR UPDATE TO rebase_admin USING (( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))) WITH CHECK (( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])));
-COMMENT ON POLICY users_update_3561e70_1 ON rebase.users IS 'rebase:d623465b2bdacc6feab5251eb086e5a4e23dd883bbdf06df6e06b8cc16d96dc8';
-CREATE POLICY users_update_3561e70_1_ar_5be2f8fb ON rebase.users FOR UPDATE TO rebase_admin_request USING (true) WITH CHECK (true);
-COMMENT ON POLICY users_update_3561e70_1_ar_5be2f8fb ON rebase.users IS 'rebase:1dc55519ecc31636ec515efd72e832595bfc406114fd154dd8060360354d450a';
+CREATE POLICY users_select_5f32f06 ON rebase.users FOR SELECT USING (( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])));
+COMMENT ON POLICY users_select_5f32f06 ON rebase.users IS 'rebase:3874cf5dbadc30188ca45e5838c96cd87ba1107b3ca83089a5cc5ff687af94a7';
+CREATE POLICY users_update_3561e70_1 ON rebase.users FOR UPDATE USING (( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))) WITH CHECK (( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])));
+COMMENT ON POLICY users_update_3561e70_1 ON rebase.users IS 'rebase:57921d8de6d32560d6333a6785aae69f82b3538b4bcf9b1ed180a5da5fd8fefb';
 GRANT USAGE ON SCHEMA public TO rebase_user;
 GRANT USAGE ON SCHEMA rebase TO rebase_user;
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.authors TO rebase_user;

@@ -86,6 +86,30 @@ describe("the admin-request companions (rebase_admin_request)", () => {
         expect(companionsOf({ operation: "select", roles: ["admin"], pgRoles: ["authenticated"] })).toEqual([]);
     });
 
+    it("never move the auth table's grants to rebase_admin: auth reads and writes it on the connection's own role", () => {
+        // Sign-up and sign-in run in the server context on the connection's
+        // role, which is not switched to rebase_admin. Moved there, the
+        // server-or-admin grants applied to no role but an owner (which skips
+        // RLS anyway), so behind any other role sign-up was refused.
+        const users: LegacyCollectionConfig = {
+            ...tasks,
+            name: "Users",
+            slug: "users",
+            table: "users",
+            auth: true,
+            properties: { id: { name: "ID", type: "string", isId: "uuid" }, email: { name: "Email", type: "string" } },
+            securityRules: [{ operations: ["select", "insert", "update", "delete"], roles: ["admin"] }]
+        };
+        const compiled = getEffectiveSecurityRules(users)
+            .flatMap((rule) => compileRulePolicies(users, rule, { adminRole: true, adminRequestRole: true }));
+        expect(compiled.filter((p) => p.roles.includes("rebase_admin"))).toEqual([]);
+        expect(compiled.some((p) => p.adminRequestTarget)).toBe(false);
+        // The tables beside it keep the optimisation.
+        const baseline = getEffectiveSecurityRules(tasks).filter((r) => r.name?.startsWith("tasks_default_admin"));
+        expect(baseline.flatMap((rule) => compileRulePolicies(tasks, rule, { adminRole: true }))
+            .every((p) => p.roles[0] === "rebase_admin")).toBe(true);
+    });
+
     it("are compiled only when asked, and never without the admin role", () => {
         const rule = { operation: "select" as const, roles: ["admin"] };
         expect(compileRulePolicies(tasks, rule, { adminRole: true }).some((p) => p.adminRequestTarget)).toBe(false);

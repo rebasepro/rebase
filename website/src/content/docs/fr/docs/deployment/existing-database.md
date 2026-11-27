@@ -1,5 +1,5 @@
 ---
-sourceHash: 61a4474d68248a58
+sourceHash: 8ad9100fe30397b6
 title: Exécution sur une base de données existante ou partagée
 sidebar_label: Base de données existante ou partagée
 description: Exécutez Rebase sur une base de données PostgreSQL dont il n'est pas propriétaire — un cluster partagé avec d'autres applications, un deuxième projet Rebase, Supabase ou une base de données verrouillée par un DBA — grâce aux paramètres rls, rebase doctor --database et rebase db request-role migrate.
@@ -172,6 +172,8 @@ La commande affiche, pour chaque rôle de requête, les instructions qui le cré
 ### Requêtes admin et `rebase_admin`
 
 Postgres combine les stratégies permissives qui s'appliquent à un rôle avec l'opérateur OR. Écrite avec `TO public`, la référence que comporte chaque table (`rebase.uid() IS NULL OR` le rôle `admin`) s'appliquerait également aux utilisateurs connectés, et un OR dont l'autre branche est constante pour l'ensemble de l'instruction ne peut pas utiliser d'index : la liste ou le décompte d'un utilisateur limité à ses propres éléments analyserait toute la table (table scan). Ainsi, les stratégies que seuls le contexte du serveur ou un administrateur peuvent valider sont écrites `TO rebase_admin`, et n'atteignent jamais le plan d'exécution de la requête d'un utilisateur.
+
+La table des utilisateurs fait exception. Auth la lit et l'écrit dans le contexte serveur avec le rôle même de la connexion, qui ne bascule pas vers `rebase_admin` : ses politiques restent donc `TO public` quel que soit le réglage, et derrière un rôle de connexion qui ne possède pas la table, l'inscription et la connexion fonctionnent quand même.
 
 `rebase_admin` ne détient aucun privilège et ne peut pas se connecter. Un appelant détenant le rôle `admin`, y compris via `rebase.dataAsAdmin`, s'exécute en tant que `<request role>_admin` (`rebase_user_admin` par défaut), qui hérite du rôle de requête et de `rebase_admin`. Une connexion qui est elle-même soumise à la sécurité au niveau des lignes hérite de `rebase_admin` pour le contexte serveur. Le démarrage crée tout cela lorsque la connexion a le droit de créer des rôles. Avec `provisionRole: "never"`, créez-les vous-même :
 

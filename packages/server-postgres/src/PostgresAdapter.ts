@@ -11,6 +11,11 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
     return {
         type: bootstrapper.type,
 
+        // Built-in auth's own table (`rebase.users`), served when the project
+        // declares no auth table. A value, not a method, so the forwarding
+        // sweep does not see it: forwarded by hand, and tested by name.
+        defaultAuthTable: bootstrapper.defaultAuthTable,
+
         async initializeDriver(config) {
             return bootstrapper.initializeDriver(config);
         },

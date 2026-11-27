@@ -322,6 +322,7 @@ export function adapterToBootstrapper(
                 adapter.initializeRealtime!(driverResult)
             : undefined,
         initializeAuth: adapter.initializeAuth,
+        defaultAuthTable: adapter.defaultAuthTable,
         initializeHistory: adapter.initializeHistory,
         initializeWebsockets: adapter.initializeWebsockets,
         verifyConnection: adapter.verifyConnection

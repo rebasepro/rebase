@@ -74,13 +74,14 @@ describe("a BaaS database whose tables have RLS off (E2E)", () => {
         return { status: response.status, ...body.error };
     }
 
-    it("names the skipped tables and the fix on the data API, instead of saying there are none", async () => {
+    it("names the skipped table and the fix on the data API, instead of saying there are none", async () => {
+        // Built-in auth's users table is served beside them, so the data API
+        // is up; a request for a skipped table still gets the reason.
         const answer = await errorAt("/api/data/customers");
         expect(answer.status).toBe(404);
-        expect(answer.code).toBe("NO_TABLES");
+        expect(answer.code).toBe("TABLE_NOT_FOUND");
         expect(answer.message).not.toMatch(/has no tables/);
         expect(answer.message).toContain("public.customers");
-        expect(answer.message).toContain("public.orders");
         expect(answer.message).toContain("ENABLE ROW LEVEL SECURITY");
         expect(answer.details?.unprotectedTables?.sort()).toEqual(["public.customers", "public.orders"]);
     });
@@ -99,11 +100,9 @@ describe("a BaaS database whose tables have RLS off (E2E)", () => {
         expect(skipped).toContain("rebase eject");
     });
 
-    it("says the same on the docs", async () => {
-        const answer = await errorAt("/api/docs");
-        expect(answer.status).toBe(404);
-        expect(answer.code).toBe("NO_TABLES");
-        expect(answer.message).toContain("public.customers");
-        expect(answer.message).not.toMatch(/has no tables/);
+    it("does not say the project serves no tables: the users table is served", async () => {
+        const answer = await errorAt("/api/data/orders/1");
+        expect(answer.code).not.toBe("NO_TABLES");
+        expect(answer.message).toContain("public.orders");
     });
 });

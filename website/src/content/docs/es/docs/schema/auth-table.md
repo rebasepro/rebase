@@ -1,5 +1,5 @@
 ---
-sourceHash: a7b5b5daa103ef94
+sourceHash: 6d0133e3a1068d99
 title: La tabla de usuarios
 sidebar_label: Tabla de usuarios
 description: "defineAuthTable declara la tabla en la que auth almacena los usuarios: las columnas que auth necesita, una política de autolectura, columnas de privilegios solo para administradores y el modelo de acceso: roles, scopes de la aplicación, claves personales y los hooks del ciclo de vida del usuario."
@@ -74,18 +74,34 @@ hacer referencia a cada columna de auth, esté declarada o no.
 
 ## Sin una tabla de usuarios
 
-Declarar una es opcional. Auth funciona de cualquier manera: sin `defineAuthTable`,
-mantiene sus usuarios en `rebase.users`, y las cuentas y roles se gestionan en
-**Users & Roles** de Studio. El panel de administración muestra Users como una
-tabla solo cuando el proyecto declara una, por lo que omitir el archivo lo mantiene
-fuera del panel de administración.
+Declarar una es opcional. La autenticación integrada siempre tiene exactamente
+una tabla de usuarios: sin `defineAuthTable`, auth guarda sus usuarios en
+`rebase.users` y el servidor sirve esa tabla como la tabla de auth. Los usuarios
+son entonces una colección en el panel de administración como cualquier otra
+tabla, con las acciones de una tabla de usuarios declarada, y solo los
+administradores pueden leerla o escribirla. Esto vale tanto para un proyecto que
+declara sus tablas como para uno cuyas tablas se leen de la base de datos.
 
-Para declararla, comience desde el archivo del scaffold `backend/schema/users.ts`,
-o ejecute `rebase schema introspect --users` contra una base de datos que ya tenga
-`rebase.users`. Ambos coinciden con la tabla que crea auth (una clave `text` y cada
-columna de auth), por lo que `db push` no cambia nada en ella, y una migración
-desde `db generate` la crea con `IF NOT EXISTS`. Luego, agregue sus propias
-columnas.
+Si el proyecto ya tiene una tabla llamada `users` (en cualquier esquema) que no
+es su tabla de auth, `rebase.users` no se sirve como tabla, y el arranque lo
+indica. El inicio de sesión sigue funcionando; declara tú mismo la tabla de
+usuarios, con otro slug, para gestionar los usuarios como una colección.
+
+Para añadir columnas, roles o hooks, declárala: parte del
+`backend/schema/users.ts` del scaffold, o ejecuta
+`rebase schema introspect --users` contra una base de datos que ya tenga
+`rebase.users`. Ambos coinciden con la tabla que crea auth (una clave `text` y
+todas las columnas de auth), así que `db push` no cambia nada en ella, y una
+migración de `db generate` la crea con `IF NOT EXISTS`. Después, añade tus
+propias columnas.
+
+## Usuarios gestionados fuera de Rebase
+
+Un backend cuyo `auth` es un [`AuthAdapter`](/docs/backend/auth-adapters/)
+no sirve una tabla de usuarios propia: los usuarios pertenecen al adaptador, y
+su `userManagement` responde a `/api/admin/users`. Para mostrarlos en el panel
+de administración, declara la tabla donde viven con `defineTable`, mapeada sobre
+las columnas que tenga, como cualquier otra tabla.
 
 ## El bloque `auth`
 

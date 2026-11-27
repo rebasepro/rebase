@@ -98,7 +98,9 @@ describe.skipIf(!dockerAvailable)("rls-check against a freshly provisioned scaff
         // (`rebase.cron_jobs`, `roles`, `storage_policies`, `table_meta`,
         // `webhooks`), which grants rebase_user nothing either.
         expect(result.stats.tables).toBe(25);
-        expect(result.stats.policies).toBe(78);
+        // 70: the auth table's eight `rebase_admin_request` companions went
+        // when its grants stopped being written `TO rebase_admin`.
+        expect(result.stats.policies).toBe(70);
     });
 
     it("reports exactly the baseline a stock scaffold produces", () => {

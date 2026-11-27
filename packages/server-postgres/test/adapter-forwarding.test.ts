@@ -1,5 +1,6 @@
 import { createPostgresAdapter } from "../src/PostgresAdapter";
 import { createPostgresBootstrapper, type PostgresDriverConfig } from "../src/PostgresBootstrapper";
+import { defaultAuthTable } from "../src/schema/default-auth-table";
 
 /**
  * `createPostgresAdapter` must not drop a capability the bootstrapper has.
@@ -51,6 +52,17 @@ describe("createPostgresAdapter forwards the bootstrapper's capabilities", () =>
             .filter(key => !hasFunction(adapter, key));
 
         expect(missing).toEqual([]);
+    });
+
+    it("forwards defaultAuthTable, which the method sweep cannot see", () => {
+        // `rebase.users`, served as the auth table of a project on built-in
+        // auth that declares none. A value: dropped by this wrapper, users
+        // would not be served on the `database: createPostgresAdapter(…)` path.
+        const bootstrapper = createPostgresBootstrapper(CONFIG);
+        const adapter = createPostgresAdapter(CONFIG);
+
+        expect(bootstrapper.defaultAuthTable).toBe(defaultAuthTable);
+        expect(adapter.defaultAuthTable).toBe(defaultAuthTable);
     });
 
     it("forwards the schema stamp, both halves", () => {

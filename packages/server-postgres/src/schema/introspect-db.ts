@@ -245,10 +245,11 @@ async function main() {
         }
 
         // The users table auth created (`rebase.users`), written as the
-        // project's `defineAuthTable` — only when asked (`--users`). The file
-        // is what puts Users in the admin, as a table of its own, and that is
-        // the project's choice: accounts are managed in the Studio's Users &
-        // Roles without it. Never `rebase` itself: that schema is auth's.
+        // project's `defineAuthTable` — only when asked (`--users`). Without
+        // the file the server already serves `rebase.users` as the auth table,
+        // so Users is a table in the admin either way; the file is how a
+        // project adds columns, roles and hooks to it. Never `rebase` itself:
+        // that schema is auth's.
         if (pgSchema !== DEFAULT_AUTH_TABLE.schema && !generatedFiles.some((file) => file.table === DEFAULT_AUTH_TABLE.table)) {
             const usersPath = path.join(outDir, `${DEFAULT_AUTH_TABLE.table}.ts`);
             // A project has at most one auth table: one already declared under
@@ -260,8 +261,8 @@ async function main() {
             } else if (!writeUsers) {
                 const authMetadata = await readSchemaMetadata(client, DEFAULT_AUTH_TABLE.schema, { forGeneration: true });
                 if (authMetadata.tables.some((row) => row.table_name === DEFAULT_AUTH_TABLE.table)) {
-                    out(chalk.gray("  rebase.users is not written: accounts are managed in the Studio's Users & Roles."));
-                    out(chalk.gray("  To show it in the admin as a table, and add columns to it, run again with --users."));
+                    out(chalk.gray("  rebase.users is not written: it is served as the users table as it is."));
+                    out(chalk.gray("  To add columns to it, or roles and hooks, run again with --users."));
                 }
             } else if (fs.existsSync(usersPath) && !force) {
                 if (!skippedFiles.includes(DEFAULT_AUTH_TABLE.table)) skippedFiles.push(DEFAULT_AUTH_TABLE.table);
