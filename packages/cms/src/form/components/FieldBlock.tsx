@@ -1,6 +1,6 @@
 import type { PropertySpan, Property } from "@rebasepro/cms-types";
 import React from "react";
-import { cls, ErrorBoundary, Tooltip, Typography } from "@rebasepro/ui";
+import { cls, ErrorBoundary, InspectorRow, Tooltip, Typography } from "@rebasepro/ui";
 import { isReadOnly } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { PropertyKeyHint } from "../../components/PropertyKeyHint";
@@ -159,6 +159,25 @@ export function FieldBlock({
     const required = Boolean(property?.validation?.required) && !(property && isReadOnly(property));
     const footed = labelInside && !reading;
     const domScope = useFormDomScope();
+
+    if (isInspector && showLabel) {
+        const multiLine = property?.type === "array" || property?.type === "relation";
+        return (
+            <InspectorRow
+                id={fieldDomId(domScope, propertyKey)}
+                data-form-field={propertyKey}
+                label={property?.name ?? label ?? propertyKey}
+                required={required}
+                description={!reading ? description : undefined}
+                labelAdornment={property ? <PropertyKeyHint propertyKey={propertyKey}/> : undefined}
+                align={multiLine ? "start" : "center"}
+            >
+                <ErrorBoundary>
+                    {children}
+                </ErrorBoundary>
+            </InspectorRow>
+        );
+    }
 
     const labelRow = showLabel ? (
         <div className={cls(

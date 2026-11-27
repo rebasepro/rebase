@@ -27,6 +27,7 @@ export * from "./FilterChip";
 export * from "./IconButton";
 export * from "./InputLabel";
 export * from "./InfoLabel";
+export * from "./InspectorRow";
 export * from "./Label";
 export * from "./LoadingButton";
 export * from "./Markdown";

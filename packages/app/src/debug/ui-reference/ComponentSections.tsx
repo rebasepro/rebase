@@ -20,6 +20,7 @@ import {
     BooleanSwitchWithLabel,
     Button,
     CenteredView,
+    Chip,
     type ChipColorKey,
     CircularProgressCenter,
     cls,
@@ -35,6 +36,7 @@ import {
     FileUpload,
     InfoLabel,
     InputLabel,
+    InspectorRow,
     Label,
     Markdown,
     Menu,
@@ -517,6 +519,27 @@ export function DataDisplaySection() {
                     <SpecimenLabel>InfoLabel · info, warn</SpecimenLabel>
                     <InfoLabel>The slug is generated from the title.</InfoLabel>
                     <InfoLabel mode="warn">Changing the slug breaks existing links.</InfoLabel>
+                </div>
+                <div className="col-span-12 sm:col-span-6 flex flex-col gap-3">
+                    <SpecimenLabel>Chip · variant=&quot;dot&quot; (wrapping label pills)</SpecimenLabel>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <Chip variant="dot" colorScheme="blue" size="smallest">Security</Chip>
+                        <Chip variant="dot" colorScheme="purple" size="smallest">Backend</Chip>
+                        <Chip variant="dot" colorScheme="green" size="smallest">Architecture</Chip>
+                        <Chip variant="dot" size="smallest">Neutral</Chip>
+                    </div>
+                </div>
+                <div className="col-span-12 sm:col-span-6 flex flex-col gap-2">
+                    <SpecimenLabel>InspectorRow · compact 2-column rail row</SpecimenLabel>
+                    <InspectorRow label="Status" required description="Publication state">
+                        <StatusDot tone="ok" size="small">Published</StatusDot>
+                    </InspectorRow>
+                    <InspectorRow label="Tags" align="start">
+                        <div className="flex flex-wrap gap-1.5">
+                            <Chip variant="dot" colorScheme="blue" size="smallest">Security</Chip>
+                            <Chip variant="dot" colorScheme="green" size="smallest">Backend</Chip>
+                        </div>
+                    </InspectorRow>
                 </div>
                 <div className="col-span-12">
                     <SpecimenLabel>Markdown · size=&quot;small&quot;</SpecimenLabel>

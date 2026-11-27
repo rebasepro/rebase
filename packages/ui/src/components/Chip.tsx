@@ -15,10 +15,13 @@ export interface ChipProps {
      * low alpha behind hue-coloured ink: a label, not a block, and the rule the
      * chrome follows for colour everywhere else (a dot, an icon, an outline, a
      * tint — never a fill). `filled` is the palette's solid stop, for the few
-     * places that want a swatch: a colour picker, a legend. A custom scheme
-     * without tint values falls back to `filled`.
+     * places that want a swatch: a colour picker, a legend. `dot` is a calm
+     * pill (`rounded-full`, `bg-surface-card`, `border-hairline`) carrying a
+     * 6px colour dot beside primary ink — built for wrapping tag/label lists
+     * and compact property inspectors. A custom scheme without tint values
+     * falls back to `filled`.
      */
-    variant?: "tinted" | "filled";
+    variant?: "tinted" | "filled" | "dot";
     error?: boolean;
     outlined?: boolean;
     onClick?: () => void;
@@ -85,7 +88,42 @@ export function Chip({
     }, [documentDark]);
     const dark = scopedDark ?? documentDark;
 
+    const isDot = variant === "dot";
     const hasScheme = error || usedColorScheme;
+
+    if (isDot) {
+        const dotColor = error
+            ? (dark ? "#f87171" : "#dc2626")
+            : usedColorScheme
+                ? (dark
+                    ? (usedColorScheme.darkOutlineText ?? usedColorScheme.darkColor ?? usedColorScheme.color)
+                    : (usedColorScheme.outlineText ?? usedColorScheme.color))
+                : undefined;
+
+        return (
+            <div
+                ref={ref}
+                className={cls(
+                    "rounded-full max-w-full w-max h-fit font-medium inline-flex gap-1.5",
+                    "text-ellipsis items-center transition-colors duration-150",
+                    "bg-surface-card border border-hairline text-text-primary dark:text-text-primary-dark",
+                    onClick ? "cursor-pointer hover:bg-surface-card-hover" : "",
+                    sizeClassNames[size],
+                    className
+                )}
+                onClick={onClick}
+                style={{ overflow: "hidden", ...style }}
+            >
+                <span
+                    aria-hidden="true"
+                    className={cls("w-1.5 h-1.5 rounded-full shrink-0", !dotColor && "bg-text-disabled dark:bg-text-disabled-dark")}
+                    style={dotColor ? { backgroundColor: dotColor } : undefined}
+                />
+                {icon}
+                {children}
+            </div>
+        );
+    }
 
     let textColor = "";
     let bgColor = "";
