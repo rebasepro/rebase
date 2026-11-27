@@ -211,10 +211,10 @@ export function deriveRebaseTheme(config: RebaseThemeConfig = {}): DerivedRebase
     const primaryDark = oklchToHex(clamp(accentOklch.l - 0.12, 0.15, 0.85), accentOklch.c * 0.95, accentOklch.h);
     const onPrimary = pickOnColor(accentHex);
 
-    // Light ladder: frame -> sheet -> card (each step lighter; high contrast widens steps)
+    // Light ladder: airy porcelain frame -> near-white sheet -> pure white card
     const stepBoost = high ? 0.014 : 0;
-    const lightFrameL = bgOklch && bgOklch.l > 0.7 ? clamp(bgOklch.l - 0.03 - stepBoost, 0.86, 0.95) : 0.952 - stepBoost;
-    const lightSheetL = clamp(lightFrameL + 0.025 + stepBoost * 0.5, 0.93, 0.985);
+    const lightFrameL = bgOklch && bgOklch.l > 0.7 ? clamp(bgOklch.l - 0.025 - stepBoost, 0.89, 0.97) : 0.967 - stepBoost;
+    const lightSheetL = clamp(lightFrameL + 0.024 + stepBoost * 0.4, 0.955, 0.992);
     const lightCardL = 1.0;
 
     // Dark ladder: frame -> sheet -> card -> raised -> lifted (each step lighter)
@@ -251,20 +251,20 @@ export function deriveRebaseTheme(config: RebaseThemeConfig = {}): DerivedRebase
     };
 
     const light: Record<string, string> = {
-        "--surface-frame": oklchToHex(lightFrameL, neutralChroma * 0.7, neutralHue),
-        "--surface-sheet": oklchToHex(lightSheetL, neutralChroma * 0.45, neutralHue),
+        "--surface-frame": oklchToHex(lightFrameL, neutralChroma * 0.55, neutralHue),
+        "--surface-sheet": oklchToHex(lightSheetL, neutralChroma * 0.35, neutralHue),
         "--surface-card": oklchToHex(lightCardL, 0, neutralHue),
-        "--surface-card-hover": oklchToHex(0.974 - stepBoost * 0.4, neutralChroma * 0.5, neutralHue),
-        "--surface-raised": oklchToHex(0.938 - stepBoost, neutralChroma * 0.8, neutralHue),
-        "--surface-raised-hover": oklchToHex(0.912 - stepBoost, neutralChroma * 0.9, neutralHue),
+        "--surface-card-hover": oklchToHex(0.982 - stepBoost * 0.4, neutralChroma * 0.45, neutralHue),
+        "--surface-raised": oklchToHex(0.956 - stepBoost, neutralChroma * 0.65, neutralHue),
+        "--surface-raised-hover": oklchToHex(0.934 - stepBoost, neutralChroma * 0.75, neutralHue),
         "--surface-lifted": "#ffffff",
-        "--surface-field": high ? "rgb(0 0 0 / 0.075)" : "rgb(0 0 0 / 0.05)",
-        "--surface-field-hover": high ? "rgb(0 0 0 / 0.11)" : "rgb(0 0 0 / 0.075)",
-        "--surface-hover": high ? "rgb(0 0 0 / 0.06)" : "rgb(0 0 0 / 0.04)",
-        "--surface-active": high ? "rgb(0 0 0 / 0.10)" : "rgb(0 0 0 / 0.07)",
-        "--surface-well": oklchToHex(0.964 - stepBoost * 0.5, neutralChroma * 0.6, neutralHue),
-        "--hairline": high ? "rgb(0 0 0 / 0.14)" : "rgb(0 0 0 / 0.06)",
-        "--hairline-strong": high ? "rgb(0 0 0 / 0.24)" : "rgb(0 0 0 / 0.12)"
+        "--surface-field": high ? "rgb(0 0 0 / 0.065)" : "rgb(0 0 0 / 0.038)",
+        "--surface-field-hover": high ? "rgb(0 0 0 / 0.095)" : "rgb(0 0 0 / 0.058)",
+        "--surface-hover": high ? "rgb(0 0 0 / 0.055)" : "rgb(0 0 0 / 0.035)",
+        "--surface-active": high ? "rgb(0 0 0 / 0.09)" : "rgb(0 0 0 / 0.06)",
+        "--surface-well": oklchToHex(0.967 - stepBoost * 0.5, neutralChroma * 0.55, neutralHue),
+        "--hairline": high ? "rgb(0 0 0 / 0.15)" : "rgb(0 0 0 / 0.075)",
+        "--hairline-strong": high ? "rgb(0 0 0 / 0.25)" : "rgb(0 0 0 / 0.13)"
     };
 
     const dark: Record<string, string> = {

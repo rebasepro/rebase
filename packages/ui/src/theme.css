@@ -331,26 +331,26 @@
    `.dark` are the only switches. */
 :root,
 [data-theme="light"] {
-    --surface-frame: #eff0f3;
-    --surface-sheet: #f8f9fa;
+    --surface-frame: #f4f5f7;
+    --surface-sheet: #fbfcfe;
     --surface-card: #ffffff;
-    --surface-card-hover: #f6f7f9;
-    --surface-raised: #eaecef;
-    --surface-raised-hover: #e1e4e7;
+    --surface-card-hover: #f8f9fb;
+    --surface-raised: #f0f1f4;
+    --surface-raised-hover: #e7e9ed;
     --surface-lifted: #ffffff;
     /* A field has no edge, so the fill alone has to read as a box on white
-       and on the sheet. 3.5% did that only with a hairline round it; 5% is
-       the FireCMS field (slate-200 at half strength), on the graphite hue. */
-    --surface-field: rgb(0 0 0 / 0.05);
-    --surface-field-hover: rgb(0 0 0 / 0.075);
-    --surface-hover: rgb(0 0 0 / 0.04);
-    --surface-active: rgb(0 0 0 / 0.07);
+       and on the sheet. Tuned lighter to sit cleanly on the airy #fcfcfd
+       sheet without feeling muddy. */
+    --surface-field: rgb(0 0 0 / 0.038);
+    --surface-field-hover: rgb(0 0 0 / 0.058);
+    --surface-hover: rgb(0 0 0 / 0.035);
+    --surface-active: rgb(0 0 0 / 0.06);
     --surface-scrim: rgb(0 0 0 / 0.4);
     /* The one surface that goes DOWN the ladder on purpose: a code well, a
        query, a log tail, a connection string, recessed into its card. */
     --surface-well: #f4f5f7;
-    --hairline: rgb(0 0 0 / 0.06);
-    --hairline-strong: rgb(0 0 0 / 0.12);
+    --hairline: rgb(0 0 0 / 0.075);
+    --hairline-strong: rgb(0 0 0 / 0.13);
 }
 
 .dark,
