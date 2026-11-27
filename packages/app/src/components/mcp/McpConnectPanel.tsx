@@ -163,14 +163,14 @@ function ClientStep({ client, name, url }: { client: ClientTab; name: string; ur
             </>;
         case "cursor":
             return <>
-                <Button component="a" href={cursorInstallLink(name, url)} color="primary" startIcon={<PlugIcon size={iconSize.smallest}/>}>
+                <Button component="a" href={cursorInstallLink(name, url)} variant="outlined" color="neutral" startIcon={<PlugIcon size={iconSize.smallest}/>}>
                     {t("mcp_connect_add_to", { client: CLIENT_NAMES.cursor })}
                 </Button>
                 <Hint>{t("mcp_connect_cursor_hint")}</Hint>
             </>;
         case "vscode":
             return <>
-                <Button component="a" href={vscodeInstallLink(name, url)} color="primary" startIcon={<PlugIcon size={iconSize.smallest}/>}>
+                <Button component="a" href={vscodeInstallLink(name, url)} variant="outlined" color="neutral" startIcon={<PlugIcon size={iconSize.smallest}/>}>
                     {t("mcp_connect_add_to", { client: CLIENT_NAMES.vscode })}
                 </Button>
                 <Hint>{t("mcp_connect_vscode_hint")}</Hint>
@@ -315,8 +315,16 @@ export function McpConnectPanel({
                         <Tab value="other">{t("mcp_connect_tab_other")}</Tab>
                     </Tabs>
 
-                    <div className="flex flex-col gap-2">
-                        <ClientStep client={tab} name={name} url={url}/>
+                    {/* Every tab's step sits in the same grid cell, the hidden
+                        ones invisible and inert, so the panel is as tall as the
+                        tallest step and does not jump when the tab changes. */}
+                    <div className="grid">
+                        {[...clients, "other" as const].map((key) => (
+                            <div key={key} inert={key !== tab}
+                                 className={cls("[grid-area:1/1] flex flex-col gap-2", key !== tab && "invisible")}>
+                                <ClientStep client={key} name={name} url={url}/>
+                            </div>
+                        ))}
                     </div>
 
                     {local && <Hint>{t("mcp_connect_remote_only_local")}</Hint>}
