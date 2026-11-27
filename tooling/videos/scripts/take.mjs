@@ -2,7 +2,7 @@
 /**
  * A TAKE, MADE RENDERABLE.
  *
- *     node scripts/take.mjs <take-id>        (pnpm take <take-id>)
+ *     node scripts/take.mjs <take-id> [--keep-pauses]   (pnpm take <take-id>)
  *
  * The recording page (src/live, `pnpm live`) leaves a take in
  * takes/<id>/: the camera-and-microphone recording as the browser wrote it,
@@ -25,6 +25,12 @@
  * level, and each line's start and end snap to the edges of it. Words inside
  * a line are placed through the line's voiced time by their syllables.
  *
+ * THE PAUSES ARE CUT. Between the first line and the last, any silence
+ * longer than a breath is cut down to one — jump cuts, the rhythm of a
+ * short — and every measured time moves onto the cut (keepSpans, cutClock).
+ * The recording in takes/<id>/ is never touched: `--keep-pauses` makes the
+ * take again with every pause in it.
+ *
  * The film then starts fifteen frames before the first word, as the
  * authored film does: the take's head is trimmed with `startFrom`.
  *
@@ -36,7 +42,7 @@
  */
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -118,6 +124,90 @@ function speech(db) {
         else bridged.push({ ...s });
     }
     return { segments: bridged.filter((s) => s.end - s.start >= 0.08), floor, voice, threshold };
+}
+
+/* ── the pauses, cut ─────────────────────────────────────────────────── */
+
+/**
+ * JUMP CUTS. A pause longer than MAX_PAUSE between two stretches of speech
+ * is cut down to PAD_AFTER of the trailing breath plus PAD_BEFORE of the
+ * lead-in to the next word — the tight, talking-head rhythm of a short.
+ * Only the read is cut: the head before the first line (the film's lead-in)
+ * and the tail after the last line (the film's outro) stay whole.
+ *
+ * Every cut lands on a frame boundary, so picture and sound stay the same
+ * length segment by segment and never drift.
+ */
+const MAX_PAUSE = 0.35;
+const PAD_BEFORE = 0.1;
+const PAD_AFTER = 0.18;
+
+const onFrame = (t) => Math.round(t * FPS) / FPS;
+
+/** The spans of the recording kept, in its own seconds, from `from` to `to`. */
+function keepSpans(segments, from, to, duration) {
+    const inside = segments.filter((s) => s.end > from && s.start < to);
+    const keep = [{ start: 0, end: onFrame(Math.min(duration, inside.length ? inside[0].end : to)) }];
+    for (let i = 1; i < inside.length; i++) {
+        const gap = inside[i].start - inside[i - 1].end;
+        if (gap <= MAX_PAUSE) continue;
+        const cutFrom = onFrame(inside[i - 1].end + PAD_AFTER);
+        const cutTo = onFrame(inside[i].start - PAD_BEFORE);
+        if (cutTo - cutFrom < 2 / FPS) continue;
+        keep[keep.length - 1].end = cutFrom;
+        keep.push({ start: cutTo, end: cutTo });
+    }
+    keep[keep.length - 1].end = onFrame(duration);
+    return keep.filter((s) => s.end - s.start >= 1 / FPS);
+}
+
+/** A time on the recording → the same moment on the cut. A moment inside a
+ *  cut pause lands where the next kept span begins. */
+function cutClock(keep) {
+    let at = 0;
+    const spans = keep.map((s) => {
+        const out = { ...s, out: at };
+        at += s.end - s.start;
+        return out;
+    });
+    const map = (t) => {
+        for (const s of spans) {
+            if (t < s.start) return s.out;
+            if (t <= s.end) return s.out + (t - s.start);
+        }
+        return at;
+    };
+    return { map, length: at };
+}
+
+/** Writes the cut: each kept span trimmed from picture and sound, with a
+ *  5 ms fade on the sound either side so no cut clicks, then joined. */
+async function renderCut(video, keep, out, signal) {
+    const parts = keep.map((s, i) => {
+        const d = (s.end - s.start).toFixed(3);
+        const fadeOut = Math.max(0, s.end - s.start - 0.005).toFixed(3);
+        return (
+            `[0:v]trim=start=${s.start.toFixed(3)}:end=${s.end.toFixed(3)},setpts=PTS-STARTPTS[v${i}];` +
+            `[0:a]atrim=start=${s.start.toFixed(3)}:end=${s.end.toFixed(3)},asetpts=PTS-STARTPTS,` +
+            `afade=t=in:d=0.005,afade=t=out:st=${fadeOut}:d=0.005,apad=whole_dur=${d}[a${i}];`
+        );
+    });
+    const graph = parts.join("\n") + "\n" + keep.map((_, i) => `[v${i}][a${i}]`).join("") + `concat=n=${keep.length}:v=1:a=1[v][a]`;
+    const script = `${out}.filter.txt`;
+    await writeFile(script, graph);
+    try {
+        await run([
+            "-y", "-i", video,
+            "-filter_complex_script", script,
+            "-map", "[v]", "-map", "[a]",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+            "-movflags", "+faststart",
+            out,
+        ], { signal });
+    } finally {
+        await rm(script, { force: true });
+    }
 }
 
 /* ── lines and words ─────────────────────────────────────────────────── */
@@ -223,7 +313,7 @@ async function synthesize(live, file) {
     ]);
 }
 
-export async function processTake(id, { log = console.log, signal } = {}) {
+export async function processTake(id, { log = console.log, signal, cut = true } = {}) {
     const check = () => {
         if (signal?.aborted) throw new Discarded(id);
     };
@@ -287,6 +377,32 @@ export async function processTake(id, { log = console.log, signal } = {}) {
     if (short > said.length / 2) {
         throw new Error(`${short} of ${said.length} lines measured under half a second — the page lost the read. The take is kept in takes/${id}/.`);
     }
+    for (const line of said) line.drift = Math.round((line.start - line.prior.start) * FPS);
+
+    /* The pauses inside the read, cut (see keepSpans), and every time
+       measured on the recording moved onto the cut. */
+    let cutNote = "pauses kept (--keep-pauses)";
+    if (cut) {
+        const keep = keepSpans(segments, first.start, said[said.length - 1].end, seconds);
+        if (keep.length > 1) {
+            log(`${id}: cutting ${keep.length - 1} pauses…`);
+            const tmp = video.replace(/\.mp4$/, ".cut.mp4");
+            await renderCut(video, keep, tmp, signal).catch(async (err) => {
+                await rm(tmp, { force: true });
+                check();
+                throw err;
+            });
+            check();
+            await rename(tmp, video);
+            const { map, length } = cutClock(keep);
+            for (const line of said) {
+                line.start = map(line.start);
+                line.end = map(line.end);
+                line.voiced = line.voiced.map((s) => ({ start: map(s.start), end: map(s.end) })).filter((s) => s.end > s.start);
+            }
+            cutNote = `${keep.length - 1} pauses cut: ${clock(seconds)} → ${clock(length)}`;
+        } else cutNote = "no pause long enough to cut";
+    }
     const startFrom = Math.max(0, Math.round(first.start * FPS) - LEAD_IN);
     const frame = (t) => Math.round(t * FPS) - startFrom;
 
@@ -312,13 +428,14 @@ export async function processTake(id, { log = console.log, signal } = {}) {
         if (!line) return `${name} — ${live.timing.lines[k] ? "stopped before the end of it" : "never heard"}`;
         const words = live.lines[k].words.length;
         const wpm = Math.round((words / Math.max(0.1, line.end - line.start)) * 60);
-        const drift = Math.round((line.start - line.prior.start) * FPS);
+        const drift = line.drift;
         return `${name} ${clock(line.start)} → ${clock(line.end)}  ${String(wpm).padStart(3)} wpm${Math.abs(drift) > 6 ? `   (page said ${drift > 0 ? drift + " frames early" : -drift + " frames late"})` : ""}`;
     });
     const last = timing.lines.filter(Boolean).pop();
     const film = (last.end + 49) / FPS;
     const summary = [
         `take ${clock(seconds)} · film ${clock(film)} · starts ${clock(startFrom / FPS)} into the take`,
+        cutNote,
         `voice ${voice.toFixed(0)} dBFS over a room of ${floor.toFixed(0)} dBFS (threshold ${threshold.toFixed(0)})${voice - floor < 15 ? " — LOW: the voice barely clears the room" : ""}`,
         "",
         ...rows,
@@ -342,14 +459,15 @@ export async function processTake(id, { log = console.log, signal } = {}) {
 /* ── as a command ────────────────────────────────────────────────────── */
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    const id = process.argv[2];
+    const id = process.argv.slice(2).find((a) => !a.startsWith("--"));
+    const cut = !process.argv.includes("--keep-pauses");
     if (!id) {
         const takes = existsSync(path.join(ROOT, "takes")) ? (await readdir(path.join(ROOT, "takes"))).filter((d) => d.startsWith("take-")) : [];
         console.log(takes.length ? `takes:\n  ${takes.join("\n  ")}` : "no takes yet — record one with `pnpm live`");
         process.exit(0);
     }
     try {
-        const out = await processTake(id);
+        const out = await processTake(id, { cut });
         console.log(`\n${out.summary}\n\nrender:\n  ${out.render}`);
     } catch (err) {
         console.error(String(err instanceof Error ? err.message : err));
