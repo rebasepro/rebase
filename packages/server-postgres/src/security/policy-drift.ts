@@ -343,6 +343,14 @@ function adminRequestCompanions(compiledTables: readonly CompiledTable[]): Map<s
     return new Map(parseExpectedPolicies(ddl).map(p => [keyOf(p), p]));
 }
 
+/**
+ * The tables built-in auth serves whatever the project declares — its users,
+ * when no project table is the auth table — whose policies every boot writes
+ * from the framework's own definition (`BackendBootstrapper.defaultAuthTable`).
+ * Not the project's to describe, so never reported as orphans of it.
+ */
+const BUILT_IN_AUTH_TABLES = new Set(["rebase.users"]);
+
 const sameRoles = (a: string[], b: string[]) =>
     a.length === b.length && [...a].sort().join(",") === [...b].sort().join(",");
 
@@ -445,8 +453,12 @@ export async function checkPolicyDrift(
         if (differences.length > 0) drift.diverged.push({ expected: want, actual: got, differences });
     }
 
+    const declaredTables = new Set(expectedTables.map(t => `${t.schema}.${t.table}`));
     for (const [key, got] of liveByKey) {
         if (expectedByKey.has(key)) continue;
+        // A table built-in auth serves and provisions itself, where no project
+        // table is it: its policies are the boot's, not the project's strays.
+        if (BUILT_IN_AUTH_TABLES.has(`${got.schema}.${got.table}`) && !declaredTables.has(`${got.schema}.${got.table}`)) continue;
         // A boot's admin-request companion, in exactly the shape it writes —
         // anything else under that name is reported like any other stranger.
         const companion = companions.get(key);

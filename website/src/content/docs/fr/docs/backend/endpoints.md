@@ -1,5 +1,5 @@
 ---
-sourceHash: 0496dc717e6c7873
+sourceHash: 3ade348460459f69
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec le contrôle d'accès sur chacune et la page qui l'explique.
@@ -229,10 +229,10 @@ elle a été créée. Une clé limitée à une table n'accède à rien de tout c
 | `PATCH` | `/api/admin/webhooks/:id` | `database:write` | Met à jour un webhook de base de données |
 | `DELETE` | `/api/admin/webhooks/:id` | `database:write` | Supprime un webhook de base de données |
 | `POST` | `/api/admin/webhooks/:id/test` | `database:write` | Envoie un test de distribution en direct vers un point de terminaison de webhook configuré |
-| `GET` | `/api/admin/roles` | `users:read` | Liste les rôles et scopes RBAC sans code depuis `rebase.roles` |
-| `POST` | `/api/admin/roles` | `users:write` | Crée ou met à jour un rôle RBAC sans code |
-| `PUT` | `/api/admin/roles/:name` | `users:write` | Met à jour un rôle RBAC sans code |
-| `DELETE` | `/api/admin/roles/:name` | `users:write` | Supprime un rôle RBAC sans code |
+| `GET` | `/api/admin/roles` | `users:read` | Liste `admin`, les rôles déclarés dans le code et ceux créés à l'exécution dans `rebase.roles`, avec leurs scopes et leur origine |
+| `POST` | `/api/admin/roles` | `users:write` | Crée ou met à jour un rôle créé à l'exécution. Refusé pour un rôle déclaré dans le code, un scope du plan des données ou inconnu, ou un scope que l'appelant ne détient pas |
+| `PUT` | `/api/admin/roles/:name` | `users:write` | Met à jour un rôle créé à l'exécution, selon les mêmes règles |
+| `DELETE` | `/api/admin/roles/:name` | `users:write` | Supprime un rôle créé à l'exécution dont l'appelant détient tous les scopes |
 | `GET` | `/api/admin/cron/jobs` | `cron:read` | Liste les tâches planifiées SQL/HTTP sans code depuis `rebase.cron_jobs` |
 | `POST` | `/api/admin/cron/jobs` | `cron:write` | Crée une tâche cron SQL ou HTTP planifiée sans code. Une tâche SQL exécute son instruction avec la propre connexion du serveur, elle nécessite donc également `database:write` |
 | `PATCH` | `/api/admin/cron/jobs/:id` | `cron:write` | Met à jour une tâche cron planifiée sans code ; une tâche SQL, ou qui le devient, nécessite également `database:write` |

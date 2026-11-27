@@ -1,5 +1,5 @@
 ---
-sourceHash: d68196665de50636
+sourceHash: 776c8068db7e477b
 title: Ruoli e scope
 sidebar_label: Ruoli e scope
 description: "Cosa può fare un chiamante: il data plane posseduto da ogni persona, l'admin plane concesso dai ruoli, gli scope che un'app dichiara per se stessa e come ogni credenziale li trasporta."
@@ -142,6 +142,29 @@ const { roles } = await client.admin.listRoles();
 // [{ id: "admin", name: "Admin", scopes: [...], builtIn: true },
 //  { id: "support", name: "Support", scopes: ["users:read", "users:write", "logs:read"], builtIn: false }, …]
 ```
+
+## Ruoli creati a runtime
+
+Accanto ai ruoli dichiarati nel codice, un progetto con l'autenticazione
+integrata può tenere ruoli nel suo database, in `rebase.roles`: creati nella
+sezione Users & roles dello Studio o con `POST /api/admin/roles`. Ognuno è un
+nome con gli scope che concede, e uno può essere il ruolo che ricevono tutti i
+nuovi iscritti.
+
+- **Un ruolo dichiarato prevale.** Un ruolo dichiarato nel codice è di sola
+  lettura a runtime e concede ciò che dice il codice anche quando esiste una riga
+  con lo stesso nome.
+- **Nessuno definisce un ruolo oltre ciò che detiene.** Definire un ruolo
+  concede i suoi scope a chiunque lo detenga, quindi chi lo scrive deve detenere
+  ogni scope che il ruolo elenca, prima e dopo la modifica. Scrivere ruoli
+  richiede `users:write`; un admin detiene ogni scope.
+- **Un ruolo elenca solo scope che esistono**, e nessuno scope del piano dati:
+  le regole a cui è tenuto un ruolo dichiarato.
+
+Nel pannello di amministrazione, il campo `roles` della tabella degli utenti
+sceglie tra questi ruoli e quelli dichiarati. Una colonna chiusa a valori propri
+(`col.text({ enum: [...] }).array()`) mantiene il suo elenco. Un ruolo che
+nessuno ha definito resta un nome che la row-level security può riconoscere.
 
 ## Scope dell'applicazione
 

@@ -251,6 +251,20 @@ export interface DatabaseAdapter {
  *
  * @group Backend
  */
+/**
+ * A table built-in auth serves whatever the project declares, and what the
+ * boot says when a project table takes its name.
+ *
+ * @group Database
+ */
+export interface BuiltInTableSpec {
+    table: import("../schema/compiled").CompiledTable;
+    /** What the table holds, as the boot names it: "Users". */
+    noun: string;
+    /** The way out when a project table takes its name. */
+    remedy: string;
+}
+
 export interface DatabaseAdapterInitConfig {
     /**
      * The tables the backend declares, compiled (`compileSchema`): each
@@ -298,14 +312,15 @@ export interface DatabaseAdapterInitConfig {
      */
     introspectCollections?: boolean;
     /**
-     * The auth table to serve beside the tables an introspecting driver
-     * derives: built-in auth's own table (`BackendBootstrapper.defaultAuthTable`),
-     * which lives outside the introspected schema. The driver reads it back
-     * from the catalogue and serves it with the rest. Absent when the project
-     * declares its tables (the auth table is then one of `tables`) or
-     * authenticates through an `AuthAdapter`.
+     * The tables built-in auth serves beside the ones an introspecting driver
+     * derives — its users (`BackendBootstrapper.defaultAuthTable`) — which
+     * live outside the introspected schema.
+     * The driver reads each back from the catalogue and serves it with the
+     * rest, unless a derived table takes its name. Absent when the project
+     * declares its tables (they are then among `tables`) or authenticates
+     * through an `AuthAdapter`.
      */
-    authTable?: import("../schema/compiled").CompiledTable;
+    builtInTables?: readonly BuiltInTableSpec[];
     /**
      * Options for an introspecting driver — see `RebaseBackendConfig.baas`.
      * Drivers that introspect should honour `unprotectedTables`.

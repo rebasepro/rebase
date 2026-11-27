@@ -35,6 +35,10 @@ import {
     buildResourceGraph,
     computeSchemaVersion,
     parseEnvBoolean,
+    ADMIN_ROLE,
+    isDataPlaneScope,
+    parseScope,
+    validateScopes,
     resourceKeyOf,
     DEFAULT_STORAGE_SOURCE_KEY,
     MCP_APP_MODULES,
@@ -60,7 +64,7 @@ import { createRebaseClient } from "@rebasepro/client";
 
 import { TableRegistry } from "../schema/table-registry";
 import { resolveDeclaredTables } from "../schema/declared-tables";
-import { compileImplicitAuthTable, withImplicitAuthTable } from "../schema/implicit-auth-table";
+import { builtInUsersTable, compileImplicitAuthTable, withBuiltInTables, type BuiltInTable } from "../schema/built-in-tables";
 import {
     logUnprovisionedTables,
     tablesStoredBy,
@@ -510,17 +514,17 @@ function authBootstrapperOf(bootstrappers: readonly BackendBootstrapper[]): Back
 }
 
 /**
- * Built-in auth's own table, compiled — the auth table of a project that
- * declares none. `undefined` when auth is an `AuthAdapter` (it owns its
- * users), when there is no auth, and when the database has no table of its
- * own to offer.
+ * The tables built-in auth serves whatever the project declares: its own
+ * users table, the auth table of a project that declares none. None when
+ * auth is an `AuthAdapter` (it owns its users), when there is no auth, and
+ * when the database offers no auth table of its own.
  */
-function resolveImplicitAuthTable(config: RebaseBackendOptions): CompiledTable | undefined {
-    if (!config.auth || isAuthAdapter(config.auth)) return undefined;
+function resolveBuiltInTables(config: RebaseBackendOptions): BuiltInTable[] {
+    if (!config.auth || isAuthAdapter(config.auth)) return [];
     const definition = config.database
         ? config.database.defaultAuthTable
         : authBootstrapperOf(config.bootstrappers ?? [])?.defaultAuthTable;
-    return definition ? compileImplicitAuthTable(definition) : undefined;
+    return definition ? [builtInUsersTable(compileImplicitAuthTable(definition))] : [];
 }
 
 /**
@@ -770,16 +774,16 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // `defineAuthTable`, or — when none is declared — the auth bootstrapper's
     // own (`rebase.users`), so a project's users are a collection whoever
     // wrote the declaration. An `AuthAdapter` owns its users: nothing is added.
-    const implicitAuthTable = resolveImplicitAuthTable(config);
+    const builtInTables = resolveBuiltInTables(config);
     /**
-     * The declared tables as served: with the implicit auth table when it
-     * applies. What the drivers open with, what boot provisions and what the
-     * registry serves; `declaredTables` stays what the source declares.
+     * The declared tables as served: with the built-in tables that apply.
+     * What the drivers open with, what boot provisions and what the registry
+     * serves; `declaredTables` stays what the source declares.
      */
-    const servedDeclaredTables = withImplicitAuthTable(declaredTables, implicitAuthTable, message => logger.warn(message));
+    const servedDeclaredTables = withBuiltInTables(declaredTables, builtInTables, message => logger.warn(message));
     if (servedDeclaredTables !== declaredTables) {
-        logger.debug("No table is declared with defineAuthTable — serving built-in auth's table as the auth table", {
-            slug: implicitAuthTable?.descriptor.slug
+        logger.debug("Serving built-in auth's tables beside the declared ones", {
+            tables: servedDeclaredTables.descriptors.slice(declaredTables.descriptors.length).map(table => table.slug)
         });
     }
     const tableRegistry = new TableRegistry();
@@ -910,12 +914,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     const provisionable = provisionableBy.get(provisionTarget) ?? [];
     // What the boot appliers plan from: the compiled tables themselves.
     const compiledBySlug = new Map(servedDeclaredTables.tables.map(table => [table.descriptor.slug, table]));
-    // Nothing declared, and built-in auth's own table served beside what the
+    // Nothing declared, and built-in auth's tables served beside what the
     // driver derives: still the framework's to provision, as the auth tables
-    // beside it are. Its policies are what let the request role read it at
-    // all — `rebase.users` with RLS off is withheld from it.
-    const introspectedAuthTables = introspectCollections && implicitAuthTable ? [implicitAuthTable.descriptor] : [];
-    if (introspectCollections && implicitAuthTable) compiledBySlug.set(implicitAuthTable.descriptor.slug, implicitAuthTable);
+    // beside them are. Their policies are what let the request role read
+    // them at all — `rebase.users` with RLS off is withheld from it.
+    const introspectedAuthTables = introspectCollections ? builtInTables.map(builtIn => builtIn.table.descriptor) : [];
+    if (introspectCollections) {
+        for (const builtIn of builtInTables) compiledBySlug.set(builtIn.table.descriptor.slug, builtIn.table);
+    }
     const compiledOf = (slug: string) => compiledBySlug.get(slug);
 
     // Before that first query: ask the database whether it is there at all. The
@@ -966,10 +972,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             tables: servedDeclaredTables.tables,
             introspectCollections,
             // Nothing declared: the driver derives the tables, and built-in
-            // auth's own table is served beside them — by the source auth
-            // lives on, the default.
-            ...(introspectCollections && implicitAuthTable && bootstrapper === authBootstrapperOf(bootstrappers)
-                ? { authTable: implicitAuthTable }
+            // auth's tables are served beside them — by the source auth lives
+            // on, the default.
+            ...(introspectCollections && builtInTables.length > 0 && bootstrapper === authBootstrapperOf(bootstrappers)
+                ? { builtInTables }
                 : {}),
             dataSourceKey: b.id || DEFAULT_DRIVER_ID,
             baas: config.baas,
@@ -1319,8 +1325,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // The descriptors of the tables the default database holds — the set this
     // process provisions there, and so the set the stamp stands for.
     const provisionableSlugs = new Set(provisionable.map(collection => collection.slug));
+    // Built-in auth's tables are the framework's, not the project's: the stamp
+    // stands for the declared tables, as `rebase doctor` and `db push` compute it.
+    const builtInSlugs = new Set(servedDeclaredTables.descriptors.slice(declaredTables.descriptors.length).map(table => table.slug));
     await enforceSchemaStamp({
-        tables: tableRegistry.list().filter(table => provisionableSlugs.has(table.slug)),
+        tables: tableRegistry.list().filter(table => provisionableSlugs.has(table.slug) && !builtInSlugs.has(table.slug)),
         // What this process *did*, not what its role permits. The difference is
         // the chart's default: with an external migration Job every pod runs
         // REBASE_MIGRATE_ON_BOOT=none, including the api, whose role still says
@@ -3269,10 +3278,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             const hooks = attached.get(table.descriptor.slug);
             return hooks ? { ...table, hooks } : table;
         });
-        // As boot serves them: with built-in auth's own table while the edited
-        // schema still declares no auth table. `servedCompiledTables` below
+        // As boot serves them: with built-in auth's tables (users while the
+        // edited schema declares no auth table). `servedCompiledTables` below
         // stays the declarations alone — what the next edit plans against.
-        const served = withImplicitAuthTable({ tables, descriptors: schema.descriptors }, implicitAuthTable, message => logger.warn(message));
+        const served = withBuiltInTables({ tables, descriptors: schema.descriptors }, builtInTables, message => logger.warn(message));
 
         const stale: string[] = [];
         for (const [bootstrapper, driverResult] of driverResults) {
@@ -3388,31 +3397,52 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         };
     };
 
+    /**
+     * The access model: the roles declared in code, and the roles made at
+     * runtime in `rebase.roles` beside them. A declaration wins over a row of
+     * the same name — what a declared role grants is what the code says. A
+     * row's scope that no role may list (a data-plane scope, one that does
+     * not exist) grants nothing, and is said once.
+     */
+    const reportedRoleScopes = new Set<string>();
     const syncRolesIntoAccessModel = async (): Promise<void> => {
         if (!rolesStore) return;
         const stored = await rolesStore.list();
         const nextRoles: Record<string, import("@rebasepro/types").RoleDefinition> = { ...accessModel.roles };
-        const nextScopes: Record<string, import("@rebasepro/types").ScopeDefinition> = { ...accessModel.scopes };
         let dbDefaultRole: string | undefined;
         for (const role of stored) {
+            if (role.name === ADMIN_ROLE || Object.prototype.hasOwnProperty.call(accessModel.roles, role.name)) continue;
+            const invalid = new Set([
+                ...role.scopes.filter(scope => isDataPlaneScope(parseScope(scope)?.scope ?? "")),
+                ...validateScopes(role.scopes, accessModel).map(problem => problem.scope)
+            ]);
+            const scopes = role.scopes.filter(scope => !invalid.has(scope));
+            const reportKey = `${role.name}:${[...invalid].sort().join(",")}`;
+            if (invalid.size > 0 && !reportedRoleScopes.has(reportKey)) {
+                reportedRoleScopes.add(reportKey);
+                logger.warn(
+                    `[Auth] Role "${role.name}" in rebase.roles lists ${[...invalid].join(", ")}, which no role may grant ` +
+                    "(a data-plane scope, or one nothing declares). It grants the rest."
+                );
+            }
             nextRoles[role.name] = {
                 name: role.name,
                 ...(role.description ? { description: role.description } : {}),
-                scopes: role.scopes
+                scopes
             };
             if (role.isDefault && !dbDefaultRole) {
                 dbDefaultRole = role.name;
             }
-            for (const scope of role.scopes) {
-                const base = scope.split(":").slice(0, 2).join(":");
-                if (base && !nextScopes[base]) {
-                    nextScopes[base] = { label: base };
-                }
-            }
         }
+        const nextScopes = accessModel.scopes;
         liveAccessModel = { roles: nextRoles, scopes: nextScopes };
         liveDefaultRole = dbDefaultRole;
     };
+
+    /** The signup role the auth config names, which wins over a database default. */
+    const codeDefaultRole = typeof config.auth === "object" && config.auth !== null && "defaultRole" in config.auth
+        ? config.auth.defaultRole
+        : undefined;
 
     if (defaultSqlAdmin && baasCatalogReady) {
         rolesStore = createRolesStore(defaultSqlAdmin);
@@ -3458,14 +3488,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             dbAdminSurface = dbRouter;
 
             if (rolesStore) {
-                const codeDefaultRole = typeof config.auth === "object" && config.auth !== null && "defaultRole" in config.auth
-                    ? config.auth.defaultRole
-                    : undefined;
                 const rRouter = new Hono<HonoEnv>();
                 applyAdminGate(rRouter, "Roles", { read: "users:read", write: "users:write" });
                 rRouter.route("/", createRolesAdminRoutes(rolesStore, {
                     onChanged: syncRolesIntoAccessModel,
                     getAccessModel: () => liveAccessModel,
+                    getCodeModel: () => accessModel,
                     codeDefaultRole
                 }));
                 rolesSurface = rRouter;

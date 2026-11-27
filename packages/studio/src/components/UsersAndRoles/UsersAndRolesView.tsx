@@ -33,7 +33,7 @@ import {
     UsersIcon
 } from "@rebasepro/ui";
 import { useSnackbarController, useStudioCollectionRegistry, useTableDescriptors, useTranslation } from "@rebasepro/app";
-import { BUILT_IN_SCOPES } from "@rebasepro/types";
+import { ADMIN_SCOPES } from "@rebasepro/types";
 import {
     asBoolean,
     asNullableString,
@@ -505,7 +505,8 @@ export function UsersAndRolesView() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right whitespace-nowrap">
-                                                    {r.source !== "built-in" && (
+                                                    {/* A role declared in code is read-only: it changes in backend/schema. */}
+                                                    {r.source === "database" && (
                                                         <IconButton size="small" aria-label={t("studio_users_edit_role_aria", { name: r.name })} onClick={() => openEditRole(r)}>
                                                             <PencilIcon size={iconSize.small} />
                                                         </IconButton>
@@ -594,7 +595,8 @@ export function UsersAndRolesView() {
                     <div className="flex flex-col gap-2">
                         <Typography variant="subtitle2">{t("studio_users_builtin_scopes")}</Typography>
                         <div className="flex flex-wrap gap-1.5">
-                            {BUILT_IN_SCOPES.map((scope) => {
+                            {/* A role grants admin-plane and app scopes: every signed-in person holds the data plane already. */}
+                            {ADMIN_SCOPES.map((scope) => {
                                 const selected = roleScopes.includes(scope);
                                 return (
                                     <Chip

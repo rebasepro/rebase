@@ -3,6 +3,7 @@ import { type User, type RebaseSdkData } from "@rebasepro/types";
 import { type AuthController, resolveAdminCollection, canReadCollection } from "@rebasepro/cms-types";
 import { accountAccessAction, resetMfaAction, resetPasswordAction } from "../../components/common/default_entity_actions";
 import { CreationResultDialog } from "../../components/admin/CreationResultDialog";
+import { RolesSelectFieldBinding } from "../../form/field_bindings/RolesSelectFieldBinding";
 import React from "react";
 
 /**
@@ -119,6 +120,28 @@ function injectAuthCollectionConfig(
                 typeof a === "string" ? a === action.key : a.key != null && a.key === action.key));
             if (missing.length > 0) {
                 result = { ...result, entityActions: [...present, ...missing] };
+            }
+        }
+
+        // ─── The roles field ────────────────────────────────────────────
+        //
+        // What a user may hold is the project's roles — the ones declared in
+        // code and the ones made at runtime, as `GET /admin/roles` lists them —
+        // so the `roles` field picks from them instead of taking free text. Left to
+        // a collection that names its own field, or closes the column to
+        // values of its own (`col.text({ enum })`).
+        const rolesProperty = result.properties?.roles;
+        if (rolesProperty && rolesProperty.type === "array" && !rolesProperty.admin?.Field) {
+            const of = rolesProperty.of;
+            const closed = of !== undefined && !Array.isArray(of) && of.type === "string" && of.enum !== undefined;
+            if (!closed) {
+                result = {
+                    ...result,
+                    properties: {
+                        ...result.properties,
+                        roles: { ...rolesProperty, admin: { ...rolesProperty.admin, Field: RolesSelectFieldBinding } }
+                    }
+                };
             }
         }
 

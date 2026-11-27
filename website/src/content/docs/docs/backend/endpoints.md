@@ -228,10 +228,10 @@ a table reaches none of this. See [Roles and scopes](/docs/backend/roles-and-sco
 | `PATCH` | `/api/admin/webhooks/:id` | `database:write` | Updates a database webhook |
 | `DELETE` | `/api/admin/webhooks/:id` | `database:write` | Deletes a database webhook |
 | `POST` | `/api/admin/webhooks/:id/test` | `database:write` | Sends a live test delivery to a configured webhook endpoint |
-| `GET` | `/api/admin/roles` | `users:read` | Lists zero-code RBAC roles and scopes from `rebase.roles` |
-| `POST` | `/api/admin/roles` | `users:write` | Creates or updates a zero-code RBAC role |
-| `PUT` | `/api/admin/roles/:name` | `users:write` | Updates a zero-code RBAC role |
-| `DELETE` | `/api/admin/roles/:name` | `users:write` | Deletes a zero-code RBAC role |
+| `GET` | `/api/admin/roles` | `users:read` | Lists `admin`, the roles declared in code and the roles made at runtime in `rebase.roles`, with their scopes and where each came from |
+| `POST` | `/api/admin/roles` | `users:write` | Creates or updates a role made at runtime. Refused for a role declared in code, a data-plane or unknown scope, or a scope the caller does not hold |
+| `PUT` | `/api/admin/roles/:name` | `users:write` | Updates a role made at runtime, under the same rules |
+| `DELETE` | `/api/admin/roles/:name` | `users:write` | Deletes a role made at runtime the caller holds every scope of |
 | `GET` | `/api/admin/cron/jobs` | `cron:read` | Lists zero-code scheduled SQL/HTTP jobs from `rebase.cron_jobs` |
 | `POST` | `/api/admin/cron/jobs` | `cron:write` | Creates a zero-code scheduled SQL or HTTP cron job. A SQL job runs its statement as the server's own connection, so it also takes `database:write` |
 | `PATCH` | `/api/admin/cron/jobs/:id` | `cron:write` | Updates a zero-code scheduled cron job; a SQL job, or one becoming one, also takes `database:write` |

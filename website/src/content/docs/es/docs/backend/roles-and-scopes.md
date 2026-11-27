@@ -1,5 +1,5 @@
 ---
-sourceHash: d68196665de50636
+sourceHash: 776c8068db7e477b
 title: Roles y scopes
 sidebar_label: Roles y scopes
 description: "Lo que un solicitante puede hacer: el plano de datos que cada persona posee, el plano de administración que otorgan los roles, los scopes que una aplicación declara para sí misma y cómo los porta cada credencial."
@@ -142,6 +142,29 @@ const { roles } = await client.admin.listRoles();
 // [{ id: "admin", name: "Admin", scopes: [...], builtIn: true },
 //  { id: "support", name: "Support", scopes: ["users:read", "users:write", "logs:read"], builtIn: false }, …]
 ```
+
+## Roles creados en tiempo de ejecución
+
+Además de los roles declarados en el código, un proyecto con la autenticación
+integrada puede guardar roles en su base de datos, en `rebase.roles`: creados en
+Users & roles del Studio o con `POST /api/admin/roles`. Cada uno es un nombre
+con los scopes que concede, y uno puede ser el rol que recibe cada nuevo
+registro.
+
+- **Un rol declarado prevalece.** Un rol declarado en el código es de solo
+  lectura en tiempo de ejecución y concede lo que dice el código aunque exista
+  una fila con el mismo nombre.
+- **Nadie define un rol más allá de lo que tiene.** Definir un rol concede sus
+  scopes a todos los que lo tienen, así que quien lo escribe debe tener cada
+  scope que el rol lista, antes y después del cambio. Escribir roles requiere
+  `users:write`; un administrador tiene todos los scopes.
+- **Un rol lista solo scopes que existen**, y ningún scope del plano de datos:
+  las reglas a las que se somete un rol declarado.
+
+En el panel de administración, el campo `roles` de la tabla de usuarios elige
+entre estos roles y los declarados. Una columna cerrada a valores propios
+(`col.text({ enum: [...] }).array()`) conserva su lista. Un rol que nadie definió
+sigue siendo un nombre que la row-level security puede reconocer.
 
 ## Scopes de la aplicación
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0496dc717e6c7873
+sourceHash: 3ade348460459f69
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Tutte le route HTTP montate da un backend Rebase — data, auth, storage, admin, meta — con il gate di ciascuna e la pagina che la descrive.
@@ -229,10 +229,10 @@ una tabella non ha accesso a nulla di tutto ciò. Vedi [Ruoli e scope](/docs/bac
 | `PATCH` | `/api/admin/webhooks/:id` | `database:write` | Aggiorna un webhook del database |
 | `DELETE` | `/api/admin/webhooks/:id` | `database:write` | Elimina un webhook del database |
 | `POST` | `/api/admin/webhooks/:id/test` | `database:write` | Invia una consegna di test in tempo reale a un endpoint webhook configurato |
-| `GET` | `/api/admin/roles` | `users:read` | Elenca ruoli e scope RBAC zero-code da `rebase.roles` |
-| `POST` | `/api/admin/roles` | `users:write` | Crea o aggiorna un ruolo RBAC zero-code |
-| `PUT` | `/api/admin/roles/:name` | `users:write` | Aggiorna un ruolo RBAC zero-code |
-| `DELETE` | `/api/admin/roles/:name` | `users:write` | Elimina un ruolo RBAC zero-code |
+| `GET` | `/api/admin/roles` | `users:read` | Elenca `admin`, i ruoli dichiarati nel codice e quelli creati a runtime in `rebase.roles`, con i loro scope e la loro origine |
+| `POST` | `/api/admin/roles` | `users:write` | Crea o aggiorna un ruolo creato a runtime. Rifiutato per un ruolo dichiarato nel codice, uno scope del piano dati o sconosciuto, o uno scope che chi chiama non detiene |
+| `PUT` | `/api/admin/roles/:name` | `users:write` | Aggiorna un ruolo creato a runtime, con le stesse regole |
+| `DELETE` | `/api/admin/roles/:name` | `users:write` | Elimina un ruolo creato a runtime di cui chi chiama detiene ogni scope |
 | `GET` | `/api/admin/cron/jobs` | `cron:read` | Elenca i job SQL/HTTP pianificati zero-code da `rebase.cron_jobs` |
 | `POST` | `/api/admin/cron/jobs` | `cron:write` | Crea un cron job pianificato SQL o HTTP zero-code. Un job SQL esegue la propria istruzione come connessione propria del server, quindi richiede anche `database:write` |
 | `PATCH` | `/api/admin/cron/jobs/:id` | `cron:write` | Aggiorna un cron job pianificato zero-code; un job SQL, o uno che lo stia diventando, richiede anche `database:write` |

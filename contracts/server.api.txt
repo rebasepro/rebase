@@ -103,6 +103,8 @@ function assertWriteRequestValid
 function backupStorageFromEnv
 function blockedAddressReason
 function bootFromBundle
+function builtInTableClash
+function builtInTableClashMessage
 function callerScopes
 function classifyProbe
 function classifySurface { collection, surface }
@@ -207,8 +209,6 @@ function honoHttpExceptionStatus
 function html
 function httpMethodToOperation
 function identityResolved
-function implicitAuthTableClash
-function implicitAuthTableClashMessage
 function implicitDeclaration
 function initializeDataSource
 function initializeDataSources
@@ -941,6 +941,7 @@ interface BranchTableDataDiff { blocked, collection, conflicts, deleted, inserte
 interface BroadcastAckMessage { channel, error, payload, requestId, row, rows, seq, subscriptionId, type }
 interface BroadcastMessage { channel, error, event, payload, requestId, row, rows, seq, subscriptionId, type }
 interface BucketOptions { account, default, engine, label, orphanSweep, prefix, publicRead, transport }
+interface BuiltInTableSpec { noun, remedy, table }
 interface ByIdReadOptions { include }
 interface CallerCredential { id, kind, name }
 interface CallerSqlOptions { params, write }
@@ -997,7 +998,7 @@ interface DataRepository { checkUniqueField, count, delete, fetchCollection, fet
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 interface DataSourceDefinition { databaseId, engine, key, label, transport }
 interface DatabaseAdapter { defaultAuthTable, destroy, ensureRlsRuntime, ensureSqlFiles, ensureTablePolicies, ensureTableSchema, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readTablesSchemaVersion, stampTablesSchemaVersion, type, verifyConnection }
-interface DatabaseAdapterInitConfig { authTable, baas, dataSourceKey, introspectCollections, provision, realtime, schemaProvisioning, tables }
+interface DatabaseAdapterInitConfig { baas, builtInTables, dataSourceKey, introspectCollections, provision, realtime, schemaProvisioning, tables }
 interface DatabaseConnection { close, isConnected, type }
 interface DatabaseHealthSample { connections, maxConnections, replicaLagSeconds, sizeBytes }
 interface DatabaseOptions { databaseId, engine, extensions, label, migrations, rls, transport }

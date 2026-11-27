@@ -1034,144 +1034,96 @@
           "operation": "select",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
           "withCheck": null,
           "ruleKey": "#0",
-          "injected": false,
-          "adminRequestCompanion": {
-            "name": "users_select_5f32f06_ar_c118f1a5",
-            "using": "true",
-            "withCheck": null
-          }
+          "injected": false
         },
         {
           "name": "users_insert_3561e70_0",
           "operation": "insert",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": null,
           "withCheck": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
           "ruleKey": "#1",
-          "injected": false,
-          "adminRequestCompanion": {
-            "name": "users_insert_3561e70_0_ar_256f49d5",
-            "using": null,
-            "withCheck": "true"
-          }
+          "injected": false
         },
         {
           "name": "users_update_3561e70_1",
           "operation": "update",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
           "withCheck": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
           "ruleKey": "#1",
-          "injected": false,
-          "adminRequestCompanion": {
-            "name": "users_update_3561e70_1_ar_5be2f8fb",
-            "using": "true",
-            "withCheck": "true"
-          }
+          "injected": false
         },
         {
           "name": "users_delete_3561e70_2",
           "operation": "delete",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
           "withCheck": null,
           "ruleKey": "#1",
-          "injected": false,
-          "adminRequestCompanion": {
-            "name": "users_delete_3561e70_2_ar_40c56324",
-            "using": "true",
-            "withCheck": null
-          }
+          "injected": false
         },
         {
           "name": "users_default_admin_read",
           "operation": "select",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
           "withCheck": null,
           "ruleKey": "users_default_admin_read",
-          "injected": true,
-          "adminRequestCompanion": {
-            "name": "users_default_admin_read_ar_b3a52ae4",
-            "using": "true",
-            "withCheck": null
-          }
+          "injected": true
         },
         {
           "name": "users_default_admin_write_insert",
           "operation": "insert",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": null,
           "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
           "ruleKey": "users_default_admin_write",
-          "injected": true,
-          "adminRequestCompanion": {
-            "name": "users_default_admin_write_insert_ar_f5b0fae5",
-            "using": null,
-            "withCheck": "true"
-          }
+          "injected": true
         },
         {
           "name": "users_default_admin_write_update",
           "operation": "update",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
           "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
           "ruleKey": "users_default_admin_write",
-          "injected": true,
-          "adminRequestCompanion": {
-            "name": "users_default_admin_write_update_ar_687e5ca3",
-            "using": "true",
-            "withCheck": "true"
-          }
+          "injected": true
         },
         {
           "name": "users_default_admin_write_delete",
           "operation": "delete",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
           "withCheck": null,
           "ruleKey": "users_default_admin_write",
-          "injected": true,
-          "adminRequestCompanion": {
-            "name": "users_default_admin_write_delete_ar_7e609e9b",
-            "using": "true",
-            "withCheck": null
-          }
+          "injected": true
         },
         {
           "name": "users_default_self_read",

@@ -4873,72 +4873,48 @@
           "operation": "select",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
           "withCheck": null,
           "ruleKey": "users_default_admin_read",
-          "injected": true,
-          "adminRequestCompanion": {
-            "name": "users_default_admin_read_ar_b3a52ae4",
-            "using": "true",
-            "withCheck": null
-          }
+          "injected": true
         },
         {
           "name": "users_default_admin_write_insert",
           "operation": "insert",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": null,
           "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
           "ruleKey": "users_default_admin_write",
-          "injected": true,
-          "adminRequestCompanion": {
-            "name": "users_default_admin_write_insert_ar_f5b0fae5",
-            "using": null,
-            "withCheck": "true"
-          }
+          "injected": true
         },
         {
           "name": "users_default_admin_write_update",
           "operation": "update",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
           "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
           "ruleKey": "users_default_admin_write",
-          "injected": true,
-          "adminRequestCompanion": {
-            "name": "users_default_admin_write_update_ar_687e5ca3",
-            "using": "true",
-            "withCheck": "true"
-          }
+          "injected": true
         },
         {
           "name": "users_default_admin_write_delete",
           "operation": "delete",
           "mode": "permissive",
           "roles": [
-            "rebase_admin"
+            "public"
           ],
-          "adminTarget": true,
           "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
           "withCheck": null,
           "ruleKey": "users_default_admin_write",
-          "injected": true,
-          "adminRequestCompanion": {
-            "name": "users_default_admin_write_delete_ar_7e609e9b",
-            "using": "true",
-            "withCheck": null
-          }
+          "injected": true
         },
         {
           "name": "users_default_self_read",

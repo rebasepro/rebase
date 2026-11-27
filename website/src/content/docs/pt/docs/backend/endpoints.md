@@ -1,5 +1,5 @@
 ---
-sourceHash: 0496dc717e6c7873
+sourceHash: 3ade348460459f69
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Todas as rotas HTTP que um backend Rebase monta — dados, autenticação, armazenamento, administração, meta — com a restrição de cada uma e a página que a explica.
@@ -229,10 +229,10 @@ uma tabela não acessa nada disso. Consulte [Papéis e escopos](/docs/backend/ro
 | `PATCH` | `/api/admin/webhooks/:id` | `database:write` | Atualiza um webhook de banco de dados |
 | `DELETE` | `/api/admin/webhooks/:id` | `database:write` | Exclui um webhook de banco de dados |
 | `POST` | `/api/admin/webhooks/:id/test` | `database:write` | Envia um disparo de teste real para um endpoint de webhook configurado |
-| `GET` | `/api/admin/roles` | `users:read` | Lista papéis e escopos RBAC zero-code de `rebase.roles` |
-| `POST` | `/api/admin/roles` | `users:write` | Cria ou atualiza um papel RBAC zero-code |
-| `PUT` | `/api/admin/roles/:name` | `users:write` | Atualiza um papel RBAC zero-code |
-| `DELETE` | `/api/admin/roles/:name` | `users:write` | Exclui um papel RBAC zero-code |
+| `GET` | `/api/admin/roles` | `users:read` | Lista `admin`, os papéis declarados no código e os criados em tempo de execução em `rebase.roles`, com seus escopos e de onde cada um veio |
+| `POST` | `/api/admin/roles` | `users:write` | Cria ou atualiza um papel criado em tempo de execução. Recusado para um papel declarado no código, um escopo do plano de dados ou desconhecido, ou um escopo que quem chama não tem |
+| `PUT` | `/api/admin/roles/:name` | `users:write` | Atualiza um papel criado em tempo de execução, com as mesmas regras |
+| `DELETE` | `/api/admin/roles/:name` | `users:write` | Exclui um papel criado em tempo de execução de que quem chama tem todos os escopos |
 | `GET` | `/api/admin/cron/jobs` | `cron:read` | Lista tarefas agendadas SQL/HTTP zero-code de `rebase.cron_jobs` |
 | `POST` | `/api/admin/cron/jobs` | `cron:write` | Cria uma tarefa cron agendada SQL ou HTTP zero-code. Uma tarefa SQL executa sua instrução usando a própria conexão do servidor, portanto também requer `database:write` |
 | `PATCH` | `/api/admin/cron/jobs/:id` | `cron:write` | Atualiza uma tarefa cron agendada zero-code; uma tarefa SQL, ou uma prestes a se tornar uma, também requer `database:write` |

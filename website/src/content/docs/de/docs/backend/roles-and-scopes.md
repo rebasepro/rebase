@@ -1,5 +1,5 @@
 ---
-sourceHash: d68196665de50636
+sourceHash: 776c8068db7e477b
 title: Rollen und Scopes
 sidebar_label: Rollen und Scopes
 description: "Was ein Aufrufer tun darf: die Datenebene, die jede Person besitzt, die Admin-Ebene, die durch Rollen gewährt wird, die Scopes, die eine App für sich selbst deklariert, und wie jedes Credential sie trägt."
@@ -151,6 +151,29 @@ const { roles } = await client.admin.listRoles();
 // [{ id: "admin", name: "Admin", scopes: [...], builtIn: true },
 //  { id: "support", name: "Support", scopes: ["users:read", "users:write", "logs:read"], builtIn: false }, …]
 ```
+
+## Zur Laufzeit erstellte Rollen
+
+Neben den im Code deklarierten Rollen kann ein Projekt mit eingebauter
+Authentifizierung Rollen in seiner Datenbank halten, in `rebase.roles`: erstellt
+im Studio unter Users & roles oder mit `POST /api/admin/roles`. Jede ist ein
+Name mit den Scopes, die sie gewährt, und eine kann die Rolle sein, die jede
+neue Registrierung erhält.
+
+- **Eine deklarierte Rolle hat Vorrang.** Eine im Code deklarierte Rolle ist zur
+  Laufzeit schreibgeschützt und gewährt, was der Code sagt, auch wenn eine Zeile
+  gleichen Namens existiert.
+- **Niemand definiert eine Rolle über das hinaus, was er hält.** Eine Rolle zu
+  definieren gewährt ihre Scopes jedem, der sie hält; wer sie schreibt, muss also
+  jeden Scope halten, den die Rolle auflistet, vor und nach der Änderung. Rollen
+  zu schreiben erfordert `users:write`; ein Admin hält jeden Scope.
+- **Eine Rolle listet nur Scopes, die existieren**, und keinen Scope der
+  Datenebene: die Regeln, denen eine deklarierte Rolle unterliegt.
+
+Im Admin-Panel wählt das Feld `roles` der Benutzertabelle aus diesen und den
+deklarierten Rollen. Eine Spalte, die auf eigene Werte beschränkt ist
+(`col.text({ enum: [...] }).array()`), behält ihre Liste. Eine Rolle, die
+niemand definiert hat, bleibt ein Name, den Row-Level-Security erkennen kann.
 
 ## App-Scopes
 

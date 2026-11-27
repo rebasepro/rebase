@@ -1,5 +1,5 @@
 ---
-sourceHash: 0496dc717e6c7873
+sourceHash: 3ade348460459f69
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -232,10 +232,10 @@ de esto. Consulte [Roles y scopes](/docs/backend/roles-and-scopes/).
 | `PATCH` | `/api/admin/webhooks/:id` | `database:write` | Actualiza un webhook de base de datos |
 | `DELETE` | `/api/admin/webhooks/:id` | `database:write` | Elimina un webhook de base de datos |
 | `POST` | `/api/admin/webhooks/:id/test` | `database:write` | Envía una entrega de prueba en vivo a un endpoint de webhook configurado |
-| `GET` | `/api/admin/roles` | `users:read` | Lista los roles y scopes de RBAC sin código de `rebase.roles` |
-| `POST` | `/api/admin/roles` | `users:write` | Crea o actualiza un rol de RBAC sin código |
-| `PUT` | `/api/admin/roles/:name` | `users:write` | Actualiza un rol de RBAC sin código |
-| `DELETE` | `/api/admin/roles/:name` | `users:write` | Elimina un rol de RBAC sin código |
+| `GET` | `/api/admin/roles` | `users:read` | Lista `admin`, los roles declarados en el código y los creados en tiempo de ejecución en `rebase.roles`, con sus scopes y su origen |
+| `POST` | `/api/admin/roles` | `users:write` | Crea o actualiza un rol creado en tiempo de ejecución. Se rechaza para un rol declarado en el código, un scope del plano de datos o desconocido, o un scope que quien llama no tiene |
+| `PUT` | `/api/admin/roles/:name` | `users:write` | Actualiza un rol creado en tiempo de ejecución, con las mismas reglas |
+| `DELETE` | `/api/admin/roles/:name` | `users:write` | Elimina un rol creado en tiempo de ejecución del que quien llama tiene todos los scopes |
 | `GET` | `/api/admin/cron/jobs` | `cron:read` | Lista los trabajos programados SQL/HTTP sin código de `rebase.cron_jobs` |
 | `POST` | `/api/admin/cron/jobs` | `cron:write` | Crea un cron job programado de SQL o HTTP sin código. Un trabajo de SQL ejecuta su sentencia utilizando la propia conexión del servidor, por lo que también requiere `database:write` |
 | `PATCH` | `/api/admin/cron/jobs/:id` | `cron:write` | Actualiza un cron job programado sin código; un trabajo de SQL, o uno que pase a serlo, también requiere `database:write` |

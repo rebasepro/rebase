@@ -111,34 +111,34 @@ CREATE POLICY "tags_default_admin_write_delete" ON "public"."tags" AS PERMISSIVE
 
 ALTER TABLE "rebase"."users" ENABLE ROW LEVEL SECURITY;
 
-DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_select_5f32f06_ar_c118f1a5' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY "users_select_5f32f06_ar_c118f1a5" ON "rebase"."users"'; END IF; END $rebase_companion$;
+DROP POLICY IF EXISTS "users_select_5f32f06_ar_c118f1a5" ON "rebase"."users";
 DROP POLICY IF EXISTS "users_select_5f32f06" ON "rebase"."users";
-CREATE POLICY "users_select_5f32f06" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "rebase_admin" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));
-DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_insert_3561e70_0_ar_256f49d5' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY "users_insert_3561e70_0_ar_256f49d5" ON "rebase"."users"'; END IF; END $rebase_companion$;
+CREATE POLICY "users_select_5f32f06" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "public" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));
+DROP POLICY IF EXISTS "users_insert_3561e70_0_ar_256f49d5" ON "rebase"."users";
 DROP POLICY IF EXISTS "users_insert_3561e70_0" ON "rebase"."users";
-CREATE POLICY "users_insert_3561e70_0" ON "rebase"."users" AS PERMISSIVE FOR INSERT TO "rebase_admin" WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));
-DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_update_3561e70_1_ar_5be2f8fb' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY "users_update_3561e70_1_ar_5be2f8fb" ON "rebase"."users"'; END IF; END $rebase_companion$;
+CREATE POLICY "users_insert_3561e70_0" ON "rebase"."users" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));
+DROP POLICY IF EXISTS "users_update_3561e70_1_ar_5be2f8fb" ON "rebase"."users";
 DROP POLICY IF EXISTS "users_update_3561e70_1" ON "rebase"."users";
-CREATE POLICY "users_update_3561e70_1" ON "rebase"."users" AS PERMISSIVE FOR UPDATE TO "rebase_admin" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));
-DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_delete_3561e70_2_ar_40c56324' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY "users_delete_3561e70_2_ar_40c56324" ON "rebase"."users"'; END IF; END $rebase_companion$;
+CREATE POLICY "users_update_3561e70_1" ON "rebase"."users" AS PERMISSIVE FOR UPDATE TO "public" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));
+DROP POLICY IF EXISTS "users_delete_3561e70_2_ar_40c56324" ON "rebase"."users";
 DROP POLICY IF EXISTS "users_delete_3561e70_2" ON "rebase"."users";
-CREATE POLICY "users_delete_3561e70_2" ON "rebase"."users" AS PERMISSIVE FOR DELETE TO "rebase_admin" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_delete_3561e70_2" ON "rebase"."users" AS PERMISSIVE FOR DELETE TO "public" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "users" to drop these and own its RLS outright.
-DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_read_ar_b3a52ae4' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY "users_default_admin_read_ar_b3a52ae4" ON "rebase"."users"'; END IF; END $rebase_companion$;
+DROP POLICY IF EXISTS "users_default_admin_read_ar_b3a52ae4" ON "rebase"."users";
 DROP POLICY IF EXISTS "users_default_admin_read" ON "rebase"."users";
-CREATE POLICY "users_default_admin_read" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "rebase_admin" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));
+CREATE POLICY "users_default_admin_read" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "public" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "users" to drop these and own its RLS outright.
-DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_write_insert_ar_f5b0fae5' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY "users_default_admin_write_insert_ar_f5b0fae5" ON "rebase"."users"'; END IF; END $rebase_companion$;
+DROP POLICY IF EXISTS "users_default_admin_write_insert_ar_f5b0fae5" ON "rebase"."users";
 DROP POLICY IF EXISTS "users_default_admin_write_insert" ON "rebase"."users";
-CREATE POLICY "users_default_admin_write_insert" ON "rebase"."users" AS PERMISSIVE FOR INSERT TO "rebase_admin" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));
-DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_write_update_ar_687e5ca3' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY "users_default_admin_write_update_ar_687e5ca3" ON "rebase"."users"'; END IF; END $rebase_companion$;
+CREATE POLICY "users_default_admin_write_insert" ON "rebase"."users" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));
+DROP POLICY IF EXISTS "users_default_admin_write_update_ar_687e5ca3" ON "rebase"."users";
 DROP POLICY IF EXISTS "users_default_admin_write_update" ON "rebase"."users";
-CREATE POLICY "users_default_admin_write_update" ON "rebase"."users" AS PERMISSIVE FOR UPDATE TO "rebase_admin" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));
-DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_write_delete_ar_7e609e9b' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY "users_default_admin_write_delete_ar_7e609e9b" ON "rebase"."users"'; END IF; END $rebase_companion$;
+CREATE POLICY "users_default_admin_write_update" ON "rebase"."users" AS PERMISSIVE FOR UPDATE TO "public" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));
+DROP POLICY IF EXISTS "users_default_admin_write_delete_ar_7e609e9b" ON "rebase"."users";
 DROP POLICY IF EXISTS "users_default_admin_write_delete" ON "rebase"."users";
-CREATE POLICY "users_default_admin_write_delete" ON "rebase"."users" AS PERMISSIVE FOR DELETE TO "rebase_admin" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));
+CREATE POLICY "users_default_admin_write_delete" ON "rebase"."users" AS PERMISSIVE FOR DELETE TO "public" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "users" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "users_default_self_read_ar_28580e2e" ON "rebase"."users";

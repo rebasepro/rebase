@@ -1,5 +1,5 @@
 ---
-sourceHash: 0496dc717e6c7873
+sourceHash: 3ade348460459f69
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend bereitstellt – Daten, Auth, Storage, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -229,10 +229,10 @@ eine Tabelle beschränkter Schlüssel hat auf nichts davon Zugriff. Siehe [Rolle
 | `PATCH` | `/api/admin/webhooks/:id` | `database:write` | Aktualisiert einen Datenbank-Webhook |
 | `DELETE` | `/api/admin/webhooks/:id` | `database:write` | Löscht einen Datenbank-Webhook |
 | `POST` | `/api/admin/webhooks/:id/test` | `database:write` | Sendet eine Live-Testzustellung an einen konfigurierten Webhook-Endpunkt |
-| `GET` | `/api/admin/roles` | `users:read` | Listet Zero-Code-RBAC-Rollen und -Scopes aus `rebase.roles` auf |
-| `POST` | `/api/admin/roles` | `users:write` | Erstellt oder aktualisiert eine Zero-Code-RBAC-Rolle |
-| `PUT` | `/api/admin/roles/:name` | `users:write` | Aktualisiert eine Zero-Code-RBAC-Rolle |
-| `DELETE` | `/api/admin/roles/:name` | `users:write` | Löscht eine Zero-Code-RBAC-Rolle |
+| `GET` | `/api/admin/roles` | `users:read` | Listet `admin`, die im Code deklarierten und die zur Laufzeit in `rebase.roles` erstellten Rollen auf, mit ihren Scopes und ihrer Herkunft |
+| `POST` | `/api/admin/roles` | `users:write` | Erstellt oder aktualisiert eine zur Laufzeit erstellte Rolle. Abgelehnt für eine im Code deklarierte Rolle, einen Scope der Datenebene oder einen unbekannten, oder einen Scope, den der Aufrufer nicht hält |
+| `PUT` | `/api/admin/roles/:name` | `users:write` | Aktualisiert eine zur Laufzeit erstellte Rolle, nach denselben Regeln |
+| `DELETE` | `/api/admin/roles/:name` | `users:write` | Löscht eine zur Laufzeit erstellte Rolle, deren Scopes der Aufrufer alle hält |
 | `GET` | `/api/admin/cron/jobs` | `cron:read` | Listet geplante Zero-Code-SQL/HTTP-Jobs aus `rebase.cron_jobs` auf |
 | `POST` | `/api/admin/cron/jobs` | `cron:write` | Erstellt einen geplanten Zero-Code-SQL- oder -HTTP-Cron-Job. Ein SQL-Job führt seine Anweisung über die servereigene Verbindung aus, weshalb zusätzlich `database:write` erforderlich ist |
 | `PATCH` | `/api/admin/cron/jobs/:id` | `cron:write` | Aktualisiert einen geplanten Zero-Code-Cron-Job; ein SQL-Job (oder ein Job, der zu einem wird) erfordert zusätzlich `database:write` |

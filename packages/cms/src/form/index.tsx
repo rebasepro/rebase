@@ -6,6 +6,7 @@ export type { EntityFormBindingProps } from "./EntityFormBinding";
 
 export { SelectFieldBinding } from "./field_bindings/SelectFieldBinding";
 export { MultiSelectFieldBinding } from "./field_bindings/MultiSelectFieldBinding";
+export { RolesSelectFieldBinding } from "./field_bindings/RolesSelectFieldBinding";
 export { ArrayOfReferencesFieldBinding } from "./field_bindings/ArrayOfReferencesFieldBinding";
 export { StorageUploadFieldBinding } from "./field_bindings/StorageUploadFieldBinding";
 export { TextFieldBinding } from "./field_bindings/TextFieldBinding";

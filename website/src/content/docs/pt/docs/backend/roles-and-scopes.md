@@ -1,5 +1,5 @@
 ---
-sourceHash: d68196665de50636
+sourceHash: 776c8068db7e477b
 title: Papéis e escopos
 sidebar_label: Papéis e escopos
 description: "O que um chamador pode fazer: o plano de dados que cada pessoa detém, o plano de administração concedido por papéis, os escopos que um aplicativo declara para si mesmo e como cada credencial os carrega."
@@ -142,6 +142,28 @@ const { roles } = await client.admin.listRoles();
 // [{ id: "admin", name: "Admin", scopes: [...], builtIn: true },
 //  { id: "support", name: "Support", scopes: ["users:read", "users:write", "logs:read"], builtIn: false }, …]
 ```
+
+## Papéis criados em tempo de execução
+
+Além dos papéis declarados no código, um projeto com a autenticação integrada
+pode manter papéis no seu banco de dados, em `rebase.roles`: criados em Users &
+roles no Studio ou com `POST /api/admin/roles`. Cada um é um nome com os escopos
+que concede, e um deles pode ser o papel que todo novo cadastro recebe.
+
+- **Um papel declarado prevalece.** Um papel declarado no código é somente
+  leitura em tempo de execução e concede o que o código diz mesmo quando existe
+  uma linha com o mesmo nome.
+- **Ninguém define um papel além do que tem.** Definir um papel concede seus
+  escopos a todos que o têm, então quem o grava precisa ter cada escopo que o
+  papel lista, antes e depois da mudança. Gravar papéis exige `users:write`; um
+  administrador tem todos os escopos.
+- **Um papel lista só escopos que existem**, e nenhum escopo do plano de dados:
+  as regras a que um papel declarado está sujeito.
+
+No painel de administração, o campo `roles` da tabela de usuários escolhe entre
+esses papéis e os declarados. Uma coluna fechada em valores próprios
+(`col.text({ enum: [...] }).array()`) mantém sua lista. Um papel que ninguém
+definiu continua sendo um nome que a row-level security pode reconhecer.
 
 ## Escopos da aplicação
 

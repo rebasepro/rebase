@@ -17,6 +17,7 @@ import {
     DEFAULT_DATA_SOURCE_KEY,
     type HistoryConfig,
     InitializedDriver,
+    type BuiltInTableSpec,
     type DatabaseAdapterInitConfig,
     RealtimeProvider,
     resourceEnvSuffix,
@@ -34,7 +35,7 @@ import { buildTableRegistry } from "./model/build-registry";
 import { refreshRelationalSchema } from "./model/refresh-relational-schema";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
-import { createEmailService, type EmailConfig, type EmailService, implicitAuthTableClash, implicitAuthTableClashMessage, logger } from "@rebasepro/server";
+import { createEmailService, type EmailConfig, type EmailService, builtInTableClash, builtInTableClashMessage, logger } from "@rebasepro/server";
 import { declaredSchemaOf, sqlRows } from "@rebasepro/common";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
 import { assertAuthSchemaCompatible, probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
@@ -695,39 +696,43 @@ interface DerivedTables {
 }
 
 /**
- * `derived` with built-in auth's own table added (`DatabaseAdapterInitConfig.authTable`),
- * read back from the catalogue like a declared table. Unchanged when there is
- * none, when a derived table takes its name (said, with the way out), and when
- * the database has no such table yet — auth creates it, and the next start or
- * reload serves it.
+ * `derived` with built-in auth's tables added (`DatabaseAdapterInitConfig.builtInTables`:
+ * its users and its roles), each read back from the catalogue like a declared
+ * table. A built-in table is left out when a derived table takes its name
+ * (said, with the way out) and when the database has no such table yet — the
+ * next start or schema reload serves it.
  */
-async function serveAuthTableBeside(
+async function serveBuiltInTablesBeside(
     client: import("pg").Pool,
-    authTable: CompiledTable | undefined,
+    builtIns: readonly BuiltInTableSpec[] | undefined,
     defaultSchema: string,
     derived: DerivedTables
 ): Promise<DerivedTables> {
-    if (!authTable) return derived;
-    const clash = implicitAuthTableClash(authTable.descriptor, derived.descriptors);
-    if (clash) {
-        logger.warn(implicitAuthTableClashMessage(authTable.descriptor, clash));
-        return derived;
+    let served = derived;
+    for (const builtIn of builtIns ?? []) {
+        const own = builtIn.table.descriptor;
+        const clash = builtInTableClash(own, served.descriptors);
+        if (clash) {
+            logger.warn(builtInTableClashMessage(builtIn, clash));
+            continue;
+        }
+        const catalogue = await readCatalogueSchema({ client, tables: [own], defaultSchema });
+        if (catalogue.missing.length > 0) {
+            logger.info(
+                `[PostgresRegistry] ${catalogue.missing.join(", ")} does not exist yet; ` +
+                `${builtIn.noun.toLowerCase()} are served as a table from the next start or schema reload.`
+            );
+            continue;
+        }
+        patchPgNumericToNumber(catalogue.tables);
+        served = {
+            descriptors: [...served.descriptors, own],
+            compiled: [...served.compiled, builtIn.table],
+            tables: { ...served.tables, ...catalogue.tables },
+            relations: { ...served.relations, ...catalogue.relations }
+        };
     }
-    const catalogue = await readCatalogueSchema({ client, tables: [authTable.descriptor], defaultSchema });
-    if (catalogue.missing.length > 0) {
-        logger.info(
-            `[PostgresRegistry] The auth table ${catalogue.missing.join(", ")} does not exist yet; ` +
-            "users are served as a table from the next start or schema reload."
-        );
-        return derived;
-    }
-    patchPgNumericToNumber(catalogue.tables);
-    return {
-        descriptors: [...derived.descriptors, authTable.descriptor],
-        compiled: [...derived.compiled, authTable],
-        tables: { ...derived.tables, ...catalogue.tables },
-        relations: { ...derived.relations, ...catalogue.relations }
-    };
+    return served;
 }
 
 /**
@@ -875,10 +880,10 @@ export async function openPostgresDriver(
             buildBaasSchema(schema.tablesMap, pgSchemaName, introspectedDescriptors));
         if (introspectedTables) patchPgNumericToNumber(introspectedTables);
 
-        // Built-in auth's own table, which lives outside the derived schema:
-        // served beside what the database describes, so users are a table
-        // here as in a project that declares them.
-        const withAuth = await serveAuthTableBeside(rawClient, config.authTable, pgSchemaName, {
+        // Built-in auth's tables, which live outside the derived schema:
+        // served beside what the database describes, so users and roles are
+        // tables here as in a project that declares its own.
+        const withAuth = await serveBuiltInTablesBeside(rawClient, config.builtInTables, pgSchemaName, {
             descriptors: introspectedDescriptors,
             compiled: introspectedCompiled,
             tables: introspectedTables,
@@ -2060,7 +2065,7 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         const derived = buildBaasSchema(schema.tablesMap, pgSchemaName, servable.tables);
         patchPgNumericToNumber(derived.tables);
         const { descriptors: nextDescriptors, compiled: nextCompiled, tables: nextTables, relations: nextRelations } =
-            await serveAuthTableBeside(rawClient, config.authTable, pgSchemaName, {
+            await serveBuiltInTablesBeside(rawClient, config.builtInTables, pgSchemaName, {
                 descriptors: servable.tables,
                 compiled: servable.compiled,
                 tables: derived.tables,

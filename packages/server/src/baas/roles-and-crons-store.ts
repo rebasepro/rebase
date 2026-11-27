@@ -2,15 +2,19 @@ import { randomUUID } from "node:crypto";
 import { Hono, type Context } from "hono";
 import {
     ADMIN_ROLE,
+    ADMIN_SCOPES,
     isAdminScope,
+    isDataPlaneScope,
     parseScope,
+    scopesBeyond,
     summarizeRoles,
+    validateScopes,
     type AccessModel,
     type SQLAdmin
 } from "@rebasepro/types";
 import { ApiError, errorHandler } from "../api/errors";
 import type { HonoEnv } from "../api/types";
-import { hasScope, scopeMissing } from "../auth/access";
+import { callerScopes, hasScope, scopeMissing } from "../auth/access";
 import type { CronScheduler } from "../cron/cron-scheduler";
 import { validateCronExpression } from "../cron/cron-scheduler";
 import { createOutboundPost } from "../services/outbound-post";
@@ -142,11 +146,78 @@ export function createRolesAdminRoutes(
     options?: {
         onChanged?: () => Promise<void> | void;
         getAccessModel?: () => AccessModel;
+        /**
+         * The roles and scopes declared in code (`auth.roles`, `auth.scopes`):
+         * a declared role is read-only here, and a role made here may list
+         * only scopes that exist.
+         */
+        getCodeModel?: () => AccessModel;
         codeDefaultRole?: string;
     }
 ): Hono<HonoEnv> {
     const rolesRouter = new Hono<HonoEnv>();
     rolesRouter.onError(errorHandler);
+
+    /**
+     * Who may define a role, and what a role may hold. A role's scopes are
+     * what everyone who holds it gets, so defining one is granting them:
+     *
+     * - a role declared in code is read-only — it changes in backend/schema;
+     * - every scope exists (an admin-plane scope, or an app scope the code
+     *   declares), and none is a data-plane scope, which every signed-in
+     *   person holds already — the rules a declared role is held to;
+     * - the caller holds every scope the role grants, before and after the
+     *   change: `users:write` lets a support role manage accounts, not mint
+     *   itself `database:write` by editing a role it holds.
+     */
+    const assertMayDefineRole = (
+        c: Context<HonoEnv>,
+        name: string,
+        scopes: readonly string[],
+        current?: StoredRole,
+        deleting = false
+    ): void => {
+        const code = options?.getCodeModel?.();
+        if (name === ADMIN_ROLE && !deleting) {
+            throw ApiError.badRequest("The \"admin\" role is built in: it holds every scope, and cannot be defined here.", "INVALID_INPUT");
+        }
+        // Deleting a row a declaration shadows only clears it away.
+        if (!deleting && code && Object.prototype.hasOwnProperty.call(code.roles, name)) {
+            throw ApiError.badRequest(
+                `Role "${name}" is declared in code (auth.roles on the users table), so it is read-only here. ` +
+                    "Change it in backend/schema.",
+                "INVALID_INPUT"
+            );
+        }
+        const dataPlane = scopes.filter(scope => isDataPlaneScope(parseScope(scope)?.scope ?? ""));
+        if (dataPlane.length > 0) {
+            throw ApiError.badRequest(
+                `Role "${name}" lists ${dataPlane.join(", ")}. Every signed-in person already holds the data plane; ` +
+                    "what they may do with rows is each table's `rls`. List admin-plane and app scopes only.",
+                "INVALID_INPUT"
+            );
+        }
+        const problems = validateScopes(scopes, code);
+        if (problems.length > 0) {
+            const appScopes = Object.keys(code?.scopes ?? {});
+            throw ApiError.badRequest(
+                `Role "${name}" lists ${problems.map(p => `"${p.scope}" (${p.reason})`).join(", ")}. ` +
+                    `A role's scopes are ${[...ADMIN_SCOPES, ...appScopes].join(", ")}; an app scope is declared in auth.scopes on the users table.`,
+                "INVALID_INPUT",
+                { problems }
+            );
+        }
+        const beyond = scopesBeyond([...new Set([...scopes, ...(current?.scopes ?? [])])], callerScopes(c));
+        if (beyond.length > 0) {
+            throw new ApiError(403, "ROLE_EXCEEDS_CALLER",
+                `Role "${name}" ${current ? "holds or would hold" : "would hold"} ${beyond.join(", ")}, which you do not, so you cannot define it.`,
+                { beyond });
+        }
+    };
+    const storedRole = async (name: string): Promise<StoredRole | undefined> =>
+        (await store.list()).find(role => role.name === name);
+    const bodyScopes = (body: Record<string, unknown>): string[] =>
+        Array.isArray(body.scopes) ? body.scopes.filter((s): s is string => typeof s === "string") : [];
 
     rolesRouter.get("/", async (c) => {
         const stored = await store.list();
@@ -162,8 +233,11 @@ export function createRolesAdminRoutes(
             });
         }
         const summaries = summarizeRoles(model);
+        const code = options?.getCodeModel?.();
         const roles = summaries.map(summary => {
-            const dbRole = storedByName.get(summary.id);
+            const declared = summary.id !== ADMIN_ROLE && code !== undefined && Object.prototype.hasOwnProperty.call(code.roles, summary.id);
+            // A declared role is the declaration's, whatever row shares its name.
+            const dbRole = declared ? undefined : storedByName.get(summary.id);
             const source = summary.id === ADMIN_ROLE
                 ? ("built-in" as const)
                 : dbRole
@@ -187,10 +261,12 @@ export function createRolesAdminRoutes(
     rolesRouter.post("/", async (c) => {
         const body: unknown = await c.req.json().catch(() => undefined);
         if (!isRecord(body)) throw ApiError.badRequest("Expected a JSON role object.", "INVALID_INPUT");
+        const name = typeof body.name === "string" ? body.name.trim() : "";
+        assertMayDefineRole(c, name, bodyScopes(body), await storedRole(name));
         const role = await store.upsert({
-            name: typeof body.name === "string" ? body.name : "",
+            name,
             description: typeof body.description === "string" ? body.description : null,
-            scopes: Array.isArray(body.scopes) ? body.scopes.filter((s): s is string => typeof s === "string") : [],
+            scopes: bodyScopes(body),
             isDefault: body.isDefault === true,
             assignable: body.assignable !== false
         });
@@ -202,10 +278,11 @@ export function createRolesAdminRoutes(
         const name = c.req.param("name");
         const body: unknown = await c.req.json().catch(() => undefined);
         if (!isRecord(body)) throw ApiError.badRequest("Expected a JSON role object.", "INVALID_INPUT");
+        assertMayDefineRole(c, name, bodyScopes(body), await storedRole(name));
         const role = await store.upsert({
             name,
             description: typeof body.description === "string" ? body.description : null,
-            scopes: Array.isArray(body.scopes) ? body.scopes.filter((s): s is string => typeof s === "string") : [],
+            scopes: bodyScopes(body),
             isDefault: body.isDefault === true,
             assignable: body.assignable !== false
         });
@@ -215,6 +292,8 @@ export function createRolesAdminRoutes(
 
     rolesRouter.delete("/:name", async (c) => {
         const name = c.req.param("name");
+        const current = await storedRole(name);
+        if (current) assertMayDefineRole(c, name, [], current, true);
         const deleted = await store.remove(name);
         if (!deleted) throw ApiError.notFound(`Role "${name}" not found.`);
         await options?.onChanged?.();

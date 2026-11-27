@@ -142,6 +142,27 @@ const { roles } = await client.admin.listRoles();
 //  { id: "support", name: "Support", scopes: ["users:read", "users:write", "logs:read"], builtIn: false }, …]
 ```
 
+## Roles made at runtime
+
+Beside the roles declared in code, a project on built-in auth can keep roles in
+its database, in `rebase.roles`: made in the Studio's Users & roles, or with
+`POST /api/admin/roles`. Each is a name and the scopes it grants, and one may be
+the role every new registrant gets.
+
+- **A declared role wins.** A role declared in code is read-only at runtime, and
+  grants what the code says even where a row of the same name exists.
+- **Nobody defines a role beyond what they hold.** Defining a role grants its
+  scopes to everyone who holds it, so the caller must hold every scope the role
+  lists, before and after the change. Writing roles needs `users:write`; an
+  admin holds every scope.
+- **A role lists only scopes that exist**, and no data-plane scope: the rules a
+  declared role is held to.
+
+In the admin panel, the users table's `roles` field picks from these roles and
+the declared ones. A column closed to values of its own
+(`col.text({ enum: [...] }).array()`) keeps its list. A role nobody defined is
+still a name row-level security can match.
+
 ## App scopes
 
 An app can name its own operations as scopes, under `auth.scopes`:

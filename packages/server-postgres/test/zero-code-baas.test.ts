@@ -522,7 +522,10 @@ describe("Zero-code BaaS foundation (PGlite)", () => {
                 body: JSON.stringify({
                     name: "member",
                     description: "Standard workspace member",
-                    scopes: ["data:read", "data:write"],
+                    // A name row-level security matches: the data plane is
+                    // every signed-in person's already, and a signup default
+                    // holds no admin-plane scope.
+                    scopes: [],
                     isDefault: true,
                     assignable: true
                 })
