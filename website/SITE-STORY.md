@@ -20,9 +20,15 @@ and beat table, §6 additions, and §7, which is new.
 > back office stops being a project" and banned "BaaS" in copy, which anchored
 > visitors on CMS/admin tooling. Rebase's focus is the Postgres BaaS (backend
 > services + Rebase Cloud on Hetzner in Europe), with the admin panel (CMS +
-> Studio) as a built-in layer over the same API. Primary CTAs across the header,
-> hero and `ClosingCta` lead to Rebase Cloud (`/cloud`) and the CLI; the hosted
-> panel demo (`demo.rebase.pro`) stays secondary.
+> Studio) as a built-in layer over the same API.
+>
+> Revised 2026-11-25: Primary CTAs across the header, hero, deep heroes and
+> `ClosingCta` are gated by `CLOUD_FLAGS.selfServe`. While Rebase Cloud is in
+> private beta (`selfServe: false`), primary CTAs never route visitors into a
+> waitlist — they lead with the interactive CLI init bar (`pnpm dlx` / `npx`)
+> and the live hosted demo (`demo.rebase.pro`), while Rebase Cloud stays visible
+> in the nav, Chapter 03 on `/`, the third closing lane, `/cloud` and `/pricing`.
+> Flipping `CLOUD_FLAGS.selfServe` promotes Cloud sign-up across those surfaces.
 
 > Revised 2026-09-12. This section used to end "Two products, one definition.
 > That is the whole story, and every page is a view onto it", and the home page

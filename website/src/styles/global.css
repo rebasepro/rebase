@@ -1102,6 +1102,50 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(var(--tone-max-rgb) / 
     color: #090a0c;
 }
 
+/* Interactive CLI init bar on the coral close: keep the bar ground bare coral
+   (so ink holds 6.07:1) and paint the active runner pill solid near-black with
+   white text (18.9:1), matching the coral slab's primary button material. */
+.ground-close .cli-init-bar {
+    background: transparent;
+    border-color: rgb(10 10 10 / 0.24);
+    box-shadow: none;
+}
+
+.ground-close .cli-init-bar :is(code, code span, .cli-init-runner-text, .cli-init-pkg-text) {
+    color: #090a0c;
+}
+
+.ground-close .cli-init-copy {
+    background: transparent;
+    border-color: transparent;
+    color: #090a0c;
+}
+
+.ground-close .cli-init-copy:hover {
+    background: rgb(10 10 10 / 0.08);
+    color: #090a0c;
+}
+
+.ground-close .cli-init-chip {
+    background: rgb(10 10 10 / 0.08);
+    border-color: rgb(10 10 10 / 0.24);
+    color: #090a0c;
+}
+
+.ground-close .cli-runner-btn {
+    color: #090a0c;
+}
+
+.ground-close .cli-runner-btn:hover {
+    background: rgb(10 10 10 / 0.08);
+    color: #090a0c;
+}
+
+.ground-close .cli-runner-btn[aria-pressed="true"] {
+    background: #090a0c;
+    color: #fff;
+}
+
 /* The "PRIVATE BETA" badge on the Cloud lane. A tint of the ground rather than
    a second hue, so it reads as a status chip and not as an accent competing
    with coral.
@@ -1763,6 +1807,69 @@ h6 {
 }
 
 .ground-close .copy-btn[data-copied] {
+    color: #090a0c;
+}
+
+/* `<CliInitBar />`: the copy button already meets the 42–48px target size, so
+   suppress the 6px pseudo-element bleed that would otherwise overlap the
+   adjacent `pnpm | npm` runner buttons. */
+.cli-init-copy::after {
+    inset: 0;
+}
+
+.cli-runner-btn {
+    color: var(--tone-400);
+}
+
+.cli-runner-btn:hover {
+    color: var(--tone-max);
+}
+
+.cli-runner-btn[aria-pressed="true"] {
+    background: rgb(var(--tone-max-rgb) / 0.1);
+    color: var(--tone-max);
+}
+
+.cli-init-runner-text {
+    color: var(--color-emerald-400);
+}
+
+.cli-init-pkg-text {
+    color: var(--color-primary-light);
+}
+
+.cli-init-copy[data-copied] .cli-init-chip {
+    border-color: rgb(52 211 153 / 0.55);
+    background: rgb(52 211 153 / 0.14);
+    color: var(--color-emerald-400);
+}
+
+.cli-init-copy[data-failed] .cli-init-chip {
+    border-color: rgb(248 113 113 / 0.55);
+    color: var(--color-red-400);
+}
+
+[data-theme="light"] .cli-init-runner-text {
+    color: #047857;
+}
+
+[data-theme="light"] .cli-init-pkg-text {
+    color: var(--color-primary-dark);
+}
+
+[data-theme="light"] .cli-init-copy[data-copied],
+[data-theme="light"] .cli-init-copy[data-copied] .cli-init-chip {
+    color: #047857;
+}
+
+[data-theme="light"] .cli-init-copy[data-copied] .cli-init-chip {
+    border-color: rgb(4 120 87 / 0.45);
+    background: rgb(4 120 87 / 0.1);
+}
+
+.ground-close .cli-init-copy[data-copied] .cli-init-chip {
+    border-color: rgb(10 10 10 / 0.35);
+    background: rgb(10 10 10 / 0.16);
     color: #090a0c;
 }
 

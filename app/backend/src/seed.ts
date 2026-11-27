@@ -677,6 +677,34 @@ name }));
             "ml-retrieval": [16, 17, 8]
         };
 
+        // Each theme maps to a curated pair of hero covers (tactile studio + real objects)
+        // so visuals match the topic and consecutive posts in the same theme alternate
+        // instead of repeating thumbnails on the first screen.
+        const themeHeroFiles: Record<string, string[]> = {
+            postgres: ["hero_01_aluminum_stack.jpg", "hero_08_smoked_glass_discs.jpg"],
+            "frontend-arch": ["hero_11_ribbed_glass.jpg", "hero_07_modular_blocks.jpg"],
+            distributed: ["hero_04_ceramic_nodes.jpg", "hero_20_bw_stairs.jpg"],
+            devex: ["hero_16_woodworker_tools.jpg", "hero_12_analog_synth.jpg"],
+            typescript: ["hero_03_cobalt_marigold.jpg", "hero_09_ceramic_prisms.jpg"],
+            "auth-security": ["hero_05_emerald_locks.jpg", "hero_10_concrete_corridor.jpg"],
+            "api-design": ["hero_07_modular_blocks.jpg", "hero_01_aluminum_stack.jpg"],
+            "design-systems": ["hero_02_acrylic_swatches.jpg", "hero_13_colored_pencils.jpg"],
+            infrastructure: ["hero_10_concrete_corridor.jpg", "hero_08_smoked_glass_discs.jpg"],
+            "data-analytics": ["hero_03_cobalt_marigold.jpg", "hero_15_water_glass.jpg"],
+            migrations: ["hero_08_smoked_glass_discs.jpg", "hero_20_bw_stairs.jpg"],
+            mobile: ["hero_09_ceramic_prisms.jpg", "hero_19_bicycle_headlamp.jpg"],
+            testing: ["hero_17_analog_clock.jpg", "hero_01_aluminum_stack.jpg"],
+            teams: ["hero_14_cast_iron_teapot.jpg", "hero_02_acrylic_swatches.jpg"],
+            performance: ["hero_19_bicycle_headlamp.jpg", "hero_17_analog_clock.jpg"],
+            documentation: ["hero_18_vintage_typewriter.jpg", "hero_13_colored_pencils.jpg"],
+            "small-teams": ["hero_14_cast_iron_teapot.jpg", "hero_16_woodworker_tools.jpg"],
+            "product-eng": ["hero_12_analog_synth.jpg", "hero_15_water_glass.jpg"],
+            "open-source": ["hero_04_ceramic_nodes.jpg", "hero_18_vintage_typewriter.jpg"],
+            "ml-retrieval": ["hero_06_optical_prism.jpg", "hero_11_ribbed_glass.jpg"]
+        };
+        const availableHeroPaths = new Set(heroImagePaths);
+        const themePostCount: Record<string, number> = {};
+
         const postValues = [];
         const ptValues: { post_id: string; tag_id: string }[] = [];
 
@@ -701,11 +729,20 @@ value: pick(contentImagePaths) });
 value: section });
             }
 
+            const countForTheme = themePostCount[post.theme] ?? 0;
+            themePostCount[post.theme] = countForTheme + 1;
+            const themeCandidates = (themeHeroFiles[post.theme] ?? [])
+                .map(file => `posts/hero/${file}`)
+                .filter(p => availableHeroPaths.has(p));
+            const heroImage = themeCandidates.length > 0
+                ? themeCandidates[countForTheme % themeCandidates.length]
+                : heroImagePaths[i % heroImagePaths.length];
+
             postValues.push({
                 id: postIds[i],
                 title: post.title,
                 slug: post.slug,
-                hero_image: pick(heroImagePaths),
+                hero_image: heroImage,
                 excerpt: post.excerpt,
                 content: blocks,
                 status,

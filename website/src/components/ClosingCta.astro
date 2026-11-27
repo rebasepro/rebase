@@ -2,24 +2,17 @@
 /**
  * The closing CTA every page owes the reader.
  *
- * SITE-STORY §5: "Each page must answer its question, carry at least one live
- * demo, and end with the same CTA pair: Try the demo + `pnpm dlx @rebasepro/cli
- * init`." Twenty-four of thirty pages were ending without the command — every
- * `rebase-vs-*` page among them, which is where a developer arrives from a
- * search with the most intent in the whole funnel.
- *
- * Extracted from the hand-rolled block on /backend so the six pages that got it
- * right and the rest converge on one implementation. Heading and blurb are props
- * because each page closes in its own voice; the command and the demo link are
- * not, because that is the part the contract fixes.
- *
- * Drawn as a drafted chapter, like every section above it: the rule and its
- * label, the claim on the left, and the hero's own pair on the right — the
- * demo button and the command as a copy chip.
+ * SITE-STORY §5: every deep page closes with the CLI init command (with pnpm /
+ * npm toggle) and an immediately actionable primary CTA. While Rebase Cloud is
+ * in private beta (`!CLOUD_FLAGS.selfServe`), the primary button opens the live
+ * demo and Rebase Cloud stays a secondary link; once self-serve opens, Cloud
+ * takes the primary slot automatically.
  */
 import { getLangFromUrl, useTranslatedPath, useTranslations } from "../i18n/ui";
 import { DEMO_URL } from "../utils/links";
+import { CLOUD_FLAGS, offerKey } from "../data/cloud-offer";
 import ChapterRule from "./ChapterRule.astro";
+import CliInitBar from "./CliInitBar.astro";
 
 interface Props {
     /** Closing headline. Keep it a claim, not a label. */
@@ -29,7 +22,7 @@ interface Props {
     /** Distinguishes copy events per page in analytics. */
     trackId?: string;
     /**
-     * Where "Try the demo" goes. One destination site-wide: the hosted panel
+     * Where "Try live demo" goes. One destination site-wide: the hosted panel
      * itself. There is no interstitial page to land on first.
      */
     demoHref?: string;
@@ -38,15 +31,14 @@ interface Props {
 const lang = getLangFromUrl(Astro.url);
 const translatePath = useTranslatedPath(lang);
 const t = useTranslations(lang);
+const isCloudPage = Astro.url.pathname.replace(/\/$/, "").endsWith("/cloud");
 
 const {
-    title = t("cta.title"),
-    blurb = t("cta.closing.blurb"),
+    title = t(offerKey("cta.title")),
+    blurb = t(offerKey("cta.closing.blurb")),
     trackId = "page",
     demoHref = DEMO_URL,
 } = Astro.props;
-const COMMAND = "pnpm dlx @rebasepro/cli init";
-const [RUNNER, PACKAGE, VERB] = COMMAND.match(/^(\S+ \S+) (\S+) (\S+)$/)!.slice(1);
 ---
 
 <section class="py-chapter">
@@ -58,47 +50,75 @@ const [RUNNER, PACKAGE, VERB] = COMMAND.match(/^(\S+ \S+) (\S+) (\S+)$/)!.slice(
                 <p class="mt-4 max-w-xl text-lg text-tone-400">{blurb}</p>
             </div>
 
-            <div class="lg:col-span-6 flex flex-col gap-5 lg:items-end">
-                <button
-                    type="button"
-                    data-track-copy={`${trackId}-cta`}
-                    data-command={COMMAND}
-                    data-copy-done-label={t("copy.command.done")}
-                    class="copy-btn group inline-flex max-w-full items-center gap-3 rounded-lg border border-tone-max/12 bg-tone-max/[0.03] px-5 min-h-(--control-large) font-mono text-sm text-tone-200 transition-colors hover:border-tone-max/25 hover:bg-tone-max/[0.06] data-copied:border-emerald-400/60 data-copied:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    aria-label={`Copy "${COMMAND}" to the clipboard`}
-                    title="Copy to clipboard"
-                >
-                    <span class="select-none text-tone-500">$</span>
-                    <span class="truncate"><span class="text-emerald-400">{RUNNER}</span> <span class="text-primary-light">{PACKAGE}</span> <span class="text-tone-max">{VERB}</span></span>
-                    <span data-copy-label class="ml-2 rounded-md border border-tone-max/10 bg-tone-max/[0.06] px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.14em] text-tone-400">{t("copy.command")}</span>
-                </button>
+            <div class="lg:col-span-6 flex flex-col gap-4 lg:items-end">
+                <div class="flex w-full flex-col gap-2 lg:max-w-lg lg:items-end">
+                    <CliInitBar variant="hero" trackId={`${trackId}-cta`} class="w-full" />
+                    <p class="font-mono text-2xs text-tone-400">
+                        {t("hero.cli.reassurance")}
+                    </p>
+                </div>
 
                 <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
-                    <a href={translatePath("/cloud")}
-                       class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 min-h-(--control-large) text-base font-semibold text-white shadow-[0_8px_28px_-6px_rgb(0_112_244/0.65)] transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                       data-track id={`${trackId}-cta-cloud`}>
-                        {t("cta.button.cloud")}
-                        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none"
-                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M5 12h14"/>
-                            <path d="m12 5 7 7-7 7"/>
-                        </svg>
-                    </a>
-                    <a href={translatePath("/docs")}
-                       class="inline-flex items-center gap-x-2 text-tone-max hover:text-primary-light transition-colors font-semibold"
-                       data-track id={`${trackId}-cta-docs`}>
-                        {t("cta.button.docs")}
-                        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none"
-                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M5 12h14"/>
-                            <path d="m12 5 7 7-7 7"/>
-                        </svg>
-                    </a>
-                    <a href={demoHref} target="_blank" rel="noopener noreferrer"
-                       class="inline-flex items-center gap-x-2 text-tone-400 hover:text-tone-max transition-colors text-sm font-semibold"
-                       data-track id={`${trackId}-cta-demo`}>
-                        {t("cta.button.demo")}
-                    </a>
+                    {CLOUD_FLAGS.selfServe ? (
+                        <>
+                            <a href={translatePath("/cloud")}
+                               class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 min-h-(--control-large) text-base font-semibold text-white shadow-[0_8px_28px_-6px_rgb(0_112_244/0.65)] transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                               data-track id={`${trackId}-cta-cloud`}>
+                                {t("cta.button.cloud")}
+                                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M5 12h14"/>
+                                    <path d="m12 5 7 7-7 7"/>
+                                </svg>
+                            </a>
+                            <a href={translatePath("/docs")}
+                               class="inline-flex items-center gap-x-2 text-tone-max hover:text-primary-light transition-colors font-semibold"
+                               data-track id={`${trackId}-cta-docs`}>
+                                {t("cta.button.docs")}
+                                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M5 12h14"/>
+                                    <path d="m12 5 7 7-7 7"/>
+                                </svg>
+                            </a>
+                            <a href={demoHref} target="_blank" rel="noopener noreferrer"
+                               class="inline-flex items-center gap-x-2 text-tone-400 hover:text-tone-max transition-colors text-sm font-semibold"
+                               data-track id={`${trackId}-cta-demo`}>
+                                {t("cta.button.demo")}
+                            </a>
+                        </>
+                    ) : (
+                        <>
+                            <a href={demoHref} target="_blank" rel="noopener noreferrer"
+                               class="inline-flex items-center gap-x-2.5 rounded-lg bg-primary px-6 min-h-(--control-large) text-base font-semibold text-white shadow-[0_8px_28px_-6px_rgb(0_112_244/0.65)] transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                               data-track id={`${trackId}-cta-demo`}>
+                                <span class="dot text-emerald-300" aria-hidden="true"></span>
+                                {t("cta.button.demo")}
+                                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M5 12h14"/>
+                                    <path d="m12 5 7 7-7 7"/>
+                                </svg>
+                            </a>
+                            <a href={translatePath("/docs/getting-started/quickstart")}
+                               class="inline-flex items-center gap-x-2 text-tone-max hover:text-primary-light transition-colors font-semibold"
+                               data-track id={`${trackId}-cta-docs`}>
+                                {t("cta.lane.local.link")}
+                                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M5 12h14"/>
+                                    <path d="m12 5 7 7-7 7"/>
+                                </svg>
+                            </a>
+                            {!isCloudPage && (
+                                <a href={translatePath("/cloud")}
+                                   class="inline-flex items-center gap-x-2 text-tone-400 hover:text-tone-max transition-colors text-sm font-semibold"
+                                   data-track id={`${trackId}-cta-cloud`}>
+                                    {t("cloud.home.link.explore")}
+                                </a>
+                            )}
+                        </>
+                    )}
                 </div>
             </div>
         </div>

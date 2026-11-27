@@ -76,7 +76,7 @@ ${cleanHtml(tr("hero.subtitle"))}
    - ${inline(tr("whatsnew.parts.title"))}: ${cleanHtml(tr("whatsnew.parts.desc"))}
    - ${inline(tr("whatsnew.rows.title"))}: ${cleanHtml(tr("whatsnew.rows.desc"))}
 7. **Shipped, not promised** — ${inline(tr("showcase.title.part1") + " " + tr("showcase.title.part2"))}: ${cleanHtml(tr("showcase.subtitle"))}
-8. **It is yours** — ${inline(tr("cta.title"))}: ${cleanHtml(tr("opensource.desc"))}
+8. **It is yours** — ${inline(tr(offerKey("cta.title")))}: ${cleanHtml(tr("opensource.desc"))}
 
 ## Three adoption modes
 

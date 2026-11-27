@@ -4,11 +4,19 @@ import LanguageSelect from "./LanguageSelect.astro";
 import GitHubStarButton from "./GitHubStarButton.astro";
 import { getLangFromUrl, useTranslations, useTranslatedPath } from "../i18n/ui";
 import { DEMO_URL } from "../utils/links";
+import { CLOUD_FLAGS } from "../data/cloud-offer";
 
 const currentPath = Astro.url.pathname.replace(/\/$/, "");
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 const translatePath = useTranslatedPath(lang);
+
+// While Rebase Cloud is in private beta, route the header's primary action to
+// the instant live demo rather than a waitlist; flip automatically once
+// self-serve signup opens.
+const headerCtaHref = CLOUD_FLAGS.selfServe ? translatePath("/cloud") : DEMO_URL;
+const headerCtaExternal = !CLOUD_FLAGS.selfServe;
+const headerCtaLabel = CLOUD_FLAGS.selfServe ? t("nav.startCloud") : t("nav.tryDemo");
 
 // SVG path data for nav icons (Lucide-style, 24×24 viewBox)
 const iconSvgPaths: Record<string, string> = {
@@ -269,13 +277,16 @@ const flatNavLinks = [
             </button>
             <GitHubStarButton class="hidden sm:inline-flex" />
             <a
-                    href={translatePath("/cloud")}
+                    href={headerCtaHref}
+                    target={headerCtaExternal ? "_blank" : undefined}
+                    rel={headerCtaExternal ? "noopener noreferrer" : undefined}
                     class="hidden sm:inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary border border-transparent px-4 py-0 min-h-(--control-medium) text-sm font-semibold text-white shadow-sm hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow"
                     transition:name="start-building-button"
                     data-track
                     id="header-start-building-desktop"
             >
-                {t("nav.startCloud")}
+                {headerCtaExternal && <span class="dot text-emerald-300" aria-hidden="true"></span>}
+                {headerCtaLabel}
                 <svg
                   class="lucide lucide-arrow-right"
                   xmlns="http://www.w3.org/2000/svg"
@@ -366,12 +377,15 @@ const flatNavLinks = [
                     )
                 ))}
                 <a
-                        href={translatePath("/cloud")}
+                        href={headerCtaHref}
+                        target={headerCtaExternal ? "_blank" : undefined}
+                        rel={headerCtaExternal ? "noopener noreferrer" : undefined}
                         class="mt-8 w-full inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-4 text-xl font-semibold text-white shadow-lg hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow"
                         data-track
                         id="header-start-building-mobile-control"
                 >
-                    {t("nav.startCloud")}
+                    {headerCtaExternal && <span class="dot text-emerald-300" aria-hidden="true"></span>}
+                    {headerCtaLabel}
                     <svg
                       class="lucide lucide-arrow-right"
                       xmlns="http://www.w3.org/2000/svg"
@@ -414,12 +428,15 @@ const flatNavLinks = [
                     ))}
                 </div>
                 <a
-                        href={translatePath("/cloud")}
+                        href={headerCtaHref}
+                        target={headerCtaExternal ? "_blank" : undefined}
+                        rel={headerCtaExternal ? "noopener noreferrer" : undefined}
                         class="mt-8 w-full inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-4 text-xl font-semibold text-white shadow-lg hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow"
                         data-track
                         id="header-start-building-mobile-flat"
                 >
-                    {t("nav.startCloud")}
+                    {headerCtaExternal && <span class="dot text-emerald-300" aria-hidden="true"></span>}
+                    {headerCtaLabel}
                     <svg
                       class="lucide lucide-arrow-right"
                       xmlns="http://www.w3.org/2000/svg"

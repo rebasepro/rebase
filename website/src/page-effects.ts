@@ -12,57 +12,142 @@
 const COPY_CONFIRM_MS = 1800;
 const copyResetTimers = new WeakMap<Element, number>();
 const copyIdleLabels = new WeakMap<Element, string>();
+// Track last status text so VoiceOver announces consecutive copies even when
+// the message is identical (copy-button guidance: append \u00A0 on repeat).
+let lastCopyAnnouncement = "";
 
-function confirmCopy(button: HTMLElement) {
+function findCopyStatusRegion(button: HTMLElement): HTMLElement | null {
+  const bar = button.closest("[data-cli-init-bar]");
+  if (bar) return bar.querySelector<HTMLElement>("[data-copy-status]");
+  const next = button.nextElementSibling;
+  if (next instanceof HTMLElement && next.hasAttribute("data-copy-status")) return next;
+  return null;
+}
+
+function reportCopy(button: HTMLElement, ok: boolean) {
   const idle = button.querySelector("[data-copy-idle]");
   const done = button.querySelector("[data-copy-done]");
   const label = button.querySelector<HTMLElement>("[data-copy-label]");
+  const statusRegion = findCopyStatusRegion(button);
   // Read the idle label once per button, never mid-confirmation — a second
   // click inside the window used to save "Copied" as the idle text for good.
   if (label && !copyIdleLabels.has(button)) copyIdleLabels.set(button, label.textContent ?? "");
 
+  const pending = copyResetTimers.get(button);
+  if (pending) clearTimeout(pending);
+
+  delete button.dataset.copied;
+  delete button.dataset.failed;
+
+  const doneText = button.dataset.copyDoneLabel || "Copied";
+  const failText = button.dataset.copyFailLabel || "Copy failed";
+  const visibleMessage = ok ? doneText : failText;
+
   // The icons are <svg>, and `hidden` is an HTMLElement property: assigning it
   // on an SVGElement sets a plain JS field and changes nothing on screen. The
   // attribute is what the stylesheet reads.
-  button.dataset.copied = "";
-  if (idle && done) { idle.toggleAttribute("hidden", true); done.toggleAttribute("hidden", false); }
-  if (label) label.textContent = button.dataset.copyDoneLabel || "Copied";
+  if (ok) {
+    button.dataset.copied = "";
+    if (idle && done) { idle.toggleAttribute("hidden", true); done.toggleAttribute("hidden", false); }
+  } else {
+    button.dataset.failed = "";
+    if (idle && done) { idle.toggleAttribute("hidden", false); done.toggleAttribute("hidden", true); }
+  }
+  if (label) label.textContent = visibleMessage;
 
-  const pending = copyResetTimers.get(button);
-  if (pending) clearTimeout(pending);
+  if (statusRegion) {
+    statusRegion.textContent = "";
+    let announcement = visibleMessage;
+    if (announcement === lastCopyAnnouncement) announcement += "\u00A0";
+    lastCopyAnnouncement = announcement;
+    requestAnimationFrame(() => {
+      statusRegion.textContent = announcement;
+    });
+  }
+
   copyResetTimers.set(button, window.setTimeout(() => {
     delete button.dataset.copied;
+    delete button.dataset.failed;
     if (idle && done) { idle.toggleAttribute("hidden", false); done.toggleAttribute("hidden", true); }
     if (label) label.textContent = copyIdleLabels.get(button) ?? "";
+    if (statusRegion) statusRegion.textContent = "";
     copyResetTimers.delete(button);
   }, COPY_CONFIRM_MS));
 }
 
+// Package-manager toggle for `<CliInitBar />`: keeps every init bar on the page
+// in sync and remembers the visitor's runner (`pnpm` | `npm`) across routes.
+const CLI_RUNNER_KEY = "rb_pm";
+type CliRunner = "pnpm" | "npm";
+
+function applyCliRunner(runner: CliRunner) {
+  const prefix = runner === "npm" ? "npx" : "pnpm dlx";
+  document.querySelectorAll<HTMLElement>("[data-cli-init-bar]").forEach((bar) => {
+    const pkg = bar.dataset.cliPackage || "@rebasepro/cli";
+    const verb = bar.dataset.cliVerb || "init";
+    const command = `${prefix} ${pkg} ${verb}`;
+
+    const runnerText = bar.querySelector<HTMLElement>("[data-cli-runner-text]");
+    if (runnerText) runnerText.textContent = prefix;
+
+    const copyBtn = bar.querySelector<HTMLElement>(".copy-btn[data-command]");
+    if (copyBtn) copyBtn.dataset.command = command;
+
+    bar.querySelectorAll<HTMLButtonElement>("[data-cli-runner]").forEach((btn) => {
+      const active = btn.dataset.cliRunner === runner;
+      btn.setAttribute("aria-pressed", String(active));
+    });
+  });
+}
+
+function readSavedCliRunner(): CliRunner {
+  try {
+    return localStorage.getItem(CLI_RUNNER_KEY) === "npm" ? "npm" : "pnpm";
+  } catch {
+    return "pnpm";
+  }
+}
+
 document.addEventListener("click", (event) => {
+  const runnerBtn = (event.target as Element | null)?.closest<HTMLButtonElement>("[data-cli-runner]");
+  if (runnerBtn) {
+    const runner: CliRunner = runnerBtn.dataset.cliRunner === "npm" ? "npm" : "pnpm";
+    applyCliRunner(runner);
+    try {
+      localStorage.setItem(CLI_RUNNER_KEY, runner);
+    } catch {
+      /* storage disabled */
+    }
+    return;
+  }
+
   const button = (event.target as Element | null)?.closest<HTMLElement>(".copy-btn[data-command]");
   if (!button) return;
   const command = button.dataset.command!;
 
   // `navigator.clipboard` is undefined on a non-secure origin, and rejects
   // when the document is not focused — both leave the reader with a button
-  // that did nothing at all. Fall back to a selection copy.
+  // that did nothing at all. Fall back to a selection copy and report failure
+  // if neither path succeeds.
   const fallback = () => {
     const scratch = document.createElement("textarea");
     scratch.value = command;
     scratch.setAttribute("readonly", "");
-    scratch.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    scratch.style.cssText = "position:fixed;inset-block-start:0;opacity:0";
     document.body.appendChild(scratch);
     scratch.select();
+    let ok = false;
     try {
-      if (document.execCommand("copy")) confirmCopy(button);
+      ok = document.execCommand("copy");
     } catch {
-      /* nothing sensible left to try */
+      ok = false;
     }
     scratch.remove();
+    reportCopy(button, ok);
   };
 
   if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(command).then(() => confirmCopy(button), fallback);
+    navigator.clipboard.writeText(command).then(() => reportCopy(button, true), fallback);
   } else {
     fallback();
   }
@@ -70,6 +155,8 @@ document.addEventListener("click", (event) => {
 
 // Mouse spotlight effect for cards
 function initPageEffects() {
+  applyCliRunner(readSavedCliRunner());
+
   const cards = document.querySelectorAll("[data-spotlight-card]");
 
   cards.forEach(card => {

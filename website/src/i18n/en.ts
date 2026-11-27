@@ -11,7 +11,9 @@ export const en = {
   "hero.pillar.agents.desc": "Enforced in DB · rebase_user",
   "hero.title.part1": "The backend for your Postgres.",
   "hero.title.part2": "Built for your team. Safe for your agents.",
-  "hero.cta.demo": "Try the demo",
+  "hero.cta.demo": "Try live demo",
+  "hero.cli.reassurance": "No account · No Docker · Built-in local Postgres · MIT",
+  "cli.runner.label": "Package manager",
   // The services grid straight under the hero: every service, named the way a
   // developer searches for it, in the first scroll (2026-11-23).
   "caps.badge": "In the box",
@@ -34,6 +36,7 @@ export const en = {
   "rlscheck.cta": "See all 15 checks",
   "copy.command": "Copy",
   "copy.command.done": "Copied",
+  "copy.command.failed": "Copy failed",
   "social.title": "Built by the team behind FireCMS (10,000+ production apps). Running production backends in Europe today.",
   "trust.europe":
     "Made in Madrid by a company under European law. Run Rebase on your own servers — Hetzner, OVHcloud, Scaleway or bare metal — or have us operate it in Europe.",
@@ -145,8 +148,10 @@ export const en = {
   "showcase.case6.title": "Edith",
   "showcase.case6.desc":
     "A CRM the team can rebuild without a deploy: pipelines, tags, tasks and an automation canvas whose triggers, branches and actions are all rows in Postgres. Twenty-three tables generated the entire back office — no admin screens were written.",
-  "cta.title": "Deploy on Rebase Cloud, or run on your own Postgres.",
-  "cta.closing.blurb": "Start with managed Postgres and S3 storage in Europe, or scaffold locally with one command.",
+  "cta.title": "Run it locally in one command. Or open the live demo.",
+  "cta.title.open": "Deploy on Rebase Cloud, or run on your own Postgres.",
+  "cta.closing.blurb": "Built-in local Postgres, no Docker and no account — or click through a live backend and admin panel right now.",
+  "cta.closing.blurb.open": "Start with managed Postgres and S3 storage in Europe, or scaffold locally with one command.",
   // The close is a fork, not a fourth copy of the hero's install command. The
   // cloud lane offers access rather than a deploy button, because Rebase Cloud
   // opens in batches — see `cloud.status`, the one key every surface quotes.
@@ -266,7 +271,7 @@ export const en = {
   "cta.lane.cloud.link.open": "See the prices",
   "cta.eyebrow": "Get started",
   "cta.button.cloud": "Start on Cloud",
-  "cta.button.demo": "Try the demo",
+  "cta.button.demo": "Try live demo",
   "cta.button.docs": "Read the docs",
   "engine.plus": "And the rest of the backend, in the same server. None of it is a separate service to sign up for and wire together.",
   // The capability grid under the demos (2026-10-25). Every line names a
@@ -383,7 +388,7 @@ export const en = {
   "nav.security": "Security & RLS",
   "nav.security.desc": "Row-level security, enforced by Postgres.",
   "nav.docs": "Docs",
-  "nav.tryDemo": "Try the demo",
+  "nav.tryDemo": "Try live demo",
   "nav.theme.toLight": "Switch to light mode",
   "nav.theme.toDark": "Switch to dark mode",
   "roadmap.badge": "Roadmap",
