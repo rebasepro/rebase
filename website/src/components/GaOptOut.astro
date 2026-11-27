@@ -1,0 +1,20 @@
+---
+// Internal-traffic opt-out for GA4. Open any page once with `?ga-optout=1` and
+// this browser sets a `ga-optout` cookie on .rebase.pro (so the marketing
+// site, the docs and demo.rebase.pro all honour it) for ten years.
+// `?ga-optout=0` removes it. While it is set, `ga-disable-<ID>` is Google's own
+// switch: gtag.js loads but sends nothing. Must render BEFORE gtag('config').
+// The same snippet lives in app/frontend/index.html for the hosted demo.
+---
+
+<script is:inline>
+    (function () {
+        var q = new URLSearchParams(location.search).get("ga-optout");
+        var dm = location.hostname.indexOf("rebase.pro") > -1 ? ";domain=.rebase.pro" : "";
+        if (q === "1") document.cookie = "ga-optout=1;path=/;max-age=315360000;samesite=lax;secure" + dm;
+        if (q === "0") document.cookie = "ga-optout=;path=/;max-age=0;samesite=lax;secure" + dm;
+        if (q === "1" || (q !== "0" && /(^|;)\s*ga-optout=1/.test(document.cookie))) {
+            window["ga-disable-G-715WKXSHF3"] = true;
+        }
+    })();
+</script>

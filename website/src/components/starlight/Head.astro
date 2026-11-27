@@ -1,6 +1,7 @@
 ---
 import type { Props } from '@astrojs/starlight/props';
 import Default from '@astrojs/starlight/components/Head.astro';
+import GaOptOut from '../GaOptOut.astro';
 
 // Generate breadcrumb structured data from Starlight's entry data
 const { entry, slug } = Astro.props;
@@ -53,6 +54,8 @@ const breadcrumbSchema = {
 
 <!-- Force dark mode - override Starlight's theme detection -->
 <script is:inline>document.documentElement.setAttribute('data-theme', 'dark');localStorage.setItem('starlight-theme', 'dark');</script>
+
+<GaOptOut />
 
 <!-- Google tag (gtag.js) - Load the library -->
 <script async is:inline src="https://www.googletagmanager.com/gtag/js?id=G-715WKXSHF3"/>

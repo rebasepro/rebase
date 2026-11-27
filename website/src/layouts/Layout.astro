@@ -8,6 +8,7 @@ import instrumentSansLatinUrl from "@fontsource-variable/instrument-sans/files/i
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
 import CookieBanner from "../components/CookieBanner.astro";
+import GaOptOut from "../components/GaOptOut.astro";
 import ABDevPanel from "../components/ABDevPanel.astro";
 import { EXPERIMENTS } from "../scripts/ab-testing";
 import TypeDevPanel from "../components/TypeDevPanel.astro";
@@ -425,6 +426,7 @@ const twitterImageType = /\.jpe?g$/.test(ogImage) ? "image/jpeg" : "image/png";
         <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} />
     )}
 
+<GaOptOut />
 <script is:inline>
 
         // Initialize dataLayer and gtag function
