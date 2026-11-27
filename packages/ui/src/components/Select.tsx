@@ -420,7 +420,9 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                             disabled ? "text-surface-accent-600 dark:text-surface-accent-400" : "text-surface-accent-800 dark:text-white",
                             controlHeight
                         ],
-                        "relative flex flex-row items-center",
+                        // A button centres its text, and without a label inside
+                        // the value is an inline span, so it sat in the middle.
+                        "relative flex flex-row items-center text-left",
                         {
                             "w-full": fullWidth,
                             "w-fit": !fullWidth
