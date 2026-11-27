@@ -189,7 +189,7 @@ describe("a panel's fields", () => {
 
     describe("that leave every image out", () => {
         const LIST_THUMBNAIL = "main .flex-shrink-0.relative.w-10.h-10";
-        const CARD_THUMBNAIL = "main [class*='aspect-[4/3]']";
+        const CARD_THUMBNAIL = "main [class*='aspect-[16/10]']";
         const withCover = {
             ...tasks,
             properties: { ...tasks.properties, cover: { type: "string", name: "Cover", admin: { urlPreview: "image" } } }

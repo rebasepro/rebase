@@ -370,19 +370,19 @@ function SchemaChanges({ diff }: { diff: BranchDiff }) {
 
 function SplitDiff({ before, after, targetLabel, branchLabel }: { before?: string; after?: string; targetLabel: string; branchLabel: string }) {
     const rows = useMemo(() => splitLineDiff(before, after), [before, after]);
-    const line = "font-mono text-[12px] leading-5 whitespace-pre-wrap break-all px-3 min-h-5";
+    const line = "font-mono text-[12px] leading-5 whitespace-pre overflow-x-auto px-3 min-h-5";
     return (
-        <div className={cls("grid grid-cols-2 border-t", defaultBorderMixin)}>
-            <Typography variant="caption" color="secondary" className={cls("px-3 py-1 border-b border-r font-mono", defaultBorderMixin)}>{targetLabel}</Typography>
-            <Typography variant="caption" color="secondary" className={cls("px-3 py-1 border-b font-mono", defaultBorderMixin)}>{branchLabel}</Typography>
+        <div className={cls("grid grid-cols-1 lg:grid-cols-2 border-t bg-surface-well", defaultBorderMixin)}>
+            <Typography variant="caption" color="secondary" className={cls("px-3 py-1.5 border-b lg:border-r font-mono bg-surface-card", defaultBorderMixin)}>{targetLabel}</Typography>
+            <Typography variant="caption" color="secondary" className={cls("px-3 py-1.5 border-b font-mono bg-surface-card hidden lg:block", defaultBorderMixin)}>{branchLabel}</Typography>
             {rows.map((row, index) => (
                 <React.Fragment key={index}>
-                    <Typography component="div" variant="body2" className={cls(line, "border-r", defaultBorderMixin,
-                        row.left === null ? "bg-surface-field" : !row.same && "bg-red-500/10 text-red-700 dark:text-red-300")}>
+                    <Typography component="div" variant="body2" className={cls(line, "lg:border-r", defaultBorderMixin,
+                        row.left === null ? "bg-surface-field/50" : !row.same && "bg-red-500/10 text-red-700 dark:text-red-300")}>
                         {row.left ?? ""}
                     </Typography>
                     <Typography component="div" variant="body2" className={cls(line,
-                        row.right === null ? "bg-surface-field" : !row.same && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300")}>
+                        row.right === null ? "bg-surface-field/50" : !row.same && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300")}>
                         {row.right ?? ""}
                     </Typography>
                 </React.Fragment>

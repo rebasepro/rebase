@@ -90,42 +90,51 @@ export function DrawerNavigationGroup({
     const groupIcon = !hideHeader && drawerOpen ? getIcon(icon, undefined, undefined, "small") : undefined;
     return (
         <div
-            className={"my-2 mx-2 flex flex-col"}
+            className={cls("mx-2 flex flex-col", drawerOpen ? "my-2" : "my-1")}
             key={`drawer_group_${group}`}
         >
-            {/* Group Header */}
+            {/* Group Header — collapses cleanly when the rail is narrow so
+                collapsed icon clusters don't carry 28px ghost gaps. */}
             {!hideHeader && (
-                <div
-                    className={cls("pl-3 pr-2 py-0.5 flex flex-row items-center transition-colors",
-                        drawerOpen ? "cursor-pointer hover:bg-surface-hover rounded-lg" : "opacity-0 invisible pointer-events-none"
+                <>
+                    {!drawerOpen && (
+                        <div className="mx-3 my-1.5 border-t border-hairline" aria-hidden="true"/>
                     )}
-                    onClick={drawerOpen ? onToggleCollapsed : undefined}
-                >
-                    <ChevronDownIcon
-                        size={iconSize.small}
+                    <div
                         className={cls(
-                            "text-surface-400 dark:text-surface-400 transition-transform duration-200 mr-1",
-                            collapsed ? "-rotate-90" : "rotate-0"
+                            "flex flex-row items-center transition-all duration-150",
+                            drawerOpen
+                                ? "pl-3 pr-2 py-1 opacity-100 cursor-pointer hover:bg-surface-hover rounded-lg"
+                                : "h-0 py-0 overflow-hidden opacity-0 pointer-events-none"
                         )}
-                    />
-                    {groupIcon && (
-                        <span className="shrink-0 mr-2 flex items-center text-surface-600 dark:text-surface-300 [&>svg]:size-4">
-                            {groupIcon}
-                        </span>
-                    )}
-                    <Typography
-                        variant={"caption"}
-                        color={"secondary"}
-                        className="font-semibold text-[11px] uppercase tracking-wider flex-grow line-clamp-1 text-surface-400 dark:text-surface-400"
+                        onClick={drawerOpen ? onToggleCollapsed : undefined}
                     >
-                        {groupLabel(group || NAVIGATION_DEFAULT_GROUP_NAME)}
-                    </Typography>
-                    {headerActions && (
-                        <div onClick={(e) => e.stopPropagation()}>
-                            {headerActions}
-                        </div>
-                    )}
-                </div>
+                        <ChevronDownIcon
+                            size={iconSize.small}
+                            className={cls(
+                                "text-text-disabled dark:text-text-disabled-dark transition-transform duration-200 mr-1",
+                                collapsed ? "-rotate-90" : "rotate-0"
+                            )}
+                        />
+                        {groupIcon && (
+                            <span className="shrink-0 mr-2 flex items-center text-text-secondary dark:text-text-secondary-dark [&>svg]:size-4">
+                                {groupIcon}
+                            </span>
+                        )}
+                        <Typography
+                            variant={"micro"}
+                            color={"disabled"}
+                            className="flex-grow truncate"
+                        >
+                            {groupLabel(group || NAVIGATION_DEFAULT_GROUP_NAME)}
+                        </Typography>
+                        {headerActions && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                                {headerActions}
+                            </div>
+                        )}
+                    </div>
+                </>
             )}
 
             {/* Collapsible Content */}

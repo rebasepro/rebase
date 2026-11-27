@@ -1136,14 +1136,14 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
             {showImage && (
                 <div className="flex-shrink-0 relative w-10 h-10">
                     {slots.image ? (
-                        <div className={cls("w-10 h-10 rounded-lg border relative overflow-hidden bg-surface-raised", defaultBorderMixin)}>
+                        <div className="w-10 h-10 rounded-lg relative overflow-hidden bg-surface-raised ring-1 ring-inset ring-black/5 dark:ring-white/5">
                             <SlotValue slot={slots.image} size="small" fill={true}/>
                         </div>
                     ) : (
-                        <div className={cls("w-10 h-10 rounded-lg bg-surface-raised flex items-center justify-center border", defaultBorderMixin)}>
+                        <div className="w-10 h-10 rounded-lg bg-surface-raised flex items-center justify-center">
                             <IconForView
                                 collectionOrView={collection}
-                                className="text-surface-500 dark:text-surface-400"
+                                className="text-text-secondary dark:text-text-secondary-dark"
                                 size="small"
                             />
                         </div>
@@ -1189,13 +1189,13 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
             <div className="flex-1 min-w-0 overflow-hidden">
                 <div className="truncate">
                     {slots.title?.value !== undefined ? (
-                        <Typography component="div" variant="body2" className="font-semibold text-surface-900 dark:text-surface-50 truncate transition-colors group-hover:text-primary dark:group-hover:text-primary-light">
+                        <Typography component="div" variant="body2" className="font-medium text-text-primary dark:text-text-primary-dark truncate">
                             {terms.length > 0 && typeof slots.title?.value === "string"
                                 ? <Highlighted text={slots.title.value} terms={terms}/>
                                 : <SlotValue slot={slots.title} size="small"/>}
                         </Typography>
                     ) : (
-                        <Typography component="div" variant="body2" className="font-semibold text-surface-500 dark:text-surface-400 font-mono text-xs transition-colors group-hover:text-primary dark:group-hover:text-primary-light">
+                        <Typography component="div" variant="body2" className="font-medium text-text-secondary dark:text-text-secondary-dark font-mono text-xs">
                             {entity.id}
                         </Typography>
                     )}

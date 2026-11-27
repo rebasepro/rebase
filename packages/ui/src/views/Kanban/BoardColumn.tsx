@@ -69,16 +69,15 @@ export const BoardColumn = memo(function BoardColumn<T>({
     const dragListeners = allowReorder ? listeners : {};
 
     const columnClassName = useMemo(() => cls(
-        "border h-full w-80 min-w-80 mx-2 flex flex-col rounded-md border-hairline",
+        "h-full w-80 min-w-80 mx-2 flex flex-col rounded-lg bg-surface-field",
         isColumnBeingDragged ? "ring-2 ring-primary" : ""
     ), [isColumnBeingDragged]);
 
     const headerClassName = useMemo(() => cls(
-        "flex items-center justify-between px-2 rounded-t-md transition-colors duration-200 ease-in-out",
+        "flex items-center justify-between px-2 rounded-t-lg transition-colors duration-150 ease-in-out",
         isColumnBeingDragged
             ? "bg-surface-active"
-            : "bg-surface-field hover:bg-surface-field-hover",
-        allowReorder ? "cursor-grab" : ""
+            : allowReorder ? "hover:bg-surface-hover cursor-grab" : ""
     ), [isColumnBeingDragged, allowReorder]);
 
     const itemIds = useMemo(() => items.map(i => i.id), [items]);
@@ -99,7 +98,7 @@ export const BoardColumn = memo(function BoardColumn<T>({
                         {title}
                     </BoardColumnTitle>
                     {totalCount !== undefined && (
-                        <span className="text-xs text-surface-500 dark:text-surface-400">
+                        <span className="font-mono tabular-nums text-xs text-text-disabled dark:text-text-disabled-dark">
                             {totalCount}
                         </span>
                     )}

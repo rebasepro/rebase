@@ -12,6 +12,7 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
+    FilterChip,
     PencilIcon,
     IconButton,
     iconSize,
@@ -26,9 +27,10 @@ import {
     TextField,
     Tooltip,
     Trash2Icon,
-    Typography
+    Typography,
+    XIcon
 } from "@rebasepro/ui";
-import { useSnackbarController, useTranslation } from "@rebasepro/app";
+import { ConfirmationDialog, useSnackbarController, useTranslation } from "@rebasepro/app";
 import { ADMIN_SCOPES } from "@rebasepro/types";
 import {
     asBoolean,
@@ -182,6 +184,8 @@ export function RolesView() {
         }
     };
 
+    const [confirmDeleteRole, setConfirmDeleteRole] = useState<string | null>(null);
+
     const handleDeleteRole = async (name: string) => {
         try {
             await requestJson(`/admin/roles/${encodeURIComponent(name)}`, { method: "DELETE" });
@@ -189,27 +193,32 @@ export function RolesView() {
             await loadRoles();
         } catch (err: unknown) {
             snackbar.open({ type: "error", message: err instanceof Error ? err.message : t("studio_users_role_delete_failed") });
+        } finally {
+            setConfirmDeleteRole(null);
         }
     };
 
+    const builtinScopeSet = new Set<string>(ADMIN_SCOPES);
+    const customScopes = roleScopes.filter((s) => !builtinScopeSet.has(s));
+
     return (
         <div className="flex flex-col h-full w-full bg-surface-sheet overflow-hidden">
-            <div className={cls("px-5 py-3 border-b flex items-center justify-between gap-4", defaultBorderMixin)}>
-                <div className="flex items-center gap-2.5">
-                    <ShieldIcon size={iconSize.medium} className={"text-text-secondary"} />
-                    <div>
-                        <Typography variant="h6">{t("studio_tool_roles")}</Typography>
-                        <Typography variant="caption" color="secondary">{t("studio_roles_header_description")}</Typography>
-                    </div>
+            <div className={cls("h-[44px] px-4 border-b bg-surface-sheet flex items-center justify-between gap-4 shrink-0", defaultBorderMixin)}>
+                <div className="flex items-center gap-2 min-w-0">
+                    <ShieldIcon size={iconSize.smallest} className={"text-text-secondary dark:text-text-secondary-dark shrink-0"} />
+                    <Typography variant="subtitle2" className="truncate">{t("studio_tool_roles")}</Typography>
+                    <Typography variant="caption" color="disabled" className="hidden md:inline truncate">
+                        {t("studio_roles_header_description")}
+                    </Typography>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 shrink-0">
                     <Tooltip title={t("refresh")}>
                         <IconButton size="small" aria-label={t("refresh")} onClick={() => { void loadRoles(); }}>
-                            <RefreshCwIcon size={iconSize.small} />
+                            <RefreshCwIcon size={iconSize.smallest} />
                         </IconButton>
                     </Tooltip>
                     <Button size="small" color="primary" variant="filled" onClick={openCreateRole}>
-                        <PlusIcon size={iconSize.small} />
+                        <PlusIcon size={iconSize.smallest} />
                         {t("studio_users_new_role")}
                     </Button>
                 </div>
@@ -270,8 +279,13 @@ export function RolesView() {
                                                         </IconButton>
                                                     )}
                                                     {r.source === "database" && r.name !== "admin" && (
-                                                        <IconButton size="small" aria-label={t("studio_users_delete_role_aria", { name: r.name })} onClick={() => void handleDeleteRole(r.name)}>
-                                                            <Trash2Icon size={iconSize.small} className={"text-red-500"} />
+                                                        <IconButton
+                                                            size="small"
+                                                            aria-label={t("studio_users_delete_role_aria", { name: r.name })}
+                                                            className="text-text-secondary hover:text-red-500"
+                                                            onClick={() => setConfirmDeleteRole(r.name)}
+                                                        >
+                                                            <Trash2Icon size={iconSize.smallest} />
                                                         </IconButton>
                                                     )}
                                                 </TableCell>
@@ -308,14 +322,14 @@ export function RolesView() {
                             {ADMIN_SCOPES.map((scope) => {
                                 const selected = roleScopes.includes(scope);
                                 return (
-                                    <Chip
+                                    <FilterChip
                                         key={scope}
                                         size="small"
-                                        colorScheme={selected ? "blueLight" : "grayLight"}
+                                        active={selected}
                                         onClick={() => toggleScope(scope)}
                                     >
                                         {scope}
-                                    </Chip>
+                                    </FilterChip>
                                 );
                             })}
                         </div>
@@ -331,11 +345,12 @@ export function RolesView() {
                         </div>
                         <Button variant="outlined" onClick={addCustomScope}>{t("add")}</Button>
                     </div>
-                    {roleScopes.length > 0 && (
+                    {customScopes.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
-                            {roleScopes.map((scope) => (
-                                <Chip key={scope} size="small" colorScheme="purpleLight" onClick={() => toggleScope(scope)}>
-                                    {scope} ×
+                            {customScopes.map((scope) => (
+                                <Chip key={scope} size="small" onClick={() => toggleScope(scope)}>
+                                    <span>{scope}</span>
+                                    <XIcon size={12} className="opacity-60 hover:opacity-100" />
                                 </Chip>
                             ))}
                         </div>
@@ -355,6 +370,7 @@ export function RolesView() {
                     <Button variant="text" onClick={() => setRoleDialogOpen(false)}>{t("cancel")}</Button>
                     <Button
                         variant="filled"
+                        color="primary"
                         disabled={savingRole || !(editingRoleName ?? roleName).trim()}
                         onClick={() => void handleSaveRole()}
                     >
@@ -362,6 +378,14 @@ export function RolesView() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <ConfirmationDialog
+                open={confirmDeleteRole !== null}
+                onAccept={() => { if (confirmDeleteRole) void handleDeleteRole(confirmDeleteRole); }}
+                onCancel={() => setConfirmDeleteRole(null)}
+                title={confirmDeleteRole ? t("studio_users_delete_role_aria", { name: confirmDeleteRole }) : t("delete")}
+                body={confirmDeleteRole ? t("delete_confirmation", { defaultValue: `Delete role "${confirmDeleteRole}"? This action cannot be undone.` }) : ""}
+            />
         </div>
     );
 }

@@ -161,11 +161,11 @@ function OverflowMenu({ presets, activeSet, onToggle, triggerLabel }: OverflowMe
                             key={originalIndex}
                             dense
                             onClick={() => onToggle(originalIndex)}
-                            className={cls(active && "bg-primary/10 dark:bg-primary/20")}
+                            className={cls(active && "bg-surface-active")}
                         >
                             <span className="flex items-center gap-2 w-full min-w-0">
-                                {active && <CheckIcon size={14} className="text-primary shrink-0" />}
-                                <span className={cls("truncate", active ? "text-primary font-medium" : "")}>
+                                {active && <CheckIcon size={14} className="text-text-primary dark:text-text-primary-dark shrink-0" />}
+                                <span className={cls("truncate", active ? "text-text-primary dark:text-text-primary-dark font-medium" : "")}>
                                     {rawLabel}
                                 </span>
                             </span>

@@ -361,15 +361,15 @@ export function DataTab({ table }: DataTabProps) {
         }
         if (column.key === ACTIONS_COLUMN) {
             return (
-                <div className="h-full flex items-center justify-center gap-0.5">
+                <div className="h-full flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
                     <Tooltip title={t("studio_tables_edit_row")}>
-                        <IconButton size="small" aria-label={t("studio_tables_edit_row")} className={ROW_ACTION_ICON}
+                        <IconButton size="smallest" aria-label={t("studio_tables_edit_row")} className={ROW_ACTION_ICON}
                             onClick={() => setRowDialog({ mode: "edit", row: rowData })}>
                             <PencilIcon size={iconSize.smallest}/>
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={t("delete_row")}>
-                        <IconButton size="small" aria-label={t("delete_row")} className={ROW_ACTION_ICON}
+                        <IconButton size="smallest" aria-label={t("delete_row")} className={cls(ROW_ACTION_ICON, "hover:text-red-500")}
                             onClick={() => setConfirmDelete([rowData])}>
                             <Trash2Icon size={iconSize.smallest}/>
                         </IconButton>
@@ -547,7 +547,7 @@ export function DataTab({ table }: DataTabProps) {
                 />
             </div>
 
-            <div className="px-4 h-10 flex items-center justify-between gap-3 shrink-0">
+            <div className="px-4 h-10 border-t border-hairline flex items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-2">
                     {writable && (
                         <Checkbox
@@ -557,13 +557,13 @@ export function DataTab({ table }: DataTabProps) {
                             onCheckedChange={(checked) => setSelected(checked ? new Set(pageKeys) : new Set())}
                         />
                     )}
-                    <Typography variant="caption" color="secondary">
+                    <Typography variant="caption" color="secondary" className="tabular-nums">
                         {t("studio_tables_rows_range", { first: formatter.format(firstRow), last: formatter.format(lastRow), total: totalLabel })}
                     </Typography>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                     <Select
-                        size="smallest"
+                        size="small"
                         value={String(pageSize)}
                         onValueChange={(value) => setPageSize(Number(value))}
                         renderValue={(value) => t("studio_tables_page_size", { count: Number(value) })}
@@ -591,7 +591,7 @@ export function DataTab({ table }: DataTabProps) {
                             <XIcon size={iconSize.smallest}/>
                         </IconButton>
                     </div>
-                    <pre className="flex-1 overflow-auto rounded-lg bg-surface-field p-3 font-mono text-xs whitespace-pre-wrap break-all">
+                    <pre className="flex-1 overflow-auto rounded-lg bg-surface-well border border-hairline p-3 font-mono text-xs whitespace-pre-wrap break-all">
                         {viewing ? prettyValue(viewing.value, columnByName.get(viewing.column)) : ""}
                     </pre>
                 </div>

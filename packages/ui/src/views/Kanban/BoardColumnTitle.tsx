@@ -28,14 +28,14 @@ export function BoardColumnTitle({
             variant="subtitle2"
             component="h4"
             className={
-                cls("py-3 px-3 transition-colors duration-200 flex-grow select-none relative outline-none focus:outline focus:outline-2 focus:outline-offset-2 flex items-center gap-3",
+                cls("py-2.5 px-2.5 transition-colors duration-150 flex-grow select-none relative outline-none focus:outline focus:outline-2 focus:outline-offset-2 flex items-center gap-2",
                     className)
             }
             {...props}
         >
             {colorScheme && (
                 <div
-                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    className="w-2 h-2 rounded-full flex-shrink-0"
                     style={{
                         backgroundColor: colorScheme.darkColor ?? colorScheme.color
                     }}

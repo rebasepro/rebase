@@ -458,8 +458,8 @@ function DrawerModeSwitch({
             // out of the tab order and the accessibility tree while it is.
             inert={!showSwitch}
             className={cls(
-                "shrink-0 overflow-hidden transition-all duration-200 ease-in-out px-3 h-8 mt-2 mb-0",
-                showSwitch ? "opacity-100" : "opacity-0 pointer-events-none"
+                "shrink-0 overflow-hidden transition-all duration-200 ease-in-out px-3 mb-0",
+                showSwitch ? "h-8 mt-2 opacity-100" : "h-0 mt-0 opacity-0 pointer-events-none"
             )}
         >
             <ToggleButtonGroup<AdminModeController["mode"]>
@@ -589,27 +589,32 @@ export function DrawerFooterActions({
                         side="top"
                         align="start"
                     >
-                        {user && <div className="px-4 py-2 mb-1">
-                            {user.displayName && <Typography variant="body1" color="secondary">
-                                {user.displayName}
-                            </Typography>}
-                            {user.email && <Typography variant="body2" color="secondary">
-                                {user.email}
-                            </Typography>}
-                        </div>}
+                        {user && (
+                            <>
+                                <div className="px-3 py-2">
+                                    {user.displayName && <Typography variant="body2" color="primary" className="font-medium truncate">
+                                        {user.displayName}
+                                    </Typography>}
+                                    {user.email && <Typography variant="caption" color="secondary" className="truncate block">
+                                        {user.email}
+                                    </Typography>}
+                                </div>
+                                <Separator orientation="horizontal" className="my-1"/>
+                            </>
+                        )}
 
                         {dropDownActions}
 
                         {!dropDownActions && <>
                             <MenuItem onClick={() => navigate("/settings")}>
-                                <SettingsIcon/>
+                                <SettingsIcon size={iconSize.smallest}/>
                                 {t("account_settings")}
                             </MenuItem>
                             <MenuItem onClick={async () => {
                                 await authController.signOut();
                                 navigate("/");
                             }}>
-                                <LogOutIcon/>
+                                <LogOutIcon size={iconSize.smallest}/>
                                 {t("log_out")}
                             </MenuItem>
                         </>}
@@ -617,7 +622,7 @@ export function DrawerFooterActions({
 
                     {/* Language + Theme — only when expanded */}
                     {showFullContent && (
-                        <div className="flex items-center gap-0">
+                        <div className="flex items-center gap-0.5 ml-auto">
                             <LanguageToggle/>
                             <Menu
                                 trigger={

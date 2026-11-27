@@ -161,31 +161,40 @@ export function FiltersDialog({
             <DialogTitle className="flex items-center gap-2" variant="h6">
                 {t("filters")}
                 {activeFilterCount > 0 && (
-                    <Chip size="small" className="ml-2">
+                    <Chip size="small">
                         {activeFilterCount}
                     </Chip>
                 )}
             </DialogTitle>
 
-            <DialogContent >
+            <DialogContent>
                 {filterableProperties.length === 0 ? (
                     <Typography color="secondary" className="py-8 text-center">
                         {t("no_filterable_properties")}
                     </Typography>
                 ) : (
-                    <div className="grid grid-cols-[160px_minmax(0,1fr)] items-center">
+                    <div className="grid grid-cols-[160px_minmax(0,1fr)] items-start">
                         {filterableProperties.map(([propertyKey, property], index) => {
                             const hasFilter = propertyKey in localFilters;
                             const rowBorder = index > 0 && cls("border-t", defaultBorderMixin);
                             return (
                                 <React.Fragment key={propertyKey}>
-                                    {/* Property name on the left */}
-                                    <div className={cls("py-3 pr-4 self-stretch flex items-center", rowBorder)}>
+                                    {/* Property name on the left — top-aligned so tall/wrapping
+                                        filter controls never push the label off-baseline. */}
+                                    <div className={cls("py-3 pr-4 pt-4 self-stretch flex items-start gap-1.5 min-w-0", rowBorder)}>
+                                        {hasFilter && (
+                                            <span
+                                                aria-hidden="true"
+                                                className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-1.5"
+                                            />
+                                        )}
                                         <Typography
                                             variant="body2"
                                             className={cls(
-                                                "font-medium",
-                                                hasFilter && "text-primary"
+                                                "truncate",
+                                                hasFilter
+                                                    ? "font-semibold text-text-primary dark:text-text-primary-dark"
+                                                    : "font-medium text-text-secondary dark:text-text-secondary-dark"
                                             )}
                                         >
                                             {property.name || propertyKey}
@@ -220,6 +229,7 @@ export function FiltersDialog({
                 </Button>
                 <Button
                     variant="filled"
+                    color="primary"
                     onClick={handleApply}
                 >
                     {t("apply_filters")}

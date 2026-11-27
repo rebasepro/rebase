@@ -65,8 +65,8 @@ describe("DrawerNavigationGroup — a group icon decorates the header only", () 
     // that look builds it in its own drawer, by overriding
     // `Shell.DrawerNavigationItem` and passing `indented`.
     const ORIGINAL_LABEL = [
-        "font-semibold", "text-[11px]", "uppercase", "tracking-wider",
-        "flex-grow", "line-clamp-1", "text-surface-400", "dark:text-surface-400"
+        "typography-micro", "text-text-disabled", "dark:text-text-disabled-dark",
+        "flex-grow", "truncate"
     ];
 
     test("a group with no icon renders no group icon, and its entries keep theirs", () => {

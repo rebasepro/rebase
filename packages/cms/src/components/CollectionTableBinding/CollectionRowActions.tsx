@@ -168,11 +168,21 @@ export const CollectionRowActions = function CollectionRowActions({
                 so a 36px row carries one line and the tools still fit. */}
             {(hasActions || selectionEnabled) &&
                 <div className={cls(
-                    "absolute inset-0 flex items-center justify-center gap-0.5",
+                    "absolute inset-0 flex items-center justify-start px-2 gap-0.5",
                     isSelected
                         ? "bg-surface-raised"
                         : "bg-surface-card group-hover:bg-surface-card-hover opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-100"
                 )}>
+
+                    {selectionEnabled &&
+                        <Tooltip title={t("select_row", { id: String(entity.id) })}>
+                            <Checkbox
+                                aria-label={t("select_row", { id: String(entity.id) })}
+                                size={"smallest"}
+                                checked={Boolean(isSelected)}
+                                onCheckedChange={onCheckedChange}
+                            />
+                        </Tooltip>}
 
                     {uncollapsedActions.map((action, index) => {
                         const isEditAction = action.key === "edit";
@@ -240,25 +250,15 @@ export const CollectionRowActions = function CollectionRowActions({
                         </Menu>
                     }
 
-                    {selectionEnabled &&
-                        <Tooltip title={t("select_row", { id: String(entity.id) })}>
-                            <Checkbox
-                                aria-label={t("select_row", { id: String(entity.id) })}
-                                size={"smallest"}
-                                checked={Boolean(isSelected)}
-                                onCheckedChange={onCheckedChange}
-                            />
-                        </Tooltip>}
-
                 </div>}
 
             {!hideId && (
                 <div
-                    className="w-[138px] overflow-hidden truncate font-mono text-xs text-text-secondary dark:text-text-secondary-dark max-w-full text-ellipsis px-2 align-center justify-center flex items-center gap-1"
+                    className="w-[138px] overflow-hidden truncate font-mono text-xs text-text-secondary dark:text-text-secondary-dark max-w-full text-ellipsis px-3 justify-start flex items-center gap-1"
                     onClick={(event) => {
                         event.stopPropagation();
                     }}>
-                    <span className="min-w-0 truncate text-center">
+                    <span className="min-w-0 truncate text-left">
                         {entity
                             ? entity.id
                             : <Skeleton/>

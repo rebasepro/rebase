@@ -35,21 +35,26 @@ export function FiltersButton<M extends Record<string, unknown>>({
     return (
         <>
             <Tooltip title={t("filters")}>
-                <Badge
-                    color="primary"
-                    invisible={activeFilterCount === 0}
-                >
-                    {!iconOnly ? (
-                        <Button
-                            variant="text"
-                            size="small"
-                            onClick={() => setOpen(true)}
-                            startIcon={<FilterIcon size={iconSize.small}/>}
-                            className={cls(activeFilterCount > 0 && "text-primary")}
-                        >
-                            {activeFilterCount > 0 ? `(${activeFilterCount})` : t("filters")}
-                        </Button>
-                    ) : (
+                {!iconOnly ? (
+                    <Button
+                        variant="text"
+                        size="small"
+                        onClick={() => setOpen(true)}
+                        startIcon={<FilterIcon size={iconSize.small}/>}
+                        className={cls(activeFilterCount > 0 && "bg-surface-active text-text-primary dark:text-text-primary-dark")}
+                    >
+                        <span>{t("filters")}</span>
+                        {activeFilterCount > 0 && (
+                            <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-md bg-primary/15 text-primary text-[11px] font-mono tabular-nums font-medium">
+                                {activeFilterCount}
+                            </span>
+                        )}
+                    </Button>
+                ) : (
+                    <Badge
+                        color="primary"
+                        invisible={activeFilterCount === 0}
+                    >
                         <IconButton aria-label={t("filters")}
                             size={"small"}
                             onClick={() => setOpen(true)}
@@ -57,8 +62,8 @@ export function FiltersButton<M extends Record<string, unknown>>({
                         >
                             <FilterIcon size={iconSize.smallest}/>
                         </IconButton>
-                    )}
-                </Badge>
+                    </Badge>
+                )}
             </Tooltip>
             <FiltersDialog
                 open={open}

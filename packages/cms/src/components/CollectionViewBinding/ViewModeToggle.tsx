@@ -183,7 +183,7 @@ export function ViewModeToggle({
                 onOpenChange={onOpenChange}
                 modal={false}
                 trigger={
-                    <Button size="small" aria-label={labelled ? undefined : getViewModeName()}>
+                    <Button variant="text" size="small" aria-label={labelled ? undefined : getViewModeName()}>
                         {getViewModeIcon()}
                         {labelled && <span className="ml-1 text-sm">{getViewModeName()}</span>}
                     </Button>

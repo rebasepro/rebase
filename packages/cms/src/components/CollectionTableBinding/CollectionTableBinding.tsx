@@ -340,8 +340,8 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         title: "ID",
         resizable: false,
         frozen: largeLayout,
-        headerAlign: "center",
-        align: "center",
+        headerAlign: "left",
+        align: "left",
         AdditionalHeaderWidget: () => stableIdHeaderWidget
     }), [getIdColumnWidth, largeLayout, stableIdHeaderWidget]);
 

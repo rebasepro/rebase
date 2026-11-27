@@ -255,6 +255,7 @@ export function StudioHomePage({
                 <div className="w-full py-3 sticky top-0 z-10 bg-surface-sheet/90 backdrop-blur-md flex flex-row gap-3 items-center">
                     <div className="flex-1">
                         <SearchBar
+                            size="small"
                             onTextSearch={(v) => setSearchQuery(v ?? "")}
                             placeholder="Search Studio tools…"
                             innerClassName="w-full"
@@ -479,31 +480,24 @@ export function StudioHomePage({
                         generator by hand; `generate-sdk` is for outside dev. */}
                     <Typography variant="body2" color="secondary" className="mb-4 max-w-2xl">
                         {t("studio_home_quick_start_dev")}{" "}
-                        <code className="text-emerald-400 font-mono text-xs bg-emerald-400/10 px-1.5 py-0.5 rounded">
+                        <code className="bg-surface-raised text-text-primary dark:text-text-primary-dark font-mono text-xs px-1.5 py-0.5 rounded-md">
                             rebase dev
                         </code>
                         {". "}
                         {t("studio_home_quick_start_outside_dev")}{" "}
-                        <code className="text-emerald-400 font-mono text-xs bg-emerald-400/10 px-1.5 py-0.5 rounded">
+                        <code className="bg-surface-raised text-text-primary dark:text-text-primary-dark font-mono text-xs px-1.5 py-0.5 rounded-md">
                             rebase generate-sdk
                         </code>
                         {"."}
                     </Typography>
 
-                    <div className="rounded-lg border border-hairline bg-surface-card overflow-hidden">
+                    <div className="rounded-lg border border-hairline bg-surface-well overflow-hidden">
                         {/* Title bar */}
-                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-hairline bg-surface-sheet">
-                            <div className="flex items-center gap-2.5">
-                                <div className="flex gap-1.5">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-red-400/60"/>
-                                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400/60"/>
-                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/60"/>
-                                </div>
-                                <span className="text-xs font-mono text-surface-400 dark:text-surface-500 ml-1">
-                                    app.ts
-                                </span>
-                            </div>
-                            <span className="text-xs font-mono text-surface-400 dark:text-surface-500">
+                        <div className="flex items-center justify-between px-4 py-2 border-b border-hairline bg-surface-card">
+                            <span className="text-xs font-mono text-text-secondary dark:text-text-secondary-dark">
+                                app.ts
+                            </span>
+                            <span className="text-[11px] font-mono text-text-disabled dark:text-text-disabled-dark">
                                 TypeScript
                             </span>
                         </div>

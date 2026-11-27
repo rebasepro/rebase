@@ -189,7 +189,7 @@ function SideDialogView({
                     scrollable={false}
                 >
                     {panel && (
-                        <div className="flex flex-col h-[75vh] min-h-[500px] w-full min-w-0 max-w-full overflow-hidden">
+                        <div className="flex flex-col max-h-[82vh] w-full min-w-0 max-w-full overflow-hidden">
                             <ErrorBoundary>
                                 {panel.component}
                             </ErrorBoundary>
@@ -199,7 +199,8 @@ function SideDialogView({
             ) : (
                 <Sheet
                     open={Boolean(panel)}
-                    includeBackgroundOverlay={true}
+                    includeBackgroundOverlay={panelIndex === 0}
+                    transparent={offsetPosition > 0}
                     overlayStyle={{ zIndex: 40 + panelIndex * 10 }}
                     style={{ zIndex: 45 + panelIndex * 10 }}
                     onOpenChange={(open) => {
@@ -213,10 +214,10 @@ function SideDialogView({
                 >
                     {panel &&
                         <div
-                            className={"transform max-w-[100vw] lg:max-w-[95vw] flex flex-col h-full transition-all duration-250 ease-in-out bg-surface-card "}
+                            className={"transform max-w-[100vw] lg:max-w-[95vw] flex flex-col h-full transition-all duration-250 ease-in-out bg-surface-card border-l border-hairline shadow-md"}
                             style={{
                                 width: panel.width,
-                                transform: `translateX(-${offsetPosition * 200}px)`
+                                transform: offsetPosition > 0 ? `translateX(-${offsetPosition * 200}px)` : undefined
                             }}
                         >
                             <ErrorBoundary>

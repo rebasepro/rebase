@@ -236,7 +236,7 @@ export function TableEditorView() {
 
     return (
         <div className="flex h-full w-full overflow-hidden bg-surface-card">
-            <aside className={cls("w-60 shrink-0 flex flex-col border-r bg-surface-card", defaultBorderMixin)}>
+            <aside className={cls("w-60 shrink-0 flex flex-col border-r bg-surface-sheet", defaultBorderMixin)}>
                 <div className={cls("h-[42px] px-3 border-b bg-surface-sheet flex items-center justify-between gap-2 shrink-0", defaultBorderMixin)}>
                     <div className="flex items-center gap-2 min-w-0">
                         <DatabaseIcon size={iconSize.smallest} className="text-text-secondary dark:text-text-secondary-dark shrink-0"/>

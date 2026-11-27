@@ -1,6 +1,6 @@
 import type { ResolvedFormField, ResolvedFormSection } from "@rebasepro/app";
 import React from "react";
-import { ChevronDownIcon, cls, defaultBorderMixin, iconSize } from "@rebasepro/ui";
+import { ChevronDownIcon, cls, defaultBorderMixin, iconSize, Typography } from "@rebasepro/ui";
 import { sectionDomId, useFormDomScope } from "../form_dom_ids";
 import { useFormFieldsContext } from "../FormFieldsContext";
 
@@ -136,9 +136,9 @@ function Header({
                         collapsed && "-rotate-90"
                     )}/>
             )}
-            <span className={"text-xs font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark whitespace-nowrap"}>
+            <Typography variant={"micro"} color={"disabled"} className={"whitespace-nowrap"}>
                 {title}
-            </span>
+            </Typography>
             <span className={cls("flex-1 border-t", defaultBorderMixin)}/>
         </>
     );

@@ -3,19 +3,18 @@ import {
     Alert,
     ArrowDownToLineIcon,
     CheckIcon,
-    Checkbox,
     ChevronRightIcon,
     Chip,
     CopyIcon,
     cls,
     defaultBorderMixin,
+    FilterChip,
     IconButton,
     iconSize,
-    Label,
+    SearchBar,
     Select,
     SelectItem,
     StatusDot,
-    TextField,
     Tooltip,
     Typography,
     type StatusTone
@@ -243,50 +242,36 @@ export function LogsExplorer() {
                     <SelectItem value="all">{t("studio_logs_all_sources")}</SelectItem>
                     {SOURCES.map(src => <SelectItem key={src} value={src}>{t(`studio_logs_source_${src}`)}</SelectItem>)}
                 </Select>
-                <TextField
+                <SearchBar
                     size="small"
-                    aria-label={t("studio_logs_search_label")}
                     placeholder={t("studio_logs_search_placeholder")}
-                    value={searchInput}
-                    onChange={e => setSearchInput(e.target.value)}
+                    onTextSearch={(v) => setSearchInput(v ?? "")}
                     className="flex-1 min-w-[200px]"
+                    innerClassName="w-full"
                 />
-                <div className="flex items-center gap-1.5 cursor-pointer ml-2">
-                    <Checkbox
-                        id="auto-scroll"
-                        checked={autoScroll}
-                        onCheckedChange={(checked: boolean) => {
-                            setAutoScroll(checked);
-                            if (checked) scrollToBottom();
-                        }}
-                        size="small"
-                        padding={false}
-                    />
-                    <Label
-                        htmlFor="auto-scroll"
-                        className="text-xs select-none cursor-pointer text-surface-600 dark:text-surface-400"
-                    >
-                        {t("studio_logs_auto_scroll")}
-                    </Label>
-                </div>
-                <div className="flex items-center gap-1.5 cursor-pointer ml-2">
-                    <Checkbox
-                        id="hide-log-noise"
-                        checked={hideNoise}
-                        onCheckedChange={(checked: boolean) => setHideNoise(checked)}
-                        size="small"
-                        padding={false}
-                    />
-                    <Label
-                        htmlFor="hide-log-noise"
-                        className="text-xs select-none cursor-pointer text-surface-600 dark:text-surface-400"
-                    >
-                        Hide noise
-                    </Label>
+                <FilterChip
+                    size="small"
+                    active={autoScroll}
+                    onClick={() => {
+                        const next = !autoScroll;
+                        setAutoScroll(next);
+                        if (next) scrollToBottom();
+                    }}
+                >
+                    {t("studio_logs_auto_scroll")}
+                </FilterChip>
+                <FilterChip
+                    size="small"
+                    active={hideNoise}
+                    onClick={() => setHideNoise((prev) => !prev)}
+                >
+                    <span>Hide noise</span>
                     {hiddenNoiseCount > 0 && (
-                        <Chip size="smallest">{`-${hiddenNoiseCount} filtered`}</Chip>
+                        <span className="ml-1 font-mono tabular-nums text-[11px] opacity-75">
+                            -{hiddenNoiseCount}
+                        </span>
                     )}
-                </div>
+                </FilterChip>
                 {/* Whether the tail is actually attached. A log view with
                     nothing in it is ambiguous — quiet server, or a stream that
                     dropped — and this is the difference. */}
@@ -498,11 +483,11 @@ const LogRow = React.memo(function LogRow({ entry, expanded, onToggle }: LogRowP
             </div>
 
             {expanded && (
-                <div className="flex items-start gap-2 pb-3 pl-[3.25rem] pr-4">
+                <div className="flex items-start gap-2 pb-3 pl-9 pr-4">
                     <Typography
                         variant="mono"
                         component="pre"
-                        className="flex-1 min-w-0 text-xs bg-surface-field rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all text-surface-700 dark:text-surface-300"
+                        className="flex-1 min-w-0 text-xs bg-surface-well border border-hairline rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all text-text-secondary dark:text-text-secondary-dark"
                     >
                         {JSON.stringify(entry.metadata, null, 2)}
                     </Typography>

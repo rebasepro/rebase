@@ -144,7 +144,7 @@ export const Sheet: React.FC<SheetProps> = ({
                         transparent ? "" : "shadow-md bg-surface-card",
                         side === "top" || side === "bottom" ? "w-full" : "h-full",
                         side === "left" || side === "top" ? "left-0 top-0" : "right-0 bottom-0",
-                        displayed && open ? "opacity-100" : "opacity-50",
+                        displayed && open ? "opacity-100" : "opacity-0",
                         !displayed || !open ? transformValue[side] : "",
                         className
                     )}

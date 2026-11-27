@@ -73,7 +73,8 @@ export function NavigationCardBinding({
                     }
                 }}>
                 <StarIcon
-                    className={favourite ? "text-secondary" : "text-surface-400 dark:text-surface-500"}/>
+                    size={15}
+                    className={favourite ? "text-amber-500 fill-amber-500" : "text-text-disabled dark:text-text-disabled-dark"}/>
             </IconButton>
         ]
         : [];

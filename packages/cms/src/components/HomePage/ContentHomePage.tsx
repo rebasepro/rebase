@@ -377,7 +377,7 @@ export function ContentHomePage({
                 </div>
                 {/* search & actions */}
                 <div
-                    className="w-full sticky py-4 transition-all duration-400 ease-in-out top-0 z-10 flex flex-row gap-4"
+                    className="w-full sticky py-3 bg-surface-sheet/90 backdrop-blur-md transition-all duration-300 ease-in-out top-0 z-10 flex flex-row gap-3"
                     style={{ top: direction === "down" ? -84 : 0 }}
                 >
                     <SearchBar

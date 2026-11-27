@@ -17,16 +17,17 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(({
     style,
     ...props
 }, ref) => {
-    const onKeyPress = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key === "Enter" || e.key === " ") {
-            onClick?.();
+    const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (onClick && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+            if (e.key === " ") e.preventDefault();
+            onClick();
         }
     }, [onClick]);
 
     return (
         <div
             ref={ref}
-            onKeyPress={onKeyPress}
+            onKeyDown={onKeyDown}
             role={onClick ? "button" : undefined}
             tabIndex={onClick ? 0 : undefined}
             onClick={onClick}
