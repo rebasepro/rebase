@@ -80,6 +80,41 @@ export function EntityFormSkeleton({
 
     const fieldSkeleton = (field: ResolvedFormField, inRail: boolean) => {
         const property = collection.properties[field.key] as Property | undefined;
+
+        // Rail fields render through `InspectorRow`: a compact 2-column row
+        // (`88px` muted label on the left, compact ghost control or wrapping
+        // dot-pills on the right, no description line underneath).
+        if (inRail && !reading) {
+            const isMultiPill = property?.type === "array"
+                || (property?.type === "relation"
+                    && property.relation !== undefined
+                    && "cardinality" in property.relation
+                    && property.relation.cardinality === "many");
+            return (
+                <div
+                    key={field.key}
+                    className={cls(
+                        "flex gap-2.5 min-w-0 min-h-[30px]",
+                        isMultiPill ? "items-start pt-0.5" : "items-center"
+                    )}
+                >
+                    <div className={cls("w-[88px] shrink-0 flex items-center", isMultiPill ? "pt-1" : "")}>
+                        <Skeleton height={10} className={"w-16"}/>
+                    </div>
+                    <div className={"flex-1 min-w-0 flex items-center gap-1.5 flex-wrap"}>
+                        {isMultiPill ? (
+                            <>
+                                <Skeleton height={22} width={64} className={"rounded-full"}/>
+                                <Skeleton height={22} width={56} className={"rounded-full"}/>
+                            </>
+                        ) : (
+                            <Skeleton height={22} className={"w-3/4 rounded-md"}/>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
         // Where FieldBlock puts the label decides the shape: inside a one-line
         // box, above anything else, or nowhere for a field whose panel header
         // is its label.
@@ -169,18 +204,27 @@ export function EntityFormSkeleton({
             {showRail && (
                 <aside className={cls(
                     // FormRail's own box: width, padding and surface.
-                    "flex flex-col gap-6 shrink-0 w-76 @7xl/form:w-84 overflow-y-auto",
-                    "px-5 py-6 bg-surface-sheet"
+                    "flex flex-col gap-5 shrink-0 w-80 @7xl/form:w-88 overflow-y-auto",
+                    "px-4 py-5 bg-surface-sheet"
                 )}>
                     {layout.sidebar.length > 0 && (
-                        <div className={"flex flex-col gap-5"}>
+                        <div className={"flex flex-col gap-1.5"}>
+                            {!reading && (
+                                <div className={"h-4 flex items-center mb-1"}>
+                                    <Skeleton height={10} width={64}/>
+                                </div>
+                            )}
                             {layout.sidebar.map(field => fieldSkeleton(field, true))}
                         </div>
                     )}
                     {layout.showRecordMeta && status === "existing" && (
                         // RecordMeta's rows: the caption, the id with its copy
                         // button, the two timestamps.
-                        <div className={"flex flex-col gap-2.5"}>
+                        <div className={cls(
+                            "flex flex-col gap-2.5",
+                            layout.sidebar.length > 0 && "pt-4 border-t",
+                            layout.sidebar.length > 0 && defaultBorderMixin
+                        )}>
                             <div className={"h-[17.4px] flex items-center"}><Skeleton height={10} width={56}/></div>
                             <div className={"h-[28.5px] flex items-center"}><Skeleton height={12}/></div>
                             {CREATED_KEYS.some(key => key in collection.properties) &&
