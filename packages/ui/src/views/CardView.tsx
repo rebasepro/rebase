@@ -501,10 +501,16 @@ export function CardView<T>({
 /** A card that exists but has not been read yet. */
 function UnreadCard({ height }: { height: number }) {
     return (
-        <Card className="p-3 flex flex-col gap-2" style={{ height }} aria-busy={true}>
-            <Skeleton className="grow"/>
-            <Skeleton width={120} height={12}/>
-            <Skeleton width={80} height={10}/>
+        <Card className="overflow-hidden flex flex-col" style={{ height }} aria-busy={true}>
+            <Skeleton className="aspect-[16/10] w-full rounded-none"/>
+            <div className="p-3.5 flex flex-col flex-1 gap-2">
+                <Skeleton className="w-4/5" height={14}/>
+                <Skeleton className="w-3/5" height={11}/>
+                <div className="mt-auto pt-2.5 border-t border-hairline flex items-center justify-between">
+                    <Skeleton width={60} height={18}/>
+                    <Skeleton width={40} height={11}/>
+                </div>
+            </div>
         </Card>
     );
 }

@@ -50,7 +50,6 @@ function CollectionEntityActions({ entity }: { entity: Entity<Record<string, unk
     if (actions.length === 0) return rowActions;
 
     const placed = placeEntityActions(actions);
-    const collapsedGroups = [placed.own, placed.generic, placed.destructive].filter(group => group.length > 0);
     const clickProps: EntityActionClickProps<Record<string, unknown>> = {
         view: "collection",
         row: rowOfEntity(entity, scope.collection),
@@ -68,22 +67,29 @@ function CollectionEntityActions({ entity }: { entity: Entity<Record<string, unk
         openEntityMode: scope.openEntityMode
     };
 
+    // Only keep *enabled* inline actions on the card surface; disabled ones
+    // stay available inside the overflow menu (with their reason) instead of
+    // stamping dead dimmed icons onto every card.
+    const enabledInline: EntityAction[] = [];
+    const disabledInline: EntityAction[] = [];
+    for (const action of placed.inline) {
+        const { enabled } = resolveEntityActionState(action, clickProps);
+        if (enabled) enabledInline.push(action);
+        else disabledInline.push(action);
+    }
+    const ownMenuGroup = [...disabledInline, ...placed.own];
+    const collapsedGroups = [ownMenuGroup, placed.generic, placed.destructive].filter(group => group.length > 0);
+
     return (
         <div className="flex items-center gap-0.5 shrink-0" onClick={stopPropagation}>
             {rowActions}
-            {placed.inline.map((action, index) => {
-                const { enabled, disabledReason } = resolveEntityActionState(action, clickProps);
+            {enabledInline.map((action, index) => {
                 const name = entityActionName(action, t);
-                // A disabled icon takes no pointer events: wrapped, the
-                // wrapper hovers, and the tooltip can still say why.
                 return (
-                    <Tooltip key={action.key ?? index}
-                        title={disabledReason ? `${name}: ${disabledReason}` : name}
-                        asChild={enabled}>
+                    <Tooltip key={action.key ?? index} title={name} asChild={true}>
                         <IconButton
                             aria-label={name}
-                            disabled={!enabled}
-                            size="small"
+                            size="smallest"
                             onClick={(event: React.MouseEvent) => {
                                 event.stopPropagation();
                                 action.onClick(clickProps);
@@ -95,8 +101,9 @@ function CollectionEntityActions({ entity }: { entity: Entity<Record<string, unk
             })}
             {collapsedGroups.length > 0 &&
                 <Menu
-                    trigger={<IconButton aria-label={t("more_actions")} size="small">
-                        <MoreVerticalIcon/>
+                    align="end"
+                    trigger={<IconButton aria-label={t("more_actions")} size="smallest">
+                        <MoreVerticalIcon size={14}/>
                     </IconButton>}>
                     {collapsedGroups.map((group, groupIndex) => (
                         <React.Fragment key={groupIndex}>

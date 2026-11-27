@@ -133,21 +133,38 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
         </div>
     );
 
+    const actions = renderActions?.(entity);
+
     return (
         <Card
             className={cls(
-                "cursor-pointer overflow-hidden group relative",
-                "transition-all duration-200",
-                "hover:shadow-lg hover:-translate-y-0.5",
-                selected && "ring-2 ring-primary bg-surface-raised",
-                highlighted && !selected && "ring-2 ring-primary/50 bg-surface-card-hover"
+                "flex flex-col h-full cursor-pointer overflow-hidden group relative",
+                "transition-colors duration-150",
+                "hover:bg-surface-card-hover hover:border-hairline-strong",
+                selected && "ring-1 ring-primary border-primary/50 bg-surface-raised",
+                highlighted && !selected && "ring-1 ring-primary/50 bg-surface-card-hover"
             )}
             onClick={handleClick}
         >
-            {/* Thumbnail area — image slot. Where `fields` leaves every image
-                out there is none, and the checkbox goes beside the title. */}
+            {/* Floating hover-revealed action bar — never sits beside the title
+                where it would crush the headline to 12 characters. */}
+            {actions && (
+                <div className={cls(
+                    "absolute top-2 right-2 z-10",
+                    "opacity-0 group-hover:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100",
+                    "transition-opacity duration-150",
+                    "rounded-md p-0.5 border border-hairline",
+                    imagePlace
+                        ? "bg-surface-frame/80 backdrop-blur-md shadow-sm"
+                        : "bg-surface-card/95 backdrop-blur-sm shadow-xs"
+                )}>
+                    {actions}
+                </div>
+            )}
+
+            {/* Full-bleed cover image — edge-to-edge 16:10, no padded letterbox. */}
             {imagePlace && (
-                <div className="aspect-[4/3] relative overflow-hidden bg-surface-well border-b border-hairline p-3 [&_img]:!object-contain">
+                <div className="aspect-[16/10] relative overflow-hidden bg-surface-well border-b border-hairline [&_img]:!object-cover [&_img]:!w-full [&_img]:!h-full [&_img]:transition-transform [&_img]:duration-300 group-hover:[&_img]:scale-[1.02]">
                     {slots.image ? (
                         <div className="w-full h-full">
                             <SlotValue slot={slots.image} size="medium" fill={true}/>
@@ -161,14 +178,21 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                         </div>
                     )}
 
-                    {/* Hover overlay */}
+                    {/* Subtle hover scrim so floating controls stay legible */}
                     <div className={cls(
-                        "absolute inset-0 bg-white/0 group-hover:bg-white/[0.06]",
-                        "transition-colors duration-200"
+                        "absolute inset-0 bg-black/0 group-hover:bg-black/10 pointer-events-none",
+                        "transition-colors duration-150"
                     )}/>
 
                     {selectionEnabled && (
-                        <div className={cls("absolute", size === "xs" || size === "s" ? "top-1 left-1" : "top-2 left-2")}>
+                        <div className={cls(
+                            "absolute z-10 transition-opacity duration-150",
+                            size === "xs" || size === "s" ? "top-1.5 left-1.5" : "top-2 left-2",
+                            "rounded-md bg-surface-frame/75 backdrop-blur-md p-0.5 border border-white/10 shadow-xs",
+                            selected
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+                        )}>
                             {checkbox}
                         </div>
                     )}
@@ -176,88 +200,81 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
             )}
 
             {/* Content area */}
-            <div className="p-3">
-                {/* No id line here.
-                    A card used to print the row id above its title, always —
-                    a truncated uuid (`isId: "uuid"` is the default) too short
-                    to copy and not what a card is read for. The list row and
-                    the board card show an id only when nothing else names the
-                    record; the card was the one surface that showed it even
-                    when it had a title, and the id is still the fallback below
-                    for a record that has none. The table's ID column, which is
-                    full width, copyable and governed by
-                    `hideIdFromCollection`, is where an id is actually read. */}
-
-                {/* Title slot, and the record's actions beside it */}
-                <div className="flex items-start gap-1">
-                    {selectionEnabled && !imagePlace && checkbox}
-                    <div className="flex-1 min-w-0 truncate my-1 text-sm font-medium min-h-[20px]">
+            <div className="p-3.5 flex flex-col flex-1 gap-2 min-w-0">
+                {/* Full-width title (up to 2 lines) */}
+                <div className="flex items-start gap-2 min-w-0">
+                    {selectionEnabled && !imagePlace && (
+                        <div className={cls(
+                            "pt-0.5 transition-opacity duration-150",
+                            selected
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+                        )}>
+                            {checkbox}
+                        </div>
+                    )}
+                    <div className="flex-1 min-w-0 line-clamp-2 text-[14px] font-medium leading-snug tracking-[-0.01em] text-text-primary dark:text-text-primary-dark">
                         {slots.title ? (
                             terms.length > 0 && typeof slots.title.value === "string"
                                 ? <Highlighted text={slots.title.value} terms={terms}/>
                                 : <SlotValue slot={slots.title} size="small"/>
                         ) : (
-                            <Typography variant="body2" className="text-surface-500">
+                            <Typography variant="body2" color="disabled">
                                 {entity.id}
                             </Typography>
                         )}
                     </div>
-                    {renderActions?.(entity)}
                 </div>
 
-                {/* Subtitle slot — or, while searching, where the hit was. A
-                    card whose match is in a field it does not show looks as
-                    arbitrary as a list row does. */}
+                {/* Subtitle / excerpt — clean 2-line rhythm */}
                 {offSlot ? (
                     <MatchExplanation
                         match={offSlot}
                         label={fieldLabel(collection.properties as Record<string, unknown>, offSlot.field)}
                     />
                 ) : slots.subtitle && (
-                    <div className="line-clamp-3 [&_div]:line-clamp-3 text-xs text-surface-600 dark:text-surface-400 [&_p]:!my-1 [&_p:first-child]:!mt-0 [&_p:last-child]:!mb-0">
+                    <div className="line-clamp-2 [&_div]:line-clamp-2 text-xs leading-relaxed text-text-secondary dark:text-text-secondary-dark [&_p]:!my-0">
                         {terms.length > 0 && typeof slots.subtitle.value === "string"
                             ? <Highlighted text={slots.subtitle.value} terms={terms}/>
                             : <SlotValue slot={slots.subtitle} size="small"/>}
                     </div>
                 )}
 
-                {/* Relation chips slot */}
-                {slots.relations.length > 0 && (
-                    <div className="flex items-center gap-1 mt-1 overflow-hidden max-w-full flex-wrap">
+                {/* Relation & tag chips — compact single-line ceiling */}
+                {(slots.relations.length > 0 || slots.tags) && (
+                    <div className="flex items-center gap-1 mt-0.5 overflow-hidden max-w-full flex-wrap">
                         {slots.relations.map((rel) => (
                             rel.items.map((item) => (
                                 <Chip
                                     key={`${rel.propertyKey}-${item.id}`}
                                     size="smallest"
                                     colorScheme={rel.colorScheme}
-                                    className="!text-xs !leading-tight !py-0 shrink-0 max-w-[100px] truncate"
+                                    className="!text-[11px] !leading-tight shrink-0 max-w-[110px] truncate"
                                 >
                                     {item.displayName}
                                 </Chip>
                             ))
                         ))}
                         {slots.relations.some(r => r.totalCount > r.items.length) && (
-                            <span className="text-xs text-surface-400 dark:text-surface-500 shrink-0">
+                            <span className="text-[11px] text-text-disabled dark:text-text-disabled-dark shrink-0">
                                 +{slots.relations.reduce((acc, r) => acc + Math.max(0, r.totalCount - r.items.length), 0)}
                             </span>
                         )}
+                        {slots.tags && <TagChips slot={slots.tags} max={2}/>}
                     </div>
                 )}
 
-                {/* Status + tags slot — "free chips beside the status" */}
-                {(slots.status || slots.tags) && (
-                    <div className="flex items-center gap-1 mt-1 flex-wrap">
-                        {slots.status && <SlotValue slot={slots.status} size="small"/>}
-                        {slots.tags && <TagChips slot={slots.tags}/>}
-                    </div>
-                )}
-
-                {/* Date slot — a card is a list row with the image on top, and the
-                    row has always shown it. It was the one slot the card resolved
-                    and never rendered. */}
-                {slots.date && (
-                    <div className="mt-1 text-xs text-surface-500 dark:text-surface-400">
-                        {slots.date.formatted}
+                {/* Anchored footer — status left, date right, aligned across the row */}
+                {(slots.status || slots.date) && (
+                    <div className="mt-auto pt-2.5 border-t border-hairline flex items-center justify-between gap-2 min-w-0">
+                        <div className="min-w-0 truncate">
+                            {slots.status && <SlotValue slot={slots.status} size="small"/>}
+                        </div>
+                        {slots.date && (
+                            <span className="text-[11px] font-medium text-text-disabled dark:text-text-disabled-dark tabular-nums whitespace-nowrap shrink-0">
+                                {slots.date.formatted}
+                            </span>
+                        )}
                     </div>
                 )}
             </div>
