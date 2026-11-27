@@ -67,8 +67,7 @@ export function FormRail({
             {fields.length > 0 && (
                 <FormDensityContext.Provider value="inspector">
                     <div className={"flex flex-col gap-1.5"}>
-                        <Typography variant={"caption"}
-                            className={"text-[11px] font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-1"}>
+                        <Typography variant={"micro"} color={"disabled"} className={"mb-1"}>
                             Properties
                         </Typography>
                         {render && fields.map(render)}
@@ -101,9 +100,8 @@ export function RecordMeta({ entity }: { entity: Entity<Record<string, unknown>>
     const updatedAt = pickDate(entity.values, ["updated_at", "updatedAt", "modified_at"]);
 
     return (
-        <div className={"flex flex-col gap-2.5"}>
-            <Typography variant={"caption"}
-                className={"text-xs font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark"}>
+        <div className={"flex flex-col gap-1.5"}>
+            <Typography variant={"micro"} color={"disabled"} className={"mb-1"}>
                 Record
             </Typography>
 
@@ -133,12 +131,12 @@ function MetaRow({
     };
 
     return (
-        <div className={"flex items-baseline justify-between gap-3 min-w-0"}>
-            <span className={"text-xs text-text-disabled dark:text-text-disabled-dark shrink-0"}>
+        <div className={"flex items-center gap-2.5 min-h-[26px] min-w-0"}>
+            <Typography variant={"caption"} color={"secondary"} className={"w-24 shrink-0 font-medium truncate"}>
                 {label}
-            </span>
-            <span className={"flex items-center gap-1 min-w-0"}>
-                <span className={"font-mono text-xs text-text-secondary dark:text-text-secondary-dark truncate"}
+            </Typography>
+            <span className={"flex items-center justify-between gap-1 flex-1 min-w-0"}>
+                <span className={"font-mono text-xs tabular-nums text-text-secondary dark:text-text-secondary-dark truncate"}
                     title={value}>
                     {value}
                 </span>

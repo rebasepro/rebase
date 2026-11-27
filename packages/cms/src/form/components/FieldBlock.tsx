@@ -161,7 +161,11 @@ export function FieldBlock({
     const domScope = useFormDomScope();
 
     if (isInspector && showLabel) {
-        const multiLine = property?.type === "array" || property?.type === "relation";
+        const multiLine = property?.type === "array"
+            || (property?.type === "relation"
+                && property.relation !== undefined
+                && "cardinality" in property.relation
+                && property.relation.cardinality === "many");
         return (
             <InspectorRow
                 id={fieldDomId(domScope, propertyKey)}
@@ -215,10 +219,19 @@ export function FieldBlock({
             {/* `data-field-control` names the slot for anything measuring the
                 control itself. A class cannot: the label row carries
                 `min-w-0` too, and a selector for it measured the label. */}
-            <div className={"min-w-0"} data-field-control={""}>
+            <div className={"relative min-w-0"} data-field-control={""}>
                 <ErrorBoundary>
                     {children}
                 </ErrorBoundary>
+                {/* For inside-labelled fields, tuck the hover-revealed key hint
+                    inside the top-right corner of the box rather than hanging
+                    it in the 24px inter-row gap below the field. */}
+                {footed && property && (
+                    <PropertyKeyHint
+                        propertyKey={propertyKey}
+                        className={"absolute top-2 right-3 z-10"}
+                    />
+                )}
             </div>
 
             {/* Under the control, where it reads as a note about the thing you
@@ -233,27 +246,12 @@ export function FieldBlock({
                 </Typography>
             )}
 
-            {/* A label drawn inside the box: the description is indented to
-                the value, as the binding's own error line is (`ml-3.5`), and
-                the key sits at the end of that line. A field with no
-                description has no line to put it on, so the key hangs in the
-                row gap below the box rather than reserving a line under every
-                field for something only a hover shows. */}
-            {footed && (description || property) && (
-                <div className={cls(
-                    "flex items-start gap-2 min-w-0 ml-3.5",
-                    description ? "mt-1.5" : "absolute top-full right-0 mt-1"
-                )}>
-                    {description && (
-                        <Typography variant={"caption"}
-                            color={"disabled"}
-                            className={"grow min-w-0 leading-snug"}>
-                            {description}
-                        </Typography>
-                    )}
-                    {property && <PropertyKeyHint propertyKey={propertyKey}
-                        className={description ? "ml-auto shrink-0" : undefined}/>}
-                </div>
+            {footed && description && (
+                <Typography variant={"caption"}
+                    color={"disabled"}
+                    className={"mt-1.5 ml-3.5 leading-snug"}>
+                    {description}
+                </Typography>
             )}
         </div>
     );

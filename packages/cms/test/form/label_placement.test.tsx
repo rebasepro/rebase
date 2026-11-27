@@ -100,19 +100,20 @@ describe("FieldBlock with the label inside the control", () => {
     };
 
     it("draws no label row, and still the description, indented to the value", () => {
-        render(
+        const { container } = render(
             <FieldBlock propertyKey={"subtotal"} property={property} showLabel={false} labelInside>
                 <span>185.11</span>
             </FieldBlock>
         );
         expect(screen.queryByText("Subtotal")).toBeNull();
         const description = screen.getByText("Sum of all line items before tax and shipping");
-        expect(description.parentElement?.className).toContain("ml-3.5");
-        // The key the label row used to reveal sits on the description's line.
-        expect(description.parentElement?.querySelector("button")).toBeTruthy();
+        expect(description.className).toContain("ml-3.5");
+        // The key hint is tucked inside the control corner rather than the inter-row gap.
+        const control = container.querySelector("[data-field-control]");
+        expect(control?.querySelector("button")).toBeTruthy();
     });
 
-    it("keeps the key hint for a field with no description, hanging below the box", () => {
+    it("keeps the key hint for a field with no description, tucked inside the box", () => {
         const { container } = render(
             <FieldBlock propertyKey={"subtotal"}
                 property={{ type: "number", name: "Subtotal" }}
@@ -123,7 +124,7 @@ describe("FieldBlock with the label inside the control", () => {
         );
         const hint = container.querySelector("button");
         expect(hint).toBeTruthy();
-        expect(hint?.parentElement?.className).toContain("absolute");
+        expect(hint?.className).toContain("absolute");
     });
 });
 

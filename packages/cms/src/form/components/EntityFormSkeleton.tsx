@@ -98,7 +98,7 @@ export function EntityFormSkeleton({
                         isMultiPill ? "items-start pt-0.5" : "items-center"
                     )}
                 >
-                    <div className={cls("w-[88px] shrink-0 flex items-center", isMultiPill ? "pt-1" : "")}>
+                    <div className={cls("w-24 shrink-0 flex items-center", isMultiPill ? "h-[30px]" : "")}>
                         <Skeleton height={10} className={"w-16"}/>
                     </div>
                     <div className={"flex-1 min-w-0 flex items-center gap-1.5 flex-wrap"}>

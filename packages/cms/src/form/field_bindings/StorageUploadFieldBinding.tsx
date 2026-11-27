@@ -48,7 +48,7 @@ import {
 // because the hint reflows once files exist ("Drag to reorder"), and any
 // content-driven height makes a filled field taller than the same field
 // empty. Extra thumbnails scroll horizontally instead of growing it.
-const dropZoneClasses = "box-border relative pt-[2px] h-[172px] items-center border border-transparent outline-none rounded-md duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary";
+const dropZoneClasses = "box-border relative pt-[2px] items-center border border-transparent outline-none rounded-lg duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary";
 const disabledClasses = fieldBackgroundDisabledMixin;
 const nonActiveDropClasses = fieldBackgroundHoverMixin
 const activeDropClasses = "pt-0 border-2 border-solid"
@@ -306,6 +306,8 @@ function FileDropComponent({
         }
     );
 
+    const singleFilled = !multipleFilesSupported && internalValue.length > 0;
+
     return (
         <div
             {...getRootProps()}
@@ -314,7 +316,7 @@ function FileDropComponent({
                 disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
                 disabled ? "text-surface-accent-600 dark:text-surface-accent-500" : "",
                 dropZoneClasses,
-                multipleFilesSupported && internalValue.length ? "" : "flex",
+                singleFilled ? "flex flex-row items-center min-h-[112px] py-2 px-3 gap-3" : "h-[172px] flex flex-col justify-center",
                 {
                     [nonActiveDropClasses]: !isDragActive,
                     [activeDropClasses]: isDragActive, // OS file drag active
@@ -324,15 +326,13 @@ function FileDropComponent({
                 })}
         >
             <div
-                className={cls("flex items-center gap-2 p-1 px-3 no-scrollbar",
+                className={cls("flex items-center gap-2 no-scrollbar",
+                    singleFilled ? "shrink-0" : "p-1 px-3",
                     // Horizontal only. `overflow-auto` scrolls both axes, so any
                     // pixel of vertical overflow turned the field into a
                     // scrollable box with nothing visible to scroll to.
-                    multipleFilesSupported && internalValue.length ? "overflow-x-auto overflow-y-hidden" : "",
-                    // A fixed height, not a minimum: the 118px preview overflowed
-                    // a `min-h`, so a field with a file stood taller than the same
-                    // field empty. 126px is the preview plus its padding.
-                    "h-[126px]"
+                    multipleFilesSupported && internalValue.length ? "overflow-x-auto overflow-y-hidden w-full" : "",
+                    singleFilled ? "" : (internalValue.length ? "h-[126px]" : "")
                 )}
             >
                 <input
@@ -359,14 +359,17 @@ function FileDropComponent({
             </div>
 
             <div
-                // Two lines' worth, fixed: the hint gains "Drag to reorder" once
-                // the field holds something, and a reflow there put the filled
-                // state 25px taller than the empty one.
-                className="box-border mx-3 mb-2.5 h-[34px] flex items-center justify-center text-center">
-                <Typography align={"center"}
+                className={cls(
+                    "box-border flex items-center",
+                    singleFilled
+                        ? "flex-1 min-w-0 justify-start text-left"
+                        : "mx-3 mb-2.5 h-[34px] justify-center text-center"
+                )}>
+                <Typography align={singleFilled ? "left" : "center"}
                             variant={"caption"}
+                            color={"disabled"}
                             className={disabled ? "text-surface-accent-600 dark:text-surface-accent-500" : ""}>
-                    {helpText}
+                    {singleFilled ? "Drop or click to replace" : helpText}
                 </Typography>
             </div>
         </div>

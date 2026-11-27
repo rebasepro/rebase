@@ -211,10 +211,10 @@ export function deriveRebaseTheme(config: RebaseThemeConfig = {}): DerivedRebase
     const primaryDark = oklchToHex(clamp(accentOklch.l - 0.12, 0.15, 0.85), accentOklch.c * 0.95, accentOklch.h);
     const onPrimary = pickOnColor(accentHex);
 
-    // Light ladder: airy porcelain frame -> near-white sheet -> pure white card
+    // Light ladder: cool-neutral frame -> soft sheet -> pure white card
     const stepBoost = high ? 0.014 : 0;
-    const lightFrameL = bgOklch && bgOklch.l > 0.7 ? clamp(bgOklch.l - 0.025 - stepBoost, 0.89, 0.97) : 0.967 - stepBoost;
-    const lightSheetL = clamp(lightFrameL + 0.024 + stepBoost * 0.4, 0.955, 0.992);
+    const lightFrameL = bgOklch && bgOklch.l > 0.7 ? clamp(bgOklch.l - 0.028 - stepBoost, 0.89, 0.965) : 0.961 - stepBoost;
+    const lightSheetL = clamp(lightFrameL + 0.015 + stepBoost * 0.3, 0.945, 0.980);
     const lightCardL = 1.0;
 
     // Dark ladder: frame -> sheet -> card -> raised -> lifted (each step lighter)

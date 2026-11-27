@@ -33,17 +33,17 @@ on screen with every card darker than the sheet it sat on.
 
 | Role | Class | Light | Dark | Used for |
 |---|---|---|---|---|
-| Frame | `bg-surface-frame` | `#f4f5f7` | `#090a0c` | drawer, rail, app bar, the page around the sheet |
-| Sheet | `bg-surface-sheet` | `#fbfcfe` | `#111316` | the content area; table headers |
+| Frame | `bg-surface-frame` | `#f1f3f6` | `#090a0c` | drawer, rail, app bar, the page around the sheet |
+| Sheet | `bg-surface-sheet` | `#f6f7f9` | `#111316` | the content area; table headers |
 | Card | `bg-surface-card` | `#ffffff` | `#16181c` | cards, paper, dialogs, menus, popovers, table rows |
 | Card hover | `hover:bg-surface-card-hover` | `#f8f9fb` | `#1b1d21` | a clickable card or row |
-| Raised | `bg-surface-raised` | `#f0f1f4` | `#212429` | neutral buttons, chips, tiles inside a card, avatars, skeletons |
-| Raised hover | `hover:bg-surface-raised-hover` | `#e7e9ed` | `#292c32` | also badges, disabled slider parts |
+| Raised | `bg-surface-raised` | `#edeff3` | `#212429` | neutral buttons, chips, tiles inside a card, avatars, skeletons |
+| Raised hover | `hover:bg-surface-raised-hover` | `#e3e6eb` | `#292c32` | also badges, disabled slider parts |
 | Lifted | `bg-surface-lifted` | `#ffffff` | `#292c32` | the active segment on a track, a switch thumb |
-| Field | `bg-surface-field` | black 3.8% | white 6.5% | inputs, search, segmented tracks, kanban columns, neutral alerts. A field has no edge, so this fill is the whole box |
-| Field hover | `hover:bg-surface-field-hover` | black 5.8% | white 9.5% | |
-| Hover | `hover:bg-surface-hover` | black 3.5% | white 6% | a transparent row, nav item, menu item, icon button |
-| Active | `bg-surface-active` | black 6% | white 9% | selected or checked item, slider track, drop target |
+| Field | `bg-surface-field` | black 4.5% | white 6.5% | inputs, search, segmented tracks, kanban columns, neutral alerts. A field has no edge, so this fill is the whole box |
+| Field hover | `hover:bg-surface-field-hover` | black 6.5% | white 9.5% | |
+| Hover | `hover:bg-surface-hover` | black 3.8% | white 6% | a transparent row, nav item, menu item, icon button |
+| Active | `bg-surface-active` | black 6.5% | white 9% | selected or checked item, slider track, drop target |
 | Scrim | `bg-surface-scrim` | black 40% | black 60% | dialog and sheet backdrops |
 | Well | `bg-surface-well` | `#f4f5f7` | `#090a0c` | an inset code well (a query, a log tail, a connection string): the one surface that goes down the ladder, darker than its card on purpose |
 | Hairline | `border-hairline` | black 7.5% | white 8% | cards on the sheet, dividers |

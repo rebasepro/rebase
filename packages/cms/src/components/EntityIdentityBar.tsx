@@ -590,7 +590,6 @@ export function EntitySaveActions({
 function SaveState({
     dirty,
     saving,
-    status,
     t
 }: {
     dirty: boolean;
@@ -603,9 +602,6 @@ function SaveState({
     }
     if (dirty) {
         return <StateText>{t("unsaved_changes_title")}</StateText>;
-    }
-    if (status === "existing") {
-        return <StateText>{t("entity_saved") ?? "Saved"}</StateText>;
     }
     return null;
 }

@@ -1,6 +1,7 @@
 import React from "react";
 import { cls } from "../util";
 import { Tooltip } from "./Tooltip";
+import { Typography } from "./Typography";
 
 export interface InspectorRowProps {
     /** Quiet 12px property label rendered in the left column. */
@@ -27,9 +28,10 @@ export interface InspectorRowProps {
 /**
  * Compact 2-column property row for side rails and inspectors.
  *
- * Keeps labels uniform (88px muted 12px column on the left) and pairs them
- * with compact controls or read-only values on the right — avoiding stacked
- * heavy slabs in narrow inspector panes.
+ * Keeps labels uniform (`w-24` / 96px muted 12px column on the left) and pairs
+ * them with compact controls or read-only values on the right. For `align="start"`,
+ * the label cell keeps a fixed `h-[30px]` flex-center box so row 1 aligns on the
+ * exact same baseline as `align="center"` rows.
  */
 export function InspectorRow({
     label,
@@ -45,12 +47,14 @@ export function InspectorRow({
     const labelNode = (
         <div
             className={cls(
-                "group/label w-[88px] shrink-0 flex items-center gap-1 min-w-0 text-xs font-medium text-text-secondary dark:text-text-secondary-dark",
-                align === "start" ? "pt-1.5" : ""
+                "group/label w-24 shrink-0 flex items-center gap-1 min-w-0",
+                align === "start" ? "h-[30px]" : ""
             )}
         >
-            <span className="truncate">{label}</span>
-            {required && <span className="text-red-500 shrink-0">*</span>}
+            <Typography variant="caption" color="secondary" className="font-medium truncate">
+                {label}
+            </Typography>
+            {required && <span className="text-red-500 text-xs shrink-0">*</span>}
             {labelAdornment}
         </div>
     );

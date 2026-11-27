@@ -104,10 +104,10 @@ export function Chip({
             <div
                 ref={ref}
                 className={cls(
-                    "rounded-full max-w-full w-max h-fit font-medium inline-flex gap-1.5",
+                    "rounded-md max-w-full w-max h-fit font-medium inline-flex gap-1.5",
                     "text-ellipsis items-center transition-colors duration-150",
-                    "bg-surface-card border border-hairline text-text-primary dark:text-text-primary-dark",
-                    onClick ? "cursor-pointer hover:bg-surface-card-hover" : "",
+                    "bg-surface-raised text-text-primary dark:text-text-primary-dark",
+                    onClick ? "cursor-pointer hover:bg-surface-raised-hover" : "",
                     sizeClassNames[size],
                     className
                 )}

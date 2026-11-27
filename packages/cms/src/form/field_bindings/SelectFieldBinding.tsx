@@ -8,7 +8,7 @@ import { LabelWithIcon } from "../components/LabelWithIcon";
 import { FormDensityContext } from "../FormFieldsContext";
 import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
-import { Chip, cls, getColorSchemeForSeed, IconButton, Select, SelectItem, XIcon } from "@rebasepro/ui";
+import { cls, IconButton, Select, SelectItem, XIcon } from "@rebasepro/ui";
 import { resolveEnumValues } from "@rebasepro/cms-types";
 
 /**
@@ -67,14 +67,14 @@ export function SelectFieldBinding({
                 size={size}
                 fullWidth={true}
                 invisible={isInspector}
-                chevron={!isInspector}
+                chevron={true}
                 position="item-aligned"
                 // 64px at the form's size, the height of a text field beside it,
                 // whose value is a 16px line where the kit's is 14px.
                 inputClassName={cls(
                     "w-full",
                     label && size === "large" && "min-h-[64px]",
-                    isInspector && "min-h-[28px] px-2 -mx-2 rounded-md hover:bg-surface-hover"
+                    isInspector && "min-h-[30px] px-2 -mx-2 rounded-md hover:bg-surface-hover focus-visible:bg-surface-active focus-visible:ring-1 focus-visible:ring-primary/50"
                 )}
                 label={label}
                 endAdornment={
@@ -94,21 +94,10 @@ export function SelectFieldBinding({
                 // and the box is a text field's height: 40px of padding at the
                 // form's size leaves 24px, a medium chip. A large one (32px)
                 // made the select 8px taller than the text fields beside it.
-                renderValue={(enumKey: string) => {
-                    if (isInspector) {
-                        const cfg = enumValues?.find((e) => String(e.id) === String(enumKey));
-                        const scheme = cfg?.color ?? getColorSchemeForSeed(String(enumKey));
-                        return (
-                            <Chip variant="dot" size="smallest" colorScheme={scheme}>
-                                {cfg?.label ?? enumKey}
-                            </Chip>
-                        );
-                    }
-                    return <EnumValuesChip
-                        enumKey={enumKey}
-                        enumValues={enumValues}
-                        size={label ? (size === "large" ? "medium" : "small") : size}/>;
-                }}
+                renderValue={(enumKey: string) => <EnumValuesChip
+                    enumKey={enumKey}
+                    enumValues={enumValues}
+                    size={isInspector ? "small" : (label ? (size === "large" ? "medium" : "small") : size)}/>}
             >
                 {enumValues && enumValues.map((option) => {
                     return <SelectItem

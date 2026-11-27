@@ -53,6 +53,8 @@ export interface SerializableAdminBaseOptions {
     customProps?: unknown;
     /** Narrows the filter operators offered for this property. Plain data. */
     filterOperators?: readonly WhereFilterOp[];
+    /** Secondary metadata field collapsed under a disclosure in the form rail. */
+    secondary?: boolean;
     // Field, Preview and Filter are dropped (ComponentRef is not serializable)
 }
 

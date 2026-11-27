@@ -52,7 +52,7 @@ export function DateTimeFieldBinding({
                 timezone={getDatePropertyTimezone(property)}
                 clearable={isInspector ? false : property.admin?.clearable}
                 invisible={isInspector}
-                pickerButton={!isInspector}
+                pickerButton={true}
                 locale={locale}
                 error={showError}
                 disabled={disabled}
@@ -69,7 +69,7 @@ export function DateTimeFieldBinding({
                 // labelled box is sized for a 24px line.
                 inputClassName={
                     isInspector
-                        ? "text-xs tabular-nums px-2 -mx-2 rounded-md hover:bg-surface-hover"
+                        ? "text-xs tabular-nums min-h-[30px] px-2 -mx-2 rounded-md hover:bg-surface-hover"
                         : (!hideLabel && size === "large" ? "text-base" : undefined)
                 }
             />

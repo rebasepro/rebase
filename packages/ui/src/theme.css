@@ -331,20 +331,19 @@
    `.dark` are the only switches. */
 :root,
 [data-theme="light"] {
-    --surface-frame: #f4f5f7;
-    --surface-sheet: #fbfcfe;
+    --surface-frame: #f1f3f6;
+    --surface-sheet: #f6f7f9;
     --surface-card: #ffffff;
     --surface-card-hover: #f8f9fb;
-    --surface-raised: #f0f1f4;
-    --surface-raised-hover: #e7e9ed;
+    --surface-raised: #edeff3;
+    --surface-raised-hover: #e3e6eb;
     --surface-lifted: #ffffff;
     /* A field has no edge, so the fill alone has to read as a box on white
-       and on the sheet. Tuned lighter to sit cleanly on the airy #fcfcfd
-       sheet without feeling muddy. */
-    --surface-field: rgb(0 0 0 / 0.038);
-    --surface-field-hover: rgb(0 0 0 / 0.058);
-    --surface-hover: rgb(0 0 0 / 0.035);
-    --surface-active: rgb(0 0 0 / 0.06);
+       and on the sheet. 4.5% stays airy while keeping crisp edges on #ffffff. */
+    --surface-field: rgb(0 0 0 / 0.045);
+    --surface-field-hover: rgb(0 0 0 / 0.065);
+    --surface-hover: rgb(0 0 0 / 0.038);
+    --surface-active: rgb(0 0 0 / 0.065);
     --surface-scrim: rgb(0 0 0 / 0.4);
     /* The one surface that goes DOWN the ladder on purpose: a code well, a
        query, a log tail, a connection string, recessed into its card. */

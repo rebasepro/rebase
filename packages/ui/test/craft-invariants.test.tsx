@@ -127,15 +127,15 @@ describe("craft invariants — stable-order MultiSelect", () => {
 });
 
 describe("craft invariants — Chip variant='dot' & InspectorRow", () => {
-    it("renders Chip variant='dot' as a rounded-full pill with a colored indicator dot", () => {
+    it("renders Chip variant='dot' as a DESIGN.md-compliant rounded-md chip with a colored indicator dot", () => {
         const { container } = render(
             <Chip variant="dot" colorScheme="blue" size="smallest">Security</Chip>
         );
-        const pill = container.firstElementChild as HTMLElement;
-        expect(pill.className).toContain("rounded-full");
-        expect(pill.className).toContain("border-hairline");
-        expect(pill).toHaveTextContent("Security");
-        const dot = pill.querySelector("span[aria-hidden='true']") as HTMLElement | null;
+        const chip = container.firstElementChild as HTMLElement;
+        expect(chip.className).toContain("rounded-md");
+        expect(chip.className).toContain("bg-surface-raised");
+        expect(chip).toHaveTextContent("Security");
+        const dot = chip.querySelector("span[aria-hidden='true']") as HTMLElement | null;
         expect(dot).not.toBeNull();
         expect(dot?.style.backgroundColor).toBeTruthy();
     });

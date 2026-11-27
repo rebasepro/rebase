@@ -4,8 +4,8 @@ import React from "react";
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { PropertyPreview } from "../../preview";
 
-import { cls, IconButton, paperMixin, Tooltip } from "@rebasepro/ui";
-import { ErrorBoundary, FileTextIcon, MinusIcon } from "@rebasepro/ui";
+import { cls, IconButton, Tooltip } from "@rebasepro/ui";
+import { ErrorBoundary, FileTextIcon, XIcon } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
 
 interface StorageItemPreviewProps {
@@ -33,25 +33,24 @@ export function StorageItemPreview({
 
     return (
         <div className={cls(
-            "relative border-box flex items-center justify-center",
-            size === "large" ? "min-w-[220px] min-h-[220px] max-w-[220px]" : "min-w-[118px] min-h-[118px] max-w-[118px]",
-            paperMixin,
+            "relative border-box flex items-center justify-center rounded-md overflow-hidden bg-surface-well",
+            size === "large" ? "min-w-[220px] min-h-[220px] max-w-[220px]" : "min-w-[96px] min-h-[96px] max-w-[118px]",
             className)}>
 
             {!placeholder && !disabled &&
                 <div
-                    className="absolute rounded-full -top-2 -right-2 z-10 bg-surface-card">
+                    className="absolute rounded-md top-1.5 right-1.5 z-10 bg-surface-card/90 shadow-xs">
 
                     <Tooltip
                         asChild={true}
                         title={t("remove")}>
                         <IconButton aria-label={t("remove")}
-                            size={"small"}
+                            size={"smallest"}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 onRemove(value);
                             }}>
-                            <MinusIcon/>
+                            <XIcon size={13}/>
                         </IconButton>
                     </Tooltip>
                 </div>

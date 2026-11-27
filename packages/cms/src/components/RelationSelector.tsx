@@ -11,7 +11,6 @@ import {
     fieldBackgroundHoverMixin,
     fieldBackgroundInvisibleMixin,
     fieldBackgroundMixin,
-    getColorSchemeForSeed,
     focusedDisabled,
     IconButton,
     iconSize,
@@ -731,7 +730,7 @@ relation } as RelationItem;
                                 onClick={toggleOpen}
                                 className={cls(
                                     inspector
-                                        ? "group/rel min-h-[28px] py-0.5 px-2 -mx-2 rounded-md hover:bg-surface-hover"
+                                        ? "group/rel min-h-[30px] py-0.5 px-2 -mx-2 rounded-md hover:bg-surface-hover focus-visible:outline-none focus-visible:bg-surface-active focus-visible:ring-1 focus-visible:ring-primary/50"
                                         : {
                                             "min-h-[42px] py-1 px-2": size === "small",
                                             "min-h-[56px] py-2 px-4": size === "medium",
@@ -746,7 +745,7 @@ relation } as RelationItem;
                                     className
                                 )}
                             >
-                                <div className="flex justify-between items-center w-full min-w-0">
+                                <div className="flex justify-between items-center w-full min-w-0 gap-1">
                                     {isLoadingSelectedItems ? (
                                         <div className="flex items-center gap-2">
                                             <CircularProgress size="smallest"/>
@@ -756,23 +755,33 @@ relation } as RelationItem;
                                         <div
                                             className={cls(
                                                 "flex flex-wrap items-center text-start flex-1 min-w-0",
-                                                inspector ? "gap-1.5" : "gap-1.5 mr-2"
+                                                inspector ? "gap-1" : "gap-1.5 mr-2"
                                             )}>
                                             {selectedItems.map((item) => {
                                                 if (!useChips || !multiple) {
+                                                    if (inspector) {
+                                                        return (
+                                                            <div key={String(item.id)}
+                                                                className="flex flex-row items-center gap-2 min-w-0 truncate">
+                                                                <span className="text-xs font-medium text-text-primary dark:text-text-primary-dark truncate">
+                                                                    {item.label}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    }
                                                     return (
                                                         <div key={String(item.id)}
                                                             className="flex flex-row items-center gap-1.5 min-w-0 truncate">
                                                             {item.data ? (
                                                                 <EntityPreviewBindingData
-                                                                    size={inspector ? "smallest" : "medium"}
+                                                                    size={"medium"}
                                                                     entity={item.data}
                                                                     includeEntityLink={false}
                                                                     includeId={false}
                                                                     onSidePanelClick={closePopover}
                                                                 />
                                                             ) : (
-                                                                <span className={cls(inspector ? "text-xs font-medium" : "text-sm", "truncate")}>{item.label}</span>
+                                                                <span className="text-sm truncate">{item.label}</span>
                                                             )}
                                                         </div>
                                                     );
@@ -780,11 +789,9 @@ relation } as RelationItem;
                                                 if (inspector) {
                                                     return (
                                                         <Chip
-                                                            variant="dot"
                                                             size="smallest"
-                                                            colorScheme={getColorSchemeForSeed(String(item.id))}
                                                             key={String(item.id)}
-                                                            className="max-w-full"
+                                                            className="max-w-full text-text-primary dark:text-text-primary-dark"
                                                         >
                                                             <span className="truncate">{item.label}</span>
                                                             <XIcon
@@ -829,7 +836,7 @@ relation } as RelationItem;
                                             </span>
                                         )}
 
-                                    <div className="flex items-center flex-shrink-0">
+                                    <div className="flex items-center gap-0.5 flex-shrink-0">
                                         {!multiple && selectedItems.length === 1 && selectedItems[0]?.data && (
                                             <Tooltip title={t("relation_open_record", { label: selectedItems[0].label })}>
                                                 <IconButton aria-label={t("relation_open_record", { label: selectedItems[0].label })}
@@ -852,12 +859,14 @@ relation } as RelationItem;
                                                 </IconButton>
                                             </Tooltip>
                                         )}
-                                        {!inspector && (
-                                            <ChevronDownIcon
-                                                size={size === "small" ? iconSize.small : iconSize.medium}
-                                                className={cls("transition", isPopoverOpen ? "rotate-180" : "")}
-                                            />
-                                        )}
+                                        <ChevronDownIcon
+                                            size={inspector ? 14 : (size === "small" ? iconSize.small : iconSize.medium)}
+                                            className={cls(
+                                                "transition shrink-0",
+                                                inspector && "text-text-disabled dark:text-text-disabled-dark",
+                                                isPopoverOpen ? "rotate-180" : ""
+                                            )}
+                                        />
                                     </div>
                                 </div>
 
@@ -897,7 +906,7 @@ relation } as RelationItem;
                                             ref={searchInputRef}
                                             className={cls(
                                                 focusedDisabled,
-                                                "bg-transparent outline-hidden flex-1 h-full w-full pl-10 pr-4 py-3 text-text-primary dark:text-text-primary-dark placeholder:text-text-secondary dark:placeholder:text-text-secondary-dark"
+                                                "bg-transparent outline-hidden flex-1 h-full w-full pl-9 pr-3 py-2.5 text-[13px] text-text-primary dark:text-text-primary-dark placeholder:text-text-secondary dark:placeholder:text-text-secondary-dark"
                                             )}
                                             placeholder={searchPlaceholder}
                                             value={searchString}
@@ -912,7 +921,7 @@ relation } as RelationItem;
                                     {selectedItems.length > 0 && (
                                         <div
                                             onClick={handleClear}
-                                            className="text-sm justify-center cursor-pointer py-3 px-4 text-text-secondary dark:text-text-secondary-dark hover:text-text-primary dark:hover:text-text-primary-dark"
+                                            className="text-xs font-medium justify-center cursor-pointer py-2.5 px-3 text-text-secondary dark:text-text-secondary-dark hover:text-text-primary dark:hover:text-text-primary-dark"
                                         >
                                             Clear
                                         </div>
@@ -973,29 +982,58 @@ relation } as RelationItem;
                                                     }}
                                                     onSelect={() => onItemClick(item)}
                                                     className={cls(
-                                                        "flex flex-row items-center gap-1.5 m-1 p-1 rounded-xs cursor-pointer ring-offset-transparent",
-                                                        isSelected && "bg-surface-active",
-                                                        "aria-selected:outline-hidden aria-selected:bg-surface-active"
+                                                        "group/opt flex flex-row items-center gap-2 mx-1 my-0.5 px-2 py-1.5 rounded-md cursor-pointer ring-offset-transparent",
+                                                        !multiple && isSelected && "bg-surface-active",
+                                                        "hover:bg-surface-hover aria-selected:outline-hidden aria-selected:bg-surface-active"
                                                     )}
                                                 >
                                                     {multiple && (<InnerCheckBox checked={isSelected}/>)}
-                                                    {item.data ? (
+                                                    {multiple ? (
+                                                        <div className="flex flex-row items-center justify-between gap-2 min-w-0 w-full">
+                                                            <span className="text-[13px] font-medium text-text-primary dark:text-text-primary-dark truncate">
+                                                                {item.label}
+                                                            </span>
+                                                            {item.data && (
+                                                                <Tooltip title={t("relation_open_record", { label: item.label })}>
+                                                                    <IconButton
+                                                                        aria-label={t("relation_open_record", { label: item.label })}
+                                                                        component="div"
+                                                                        size="smallest"
+                                                                        className="opacity-0 group-hover/opt:opacity-60 hover:!opacity-100 transition-opacity shrink-0"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            e.preventDefault();
+                                                                            setPopoverOpen(false);
+                                                                            sidePanelController.open({
+                                                                                id: item.data!.id,
+                                                                                path: item.data!.path,
+                                                                                collection,
+                                                                                updateUrl: true
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        <ArrowRightToLineIcon size={13}/>
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            )}
+                                                        </div>
+                                                    ) : item.data ? (
                                                         <div
                                                             className="flex flex-row items-center gap-2 min-w-0 w-full">
                                                             <EntityPreviewBindingData
-                                                                size={multiple ? "smallest" : "medium"}
+                                                                size={"small"}
                                                                 entity={item.data}
                                                                 includeId={false}
-                                                                includeEntityLink={true}
+                                                                includeEntityLink={false}
                                                             />
                                                         </div>
                                                     ) : (
-                                                        <div>
+                                                        <div className="min-w-0">
                                                             <div
-                                                                className="text-sm font-medium text-text-primary dark:text-text-primary-dark">{item.label}</div>
+                                                                className="text-[13px] font-medium text-text-primary dark:text-text-primary-dark truncate">{item.label}</div>
                                                             {item.description && (
                                                                 <div
-                                                                    className="text-xs text-text-secondary dark:text-text-secondary-dark">{item.description}</div>
+                                                                    className="text-xs text-text-secondary dark:text-text-secondary-dark truncate">{item.description}</div>
                                                             )}
                                                         </div>
                                                     )}
