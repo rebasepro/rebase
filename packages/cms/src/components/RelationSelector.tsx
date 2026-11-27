@@ -11,6 +11,7 @@ import {
     fieldBackgroundHoverMixin,
     fieldBackgroundInvisibleMixin,
     fieldBackgroundMixin,
+    getColorSchemeForSeed,
     focusedDisabled,
     IconButton,
     iconSize,
@@ -136,6 +137,12 @@ export interface RelationSelectorProps {
      * creating is possible but not wanted, like a filter.
      */
     allowCreate?: boolean;
+    /**
+     * Compact ghost inspector rendering for narrow side rails (`FormRail`):
+     * transparent trigger without permanent chevron, single-line preview for
+     * single relations, and wrapping `Chip variant="dot"` pills for multi-relations.
+     */
+    inspector?: boolean;
 }
 
 export const RelationSelector = React.forwardRef<
@@ -163,6 +170,7 @@ export const RelationSelector = React.forwardRef<
             emptyCollectionText,
             loadingText = "Loading...",
             allowCreate = true,
+            inspector = false,
             open: openProp,
             onOpenChange,
             triggerContent,
@@ -722,21 +730,23 @@ relation } as RelationItem;
                                 disabled={disabled}
                                 onClick={toggleOpen}
                                 className={cls(
-                                    {
-                                        "min-h-[42px] py-1 px-2": size === "small",
-                                        "min-h-[56px] py-2 px-4": size === "medium",
-                                        "min-h-[48px] py-1 px-4": size === "large"
-                                    },
+                                    inspector
+                                        ? "group/rel min-h-[28px] py-0.5 px-2 -mx-2 rounded-md hover:bg-surface-hover"
+                                        : {
+                                            "min-h-[42px] py-1 px-2": size === "small",
+                                            "min-h-[56px] py-2 px-4": size === "medium",
+                                            "min-h-[48px] py-1 px-4": size === "large"
+                                        },
                                     // `rounded-lg` like every other field box —
                                     // `rounded-md` made this the one control in a
                                     // row with a different corner.
-                                    "w-full select-none rounded-lg text-sm relative flex items-center",
-                                    invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
-                                    disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
+                                    inspector ? "w-full select-none text-xs relative flex items-center" : "w-full select-none rounded-lg text-sm relative flex items-center",
+                                    invisible || inspector ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
+                                    disabled ? fieldBackgroundDisabledMixin : (inspector ? "" : fieldBackgroundHoverMixin),
                                     className
                                 )}
                             >
-                                <div className="flex justify-between items-center w-full">
+                                <div className="flex justify-between items-center w-full min-w-0">
                                     {isLoadingSelectedItems ? (
                                         <div className="flex items-center gap-2">
                                             <CircularProgress size="smallest"/>
@@ -744,23 +754,48 @@ relation } as RelationItem;
                                         </div>
                                     ) : selectedItems.length > 0 ? (
                                         <div
-                                            className="flex flex-wrap items-center gap-1.5 text-start flex-1 min-w-0 mr-2">
+                                            className={cls(
+                                                "flex flex-wrap items-center text-start flex-1 min-w-0",
+                                                inspector ? "gap-1.5" : "gap-1.5 mr-2"
+                                            )}>
                                             {selectedItems.map((item) => {
                                                 if (!useChips || !multiple) {
                                                     return (
                                                         <div key={String(item.id)}
-                                                            className="flex flex-row items-center gap-1 truncate">
+                                                            className="flex flex-row items-center gap-1.5 min-w-0 truncate">
                                                             {item.data ? (
-                                                                <EntityPreviewBindingData size={"medium"}
+                                                                <EntityPreviewBindingData
+                                                                    size={inspector ? "smallest" : "medium"}
                                                                     entity={item.data}
                                                                     includeEntityLink={false}
                                                                     includeId={false}
                                                                     onSidePanelClick={closePopover}
                                                                 />
                                                             ) : (
-                                                                <span className="text-sm truncate">{item.label}</span>
+                                                                <span className={cls(inspector ? "text-xs font-medium" : "text-sm", "truncate")}>{item.label}</span>
                                                             )}
                                                         </div>
+                                                    );
+                                                }
+                                                if (inspector) {
+                                                    return (
+                                                        <Chip
+                                                            variant="dot"
+                                                            size="smallest"
+                                                            colorScheme={getColorSchemeForSeed(String(item.id))}
+                                                            key={String(item.id)}
+                                                            className="max-w-full"
+                                                        >
+                                                            <span className="truncate">{item.label}</span>
+                                                            <XIcon
+                                                                size={11}
+                                                                className="opacity-50 hover:opacity-100 shrink-0"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    handleRemoveItem(item);
+                                                                }}
+                                                            />
+                                                        </Chip>
                                                     );
                                                 }
                                                 return (
@@ -789,7 +824,7 @@ relation } as RelationItem;
                                         </div>
                                     ) :
                                         (
-                                            <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                            <span className={cls(inspector ? "text-xs" : "text-sm", "text-text-secondary dark:text-text-secondary-dark")}>
                                                 {resolvedPlaceholder}
                                             </span>
                                         )}
@@ -799,8 +834,8 @@ relation } as RelationItem;
                                             <Tooltip title={t("relation_open_record", { label: selectedItems[0].label })}>
                                                 <IconButton aria-label={t("relation_open_record", { label: selectedItems[0].label })}
                                                     component={"div"}
-                                                    size={"small"}
-                                                    className="opacity-60 hover:opacity-100"
+                                                    size={"smallest"}
+                                                    className={inspector ? "opacity-0 group-hover/rel:opacity-60 hover:!opacity-100 transition-opacity" : "opacity-60 hover:opacity-100"}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         e.preventDefault();
@@ -813,14 +848,16 @@ relation } as RelationItem;
                                                             updateUrl: true
                                                         });
                                                     }}>
-                                                    <ArrowRightToLineIcon size={iconSize.small}/>
+                                                    <ArrowRightToLineIcon size={inspector ? 13 : iconSize.small}/>
                                                 </IconButton>
                                             </Tooltip>
                                         )}
-                                        <ChevronDownIcon
-                                            size={size === "small" ? iconSize.small : iconSize.medium}
-                                            className={cls("transition", isPopoverOpen ? "rotate-180" : "")}
-                                        />
+                                        {!inspector && (
+                                            <ChevronDownIcon
+                                                size={size === "small" ? iconSize.small : iconSize.medium}
+                                                className={cls("transition", isPopoverOpen ? "rotate-180" : "")}
+                                            />
+                                        )}
                                     </div>
                                 </div>
 

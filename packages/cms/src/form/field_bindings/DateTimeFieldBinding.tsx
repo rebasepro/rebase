@@ -1,11 +1,10 @@
 import type { FieldProps } from "../../types/fields";
 import type { DateProperty } from "@rebasepro/cms-types";
-import React from "react";
-
-;
+import React, { useContext } from "react";
 
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
+import { FormDensityContext } from "../FormFieldsContext";
 import { useCustomizationController } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { DateTimeField } from "@rebasepro/ui";
@@ -36,6 +35,7 @@ export function DateTimeFieldBinding({
 }: DateTimeFieldProps) {
 
     const { locale } = useCustomizationController();
+    const isInspector = useContext(FormDensityContext) === "inspector";
     const internalValue = value || null;
 
     return (
@@ -50,7 +50,9 @@ export function DateTimeFieldBinding({
                 onChange={(dateValue) => setValue(dateValue)}
                 mode={getDatePropertyMode(property)}
                 timezone={getDatePropertyTimezone(property)}
-                clearable={property.admin?.clearable}
+                clearable={isInspector ? false : property.admin?.clearable}
+                invisible={isInspector}
+                pickerButton={!isInspector}
                 locale={locale}
                 error={showError}
                 disabled={disabled}
@@ -65,7 +67,11 @@ export function DateTimeFieldBinding({
                 aria-label={hideLabel ? (property.name ?? propertyKey) : undefined}
                 // 16px under the label, as the text field beside it: the 64px
                 // labelled box is sized for a 24px line.
-                inputClassName={!hideLabel && size === "large" ? "text-base" : undefined}
+                inputClassName={
+                    isInspector
+                        ? "text-xs tabular-nums px-2 -mx-2 rounded-md hover:bg-surface-hover"
+                        : (!hideLabel && size === "large" ? "text-base" : undefined)
+                }
             />
 
             <FieldHelperText includeDescription={includeDescription}

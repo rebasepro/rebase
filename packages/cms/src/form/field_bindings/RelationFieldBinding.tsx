@@ -2,9 +2,10 @@ import { useEntitySelectionDialog } from "../../hooks/useSelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/cms-types";
 import { getDataSourceCapabilities } from "@rebasepro/types";
-import React, { useCallback } from "react";
+import React, { useCallback, useContext } from "react";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
+import { FormDensityContext } from "../FormFieldsContext";
 import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { ErrorView, IconForView, useTranslation } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
@@ -73,6 +74,7 @@ function RelationSelectorBinding({
     relation,
     manyRelation
 }: FieldProps<RelationProperty> & { relation: Relation; manyRelation: boolean }) {
+    const isInspector = useContext(FormDensityContext) === "inspector";
     const normalizedSingle = (!manyRelation && value && !Array.isArray(value)) ? normalizeToEntityRelation(value) : null;
     const singleValue = normalizedSingle ?? null;
     const multipleValue = (manyRelation && Array.isArray(value)) ? value : [];
@@ -104,6 +106,8 @@ function RelationSelectorBinding({
                 disabled={disabled || isSubmitting}
                 fixedFilter={property.admin?.fixedFilter}
                 size={selectorSize}
+                invisible={isInspector}
+                inspector={isInspector}
             />
 
             <FieldHelperText includeDescription={includeDescription}

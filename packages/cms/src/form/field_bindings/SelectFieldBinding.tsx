@@ -1,13 +1,14 @@
 import { useTranslation } from "@rebasepro/app";
 import type { FieldProps } from "../../types/fields";
 import type { NumberProperty, StringProperty } from "@rebasepro/cms-types";
-import React, { useCallback } from "react";
+import React, { useCallback, useContext } from "react";
 
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
+import { FormDensityContext } from "../FormFieldsContext";
 import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
-import { cls, IconButton, Select, SelectItem, XIcon } from "@rebasepro/ui";
+import { Chip, cls, getColorSchemeForSeed, IconButton, Select, SelectItem, XIcon } from "@rebasepro/ui";
 import { resolveEnumValues } from "@rebasepro/cms-types";
 
 /**
@@ -33,6 +34,7 @@ export function SelectFieldBinding({
     size = "large"
 }: FieldProps<StringProperty | NumberProperty>) {
     const { t } = useTranslation();
+    const isInspector = useContext(FormDensityContext) === "inspector";
 
     const enumValues = resolveEnumValues(property.enum ?? []);
 
@@ -64,13 +66,19 @@ export function SelectFieldBinding({
                 error={Boolean(showError && error)}
                 size={size}
                 fullWidth={true}
+                invisible={isInspector}
+                chevron={!isInspector}
                 position="item-aligned"
                 // 64px at the form's size, the height of a text field beside it,
                 // whose value is a 16px line where the kit's is 14px.
-                inputClassName={cls("w-full", label && size === "large" && "min-h-[64px]")}
+                inputClassName={cls(
+                    "w-full",
+                    label && size === "large" && "min-h-[64px]",
+                    isInspector && "min-h-[28px] px-2 -mx-2 rounded-md hover:bg-surface-hover"
+                )}
                 label={label}
                 endAdornment={
-                    property.admin?.clearable && !disabled && <IconButton aria-label={t("clear")}
+                    !isInspector && property.admin?.clearable && !disabled && <IconButton aria-label={t("clear")}
                         size="small"
                         onClick={handleClearClick}>
                         <XIcon/>
@@ -86,10 +94,21 @@ export function SelectFieldBinding({
                 // and the box is a text field's height: 40px of padding at the
                 // form's size leaves 24px, a medium chip. A large one (32px)
                 // made the select 8px taller than the text fields beside it.
-                renderValue={(enumKey: string) => <EnumValuesChip
-                    enumKey={enumKey}
-                    enumValues={enumValues}
-                    size={label ? (size === "large" ? "medium" : "small") : size}/>}
+                renderValue={(enumKey: string) => {
+                    if (isInspector) {
+                        const cfg = enumValues?.find((e) => String(e.id) === String(enumKey));
+                        const scheme = cfg?.color ?? getColorSchemeForSeed(String(enumKey));
+                        return (
+                            <Chip variant="dot" size="smallest" colorScheme={scheme}>
+                                {cfg?.label ?? enumKey}
+                            </Chip>
+                        );
+                    }
+                    return <EnumValuesChip
+                        enumKey={enumKey}
+                        enumValues={enumValues}
+                        size={label ? (size === "large" ? "medium" : "small") : size}/>;
+                }}
             >
                 {enumValues && enumValues.map((option) => {
                     return <SelectItem

@@ -61,14 +61,14 @@ export function FormRail({
             // `@container/form`, so a panel that never gets that wide keeps 304.
             // No left rule: the rail is sheet beside the form's card, and that
             // step is the separation. Regions meet with a step, not a line.
-            "flex flex-col gap-5 shrink-0 w-76 @7xl/form:w-84 overflow-y-auto",
+            "flex flex-col gap-5 shrink-0 w-80 @7xl/form:w-88 overflow-y-auto",
             "px-4 py-5 bg-surface-sheet"
         )}>
             {fields.length > 0 && (
                 <FormDensityContext.Provider value="inspector">
-                    <div className={"flex flex-col gap-3"}>
+                    <div className={"flex flex-col gap-1.5"}>
                         <Typography variant={"caption"}
-                            className={"text-[11px] font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark"}>
+                            className={"text-[11px] font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-1"}>
                             Properties
                         </Typography>
                         {render && fields.map(render)}

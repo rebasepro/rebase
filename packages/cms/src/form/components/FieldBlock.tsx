@@ -169,7 +169,6 @@ export function FieldBlock({
                 label={property?.name ?? label ?? propertyKey}
                 required={required}
                 description={!reading ? description : undefined}
-                labelAdornment={property ? <PropertyKeyHint propertyKey={propertyKey}/> : undefined}
                 align={multiLine ? "start" : "center"}
             >
                 <ErrorBoundary>

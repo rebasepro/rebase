@@ -45,7 +45,7 @@ export function InspectorRow({
     const labelNode = (
         <div
             className={cls(
-                "group/label w-[92px] shrink-0 flex items-center gap-1 min-w-0 text-xs font-medium text-text-secondary dark:text-text-secondary-dark",
+                "group/label w-[88px] shrink-0 flex items-center gap-1 min-w-0 text-xs font-medium text-text-secondary dark:text-text-secondary-dark",
                 align === "start" ? "pt-1.5" : ""
             )}
         >
