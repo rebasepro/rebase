@@ -830,7 +830,7 @@ relation } as RelationItem;
                         <PopoverPrimitive.Content
                             ref={contentRef}
                             data-relation-selector-content
-                            className={cls("z-50 overflow-hidden border bg-surface-card rounded-lg min-w-72", defaultBorderMixin)}
+                            className={cls("z-50 flex flex-col overflow-hidden border bg-surface-card rounded-lg min-w-72", defaultBorderMixin)}
                             align="start"
                             sideOffset={8}
                             side="bottom"
@@ -842,9 +842,15 @@ relation } as RelationItem;
                             onCloseAutoFocus={(e) => {
                                 e.preventDefault();
                             }}
-                            style={{ width: "var(--radix-popover-trigger-width)" }}
+                            // Capped to the room Radix measured on the side it opened
+                            // towards, so a field low on the page (which flips the popover
+                            // above it) can't push the search box off the top of the screen.
+                            style={{
+                                width: "var(--radix-popover-trigger-width)",
+                                maxHeight: "var(--radix-popover-content-available-height)"
+                            }}
                         >
-                            <CommandPrimitive shouldFilter={false}>
+                            <CommandPrimitive shouldFilter={false} className="flex flex-col min-h-0">
                                 <div className="flex flex-row items-center">
                                     <div className="relative flex-1">
                                         <SearchIcon
@@ -878,6 +884,7 @@ relation } as RelationItem;
                                 <Separator orientation="horizontal" className="my-0"/>
                                 <CommandPrimitive.List
                                     ref={scrollContainerRef}
+                                    className="min-h-0"
                                     style={{
                                         maxHeight: "40vh",
                                         overflowY: "auto"
@@ -986,7 +993,7 @@ relation } as RelationItem;
                                         onClick={handleCreateNew}
                                         className={cls(
                                             "w-full flex flex-row items-center gap-2 px-4 py-3 text-sm text-left",
-                                            "text-primary hover:bg-surface-hover"
+                                            "text-text-secondary dark:text-text-secondary-dark hover:text-text-primary dark:hover:text-text-primary-dark hover:bg-surface-hover"
                                         )}>
                                         <PlusIcon size={iconSize.smallest}/>
                                         <span className="truncate">
