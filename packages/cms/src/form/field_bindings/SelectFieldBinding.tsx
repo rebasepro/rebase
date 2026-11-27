@@ -107,7 +107,7 @@ export function SelectFieldBinding({
                         <EnumValuesChip
                             enumKey={String(option.id)}
                             enumValues={enumValues}
-                            size={size}/>
+                            size={isInspector ? "small" : (label ? (size === "large" ? "medium" : "small") : size)}/>
                     </SelectItem>
                 })}
             </Select>

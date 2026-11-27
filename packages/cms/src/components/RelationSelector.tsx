@@ -28,8 +28,10 @@ import { Command as CommandPrimitive } from "cmdk";
 import { FilterValues } from "@rebasepro/types";
 import { Relation, getCollectionDataPath, EntityRelation, normalizeToEntityRelation, Entity } from "@rebasepro/cms-types";
 import { EntityPreviewBindingData } from "./EntityPreviewBinding";
+import { PropertyPreview } from "../preview";
 import { PickerTrigger } from "./PickerTrigger";
-import { getTitlePropertyKey, useData, usePermissions, useRelationSelector, useTranslation } from "@rebasepro/app";
+import { getEntityImagePreviewPropertyKey, getTitlePropertyKey, useData, usePermissions, useRelationSelector, useTranslation } from "@rebasepro/app";
+import { getValueInPath } from "@rebasepro/utils";
 import { useSidePanel } from "../hooks/useSidePanel";
 import { findEntitiesByIds } from "../util/find_entities_by_ids";
 import { entityOfRow } from "@rebasepro/app";
@@ -760,9 +762,27 @@ relation } as RelationItem;
                                             {selectedItems.map((item) => {
                                                 if (!useChips || !multiple) {
                                                     if (inspector) {
+                                                        const imgKey = item.data ? getEntityImagePreviewPropertyKey(collection) : undefined;
+                                                        const imgProp = imgKey ? collection.properties[imgKey] : undefined;
+                                                        const ofProp = imgProp && "of" in imgProp ? imgProp.of : undefined;
+                                                        const usedImgProp = ofProp ? (Array.isArray(ofProp) ? ofProp[0] : ofProp) : imgProp;
+                                                        const rawImgVal = imgKey && item.data ? getValueInPath(item.data.values, imgKey) : undefined;
+                                                        const usedImgVal = imgProp && "of" in imgProp
+                                                            ? (Array.isArray(rawImgVal) && rawImgVal.length > 0 ? rawImgVal[0] : undefined)
+                                                            : rawImgVal;
                                                         return (
                                                             <div key={String(item.id)}
                                                                 className="flex flex-row items-center gap-2 min-w-0 truncate">
+                                                                {usedImgProp && usedImgVal ? (
+                                                                    <div className="w-5 h-5 rounded-md overflow-hidden shrink-0 flex items-center justify-center">
+                                                                        <PropertyPreview
+                                                                            property={usedImgProp}
+                                                                            propertyKey={imgKey as string}
+                                                                            size="small"
+                                                                            value={usedImgVal}
+                                                                        />
+                                                                    </div>
+                                                                ) : null}
                                                                 <span className="text-xs font-medium text-text-primary dark:text-text-primary-dark truncate">
                                                                     {item.label}
                                                                 </span>
@@ -956,7 +976,7 @@ relation } as RelationItem;
                                                 : (emptyCollectionText ?? `No ${collection.name ?? "entries"} yet.`)}
                                         </CommandPrimitive.Empty>
                                     )}
-                                    <CommandPrimitive.Group>
+                                    <CommandPrimitive.Group className="p-1">
                                         {(() => {
                                             // Sort items so that initially-selected (pinned) items appear first.
                                             // We use the entity taken when the popover opened so items don't
@@ -982,7 +1002,7 @@ relation } as RelationItem;
                                                     }}
                                                     onSelect={() => onItemClick(item)}
                                                     className={cls(
-                                                        "group/opt flex flex-row items-center gap-2 mx-1 my-0.5 px-2 py-1.5 rounded-md cursor-pointer ring-offset-transparent",
+                                                        "group/opt flex flex-row items-center gap-2.5 my-0.5 px-2 py-1.5 rounded-md cursor-pointer ring-offset-transparent",
                                                         !multiple && isSelected && "bg-surface-active",
                                                         "hover:bg-surface-hover aria-selected:outline-hidden aria-selected:bg-surface-active"
                                                     )}
@@ -1067,7 +1087,7 @@ relation } as RelationItem;
                                         }}
                                         onClick={handleCreateNew}
                                         className={cls(
-                                            "w-full flex flex-row items-center gap-2 px-4 py-3 text-sm text-left",
+                                            "w-full flex flex-row items-center gap-2 px-3 py-2 text-[13px] text-left",
                                             "text-text-secondary dark:text-text-secondary-dark hover:text-text-primary dark:hover:text-text-primary-dark hover:bg-surface-hover"
                                         )}>
                                         <PlusIcon size={iconSize.smallest}/>
@@ -1091,17 +1111,13 @@ RelationSelector.displayName = "RelationSelector";
 
 function InnerCheckBox({ checked }: { checked: boolean }) {
     return (
-        <div className={cls(
-            "p-2 w-8 h-8 inline-flex items-center justify-center text-sm font-medium focus:outline-hidden transition-colors ease-in-out duration-150"
-        )}>
-            <div
-                className={cls(
-                    "border-2 relative transition-colors ease-in-out duration-150 w-4 h-4 rounded-xs flex items-center justify-center",
-                    checked ? "bg-primary text-on-primary border-transparent" : "bg-surface-card border-surface-accent-800 dark:border-surface-accent-500"
-                )}
-            >
-                {checked && <CheckIcon size={iconSize.smallest} className="absolute"/>}
-            </div>
+        <div
+            className={cls(
+                "border relative transition-colors ease-in-out duration-150 w-4 h-4 rounded-xs flex items-center justify-center shrink-0",
+                checked ? "bg-primary text-on-primary border-transparent" : "bg-surface-card border-hairline-strong"
+            )}
+        >
+            {checked && <CheckIcon size={12} className="absolute"/>}
         </div>
     );
 }

@@ -16,10 +16,9 @@ export interface ChipProps {
      * chrome follows for colour everywhere else (a dot, an icon, an outline, a
      * tint — never a fill). `filled` is the palette's solid stop, for the few
      * places that want a swatch: a colour picker, a legend. `dot` is a calm
-     * pill (`rounded-full`, `bg-surface-card`, `border-hairline`) carrying a
-     * 6px colour dot beside primary ink — built for wrapping tag/label lists
-     * and compact property inspectors. A custom scheme without tint values
-     * falls back to `filled`.
+     * chip (`rounded-md`, `bg-surface-raised`) carrying a 6px colour dot beside
+     * primary ink — built for wrapping tag/label lists and compact property
+     * inspectors. A custom scheme without tint values falls back to `filled`.
      */
     variant?: "tinted" | "filled" | "dot";
     error?: boolean;
