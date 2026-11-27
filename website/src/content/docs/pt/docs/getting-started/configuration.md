@@ -1,5 +1,5 @@
 ---
-sourceHash: 45d6fa4b1ef2c72a
+sourceHash: bafbb63e7ad2ac20
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -251,8 +251,8 @@ publicada. Um projeto que executou o eject gerencia essas decisões diretamente 
 | `REBASE_RLS_SHARED_ROLE` | O que a inicialização faz quando outro login pode alternar para a request role: `warn`, `refuse` ou `ignore`. | `warn` |
 | `REBASE_BASE_PATH` | Caminho base para todas as rotas de API. O cliente deve ser configurado com o mesmo valor — consulte [Alterando `basePath`](#alterando-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Serve os assets estáticos/admin do bundle a partir deste processo. Desative quando houver uma CDN à frente. | `true` |
-| `REBASE_STUDIO` | Serve o console standalone integrado do Rebase Studio em `/_studio` quando um bundle estático do Studio estiver disponível. Defina como `false` para desativar. | `true` |
-| `REBASE_STUDIO_DIR` | Diretório contendo a SPA standalone pré-compilada do Rebase Studio servida em `/_studio`. O padrão é `/studio` na imagem do container. | `/studio` |
+| `REBASE_STUDIO` | Serve o painel de administração integrado em `/_studio` quando o bundle estático dele estiver disponível: as tabelas do projeto como coleções, usuários e papéis incluídos, e o Studio. É com ele que se administra um projeto sem código. Defina como `false` para desativar. | `true` |
+| `REBASE_STUDIO_DIR` | Diretório contendo o painel de administração pré-compilado servido em `/_studio`. O padrão é `/studio` na imagem do container. | `/studio` |
 | `REBASE_HISTORY` | Registra o [histórico de alterações de entidades](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | Respostas com gzip/brotli. | `true` |
 | `REBASE_PUSH` | `true` ativa as [notificações push](/docs/backend/push-notifications/): as rotas `/api/push`, a tabela `rebase.push_subscriptions` e `rebase.push`. | `false` |

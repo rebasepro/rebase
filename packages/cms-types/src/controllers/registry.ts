@@ -155,8 +155,12 @@ export interface RebaseStudioConfig {
     /**
      * Which built-in tools to register. Omit for all of them; pass a shorter
      * list to hide the rest.
+     *
+     * `"users"` is the old name of `"roles"`, accepted and warned about once:
+     * users are a collection now, edited in the content, and the tool kept
+     * only the roles.
      */
-    tools?: ("tables" | "sql" | "js" | "rls" | "storage" | "cron" | "schema-visualizer" | "branches" | "backups" | "database" | "api" | "webhooks" | "logs" | "users" | "api-keys")[];
+    tools?: ("tables" | "sql" | "js" | "rls" | "storage" | "cron" | "schema-visualizer" | "branches" | "backups" | "database" | "api" | "webhooks" | "logs" | "roles" | "users" | "api-keys")[];
 
     /** Replaces the Studio landing page. */
     homePage?: ReactNode;

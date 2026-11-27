@@ -1,5 +1,5 @@
 ---
-sourceHash: 45d6fa4b1ef2c72a
+sourceHash: bafbb63e7ad2ac20
 title: Environnement & Configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -251,8 +251,8 @@ Un projet qui s'est éjecté gère ces décisions dans son propre code.
 | `REBASE_RLS_SHARED_ROLE` | Action effectuée au démarrage lorsqu'un autre identifiant peut basculer vers le rôle de requête : `warn`, `refuse` ou `ignore`. | `warn` |
 | `REBASE_BASE_PATH` | Chemin de base pour chaque route d'API. Le client doit être configuré à l'identique — voir [Modifier `basePath`](#modifier-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Servir les ressources statiques/d'administration du bundle depuis ce processus. Désactivez-le lorsqu'un CDN est placé devant. | `true` |
-| `REBASE_STUDIO` | Servir la console autonome intégrée Rebase Studio à l'adresse `/_studio` lorsqu'un bundle statique Studio est disponible. Définissez sur `false` pour désactiver. | `true` |
-| `REBASE_STUDIO_DIR` | Répertoire contenant la SPA autonome Rebase Studio précompilée servie à l'adresse `/_studio`. La valeur par défaut est `/studio` dans l'image de conteneur. | `/studio` |
+| `REBASE_STUDIO` | Servir le panneau d'administration intégré à l'adresse `/_studio` lorsque son bundle statique est disponible : les tables du projet comme collections, utilisateurs et rôles compris, et le Studio. C'est avec lui qu'on administre un projet sans code. Définissez sur `false` pour désactiver. | `true` |
+| `REBASE_STUDIO_DIR` | Répertoire contenant le panneau d'administration précompilé servi à l'adresse `/_studio`. La valeur par défaut est `/studio` dans l'image de conteneur. | `/studio` |
 | `REBASE_HISTORY` | Enregistrer l'[historique des modifications d'entités](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | Compresser les réponses en gzip/brotli. | `true` |
 | `REBASE_PUSH` | `true` active les [notifications push](/docs/backend/push-notifications/) : les routes `/api/push`, la table `rebase.push_subscriptions` et `rebase.push`. | `false` |

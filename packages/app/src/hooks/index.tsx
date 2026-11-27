@@ -20,6 +20,7 @@ export * from "./useRebaseContext";
 export * from "./useSnackbarController";
 export * from "./useModeController";
 export * from "./useClipboard";
+export * from "./useAdminUserRequest";
 export * from "./useLargeLayout";
 export * from "./useCollapsedGroups";
 

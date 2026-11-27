@@ -71,7 +71,7 @@ import { DirectRlsPoliciesPanel } from "../src/components/RLSEditor/DirectRlsPol
 import { StoragePoliciesPanel } from "../src/components/StorageView/StoragePoliciesPanel";
 import { DbCronJobsPanel } from "../src/components/CronJobs/DbCronJobsPanel";
 import { WebhooksView } from "../src/components/Webhooks/WebhooksView";
-import { UsersAndRolesView } from "../src/components/UsersAndRoles/UsersAndRolesView";
+import { RolesView } from "../src/components/Roles/RolesView";
 
 const originalFetch = globalThis.fetch;
 
@@ -268,27 +268,13 @@ describe("Zero-code Studio console views", () => {
         expect(await screen.findByText("POST https://example.com/cron/ping")).toBeTruthy();
     });
 
-    it("UsersAndRolesView lists accounts and zero-code roles", async () => {
+    it("RolesView lists the roles, with where each came from, and edits only the ones made here", async () => {
         installFetch((url) => {
-            if (url.includes("/api/admin/users")) {
-                return fakeResponse({
-                    users: [
-                        {
-                            uid: "u-1",
-                            email: "admin@rebase.pro",
-                            displayName: "Admin User",
-                            roles: ["admin"],
-                            disabled: false,
-                            emailVerified: true,
-                            createdAt: "2026-01-01T00:00:00.000Z"
-                        }
-                    ]
-                });
-            }
             if (url.endsWith("/api/admin/roles")) {
                 return fakeResponse({
                     roles: [
                         { id: "admin", name: "admin", description: "Full access", scopes: [], isDefault: false, assignable: true, source: "built-in" },
+                        { id: "editor", name: "editor", description: "Edits content", scopes: ["schema:read"], isDefault: false, assignable: true, source: "code" },
                         { id: "support", name: "support", description: "Support desk", scopes: ["users:read", "logs:read"], isDefault: true, assignable: true, source: "database" }
                     ]
                 });
@@ -296,10 +282,16 @@ describe("Zero-code Studio console views", () => {
             return fakeResponse({});
         });
 
-        render(<UsersAndRolesView />);
+        render(<RolesView />);
 
-        expect(await screen.findByText("admin@rebase.pro")).toBeTruthy();
-        expect(await screen.findByText("Admin User")).toBeTruthy();
+        expect(await screen.findByText("support")).toBeTruthy();
+        expect(screen.getByText("editor")).toBeTruthy();
+        // This file's `t` answers the key itself.
+        expect(screen.getByText("studio_roles_source_code")).toBeTruthy();
+        expect(screen.getByText("studio_roles_source_builtin")).toBeTruthy();
+        // Only the role made at runtime can be edited or deleted: one of each button.
+        expect(screen.getAllByLabelText("studio_users_edit_role_aria")).toHaveLength(1);
+        expect(screen.getAllByLabelText("studio_users_delete_role_aria")).toHaveLength(1);
     });
 
     it("DirectRlsPoliciesPanel submits explicit operation + using/withCheck to POST /api/admin/db/tables/:table/policies", async () => {

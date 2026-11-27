@@ -42,7 +42,7 @@ import { navigateToEntity } from "../../util/navigation_utils";
 import { callerHoldsScope } from "../../util/caller_scopes";
 import { resolveDefaultSelectedView } from "@rebasepro/app";
 import { CreationResultDialog } from "../admin/CreationResultDialog";
-import { entityOfRow } from "@rebasepro/app";
+import { entityOfRow, useAdminUserRequest } from "@rebasepro/app";
 import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 export const editEntityAction: EntityAction = {
@@ -277,8 +277,7 @@ export function ResetPasswordActionDialog({
     open: boolean;
     onClose: () => void;
 }) {
-    const client = useRebaseClient<{ baseUrl?: string, apiPath?: string }>();
-    const { getAuthToken } = useAuthController();
+    const request = useAdminUserRequest();
     const snackbarController = useSnackbarController();
     const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
@@ -301,21 +300,10 @@ export function ResetPasswordActionDialog({
         setLoading(true);
         setError(null);
         try {
-            const apiBase = apiBaseOf(client) ?? "";
-            const token = await getAuthToken?.();
-            const response = await fetch(`${apiBase}/admin/users/${user.uid}/reset-password`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
-                },
-                body: JSON.stringify(mode === "manual" ? { password } : {})
-            });
-            if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({}));
-                throw new Error(errorBody.error?.message || errorBody.message || "Failed to reset password");
-            }
-            const data = await response.json();
+            const data = await request<{ invitationSent?: boolean; temporaryPassword?: string; emailDeliveryFailed?: boolean }>(
+                `${encodeURIComponent(user.uid)}/reset-password`,
+                { method: "POST", body: mode === "manual" ? { password } : {} }
+            );
             snackbarController.open({
                 type: "success",
                 message: t("reset_password_success", { defaultValue: "Password reset successfully" })
@@ -489,30 +477,6 @@ function adminActionUser(id: string | number, row: Record<string, unknown>): Adm
     return { uid: String(id), email: typeof row.email === "string" ? row.email : "" };
 }
 
-/**
- * Call an admin user route as the signed-in caller, and turn a refusal into an
- * error carrying the server's message.
- */
-function useAdminUserRequest() {
-    const client = useRebaseClient<{ baseUrl?: string, apiPath?: string }>();
-    const { getAuthToken } = useAuthController();
-    return useCallback(async <T,>(path: string, init?: { method: string; body?: unknown }): Promise<T> => {
-        const token = await getAuthToken?.();
-        const response = await fetch(`${apiBaseOf(client) ?? ""}/admin/users/${path}`, {
-            method: init?.method ?? "GET",
-            headers: {
-                ...(init?.body !== undefined ? { "Content-Type": "application/json" } : {}),
-                ...(token ? { "Authorization": `Bearer ${token}` } : {})
-            },
-            ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {})
-        });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            throw new Error(body?.error?.message || body?.message || response.statusText);
-        }
-        return body as T;
-    }, [client, getAuthToken]);
-}
 
 /**
  * Remove every second factor and recovery code an account has, and end its

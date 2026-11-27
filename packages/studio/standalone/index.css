@@ -4,4 +4,6 @@
 @source "../src/**/*.{js,ts,jsx,tsx}";
 @source "../../app/src/**/*.{js,ts,jsx,tsx}";
 @source "../../ui/src/**/*.{js,ts,jsx,tsx}";
+@source "../../cms/src/**/*.{js,ts,jsx,tsx}";
+@source "../../forms/src/**/*.{js,ts,jsx,tsx}";
 @custom-variant dark (&:where(.dark, .dark *));

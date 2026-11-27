@@ -146,6 +146,26 @@ describe("the implicit auth table", () => {
         expect(body.data[0]).not.toHaveProperty("passwordHash");
     });
 
+    it("creates a user from the collection, as the admin panel's form sends it", async () => {
+        const app = await boot({ tables: [notes], auth: { allowRegistration: true, jwtSecret: JWT_SECRET } });
+        const headers = { ...(await signUpAdmin(app)), "Content-Type": "application/json" };
+
+        // The form sends every field it shows, the ones nobody filled as null.
+        for (const body of [
+            { email: "plain@example.com" },
+            { email: "form@example.com", displayName: null, photoURL: null, roles: [], createdAt: null, updatedAt: null, emailVerificationSentAt: null, disabledAt: null }
+        ]) {
+            const res = await app.request("/api/data/users", { method: "POST", headers, body: JSON.stringify(body) });
+            const text = await res.text();
+            if (res.status !== 201) throw new Error(`${body.email}: ${res.status} ${text}`);
+            const created = JSON.parse(text) as { email: string; createdAt: unknown; temporaryPassword?: string; invitationSent?: boolean };
+            expect(created.email).toBe(body.email);
+            expect(created.createdAt).toBeTruthy();
+            // What the panel's creation dialog shows: a temporary password, or an invitation sent.
+            expect(Boolean(created.temporaryPassword) || created.invitationSent === true).toBe(true);
+        }
+    });
+
     it("leaves a project table called users alone, and says why users are not served", async () => {
         const warnings: string[] = [];
         jest.spyOn(logger, "warn").mockImplementation((message: unknown) => {
@@ -197,6 +217,50 @@ describe("roles", () => {
         const { tokens } = await login.json() as { tokens: { accessToken: string } };
         return { Authorization: `Bearer ${tokens.accessToken}`, "Content-Type": "application/json" };
     }
+
+    it("lets no one but an admin grant a role through the users collection, whatever the table's rules", async () => {
+        // A declared users table whose rules let everyone edit their own row:
+        // the restrictive admin write gate every auth table carries still holds.
+        const people = defineAuthTable("people", {
+            columns: { id: col.uuid().primaryKey().defaultRandom(), email: col.text().notNull(), nickname: col.text(), roles: col.text().array() },
+            rls: [
+                { operation: "select", roles: ["admin"] },
+                { operation: "update", using: "id = rebase.uid()::uuid", withCheck: "id = rebase.uid()::uuid" }
+            ]
+        });
+        const app = await boot({ tables: [notes, people], auth: { allowRegistration: true, jwtSecret: JWT_SECRET } });
+        await signUpAdmin(app);
+        const member = await app.request("/api/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: "member@example.com", password: "StrongPassword123!" })
+        });
+        const { user, tokens } = await member.json() as { user: { uid: string }; tokens: { accessToken: string } };
+        const headers = { Authorization: `Bearer ${tokens.accessToken}`, "Content-Type": "application/json" };
+
+        const promote = await app.request(`/api/data/people/${user.uid}`, { method: "PATCH", headers, body: JSON.stringify({ roles: ["admin"] }) });
+        expect(promote.status).toBe(403);
+        expect((await promote.json() as { error: { code: string } }).error.code).toBe("WRITE_DENIED");
+        const create = await app.request("/api/data/people", { method: "POST", headers, body: JSON.stringify({ email: "boss@example.com", roles: ["admin"] }) });
+        expect(create.status).toBe(403);
+        expect((await create.json() as { error: { code: string } }).error.code).toBe("WRITE_DENIED");
+    });
+
+    it("leaves an AuthAdapter's own /admin/roles answering: the overlay is built-in auth's", async () => {
+        const adminRoutes = new Hono();
+        adminRoutes.get("/roles", (c) => c.json({ roles: [{ name: "staff", source: "adapter" }] }));
+        const app = await boot({ tables: [notes], auth: { ...externalAuth(), createAdminRoutes: () => adminRoutes } });
+
+        const res = await app.request("/api/admin/roles", { headers: { Authorization: "Bearer external" } });
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ roles: [{ name: "staff", source: "adapter" }] });
+        const write = await app.request("/api/admin/roles", {
+            method: "POST",
+            headers: { Authorization: "Bearer external", "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "x", scopes: [] })
+        });
+        expect(write.status).toBe(404);
+    });
 
     it("grants what a role made at runtime lists, beside the ones declared in code", async () => {
         const app = await boot({ tables: [notes, members], auth: { allowRegistration: true, jwtSecret: JWT_SECRET } });

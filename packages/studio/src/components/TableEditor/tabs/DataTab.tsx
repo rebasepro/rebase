@@ -42,6 +42,7 @@ import { isRecord, useAdminFetch } from "../../../utils/adminFetch";
 import { parseCsvWithHeader } from "../../../utils/csv_parse";
 import { FixedEditorOverlay } from "../../SQLEditor/FixedEditorOverlay";
 import { useRunAsUsers } from "../../useRunAsUsers";
+import { AuthUserRowActions, useIsAuthTable } from "./AuthUserActions";
 import {
     parseFilterParam,
     parseRowsPage,
@@ -170,6 +171,7 @@ export function DataTab({ table }: DataTabProps) {
     const [viewAsUser, setViewAsUser] = useState<SelectableUser | null>(null);
     const runAs = useRunAsUsers();
     const throughApi = readAs === "api";
+    const isAuthTable = useIsAuthTable(table);
 
     const loadRequest = useRef(0);
     const filterKey = JSON.stringify(filters);
@@ -324,7 +326,8 @@ export function DataTab({ table }: DataTabProps) {
     const gridColumns = useMemo((): VirtualTableColumn[] => [
         ...(writable ? [
             { key: SELECT_COLUMN, title: "", width: 40, sortable: false, resizable: false },
-            { key: ACTIONS_COLUMN, title: "", width: 76, sortable: false, resizable: false }
+            // The auth table's rows are accounts: three more actions on each.
+            { key: ACTIONS_COLUMN, title: "", width: isAuthTable ? 148 : 76, sortable: false, resizable: false }
         ] : []),
         ...columns.map(column => ({
             key: column.name,
@@ -333,7 +336,7 @@ export function DataTab({ table }: DataTabProps) {
             sortable: !throughApi,
             resizable: true
         }))
-    ], [columns, writable, throughApi]);
+    ], [columns, writable, throughApi, isAuthTable]);
 
     const pageKeys = useMemo(() => rows.map(row => rowKeyString(row, primaryKey)), [rows, primaryKey]);
     const allSelected = pageKeys.length > 0 && pageKeys.every(key => selected.has(key));
@@ -371,6 +374,10 @@ export function DataTab({ table }: DataTabProps) {
                             <Trash2Icon size={iconSize.smallest}/>
                         </IconButton>
                     </Tooltip>
+                    {isAuthTable && primaryKey.length === 1 && rowData[primaryKey[0]] !== undefined && (
+                        <AuthUserRowActions row={rowData} uid={String(rowData[primaryKey[0]])}
+                            iconClassName={ROW_ACTION_ICON} onChanged={() => void load()}/>
+                    )}
                 </div>
             );
         }
@@ -419,7 +426,7 @@ export function DataTab({ table }: DataTabProps) {
                 )}
             </div>
         );
-    }, [primaryKey, selected, t, columnByName, editingCell, saveCell, foreignKeyByColumn, writable, openForeignRow]);
+    }, [primaryKey, selected, t, columnByName, editingCell, saveCell, foreignKeyByColumn, writable, openForeignRow, isAuthTable, load]);
 
     const count = page?.count ?? { value: 0, exact: true };
     const firstRow = rows.length === 0 ? 0 : offset + 1;

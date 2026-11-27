@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f18ccdd99ad1dc9
+sourceHash: 3594b5aeed9b6b44
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -259,7 +259,7 @@ Dois grupos separados de pessoas estão envolvidos, como no Firebase e no Supaba
 - **Acesso ao Cloud** define quem pode trabalhar no projeto no Rebase Cloud. Os proprietários e administradores de uma organização são `admin` em todos os projetos pertencentes a ela, e seus membros são `developer`. Um projeto também pode conceder a uma pessoa uma função própria, `admin`, `developer` ou `viewer`, por meio de um convite por e-mail, sem torná-la membro da organização. A função de maior privilégio prevalece. [`rebase cloud access`](/docs/cli/cloud/#project-access) faz o gerenciamento disso.
 - **Os usuários do seu app** residem no próprio banco de dados do app, com seu próprio fluxo de cadastro e suas funções. O Cloud nunca os lista ou edita.
 
-A única ponte é o **Open admin panel**. Ele faz o login de uma pessoa com acesso `admin` ao Cloud no painel de administração do app, fazendo a correspondência pelo e-mail verificado: o app localiza ou cria a conta com esse endereço, atribui a ela a função `admin` e registra que a função veio do Rebase Cloud (Users & roles do Studio indica isso). Quando essa pessoa perde o acesso `admin` ao Cloud no projeto, o Rebase Cloud solicita ao app que revogue esse privilégio de `admin` e encerra suas sessões no app. Uma função concedida manualmente no app, incluindo um `admin` concedido antes do primeiro "Open admin panel", permanece inalterada, e a conta nunca é excluída.
+A única ponte é o **Open admin panel**. Ele faz o login de uma pessoa com acesso `admin` ao Cloud no painel de administração do app, fazendo a correspondência pelo e-mail verificado: o app localiza ou cria a conta com esse endereço, atribui a ela a função `admin` e registra que a função veio do Rebase Cloud (o campo `roles` da tabela de usuários no painel de administração indica isso). Quando essa pessoa perde o acesso `admin` ao Cloud no projeto, o Rebase Cloud solicita ao app que revogue esse privilégio de `admin` e encerra suas sessões no app. Uma função concedida manualmente no app, incluindo um `admin` concedido antes do primeiro "Open admin panel", permanece inalterada, e a conta nunca é excluída.
 
 ## Veja quem fez o quê
 

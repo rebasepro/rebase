@@ -1,5 +1,5 @@
 ---
-sourceHash: 45d6fa4b1ef2c72a
+sourceHash: bafbb63e7ad2ac20
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos de Rebase.
@@ -248,8 +248,8 @@ publicada). Un proyecto que ha hecho eject gestiona estas decisiones en su propi
 | `REBASE_RLS_SHARED_ROLE` | Comportamiento del arranque si otro usuario de inicio de sesión puede asumir el rol de petición: `warn`, `refuse` o `ignore`. | `warn` |
 | `REBASE_BASE_PATH` | Ruta base para todas las rutas de la API. Debe coincidir con la configurada en el cliente; consulta [Cambiar `basePath`](#cambiar-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Sirve los recursos estáticos y del panel de administración del bundle desde este proceso. Desactívalo si hay un CDN intermediario. | `true` |
-| `REBASE_STUDIO` | Sirve la consola Rebase Studio independiente integrada en `/_studio` cuando exista un bundle estático de Studio. Configura en `false` para deshabilitarla. | `true` |
-| `REBASE_STUDIO_DIR` | Directorio que contiene la SPA precompilada de Rebase Studio servida en `/_studio`. Por defecto es `/studio` en la imagen del contenedor. | `/studio` |
+| `REBASE_STUDIO` | Sirve el panel de administración integrado en `/_studio` cuando su bundle estático está disponible: las tablas del proyecto como colecciones, usuarios y roles incluidos, y el Studio. Es con lo que se administra un proyecto sin código. Configura en `false` para deshabilitarlo. | `true` |
+| `REBASE_STUDIO_DIR` | Directorio que contiene el panel de administración precompilado servido en `/_studio`. Por defecto es `/studio` en la imagen del contenedor. | `/studio` |
 | `REBASE_HISTORY` | Registra el [historial de cambios de entidades](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | Habilita la compresión gzip/brotli en las respuestas. | `true` |
 | `REBASE_PUSH` | `true` activa las [notificaciones push](/docs/backend/push-notifications/): las rutas `/api/push`, la tabla `rebase.push_subscriptions` y `rebase.push`. | `false` |

@@ -462,8 +462,8 @@ Two separate sets of people are involved, as in Firebase and Supabase:
 The one bridge is **Open admin panel**. It signs a person with `admin` Cloud
 access in to the app's admin panel, matched by their verified email: the app
 finds or creates the account with that address and gives it the `admin` role,
-and records that the role came from Rebase Cloud (Studio's Users & roles
-marks it). When that person loses `admin` Cloud access to the project, Rebase
+and records that the role came from Rebase Cloud (the users table's `roles`
+field in the admin panel marks it). When that person loses `admin` Cloud access to the project, Rebase
 Cloud asks the app to take that `admin`
 back and ends their sessions in the app. A role granted by hand in the app,
 including an `admin` held before the first Open admin panel, stays, and the

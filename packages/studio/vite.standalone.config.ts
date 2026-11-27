@@ -4,8 +4,10 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 /**
- * Builds the standalone zero-CMS Rebase Studio SPA served at `/_studio`
- * by the zero-code BaaS runtime image and `rebase dev --zero-code`.
+ * Builds the admin panel a project with no code is served at `/_studio` by
+ * the zero-code BaaS runtime image and `rebase dev --zero-code`: the content
+ * (`@rebasepro/cms`, every served table as a collection) and the Studio,
+ * composed as a scaffolded frontend composes them (standalone/StandalonePanel).
  */
 export default defineConfig({
     root: path.resolve(__dirname, "standalone"),
@@ -28,9 +30,14 @@ export default defineConfig({
         }
     },
     resolve: {
+        // One React, one router: the content and the Studio share their contexts.
+        dedupe: ["react", "react-dom", "react-router", "@remix-run/router"],
         alias: {
             "@rebasepro/app": path.resolve(__dirname, "../app/src"),
             "@rebasepro/client": path.resolve(__dirname, "../client/src"),
+            "@rebasepro/cms": path.resolve(__dirname, "../cms/src"),
+            "@rebasepro/forms": path.resolve(__dirname, "../forms/src"),
+            "@rebasepro/inference": path.resolve(__dirname, "../inference/src"),
             "@rebasepro/cms-types": path.resolve(__dirname, "../cms-types/src"),
             "@rebasepro/common": path.resolve(__dirname, "../common/src"),
             "@rebasepro/types": path.resolve(__dirname, "../types/src"),

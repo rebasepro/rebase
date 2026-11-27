@@ -1,5 +1,5 @@
 ---
-sourceHash: 45d6fa4b1ef2c72a
+sourceHash: bafbb63e7ad2ac20
 title: Ambiente e Configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -250,8 +250,8 @@ pubblicata. Un progetto che ha eseguito l'eject gestisce queste impostazioni dir
 | `REBASE_RLS_SHARED_ROLE` | Azione eseguita all'avvio quando un altro login può passare al ruolo della richiesta: `warn`, `refuse` o `ignore`. | `warn` |
 | `REBASE_BASE_PATH` | Percorso di base per tutte le route API. Il client deve essere configurato di conseguenza — vedi [Modifica di `basePath`](#modifica-di-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Distribuisce gli asset statici/amministrativi del bundle da questo processo. Disattivare quando è presente una CDN davanti. | `true` |
-| `REBASE_STUDIO` | Serve la console Rebase Studio integrata e standalone su `/_studio` quando è disponibile un bundle statico di Studio. Impostare su `false` per disabilitare. | `true` |
-| `REBASE_STUDIO_DIR` | Directory contenente la SPA precompilata standalone di Rebase Studio servita su `/_studio`. Il valore predefinito è `/studio` nell'immagine del container. | `/studio` |
+| `REBASE_STUDIO` | Serve il pannello di amministrazione integrato su `/_studio` quando è disponibile il suo bundle statico: le tabelle del progetto come collection, utenti e ruoli compresi, e lo Studio. È ciò con cui si amministra un progetto senza codice. Impostare su `false` per disabilitare. | `true` |
+| `REBASE_STUDIO_DIR` | Directory contenente il pannello di amministrazione precompilato servito su `/_studio`. Il valore predefinito è `/studio` nell'immagine del container. | `/studio` |
 | `REBASE_HISTORY` | Registra la [cronologia delle modifiche alle entità](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | Risposte compresse con gzip/brotli. | `true` |
 | `REBASE_PUSH` | `true` abilita le [notifiche push](/docs/backend/push-notifications/): le route `/api/push`, la tabella `rebase.push_subscriptions` e `rebase.push`. | `false` |

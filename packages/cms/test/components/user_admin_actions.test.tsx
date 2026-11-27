@@ -20,7 +20,22 @@ jest.mock("@rebasepro/app", () => ({
     useRebaseClient: () => ({}),
     useSnackbarController: () => snackbar,
     useTranslation: () => ({ t: (key: string) => key }),
-    resolveDefaultSelectedView: () => undefined
+    resolveDefaultSelectedView: () => undefined,
+    // The shared admin user request, as `@rebasepro/app` makes it: the route
+    // under `/admin/users/`, the caller's token, the server's message on a refusal.
+    useAdminUserRequest: () => async (path: string, init?: { method: string; body?: unknown }) => {
+        const response = await fetch(`https://api.test/api/admin/users/${path}`, {
+            method: init?.method ?? "GET",
+            headers: {
+                ...(init?.body !== undefined ? { "Content-Type": "application/json" } : {}),
+                Authorization: "Bearer admin-token"
+            },
+            ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {})
+        });
+        const body = await response.json().catch(() => ({})) as { error?: { message?: string }; message?: string };
+        if (!response.ok) throw new Error(body.error?.message || body.message || response.statusText);
+        return body;
+    }
 }));
 
 import {

@@ -1,5 +1,5 @@
 ---
-sourceHash: 45d6fa4b1ef2c72a
+sourceHash: bafbb63e7ad2ac20
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -249,8 +249,8 @@ stattdessen im eigenen Code.
 | `REBASE_RLS_SHARED_ROLE` | Verhalten beim Start, wenn ein anderer Login in die Request-Rolle wechseln kann: `warn`, `refuse` oder `ignore`. | `warn` |
 | `REBASE_BASE_PATH` | Basispfad für alle API-Routen. Dem Client muss derselbe Pfad mitgeteilt werden – siehe [`basePath` ändern](#basepath-ändern). | `/api` |
 | `REBASE_SERVE_STATIC` | Statische/Admin-Assets des Bundles von diesem Prozess aus bereitstellen. Deaktivieren Sie dies, wenn ein CDN vorgeschaltet ist. | `true` |
-| `REBASE_STUDIO` | Die integrierte Standalone-Konsole von Rebase Studio unter `/_studio` bereitstellen, wenn ein statisches Studio-Bundle verfügbar ist. Auf `false` setzen zum Deaktivieren. | `true` |
-| `REBASE_STUDIO_DIR` | Verzeichnis mit der vorgefertigten Standalone-SPA von Rebase Studio, die unter `/_studio` bereitgestellt wird. Standardmäßig `/studio` im Container-Image. | `/studio` |
+| `REBASE_STUDIO` | Das integrierte Admin-Panel unter `/_studio` bereitstellen, wenn sein statisches Bundle verfügbar ist: die Tabellen des Projekts als Collections, Benutzer und Rollen eingeschlossen, und das Studio. Damit wird ein Projekt ohne Code verwaltet. Auf `false` setzen zum Deaktivieren. | `true` |
+| `REBASE_STUDIO_DIR` | Verzeichnis mit dem vorgefertigten Admin-Panel, das unter `/_studio` bereitgestellt wird. Standardmäßig `/studio` im Container-Image. | `/studio` |
 | `REBASE_HISTORY` | [Änderungshistorie für Entitäten](/docs/backend/history) aufzeichnen. | `true` |
 | `REBASE_COMPRESSION` | gzip/brotli-Kompression für Antworten. | `true` |
 | `REBASE_PUSH` | `true` aktiviert [Push-Benachrichtigungen](/docs/backend/push-notifications/): die `/api/push`-Routen, die Tabelle `rebase.push_subscriptions` und `rebase.push`. | `false` |

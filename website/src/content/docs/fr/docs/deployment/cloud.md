@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f18ccdd99ad1dc9
+sourceHash: 3594b5aeed9b6b44
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, opéré pour vous. Présentation, association et déploiement d'un projet, et ce que la bêta privée n'inclut pas encore.
@@ -462,8 +462,8 @@ Deux groupes de personnes distincts sont concernés, comme dans Firebase et Supa
 La seule passerelle est le bouton **Open admin panel**. Il connecte une personne disposant d'un
 accès Cloud `admin` au panneau d'administration de l'application, en faisant correspondre son e-mail vérifié : l'application
 trouve ou crée le compte avec cette adresse, lui attribue le rôle `admin`
-et consigne que ce rôle provient de Rebase Cloud (la section Users & roles de Studio le
-précise). Lorsque cette personne perd son accès Cloud `admin` au projet, Rebase
+et consigne que ce rôle provient de Rebase Cloud (le champ `roles` de la table des utilisateurs
+dans le panneau d'administration le précise). Lorsque cette personne perd son accès Cloud `admin` au projet, Rebase
 Cloud demande à l'application de révoquer ce rôle `admin`
 et met fin à ses sessions dans l'application. Un rôle accordé manuellement dans l'application,
 y compris un rôle `admin` détenu avant la première utilisation de Open admin panel, est conservé, et le

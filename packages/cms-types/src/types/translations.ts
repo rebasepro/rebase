@@ -1923,6 +1923,17 @@ export interface RebaseTranslations {
     studio_users_roles_empty?: string;
     studio_users_default_role_chip?: string;
     studio_users_no_scopes?: string;
+    /** The users table's roles picker, when the caller cannot read the project's roles. */
+    roles_field_unavailable?: string;
+    studio_tool_roles?: string;
+    studio_tool_roles_description?: string;
+    studio_roles_header_description?: string;
+    studio_roles_source_code?: string;
+    studio_roles_source_builtin?: string;
+    /** The zero-code panel's home: generated from the database, and how to move to code. */
+    zero_code_panel_title?: string;
+    zero_code_panel_body?: string;
+    zero_code_panel_link?: string;
     studio_users_edit_role_aria?: string;
     studio_users_delete_role_aria?: string;
     studio_users_edit_user_title?: string;

@@ -1,3 +1,4 @@
+import { Navigate } from "react-router";
 import React, { Suspense, useLayoutEffect, useMemo } from "react";
 import { useRebaseEmbedHost, useRebaseRegistryDispatch, useTranslation, type AppView, type RebaseStudioConfig } from "@rebasepro/app";
 import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
@@ -16,7 +17,7 @@ const BackupsView = lazyChunk(() => import("./Backups/BackupsView").then(m => ({
 const ApiExplorer = lazyChunk(() => import("./ApiExplorer/ApiExplorer").then(m => ({ default: m.ApiExplorer })));
 const WebhooksView = lazyChunk(() => import("./Webhooks/WebhooksView").then(m => ({ default: m.WebhooksView })));
 const LogsExplorer = lazyChunk(() => import("./LogsExplorer/LogsExplorer").then(m => ({ default: m.LogsExplorer })));
-const UsersAndRolesView = lazyChunk(() => import("./UsersAndRoles/UsersAndRolesView").then(m => ({ default: m.UsersAndRolesView })));
+const RolesView = lazyChunk(() => import("./Roles/RolesView").then(m => ({ default: m.RolesView })));
 const ApiKeysView = lazyChunk(() => import("./ApiKeys/ApiKeysView").then(m => ({ default: m.ApiKeysView })));
 const DatabaseView = lazyChunk(() => import("./Database/DatabaseView").then(m => ({ default: m.DatabaseView })));
 
@@ -39,6 +40,15 @@ const DEFAULT_HOME_PAGE = <StudioHomePage/>;
 export function RebaseStudio(props: RebaseStudioConfig) {
     const embed = useRebaseEmbedHost();
     return embed ? null : <RebaseStudioRegistration {...props}/>;
+}
+
+let usersToolWarned = false;
+/** Said once per page: `tools: ["users"]` is the old name of `"roles"`. */
+function warnUsersToolRenamed(): void {
+    if (usersToolWarned) return;
+    usersToolWarned = true;
+    console.warn("[Rebase] The Studio tool \"users\" is now \"roles\": users are a collection, edited in the content. " +
+        "Pass \"roles\" in `tools`; \"users\" still works and will be removed in a future release.");
 }
 
 function RebaseStudioRegistration({ tools, homePage, devViews: extraViews }: RebaseStudioConfig) {
@@ -64,7 +74,7 @@ function RebaseStudioRegistration({ tools, homePage, devViews: extraViews }: Reb
 
     const devViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
-        const activeTools = tools ?? ["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "backups", "database", "api", "webhooks", "logs", "users", "api-keys"];
+        const activeTools = tools ?? ["tables", "sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "backups", "database", "api", "webhooks", "logs", "roles", "api-keys"];
         const suspense = (el: React.ReactNode) => <Suspense fallback={<CircularProgressCenter/>}>{el}</Suspense>;
         const hasTables = activeTools.includes("tables");
 
@@ -179,13 +189,22 @@ icon: "Activity",
 description: t("studio_tool_logs_description"),
 view: suspense(<LogsExplorer/>) });
         }
-        if (activeTools.includes("users")) {
-            views.push({ slug: "users",
-name: t("studio_tool_users"),
+        // `"users"` is the old name of the tool, from when it also listed the
+        // accounts; users are a collection now. Its links (`/users`) still
+        // open the roles.
+        if (activeTools.includes("users")) warnUsersToolRenamed();
+        if (activeTools.includes("roles") || activeTools.includes("users")) {
+            views.push({ slug: "roles",
+name: t("studio_tool_roles"),
 group: "Access Control",
-icon: "Users",
-description: t("studio_tool_users_description"),
-view: suspense(<UsersAndRolesView/>) });
+icon: "Shield",
+description: t("studio_tool_roles_description"),
+view: suspense(<RolesView/>) });
+            // The old address: links and bookmarks to it land on the roles.
+            views.push({ slug: "users",
+name: t("studio_tool_roles"),
+hideFromNavigation: true,
+view: <Navigate to="../roles" relative="path" replace/> });
         }
         if (activeTools.includes("api-keys")) {
             views.push({ slug: "api-keys",

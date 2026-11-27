@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f18ccdd99ad1dc9
+sourceHash: 3594b5aeed9b6b44
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud es el mismo Rebase, operado para ti. Qué es, cómo se vincula y despliega un proyecto, y qué no incluye aún la beta privada.
@@ -465,7 +465,7 @@ Hay dos grupos distintos de personas involucrados, al igual que en Firebase y Su
 El único punto de enlace es **Open admin panel**. Inicia sesión a una persona con acceso `admin`
 en Cloud dentro del panel de administración de la app, coincidiendo con su correo electrónico
 verificado: la app busca o crea la cuenta con esa dirección, le asigna el rol `admin` y
-registra que el rol se originó en Rebase Cloud (la sección Users & roles de Studio lo indica).
+registra que el rol se originó en Rebase Cloud (lo indica el campo `roles` de la tabla de usuarios en el panel de administración).
 Cuando esa persona pierde el acceso `admin` en Cloud al proyecto, Rebase Cloud solicita a la app
 que revoque ese permiso de `admin` y finalice sus sesiones en la app. Un rol otorgado manualmente
 en la app, incluido un rol de `admin` obtenido con anterioridad al primer Open admin panel, se

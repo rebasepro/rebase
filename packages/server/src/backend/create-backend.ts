@@ -3444,7 +3444,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         ? config.auth.defaultRole
         : undefined;
 
-    if (defaultSqlAdmin && baasCatalogReady) {
+    // The roles made at runtime are built-in auth's. A backend whose `auth`
+    // is an `AuthAdapter` owns its roles, and may serve `/admin/roles` itself:
+    // the overlay's routes, mounted ahead of the adapter's, answered in its place.
+    const builtInAuth = config.auth !== undefined && !isAuthAdapter(config.auth);
+    if (defaultSqlAdmin && baasCatalogReady && builtInAuth) {
         rolesStore = createRolesStore(defaultSqlAdmin);
         await syncRolesIntoAccessModel();
     }

@@ -250,8 +250,8 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_RLS_SHARED_ROLE` | What a boot does when another login can switch into the request role: `warn`, `refuse` or `ignore`. | `warn` |
 | `REBASE_BASE_PATH` | Base path for every API route. The client must be told the same thing — see [Changing `basePath`](#changing-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Serve the bundle's static/admin assets from this process. Turn it off when a CDN sits in front. | `true` |
-| `REBASE_STUDIO` | Serve the built-in standalone Rebase Studio console at `/_studio` when a Studio static bundle is available. Set `false` to disable. | `true` |
-| `REBASE_STUDIO_DIR` | Directory containing the prebuilt standalone Rebase Studio SPA served at `/_studio`. Defaults to `/studio` in the container image. | `/studio` |
+| `REBASE_STUDIO` | Serve the built-in admin panel at `/_studio` when its static bundle is available: a project's tables as collections, its users and roles among them, and the Studio. It is what a project with no code is administered with. Set `false` to disable. | `true` |
+| `REBASE_STUDIO_DIR` | Directory containing the prebuilt admin panel served at `/_studio`. Defaults to `/studio` in the container image. | `/studio` |
 | `REBASE_HISTORY` | Record [entity change history](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | gzip/brotli responses. | `true` |
 | `REBASE_PUSH` | `true` turns on [push notifications](/docs/backend/push-notifications/): the `/api/push` routes, the `rebase.push_subscriptions` table and `rebase.push`. | `false` |
