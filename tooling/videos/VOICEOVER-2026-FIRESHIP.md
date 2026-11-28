@@ -100,7 +100,7 @@ const SCRIPT = lines([
     ["privacy", "Reading that audit trail checks the exact policy protecting the record, and never leaks columns from related tables."],
     ["cli", "Open a terminal, pull the timeline for the broken order, and compare every version in seconds."],
     ["revert", "One revert command writes the previous values back through the API, with hooks and permissions intact."],
-    ["close", "Mistakes happen faster in twenty twenty-six. Ship a backend with undo built in."],
+    ["close", "Mistakes happen faster with agents. Ship a backend with undo built in."],
 ]);
 ```
 
