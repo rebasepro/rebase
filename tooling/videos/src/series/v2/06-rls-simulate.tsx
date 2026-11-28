@@ -32,12 +32,12 @@ const GREEN = "#34D399";
 const AMBER = "#F59E0B";
 
 const SCRIPT = lines([
-    ["hook", "Nobody actually tests row-level security across five roles and fifteen tables, because doing it by hand is miserable."],
-    ["guess", "Teams eyeball the SQL, push to production, and pray one buyer cannot read someone else's invoices."],
-    ["sim", "With Rebase, you run the simulator from your terminal or switch on Simulate Access inside Studio."],
-    ["matrix", "Pick any person, role, or scoped agent key, and see across every table what Postgres serves and what comes back forbidden."],
-    ["loop", "Before you even deploy, our verifier catches policies referencing each other in a loop, stopping infinite recursion crashes cold."],
-    ["close", "Quit guessing what your database rules allow, and prove them before launch."],
+    ["hook", "Almost nobody tests row-level security across five roles and fifteen tables, because doing it by hand takes days."],
+    ["guess", "So teams eyeball the SQL, push to production, and hope one buyer can't read someone else's invoices."],
+    ["sim", "With Rebase, run the simulator from the terminal, or turn on Simulate Access inside Studio."],
+    ["matrix", "Pick any person, role, or scoped agent key, and see, across every table, what Postgres serves and what comes back forbidden."],
+    ["loop", "Before you deploy, the verifier also catches policies that reference each other in a loop, which would otherwise crash with infinite recursion."],
+    ["close", "Stop guessing what your rules allow. Prove it before launch."],
 ]);
 
 /* ── inline icons (no emojis) ───────────────────────────────────────── */
@@ -89,7 +89,7 @@ const Guess: React.FC = () => {
     const { x, y, w, format } = useBodyFor(H_GUESS);
     const tall = format === "tall";
 
-    const atPray = useCue({ line: "guess", word: "pray", plus: -4 }) ?? 22;
+    const atPray = useCue({ line: "guess", word: "hope", plus: -4 }) ?? 22;
     const leakO = ramp(frame, Math.max(6, atPray), 12, ENTER);
     const pulse = 0.65 + 0.35 * Math.sin(frame * 0.22);
 
@@ -608,7 +608,7 @@ const Loop: React.FC = () => {
     const tall = format === "tall";
 
     const atLoop = useCue({ line: "loop", word: "loop", plus: -4 }) ?? 22;
-    const atStopping = useCue({ line: "loop", word: "stopping", plus: -2 }) ?? 38;
+    const atStopping = useCue({ line: "loop", word: "crash", plus: -2 }) ?? 38;
 
     const diagO = ramp(frame, 0, 10, ENTER);
     const loopLit = ramp(frame, Math.max(4, atLoop - 6), 12, ENTER);

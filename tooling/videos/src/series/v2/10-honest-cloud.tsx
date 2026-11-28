@@ -22,12 +22,12 @@ const AMBER = "#F59E0B";
 const CYAN = CHROMA.cyan;
 
 const SCRIPT = lines([
-    ["hook", "Two habits in cloud pricing need to die: charging thirty dollars a seat for an admin panel, and selling fake reserved compute on pooled databases."],
-    ["physics", "Postgres has zero per-tenant CPU quotas, so multi-tenant clusters cannot reserve anything. On Rebase Cloud, every project gets a dedicated engine."],
-    ["dials", "Turn three dials for app, database, and storage, read the itemized price, and invite fifty teammates to Rebase CMS for nothing extra."],
-    ["signin", "Owners click Open CMS in the console and land inside their panel already signed in, with zero bootstrap passwords to wire up."],
-    ["region", "Place an app in Germany and an external Postgres in Belgium, and the form warns you up front about latency and double egress."],
-    ["close", "And because Cloud runs our exact MIT image, a standard dump plus eject moves everything onto your own box the same day."],
+    ["hook", "Two habits in cloud pricing need to end: thirty dollars a seat for an admin panel, and reserved compute on databases that can't reserve anything."],
+    ["physics", "Postgres has no per-tenant CPU quotas, so a shared cluster can't guarantee you anything. On Rebase Cloud, every project gets a dedicated engine."],
+    ["dials", "Set three dials for app, database, and storage, read the itemized price, and invite fifty teammates to Rebase CMS at no extra cost."],
+    ["signin", "Owners click Open CMS in the console and land in their panel already signed in, with no bootstrap passwords to set up."],
+    ["region", "Put an app in Germany and an external Postgres in Belgium, and the form warns you about latency and double egress up front."],
+    ["close", "Because Cloud runs our exact MIT image, a standard dump plus eject moves everything onto your own server the same day."],
 ]);
 
 /* ── shared inline icons (clean 1.5-stroke SVGs, zero emojis) ───────── */
@@ -88,7 +88,7 @@ const Physics: React.FC = () => {
     const { x, y, w, format } = useBodyFor(headline);
     const tall = format === "tall";
 
-    const strikeAt = useCue({ line: "physics", word: "cannot", plus: -4 }) ?? 9999;
+    const strikeAt = useCue({ line: "physics", word: "can't", plus: -4 }) ?? 9999;
     const dedicatedAt = useCue({ line: "physics", word: "dedicated", plus: -6 }) ?? 9999;
 
     const leftIn = ramp(frame, 0, 10, ENTER);
@@ -655,7 +655,7 @@ const SignIn: React.FC = () => {
 
     const clickAt = useCue({ line: "signin", word: "Open", plus: -2 }) ?? 9999;
     const landAt = useCue({ line: "signin", word: "land", plus: -4 }) ?? 9999;
-    const zeroAt = useCue({ line: "signin", word: "zero", plus: -6 }) ?? 9999;
+    const zeroAt = useCue({ line: "signin", word: "bootstrap", plus: -6 }) ?? 9999;
 
     const topIn = ramp(frame, 0, 10, ENTER);
     const clickProg = ramp(frame, clickAt, 10, ENTER);

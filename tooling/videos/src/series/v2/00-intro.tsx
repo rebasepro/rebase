@@ -26,13 +26,13 @@ const GREEN = "#34D399";
 const AMBER = "#F59E0B";
 
 const SCRIPT = lines([
-    ["hook", "Writing a backend takes twenty minutes with a coding agent now. Trusting it in production is the hard part."],
-    ["problem", "Agents optimize for green tests, not locked doors. Run a quick audit on an agent-built Postgres database, and half the tables are wide open."],
-    ["schema", "We built Rebase so your security lives in Postgres, not in middleware somebody can forget. You declare each table and its access rules once in TypeScript, push, and the engine enforces those policies on every query."],
-    ["panel", "From the same files, you get a typed REST API, realtime, auth, storage, functions, and an entire admin panel on day one. Your team gets Rebase CMS, developers get Studio, and every click still obeys row-level security."],
-    ["agents", "Because agents are touching live data now, Rebase treats them as first-class callers. Hand an agent a scoped key, stage its writes for human approval, or open your real admin table inside Claude with confirmation before anything saves."],
-    ["cloud", "Rebase is MIT open source, so you can self-host on any Postgres you already own. When you want zero ops, Rebase Cloud runs that exact image on dedicated hardware with no per-seat tax and a clean exit anytime."],
-    ["close", "Keep your database, ship faster with agents, and stop building the back office by hand. Start free or request Cloud access at rebase dot pro."],
+    ["hook", "A coding agent builds your backend in twenty minutes, and it ships with every table wide open."],
+    ["problem", "That happens all the time now: writing the code got fast, and trusting it in production stayed hard."],
+    ["schema", "Rebase, an open source backend for Postgres, puts security inside the database, so there is nothing to forget."],
+    ["panel", "One definition gives you a typed REST API, realtime, auth, storage, functions, and an admin panel on day one, Rebase CMS for your team and Studio for developers, with every click obeying row-level security."],
+    ["agents", "Agents are first-class callers. They get scoped keys, their writes are staged for human approval, and the real admin table even opens inside Claude, where nothing saves until you confirm."],
+    ["cloud", "MIT licensed, it self-hosts on any Postgres you already have. But here's the catch: Rebase Cloud is in private beta, so you request access. We run the exact same image on dedicated hardware, no per-seat pricing, clean exit anytime."],
+    ["close", "Fast was solved; trust is the product. Start free, or request Cloud access, at rebase dot pro."],
 ]);
 
 /* ── icons (inline SVG, zero emojis) ───────────────────────────────── */
@@ -68,8 +68,8 @@ const Problem: React.FC = () => {
     const { x, y, w, format } = useBodyFor(H_PROBLEM);
     const tall = format === "tall";
 
-    const atAudit = useCue({ line: "problem", word: "audit", plus: -4 }) ?? 18;
-    const atOpen = useCue({ line: "problem", word: "wide", plus: -4 }) ?? 48;
+    const atAudit = useCue({ line: "problem", word: "writing", plus: -4 }) ?? 18;
+    const atOpen = useCue({ line: "problem", word: "trusting", plus: -4 }) ?? 48;
 
     const termO = ramp(frame, 0, 10, ENTER);
     const tallyO = ramp(frame, atAudit + 10, 12, ENTER);
@@ -209,9 +209,9 @@ const Schema: React.FC = () => {
     const { x, y, w, format } = useBodyFor(H_SCHEMA);
     const tall = format === "tall";
 
-    const atDeclare = useCue({ line: "schema", word: "declare", plus: -4 }) ?? 18;
-    const atPush = useCue({ line: "schema", word: "push,", plus: -4 }) ?? 55;
-    const atEnforces = useCue({ line: "schema", word: "enforces", plus: -4 }) ?? 70;
+    const atDeclare = useCue({ line: "schema", word: "Rebase,", plus: -4 }) ?? 18;
+    const atPush = useCue({ line: "schema", word: "security", plus: -4 }) ?? 55;
+    const atEnforces = useCue({ line: "schema", word: "forget.", plus: -4 }) ?? 70;
 
     const sqlO = ramp(frame, Math.min(atPush, 45), 14, ENTER);
     const cleanO = ramp(frame, atEnforces, 14, ENTER);
@@ -319,7 +319,7 @@ const Panel: React.FC = () => {
     const tall = format === "tall";
 
     const atStudio = useCue({ line: "panel", word: "Studio,", plus: -6 }) ?? 90;
-    const atRls = useCue({ line: "panel", word: "obeys", plus: -4 }) ?? 115;
+    const atRls = useCue({ line: "panel", word: "obeying", plus: -4 }) ?? 115;
 
     const studioBlend = ramp(frame, atStudio, 14, SHIFT);
     const rlsO = ramp(frame, atRls, 12, ENTER);
@@ -465,9 +465,9 @@ const Agents: React.FC = () => {
     const tall = format === "tall";
 
     const atKey = useCue({ line: "agents", word: "scoped", plus: -4 }) ?? 18;
-    const atStage = useCue({ line: "agents", word: "stage", plus: -4 }) ?? 40;
+    const atStage = useCue({ line: "agents", word: "staged", plus: -4 }) ?? 40;
     const atClaude = useCue({ line: "agents", word: "Claude", plus: -6 }) ?? 66;
-    const atConfirm = useCue({ line: "agents", word: "confirmation", plus: -4 }) ?? 84;
+    const atConfirm = useCue({ line: "agents", word: "confirm.", plus: -4 }) ?? 84;
 
     const keyO = ramp(frame, Math.min(4, atKey), 12, ENTER);
     const stageO = ramp(frame, Math.min(atStage, 42), 12, ENTER);

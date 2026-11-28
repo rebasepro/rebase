@@ -23,12 +23,12 @@ const CORAL = CHROMA.coral;
 const AMBER = "#F59E0B";
 
 const SCRIPT = lines([
-    ["hook", "When four coding agents open backend pull requests before lunch, a shared staging server turns into a crime scene."],
+    ["hook", "When four coding agents open backend pull requests before lunch, a shared staging server stops being safe."],
     ["deploy", "On Rebase Cloud, pass a preview name when you deploy, and that branch gets its own live address in seconds."],
-    ["isolated", "Every backend preview boots inside an isolated pod on a fresh, empty Postgres instance with a separate service key."],
-    ["why", "Production tables stay untouched, live security policies never get overwritten, and scheduled jobs cannot fire against real users."],
-    ["guard", "Even the upload route is fail-safe: hit an older control plane by mistake, and it returns four-oh-four rather than touching live traffic."],
-    ["close", "Ship ten agent branches at once with Rebase Cloud and stop sweating production."],
+    ["isolated", "Each preview boots in an isolated pod on a fresh, empty Postgres, with a separate service key."],
+    ["why", "Production tables stay untouched, live security policies never get overwritten, and scheduled jobs can't fire against real users."],
+    ["guard", "Even the upload route fails safe: hit an older control plane by mistake, and it returns four-oh-four instead of touching live traffic."],
+    ["close", "Ship ten agent branches at once, and keep production out of it. Rebase Cloud."],
 ]);
 
 /* ── inline glyphs (zero emojis) ────────────────────────────────────── */

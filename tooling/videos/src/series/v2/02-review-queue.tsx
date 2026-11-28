@@ -22,12 +22,12 @@ const CORAL = CHROMA.coral;
 const CYAN = CHROMA.cyan;
 
 const SCRIPT = lines([
-    ["hook", "Giving a support agent direct write access to your orders table is how you wake up to four hundred accidental refunds."],
-    ["stage", "With the Rebase review plugin, agents never hold write scopes. Instead, their key can only propose changes."],
-    ["hold", "Every insert, update, or delete lands in a staged table that regular users cannot even see."],
-    ["diff", "Your ops team opens the admin panel, checks a cell-level diff of what the bot wants to edit, and clicks approve."],
-    ["apply", "Postgres runs that mutation inside one transaction under the human reviewer's own row-level security."],
-    ["close", "Agents do the legwork, people make the call, on self-hosted Rebase or Rebase Cloud."],
+    ["hook", "Give a support agent write access to your orders table, and one bad prompt means four hundred accidental refunds."],
+    ["stage", "With the Rebase review plugin, agents never hold write scopes. Their key can only propose changes."],
+    ["hold", "Every insert, update, or delete lands in a staged table that regular users can't see."],
+    ["diff", "Your ops team opens the admin panel, reads a cell-level diff of what the agent wants to change, and approves or rejects it."],
+    ["apply", "Approved edits run in one Postgres transaction, under the reviewer's own row-level security."],
+    ["close", "Agents do the legwork, people make the call. Self-hosted Rebase or Rebase Cloud."],
 ]);
 
 const REVIEW_CONFIG_CODE = `import type { ReviewConfig } from "@rebasepro/plugin-review/config";
@@ -569,7 +569,7 @@ const Diff: React.FC = () => {
     const { x, y, w, format } = useBodyFor(DIFF_HEADLINE);
     const tall = format === "tall";
     const diffAt = useCue({ line: "diff", word: "diff", plus: -4 }) ?? 9999;
-    const approveAt = useCue({ line: "diff", word: "approve", plus: -4 }) ?? 9999;
+    const approveAt = useCue({ line: "diff", word: "approves", plus: -4 }) ?? 9999;
 
     const enterO = ramp(frame, 0, 10, ENTER);
     const diffLit = ramp(frame, diffAt, 12, ENTER);

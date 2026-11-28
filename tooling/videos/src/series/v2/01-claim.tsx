@@ -22,12 +22,12 @@ const GREEN = "#34D399";
 const AMBER = "#F59E0B";
 
 const SCRIPT = lines([
-    ["hook", "My coding agent just deployed a live production backend, and I haven't even created an account yet."],
+    ["hook", "My coding agent just deployed a production backend, and I haven't created an account yet."],
     ["run", "One Rebase Cloud command spins up Postgres, pushes the schema, and puts the API on a real public address."],
-    ["locked", "Until a human claims the project, mail ports remain shut, secrets stay hidden, and the whole stack self-destructs after seventy-two hours."],
-    ["handover", "When the app works, my agent hands me a single-use link. I click it, drop the backend into my org, and keep shipping."],
-    ["rotate", "Claiming revokes the agent's bootstrap token and rotates the service key behind its back with one clean restart."],
-    ["close", "Let agents build at full speed, then take the keys away on Rebase Cloud."],
+    ["locked", "Until a human claims the project, mail ports remain shut, secrets stay hidden, and the whole stack deletes itself after seventy-two hours."],
+    ["handover", "When the app works, my agent hands me a single-use link. I click it, and the backend moves into my org."],
+    ["rotate", "Claiming revokes the agent's bootstrap token and rotates the service key, with one restart."],
+    ["close", "Let agents build at full speed, then take the keys back. Rebase Cloud."],
 ]);
 
 /* ── inline icons ───────────────────────────────────────────────────── */
@@ -930,7 +930,7 @@ export const CLAIM: FilmSpec = checkFilm({
     toCorner: { line: "hook", end: true, plus: 2 },
     close: { line: "close", plus: -2 },
     scenes: [
-        { id: "run", at: { line: "run", plus: -16 }, render: Run, roll: 0.32 },
+        { id: "run", at: { line: "run", plus: -26 }, render: Run, roll: 0.32 },
         { id: "locked", at: { line: "locked", plus: 0 }, render: Locked, roll: 0.56 },
         { id: "handover", at: { line: "handover", plus: 0 }, render: Handover, roll: 0.72 },
         { id: "rotate", at: { line: "rotate", plus: 0 }, render: Rotate, roll: 0.16, bright: true },

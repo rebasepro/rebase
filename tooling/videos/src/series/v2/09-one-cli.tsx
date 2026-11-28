@@ -20,12 +20,12 @@ const CORAL = CHROMA.coral;
 const CYAN = CHROMA.cyan;
 
 const SCRIPT = lines([
-    ["hook", "Agents are incredible in a terminal right up until a piped script misreads a flag and deletes production."],
-    ["reach", "The Rebase CLI drives your whole running app: query rows as JSON or CSV, tail logs, run crons, upload files, or run remote SQL directly."],
-    ["proxy", "Target any Cloud project by slug, and requests route through our Studio proxy so your live service key never enters local memory."],
-    ["guard", "Pipe a destructive command with no terminal attached, and it stops cold with confirmation-required unless you explicitly approve."],
-    ["token", "For CI and background bots, mint a ninety-day token narrowed to deploys and logs, unable to create new keys or overwrite live backups."],
-    ["close", "One CLI built for humans at a keyboard and agents in a shell."],
+    ["hook", "Agents are fast in a terminal, until a piped script misreads a flag and deletes production."],
+    ["reach", "The Rebase CLI drives your whole running app: query rows as JSON or CSV, tail logs, run crons, upload files, or run remote SQL."],
+    ["proxy", "Target any Cloud project by slug, and requests go through the Studio proxy, so the live service key never reaches local memory."],
+    ["guard", "Pipe a destructive command with no terminal attached, and it stops with confirmation required until you explicitly approve."],
+    ["token", "For CI and background bots, mint a ninety-day token scoped to deploys and logs. It can't create keys or overwrite live backups."],
+    ["close", "One CLI, for humans at a keyboard and agents in a shell."],
 ]);
 
 /* ── shared inline icons (clean 1.5-stroke SVGs, zero emojis) ───────── */
@@ -301,7 +301,7 @@ const Proxy: React.FC = () => {
     const { x, y, w, format } = useBodyFor(headline);
     const tall = format === "tall";
 
-    const proxyAt = useCue({ line: "proxy", word: "route", plus: -4 }) ?? 9999;
+    const proxyAt = useCue({ line: "proxy", word: "through", plus: -4 }) ?? 9999;
     const runtimeAt = useCue({ line: "proxy", word: "proxy", plus: 2 }) ?? 9999;
     const shieldAt = useCue({ line: "proxy", word: "never", plus: -6 }) ?? 9999;
 

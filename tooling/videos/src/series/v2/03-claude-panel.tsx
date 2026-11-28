@@ -25,12 +25,12 @@ const GREEN = "#34D399";
 const AMBER = "#F59E0B";
 
 const SCRIPT = lines([
-    ["hook", "Stop vibe-coding fifty throwaway internal dashboards that break the next time somebody renames a column."],
-    ["blind", "And definitely stop letting Claude edit production database rows blind in plain text."],
-    ["open", "Connect Rebase to Claude, ask for your orders, and your real admin table opens inside the chat with live search, filters, and forms."],
-    ["app", "Need a custom view? Ask Claude to sketch an interactive app over those records and run it right there."],
+    ["hook", "Internal dashboards: teams vibe-code dozens of them, and they break the next time somebody renames a column."],
+    ["blind", "Meanwhile, AI assistants edit production rows blind, in plain text."],
+    ["open", "Connect Rebase to Claude, ask for your orders, and your real admin table opens inside the chat, with live search, filters, and forms."],
+    ["app", "Need a custom view? Ask Claude to build an interactive app over those records and run it right there."],
     ["confirm", "Every edit, deploy, rollback, or cron trigger shows the exact plan first and waits for your click, signed in as your own account."],
-    ["close", "Use it on Rebase Cloud from your laptop or phone, or link any self-hosted server in seconds."],
+    ["close", "Use it on Rebase Cloud from a laptop or a phone, or link any self-hosted server in seconds."],
 ]);
 
 /* ── inline icons (no emojis) ───────────────────────────────────────── */
@@ -511,7 +511,7 @@ const AppScene: React.FC = () => {
     const { x, y, w, format } = useBodyFor(H);
     const tall = format === "tall";
 
-    const sketchCue = useCue({ line: "app", word: "sketch", plus: -4 }) ?? 18;
+    const sketchCue = useCue({ line: "app", word: "build", plus: -4 }) ?? 18;
     const interactiveCue = useCue({ line: "app", word: "interactive", plus: -4 }) ?? 44;
     const runCue = useCue({ line: "app", word: "run", plus: -4 }) ?? 78;
 

@@ -23,12 +23,12 @@ const AMBER = "#F59E0B";
 const CYAN = CHROMA.cyan;
 
 const SCRIPT = lines([
-    ["hook", "Before you let an agent run a risky migration or backfill ten thousand rows, clone the database."],
-    ["clone", "One CLI command gives you a full copy in under a second, including every table, index, row, and security policy."],
-    ["how", "Postgres copies the underlying files straight on disk through native templates right after Rebase evicts idle connection pools."],
-    ["wild", "Point your coding agent at that isolated copy and let it go wild while production feels nothing."],
-    ["merge", "Inspect every changed record in the terminal diff, then merge back only the row updates that look right."],
-    ["close", "Instant database branches without moving your Postgres to a proprietary vendor."],
+    ["hook", "Before an agent runs a risky migration or backfills ten thousand rows, clone the database."],
+    ["clone", "One CLI command makes a full copy in under a second, with every table, index, row, and security policy."],
+    ["how", "It doesn't copy records one by one. Postgres clones the files on disk through native templates, right after Rebase evicts idle connection pools."],
+    ["wild", "Point your coding agent at that copy and let it work. Production never sees it."],
+    ["merge", "Then inspect every changed row in the terminal diff, and merge back only the updates that look right."],
+    ["close", "Instant database branches, without moving your Postgres to a proprietary vendor."],
 ]);
 
 /* ── persistent bottom branch graph layer ───────────────────────────── */
@@ -434,7 +434,7 @@ const Wild: React.FC = () => {
     const { x, y, w, format } = useBodyFor(H);
     const tall = format === "tall";
 
-    const wildCue = useCue({ line: "wild", word: "wild", plus: -8 }) ?? 34;
+    const wildCue = useCue({ line: "wild", word: "work.", plus: -8 }) ?? 34;
     const prodCue = useCue({ line: "wild", word: "production", plus: -4 }) ?? 56;
 
     const leftIn = ramp(frame, 0, 12, ENTER);
@@ -699,7 +699,7 @@ export const DB_BRANCH: FilmSpec = checkFilm({
     endCommand: "rebase db branch create experiment",
     layer: BranchGraphLayer,
     scenes: [
-        { id: "clone", at: { line: "clone", plus: -16 }, render: Clone, roll: 0.28 },
+        { id: "clone", at: { line: "clone", plus: -26 }, render: Clone, roll: 0.28 },
         { id: "how", at: { line: "how", plus: 0 }, render: How, roll: 0.54 },
         { id: "wild", at: { line: "wild", plus: 0 }, render: Wild, roll: 0.72 },
         { id: "merge", at: { line: "merge", plus: 0 }, render: Merge, roll: 0.36, bright: true },

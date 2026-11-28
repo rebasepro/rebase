@@ -33,12 +33,12 @@ const GREEN = "#34D399";
 const AMBER = "#F59E0B";
 
 const SCRIPT = lines([
-    ["hook", "Sooner or later, an agent script with a bad filter is going to wipe out the wrong customer records."],
-    ["on", "In Rebase, entity history is switched on out of the box. Every create, update, and delete snapshots what changed, who did it, and what sat there before."],
-    ["privacy", "Viewing an audit trail checks the exact policy protecting that record, and never leaks columns from related tables."],
-    ["cli", "Open your terminal, pull the timeline for that broken order, and compare every version in seconds."],
-    ["revert", "One revert command writes the previous values back through the API with all hooks and permissions intact."],
-    ["close", "Mistakes happen faster in twenty twenty-six, so ship a backend with undo built in."],
+    ["hook", "Sooner or later, an agent script with a bad filter deletes the wrong customer records. What matters is whether you can undo it."],
+    ["on", "In Rebase, entity history is on out of the box. Every create, update, and delete records what changed, who did it, and what was there before."],
+    ["privacy", "Reading that audit trail checks the exact policy protecting the record, and never leaks columns from related tables."],
+    ["cli", "Open a terminal, pull the timeline for the broken order, and compare every version in seconds."],
+    ["revert", "One revert command writes the previous values back through the API, with hooks and permissions intact."],
+    ["close", "Mistakes happen faster with agents. Ship a backend with undo built in."],
 ]);
 
 /* ── inline icons (no emojis) ───────────────────────────────────────── */

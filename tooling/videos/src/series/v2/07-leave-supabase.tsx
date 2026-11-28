@@ -23,12 +23,12 @@ const CYAN = CHROMA.cyan;
 const AMBER = "#F59E0B";
 
 const SCRIPT = lines([
-    ["hook", "Try moving off Supabase by hand, and your first migration dies on proprietary auth functions before a single table loads."],
-    ["why", "Your schemas get tangled up with custom Postgres roles, UUID user links, and service-role shortcuts."],
-    ["cmd", "Point the Rebase schema introspector at your live Supabase connection string with one flag."],
-    ["translate", "It rewrites user defaults into server hooks, converts authenticated and anon rules into clean policies, and drops service-role backdoors."],
-    ["honest", "Anything outside your tables, like triggers, custom SQL functions, and check constraints, gets saved into a file you can run straight on Rebase Cloud."],
-    ["close", "Preserve every user ID, own your stack, and leave lock-in behind."],
+    ["hook", "Move off Supabase by hand, and the first migration fails on proprietary auth functions before a single table loads."],
+    ["why", "Your schema is tangled up with custom Postgres roles, UUID user links, and service-role shortcuts."],
+    ["cmd", "Point the Rebase schema introspector at your live Supabase connection string. It takes one flag."],
+    ["translate", "It rewrites user defaults into server hooks, turns authenticated and anon rules into clean policies, and drops the service-role backdoors."],
+    ["honest", "Here's the catch: triggers, custom SQL functions, and check constraints aren't translated. They're saved to a file you can run directly on Rebase Cloud."],
+    ["close", "Every user ID carries over, the stack is yours, and lock-in stays behind."],
 ]);
 
 /* ── inline glyphs (zero emojis) ────────────────────────────────────── */
