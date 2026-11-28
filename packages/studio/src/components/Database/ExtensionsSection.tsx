@@ -136,7 +136,7 @@ export function ExtensionsSection() {
                                     {!CORE_EXTENSIONS.has(extension.name) && (
                                         <Tooltip title={t("studio_database_drop")}>
                                             <IconButton size="small" aria-label={t("studio_database_extensions_drop_aria", { name: extension.name })} onClick={() => askDrop(extension, false)}>
-                                                <Trash2Icon size={iconSize.small} className="text-red-500"/>
+                                                <Trash2Icon size={iconSize.smallest} className="text-text-secondary hover:text-red-500 transition-colors"/>
                                             </IconButton>
                                         </Tooltip>
                                     )}

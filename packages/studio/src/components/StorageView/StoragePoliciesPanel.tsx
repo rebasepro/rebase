@@ -322,7 +322,7 @@ export function StoragePoliciesPanel() {
                                             <PencilIcon size={iconSize.small} />
                                         </IconButton>
                                         <IconButton size="small" aria-label={t("studio_storage_policies_delete_aria")} onClick={() => void handleDelete(p)}>
-                                            <Trash2Icon size={iconSize.small} className={"text-red-500"} />
+                                            <Trash2Icon size={iconSize.smallest} className={"text-text-secondary hover:text-red-500 transition-colors"} />
                                         </IconButton>
                                     </TableCell>
                                 </TableRow>

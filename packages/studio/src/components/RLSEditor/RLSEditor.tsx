@@ -85,7 +85,7 @@ function SidebarTableRow({ table, isSelected, onSelect, badge, dimmed, t }: {
             className={cls(
                 "flex items-center p-1 cursor-pointer rounded transition-colors group relative",
                 isSelected
-                    ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
+                    ? "bg-surface-active text-text-primary dark:text-text-primary-dark font-medium"
                     : "hover:bg-surface-hover text-text-secondary dark:text-text-secondary-dark",
                 dimmed && !isSelected && "opacity-60"
             )}

@@ -87,7 +87,7 @@ describe("the catalogue reads of the RLS editor", () => {
 
         for (const table of ["posts", "tags"]) {
             fireEvent.click(sidebarRow(table));
-            await waitFor(() => expect(sidebarRow(table).className).toContain("bg-primary/10"));
+            await waitFor(() => expect(sidebarRow(table).className).toContain("bg-surface-active"));
         }
         await new Promise(resolve => setTimeout(resolve, 50));
 

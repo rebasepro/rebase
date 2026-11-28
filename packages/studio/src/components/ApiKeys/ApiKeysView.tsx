@@ -276,12 +276,12 @@ function KeysPane({
                 {tabs}
                 <div className="flex flex-1 min-h-0 w-full overflow-hidden">
                     {/* ── Key List ── */}
-                    <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
-                        <div className={cls("flex items-center justify-between px-4 h-14 shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
+                    <div className={cls("flex flex-col w-[320px] min-w-[260px] border-r h-full bg-surface-sheet", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-4 h-[44px] shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
                             <div className="flex items-center gap-2">
-                                <KeyRoundIcon size={iconSize.smallest} className="text-primary"/>
+                                <KeyRoundIcon size={iconSize.smallest} className="text-text-secondary dark:text-text-secondary-dark"/>
                                 <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_api_keys")}</Typography>
-                                <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{activeKeys.length}</Chip>
+                                <Chip size="smallest" className="font-mono tabular-nums">{activeKeys.length}</Chip>
                             </div>
                             <div className="flex items-center gap-1">
                                 <IconButton aria-label={t("studio_api_keys_refresh")} size="small" onClick={loadKeys} title={t("studio_api_keys_refresh")}><RefreshCwIcon size={iconSize.smallest}/></IconButton>
@@ -477,9 +477,9 @@ function KeyListItem({ apiKey, catalogue, selected, onClick }: {
         <div
             onClick={onClick}
             className={cls(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all",
+                "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors duration-150",
                 selected
-                    ? "bg-primary/10 dark:bg-primary/15 ring-1 ring-primary/30"
+                    ? "bg-surface-active text-text-primary dark:text-text-primary-dark"
                     : "hover:bg-surface-hover"
             )}
         >
@@ -522,15 +522,13 @@ function KeyDetail({ apiKey, catalogue, revoking, onRevoke }: {
     return (
         <>
             {/* Header */}
-            <div className={cls("flex items-center justify-between px-5 h-14 shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
-                <div className="flex items-center gap-3 min-w-0">
-                    <KeyRoundIcon size={iconSize.small} className="text-primary shrink-0"/>
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                            <Typography variant="subtitle1" className="font-semibold truncate">{apiKey.name}</Typography>
-                            {runsAsAdmin(apiKey) && <AdminChip/>}
-                        </div>
-                        <Typography variant="caption" color="secondary" className="font-mono text-xs">{apiKey.key_prefix}•••</Typography>
+            <div className={cls("flex items-center justify-between px-5 h-[44px] shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <KeyRoundIcon size={iconSize.smallest} className="text-text-secondary dark:text-text-secondary-dark shrink-0"/>
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Typography variant="subtitle2" className="font-semibold truncate">{apiKey.name}</Typography>
+                        {runsAsAdmin(apiKey) && <AdminChip/>}
+                        <Typography variant="caption" color="disabled" className="font-mono text-xs hidden sm:inline">{apiKey.key_prefix}•••</Typography>
                     </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

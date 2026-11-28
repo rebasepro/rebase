@@ -125,7 +125,7 @@ export function FunctionsSection() {
                                     ) : (
                                         <Tooltip title={t("studio_database_drop")}>
                                             <IconButton size="small" aria-label={t("studio_database_functions_drop_aria", { name: key })} onClick={() => askDrop(fn)}>
-                                                <Trash2Icon size={iconSize.small} className="text-red-500"/>
+                                                <Trash2Icon size={iconSize.smallest} className="text-text-secondary hover:text-red-500 transition-colors"/>
                                             </IconButton>
                                         </Tooltip>
                                     )}

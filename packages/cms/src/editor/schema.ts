@@ -183,7 +183,7 @@ const nodes: { [key: string]: NodeSpec } = {
         group: "block",
         parseDOM: [{ tag: "hr" }],
         toDOM() {
-            return ["hr", { class: "mt-4 mb-6 border-t border-solid border-gray-200 dark:border-gray-800" }];
+            return ["hr", { className: "mt-4 mb-6 border-t border-solid border-hairline" }];
         }
     },
     code_block: {

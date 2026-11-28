@@ -285,7 +285,7 @@ export function DirectRlsPoliciesPanel() {
                                                         aria-label={t("studio_rls_direct_drop_policy_aria", { name: p.name })}
                                                         onClick={() => void handleDropPolicy(p.name)}
                                                     >
-                                                        <Trash2Icon size={iconSize.small} className={"text-red-500"} />
+                                                        <Trash2Icon size={iconSize.smallest} className={"text-text-secondary hover:text-red-500 transition-colors"} />
                                                     </IconButton>
                                                 </TableCell>
                                             </TableRow>

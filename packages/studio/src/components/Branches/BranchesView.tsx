@@ -194,23 +194,23 @@ export function BranchesView() {
     return (
         <div className="flex h-full w-full overflow-hidden bg-surface-card">
             {/* ── Branch List ── */}
-            <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
-                <div className={cls("flex items-center justify-between px-4 h-14 shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
+            <div className={cls("flex flex-col w-[320px] min-w-[260px] border-r h-full bg-surface-sheet", defaultBorderMixin)}>
+                <div className={cls("flex items-center justify-between px-4 h-[44px] shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
-                        <GitBranchIcon size={iconSize.small} className="text-primary"/>
+                        <GitBranchIcon size={iconSize.smallest} className="text-text-secondary dark:text-text-secondary-dark"/>
                         <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_branches")}</Typography>
-                        <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{branches.length}</Chip>
+                        <Chip size="smallest" className="font-mono tabular-nums">{branches.length}</Chip>
                     </div>
                     <div className="flex items-center gap-1">
                         <IconButton aria-label={t("refresh")} size="small" onClick={loadBranches} title={t("refresh")}>
                             <RefreshCwIcon size={iconSize.smallest}/>
                         </IconButton>
-                        <IconButton aria-label={t("create_branch")} size="small" onClick={() => setCreateOpen(true)} title={t("create_branch")} className="text-primary">
+                        <IconButton aria-label={t("create_branch")} size="small" onClick={() => setCreateOpen(true)} title={t("create_branch")}>
                             <PlusIcon size={iconSize.smallest}/>
                         </IconButton>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
                     {failure ? (
                         <LoadFailureView
                             failure={failure}
@@ -240,9 +240,9 @@ export function BranchesView() {
                                 key={branch.name}
                                 onClick={() => setSelectedBranch(branch.name)}
                                 className={cls(
-                                    "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all",
+                                    "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors duration-150",
                                     selectedBranch === branch.name
-                                        ? "bg-primary/10 dark:bg-primary/15 ring-1 ring-primary/30"
+                                        ? "bg-surface-active text-text-primary dark:text-text-primary-dark"
                                         : "hover:bg-surface-hover"
                                 )}
                             >
@@ -276,12 +276,12 @@ export function BranchesView() {
                 ) : (
                     <>
                         {/* Header */}
-                        <div className={cls("flex items-center justify-between px-5 h-14 shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
-                            <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"/>
-                                <div className="min-w-0">
-                                    <Typography variant="subtitle1" className="font-semibold truncate">{selected.name}</Typography>
-                                    <Typography variant="caption" color="secondary" className="truncate">
+                        <div className={cls("flex items-center justify-between px-5 h-[44px] shrink-0 border-b bg-surface-sheet", defaultBorderMixin)}>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"/>
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <Typography variant="subtitle2" className="font-semibold truncate">{selected.name}</Typography>
+                                    <Typography variant="caption" color="disabled" className="truncate hidden md:inline">
                                         {t("studio_branches_created_from")} <Typography variant="mono" component="span" className="text-xs">{selected.parentDatabase}</Typography>
                                     </Typography>
                                 </div>

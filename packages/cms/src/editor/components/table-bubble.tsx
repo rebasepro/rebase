@@ -143,7 +143,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                     e.preventDefault();
                 }}
             >
-                <div className="flex gap-1 border-r pr-1 mr-1 dark:border-gray-700">
+                <div className="flex gap-1 border-r border-hairline pr-1 mr-1">
                     <Tooltip title={t("add_row_before")}>
                         <IconButton aria-label={t("add_row_before")} size="small" onClick={() => executeCommand(addRowBefore)}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -178,7 +178,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                     </Tooltip>
                 </div>
 
-                <div className="flex gap-1 border-r pr-1 mr-1 dark:border-gray-700">
+                <div className="flex gap-1 border-r border-hairline pr-1 mr-1">
                     <Tooltip title={t("add_column_before")}>
                         <IconButton aria-label={t("add_column_before")} size="small" onClick={() => executeCommand(addColumnBefore)}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"

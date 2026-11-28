@@ -215,7 +215,7 @@ export function ActivitySection() {
                                                 aria-label={t("studio_database_activity_terminate_aria", { pid: session.pid })}
                                                 onClick={() => askTerminate(session)}
                                             >
-                                                <PowerIcon size={iconSize.small} className="text-red-500"/>
+                                                <PowerIcon size={iconSize.smallest} className="text-text-secondary hover:text-red-500 transition-colors"/>
                                             </IconButton>
                                         </Tooltip>
                                     </TableCell>

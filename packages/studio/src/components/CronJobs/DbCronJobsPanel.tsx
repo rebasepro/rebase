@@ -247,7 +247,7 @@ export function DbCronJobsPanel() {
                                             <PencilIcon size={iconSize.small} />
                                         </IconButton>
                                         <IconButton size="small" aria-label={t("studio_cron_db_delete_aria", { name: j.name })} onClick={() => void handleDelete(j)}>
-                                            <Trash2Icon size={iconSize.small} className={"text-red-500"} />
+                                            <Trash2Icon size={iconSize.smallest} className={"text-text-secondary hover:text-red-500 transition-colors"} />
                                         </IconButton>
                                     </TableCell>
                                 </TableRow>
