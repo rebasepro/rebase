@@ -125,6 +125,7 @@ export function tableDefaultPoliciesDisabled(table: PolicyTable): boolean {
 }
 
 export function tableEffectiveRules(table: PolicyTable): SecurityRule[] {
+    if (table.posture === "external" || table.posture === "unmanaged") return [];
     const explicit = [...table.rules];
 
     const tableName = table.table;
@@ -205,6 +206,7 @@ export function tableEffectiveRules(table: PolicyTable): SecurityRule[] {
  * DDL, which policies are injected and how to take them off.
  */
 export function tableInjectedRules(table: PolicyTable): SecurityRule[] {
+    if (table.posture === "external" || table.posture === "unmanaged") return [];
     if (tableDefaultPoliciesDisabled(table)) {
         // Not empty for an auth collection, nor for a tenant-scoped one: both
         // restrictive rules are still injected, and the generated DDL has to

@@ -272,25 +272,28 @@ export function TablePolicies({ schemaName, tableName, rlsEnabled, policies, isJ
 
     const activeTableCategory = classifyTableClient(tableName, schemaName, Boolean(activeJunction) || isJunction, Boolean(activeDescriptor));
 
+    const activeRlsPosture = activeDescriptor?.rls.posture;
+    const activeTableNonManaged = activeRlsPosture === "external" || activeRlsPosture === "unmanaged";
+
     /** Whether the server re-asserts this table's RLS on every start. */
-    const activeTableManaged = Boolean(activeDescriptor || activeJunction);
+    const activeTableManaged = Boolean((activeDescriptor && !activeTableNonManaged) || activeJunction);
 
     /**
      * What the server says the table's policies are — `undefined` when it
      * declares none, or withheld them from this caller.
      */
     const activeDeclared = useMemo((): DeclaredPolicies | undefined => {
-        if (activeDescriptor) return declaredPoliciesOf(activeDescriptor.rls);
+        if (activeDescriptor) return activeTableNonManaged ? undefined : declaredPoliciesOf(activeDescriptor.rls);
         if (activeJunction && activeJunction.policies.length > 0) return { rules: [], policies: activeJunction.policies };
         return undefined;
-    }, [activeDescriptor, activeJunction]);
+    }, [activeDescriptor, activeJunction, activeTableNonManaged]);
 
     /**
      * The table is declared, but this caller is not shown what it compiles to
      * (no `schema:read`): the list is what the database holds, and nothing is
      * written to the declaration — its raw rules may be redacted.
      */
-    const declaredWithheld = activeDescriptor !== null && activeDeclared === undefined;
+    const declaredWithheld = activeDescriptor !== null && !activeTableNonManaged && activeDeclared === undefined;
 
     /** A save to the declaration needs the declaration, and a codebase to write it into. */
     const savesToCodebase = activeDescriptor !== null && hasCodebase;
@@ -460,6 +463,25 @@ export function TablePolicies({ schemaName, tableName, rlsEnabled, policies, isJ
                     <Typography variant="caption">{t("studio_rls_reapplied_on_start", { table: tableName })}</Typography>
                 </Alert>
             )}
+            {activeRlsPosture === "external" && (
+                <Alert color="info">
+                    <Typography variant="body2" className="mb-1 font-semibold">External Row-Level Security</Typography>
+                    <Typography variant="caption" className="opacity-80">
+                        This table declares <code>rls: &quot;external&quot;</code>. Postgres enforces row-level security using
+                        policies managed outside Rebase (SQL migrations, Supabase, or a DBA); Rebase does not generate or
+                        overwrite policies for it.
+                    </Typography>
+                </Alert>
+            )}
+            {activeRlsPosture === "unmanaged" && (
+                <Alert color="info">
+                    <Typography variant="body2" className="mb-1 font-semibold">Unmanaged Row-Level Security</Typography>
+                    <Typography variant="caption" className="opacity-80">
+                        This table declares <code>rls: &quot;unmanaged&quot;</code>. Rebase does not enable row-level security
+                        or generate policies for it; access is enforced in application code (hooks, scopes, or routes).
+                    </Typography>
+                </Alert>
+            )}
             {activeTableCategory === "internal" && (
                 <Alert color="info">
                     <Typography variant="body2" className="mb-1 font-semibold">Rebase System Table</Typography>
@@ -514,8 +536,9 @@ export function TablePolicies({ schemaName, tableName, rlsEnabled, policies, isJ
                                         </Tooltip>
                                     )}
                                     {/* A *drift* signal: the codebase does not declare this policy.
-                                        Without a codebase every policy trivially qualifies. */}
-                                    {policy.status === "live" && hasCodebase && (
+                                        Without a codebase, or on external/unmanaged tables, live policies
+                                        are not codebase drift. */}
+                                    {policy.status === "live" && hasCodebase && !activeTableNonManaged && (
                                         <Tooltip title={t("studio_tables_policy_db_only_tooltip")}>
                                             <span><StatusDot tone="busy" size="small">{t("studio_tables_policy_db_only")}</StatusDot></span>
                                         </Tooltip>

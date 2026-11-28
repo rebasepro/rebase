@@ -89,6 +89,11 @@ function viewRules(table: TableDescriptor): SecurityRule[] {
  *   `view` (see `viewRules`).
  * - `posture: "view"` on a table, which the compiler never emits → one rule
  *   that grants nothing.
+ * - `posture: "external"` / `posture: "unmanaged"` → one `"all"` rule carrying
+ *   a raw SQL condition so the evaluator answers `"unknown"`: panel gating
+ *   offers the controls and lets Postgres (`"external"`) or server hooks/scopes
+ *   (`"unmanaged"`) decide each request, while client-side enforcement callers
+ *   never misread the table as unconditionally open.
  * - `posture: "admin-only"` → the injected admin baseline alone: admins may
  *   read and write, nobody else may do anything.
  * - `posture: "rules"` → the declared rules, plus the admin baseline unless
@@ -105,6 +110,12 @@ function viewRules(table: TableDescriptor): SecurityRule[] {
 export function securityRulesFromRls(table: TableDescriptor, basis: RlsProjectionBasis): SecurityRule[] {
     if (table.kind === "view") return viewRules(table);
     if (table.rls.posture === "view") return [closedRule(table)];
+    if (table.rls.posture === "external" || table.rls.posture === "unmanaged") {
+        const note = table.rls.posture === "external"
+            ? "/* external: decided by database RLS policies */"
+            : "/* unmanaged: decided by application hooks and scopes */";
+        return [{ name: `${table.table}_${table.rls.posture}`, operations: ["all"], condition: policy.raw(note) }];
+    }
 
     const declared = table.rls.posture === "admin-only" ? [] : table.rls.rules.map(asEvaluated);
     const tenant: CollectionTenantConfig | undefined = table.tenant

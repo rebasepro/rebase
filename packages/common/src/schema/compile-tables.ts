@@ -727,12 +727,36 @@ function compileOne(
     if (!rls.ok) {
         refuse(rls.message);
     } else {
+        if (rls.rls.posture === "unmanaged" && tableConfig.rlsRequired === true) {
+            refuse(
+                "`rls: \"unmanaged\"` with `rlsRequired: true` is contradictory: \"unmanaged\" tells Rebase " +
+                "the table has no Postgres row-level security and the app enforces access itself. Drop `rlsRequired: true`, " +
+                "or use `rls: \"external\"` if Postgres enforces policies managed outside Rebase.",
+                "rlsRequired"
+            );
+        }
+        if (auth && rls.rls.posture === "unmanaged") {
+            refuse(
+                "`defineAuthTable` cannot use `rls: \"unmanaged\"`: the users table relies on row-level security " +
+                "to stop non-admins from escalating their own `roles`. Use `\"admin-only\"`, a list of rules, or " +
+                "`\"external\"` if Postgres RLS policies are managed outside Rebase.",
+                "rls"
+            );
+        }
         descriptor.rls = typeof tableConfig.rlsRequired === "boolean" ? { ...rls.rls, required: tableConfig.rlsRequired } : rls.rls;
         problems.push(...checkRules(name, rls.rls, allColumns, relations, auth));
     }
 
     // ── tenant ───────────────────────────────────────────────────────────────
     if (tableConfig.tenant !== undefined) {
+        if (rls.ok && (rls.rls.posture === "external" || rls.rls.posture === "unmanaged")) {
+            refuse(
+                `\`tenant\` cannot be combined with \`rls: "${rls.rls.posture}"\`: tenant isolation is enforced by a ` +
+                "restrictive RLS policy Rebase generates, and Rebase generates no policies under this posture. " +
+                "Switch `rls` to `\"admin-only\"` or a list of rules, or remove `tenant` and enforce tenancy yourself.",
+                "tenant"
+            );
+        }
         const tenant = compileTenant(tableConfig.tenant, columnOf, refuse);
         if (tenant) {
             descriptor.tenant = tenant;

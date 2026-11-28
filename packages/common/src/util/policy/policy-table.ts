@@ -1,6 +1,7 @@
 import {
     isNumericColumnType,
     type ColumnType,
+    type RlsDescriptor,
     type SecurityRule,
     type TableDescriptor,
     type TenantDescriptor
@@ -64,6 +65,8 @@ export interface PolicyTable {
     links: Readonly<Record<string, PolicyColumn>>;
     /** The key of the row id: the first primary-key column. */
     idKey: string;
+    /** The table's RLS posture when known. `"external"` and `"unmanaged"` emit no Rebase policies. */
+    posture?: RlsDescriptor["posture"];
     /** The declared rules, exactly as written (policy names hash them). */
     rules: readonly SecurityRule[];
     /**
@@ -138,8 +141,9 @@ export function policyTableFromDescriptor(descriptor: TableDescriptor): PolicyTa
         columns,
         links,
         idKey: descriptor.primaryKey[0] ?? "id",
+        posture: descriptor.rls.posture,
         rules: descriptor.rls.posture === "rules" ? descriptor.rls.rules : [],
-        ...(descriptor.rls.posture === "view"
+        ...(descriptor.rls.posture === "view" || descriptor.rls.posture === "external" || descriptor.rls.posture === "unmanaged"
             ? { defaultPolicies: false }
             : !descriptor.rls.defaultPolicies ? { defaultPolicies: false }
                 : descriptor.rls.declaredDefaultPolicies ? { defaultPolicies: true } : {}),

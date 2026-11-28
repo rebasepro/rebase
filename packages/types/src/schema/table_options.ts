@@ -7,21 +7,27 @@ import type { TenantSource } from "../types/tenancy";
  *
  * - `"admin-only"` — RLS on, and only the admin baseline policy: the `admin`
  *   role and the server's own code reach rows; every other caller gets none.
+ * - `"external"` — Postgres enforces RLS, and the policies live outside Rebase
+ *   (SQL migrations, Supabase, Terraform, a DBA). Rebase emits no RLS/policy
+ *   DDL for the table and verifies `relrowsecurity = true` at boot.
+ * - `"unmanaged"` — no Postgres RLS on this table; access is enforced by the
+ *   application (auth, scopes, hooks, custom routes). Rebase emits no RLS/policy
+ *   DDL for the table and serves it with a boot notice.
  * - `"inherit"` — the `defaultRls` exported from `backend/schema/index.ts`.
  *   Refused when that export is missing.
  * - a non-empty list of {@link SecurityRule} — the policies to generate.
  *
  * @group Schema
  */
-export type RlsPosture = "admin-only" | "inherit" | readonly [SecurityRule, ...SecurityRule[]];
+export type RlsPosture = "admin-only" | "external" | "unmanaged" | "inherit" | readonly [SecurityRule, ...SecurityRule[]];
 
 /**
- * What `backend/schema/index.ts` may export as `defaultRls`: the rules every
- * `rls: "inherit"` table takes.
+ * What `backend/schema/index.ts` may export as `defaultRls`: the posture or
+ * rules every `rls: "inherit"` table takes.
  *
  * @group Schema
  */
-export type DefaultRls = "admin-only" | readonly [SecurityRule, ...SecurityRule[]];
+export type DefaultRls = "admin-only" | "external" | "unmanaged" | readonly [SecurityRule, ...SecurityRule[]];
 
 /**
  * One key of an index: a column, optionally with its sort order.

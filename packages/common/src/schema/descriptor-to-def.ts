@@ -116,6 +116,7 @@ function rlsPostureOf(descriptor: TableDescriptor, rls: RlsDescriptor): { rls: R
     const rules = rls.rules;
     const declared = rls.declaredDefaultPolicies ? { defaultPolicies: true } : {};
     if (rls.posture === "admin-only") return { rls: "admin-only", ...declared };
+    if (rls.posture === "external" || rls.posture === "unmanaged") return { rls: rls.posture };
     if (rules.length > 0) {
         const posture: RlsPosture = [rules[0], ...rules.slice(1)];
         return rls.defaultPolicies ? { rls: posture, ...declared } : { rls: posture, defaultPolicies: false };

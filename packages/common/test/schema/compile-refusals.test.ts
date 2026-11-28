@@ -187,6 +187,41 @@ describe("compileTables — refusals", () => {
             }]);
         });
 
+        it("accepts \"external\" and \"unmanaged\" (direct or inherited) and refuses contradictory options", () => {
+            expect(problemsOf([rawTable("ext", { columns: { id: id() }, rls: "external" })])).toEqual([]);
+            expect(problemsOf([rawTable("app", { columns: { id: id() }, rls: "unmanaged" })])).toEqual([]);
+            expect(problemsOf([rawTable("ext_inh", { columns: { id: id() }, rls: "inherit" })], "external")).toEqual([]);
+            expect(problemsOf([rawTable("app_inh", { columns: { id: id() }, rls: "inherit" })], "unmanaged")).toEqual([]);
+            expect(problemsOf([defineAuthTable("ext_users", { columns: { id: id() }, rls: "external" })])).toEqual([]);
+
+            expect(problemsOf([rawTable("t", { columns: { id: id() }, rls: "external", defaultPolicies: true })])).toEqual([{
+                table: "t", message: expect.stringContaining("`rls: \"external\"` with `defaultPolicies: true` is contradictory")
+            }]);
+            expect(problemsOf([rawTable("t", { columns: { id: id() }, rls: "unmanaged", defaultPolicies: true })])).toEqual([{
+                table: "t", message: expect.stringContaining("`rls: \"unmanaged\"` with `defaultPolicies: true` is contradictory")
+            }]);
+            expect(problemsOf([rawTable("t", { columns: { id: id() }, rls: "unmanaged", rlsRequired: true })])).toEqual([{
+                table: "t", key: "rlsRequired", message: expect.stringContaining("`rls: \"unmanaged\"` with `rlsRequired: true` is contradictory")
+            }]);
+            expect(problemsOf([defineAuthTable("users", { columns: { id: id() }, rls: "unmanaged" })])).toEqual([{
+                table: "users", key: "rls", message: expect.stringContaining("`defineAuthTable` cannot use `rls: \"unmanaged\"`")
+            }]);
+            expect(problemsOf([rawTable("t", {
+                columns: { id: id(), orgId: col.uuid() },
+                rls: "external",
+                tenant: { field: "orgId", from: { claim: "org_id" } }
+            })])).toEqual([{
+                table: "t", key: "tenant", message: expect.stringContaining("`tenant` cannot be combined with `rls: \"external\"`")
+            }]);
+            expect(problemsOf([rawTable("t", {
+                columns: { id: id(), orgId: col.uuid() },
+                rls: "unmanaged",
+                tenant: { field: "orgId", from: { claim: "org_id" } }
+            })])).toEqual([{
+                table: "t", key: "tenant", message: expect.stringContaining("`tenant` cannot be combined with `rls: \"unmanaged\"`")
+            }]);
+        });
+
         it("refuses an ownerField naming no column, and accepts a key, a relation or a column name", () => {
             const users = table("users");
             const t = rawTable("t", {

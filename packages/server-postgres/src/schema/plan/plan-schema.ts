@@ -107,6 +107,7 @@ import type {
     RelationPlan,
     SchemaPlan,
     TablePlan,
+    TableRlsMode,
     TriggerPlan,
     ViewPlan
 } from "./types";
@@ -1045,16 +1046,24 @@ function planCollectionTable(
 
     const primaryKey = planPrimaryKey(descriptor, columns);
 
+    const rlsMode: TableRlsMode = descriptor.rls.posture === "external"
+        ? "external"
+        : descriptor.rls.posture === "unmanaged"
+            ? "unmanaged"
+            : "managed";
+
     const policyTable = resolvePolicyTable(descriptor.slug) ?? policyTableFromDescriptor(descriptor);
     const injected = new Set(tableInjectedRules(policyTable).map(rule => rule.name));
-    const policies = withoutLiveSupersededNames(tableEffectiveRules(policyTable).flatMap((rule, index) =>
-        compileTableSecurityRule(
-            policyTable,
-            rule,
-            resolvePolicyTable,
-            Boolean(rule.name && injected.has(rule.name)),
-            rule.name ?? `#${index}`
-        )));
+    const policies = rlsMode === "managed"
+        ? withoutLiveSupersededNames(tableEffectiveRules(policyTable).flatMap((rule, index) =>
+            compileTableSecurityRule(
+                policyTable,
+                rule,
+                resolvePolicyTable,
+                Boolean(rule.name && injected.has(rule.name)),
+                rule.name ?? `#${index}`
+            )))
+        : [];
 
     // ── Tenancy ──────────────────────────────────────────────────────────────
     // The policy is already above — `tableEffectiveRules` injects it, so
@@ -1099,6 +1108,7 @@ function planCollectionTable(
         search,
         vector: buildTableVectorIndexPlan(descriptor),
         vectorColumns: buildTableVectorColumnSpecs(descriptor),
+        rlsMode,
         policies,
         triggers,
         auth
@@ -1572,10 +1582,20 @@ function planJunctionTable(
     // Junction tables are generated tables like any other: locked by default,
     // with derived policies — reads follow the endpoints' visibility, writes
     // follow the declaring side's update rules. Without them they were the one
-    // kind of generated table with no RLS at all.
+    // kind of generated table with no RLS at all. When every declaring side
+    // opted out of Rebase-managed RLS (`"unmanaged"` or `"external"`), the
+    // junction follows suit rather than generating policies nobody asked for.
+    const declaring = junction.declaringSides;
+    const rlsMode: TableRlsMode = declaring.length > 0 && declaring.every(side => side.descriptor.rls.posture === "unmanaged")
+        ? "unmanaged"
+        : declaring.length > 0 && declaring.every(side => side.descriptor.rls.posture === "external" || side.descriptor.rls.posture === "unmanaged")
+            ? "external"
+            : "managed";
     const junctionTable = junctionPolicyTable(junction);
-    const policies = withoutLiveSupersededNames(tableJunctionRules(junction).flatMap((rule, index) =>
-        compileTableSecurityRule(junctionTable, rule, resolvePolicyTable, false, rule.name ?? `#${index}`)));
+    const policies = rlsMode === "managed"
+        ? withoutLiveSupersededNames(tableJunctionRules(junction).flatMap((rule, index) =>
+            compileTableSecurityRule(junctionTable, rule, resolvePolicyTable, false, rule.name ?? `#${index}`)))
+        : [];
 
     return {
         schema,
@@ -1593,6 +1613,7 @@ function planJunctionTable(
         indexes: planForeignKeyIndexes(schema, table, columns, [sourceColumn, targetColumn], [],
             column => (column.source.kind === "junction-key" ? column.foreignKey?.column : undefined)),
         vectorColumns: [],
+        rlsMode,
         policies,
         triggers,
         auth: false

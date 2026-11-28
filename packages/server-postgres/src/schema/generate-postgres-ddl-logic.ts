@@ -307,8 +307,8 @@ interface WrittenPolicy {
 const policyTablesOf = (tables: readonly CompiledTable[]): TablePlan[] => {
     const plan = planOf(tables);
     return [
-        ...plan.tables.filter(t => t.kind === "collection"),
-        ...plan.tables.filter(t => t.kind === "junction")
+        ...plan.tables.filter(t => t.kind === "collection" && t.rlsMode === "managed"),
+        ...plan.tables.filter(t => t.kind === "junction" && t.rlsMode === "managed")
     ];
 };
 

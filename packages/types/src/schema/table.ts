@@ -180,15 +180,16 @@ function assertTableShape(builder: string, name: unknown, config: unknown): void
 
 function assertRlsDeclared(builder: string, name: string, config: object): void {
     const rls = "rls" in config ? config.rls : undefined;
-    const ok = rls === "admin-only" || rls === "inherit" || (Array.isArray(rls) && rls.length > 0);
+    const ok = rls === "admin-only" || rls === "external" || rls === "unmanaged" || rls === "inherit"
+        || (Array.isArray(rls) && rls.length > 0);
     if (ok) return;
     const detail = Array.isArray(rls)
         ? "`rls: []` grants nothing and says nothing. Write `rls: \"admin-only\"` to lock the table to admins."
         : "Every table needs an explicit row-level security posture.";
     throw new Error(
         `\`${builder}("${name}", …)\` has no usable \`rls\`. ${detail} ` +
-        "Accepted: `\"admin-only\"`, `\"inherit\"` (the `defaultRls` exported from backend/schema/index.ts), " +
-        "or a non-empty list of rules."
+        "Accepted: `\"admin-only\"`, `\"external\"`, `\"unmanaged\"`, `\"inherit\"` " +
+        "(the `defaultRls` exported from backend/schema/index.ts), or a non-empty list of rules."
     );
 }
 

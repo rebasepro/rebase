@@ -51,6 +51,7 @@ import { DEFAULT_DATA_SOURCE_KEY, declaredDatabaseRls } from "@rebasepro/types";
 import { viaJoinTableNames } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 import { planTablePolicies, quoteSqlLiteral } from "../schema/generate-postgres-ddl-logic";
+import { planSchema } from "../schema/plan/plan-schema";
 import type { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import type { RawSqlRunner } from "./rls-enforcement";
 
@@ -106,10 +107,11 @@ export interface ServedTableProtection {
 
 /**
  * Whether the server refuses to serve this table when the database does not
- * enforce its `rls`: the table's `rlsRequired`, else its database's
- * `rls.required`, else yes.
+ * enforce its `rls`: `false` for `rls: "unmanaged"`, else the table's
+ * `rlsRequired`, else its database's `rls.required`, else yes.
  */
 export function rlsRequiredFor(descriptor: Pick<TableDescriptor, "rls" | "database">): boolean {
+    if (descriptor.rls?.posture === "unmanaged") return false;
     if (typeof descriptor.rls?.required === "boolean") return descriptor.rls.required;
     return declaredDatabaseRls(descriptor.database ?? DEFAULT_DATA_SOURCE_KEY).required !== false;
 }
@@ -152,6 +154,12 @@ export async function findServedTableProtection(
     const optedOut = new Set(served.filter(({ descriptor }) => !rlsRequiredFor(descriptor)).map(({ descriptor }) => descriptor.slug));
     const planned = planTablePolicies(served, options);
     const plans = new Map(planned.map(plan => [plan.qualified, plan]));
+    // All planned junctions (including `"external"` and `"unmanaged"` ones that
+    // `planTablePolicies` omits), so an `"external"` implicit junction is still
+    // checked for `relrowsecurity = true` and an `"unmanaged"` one is recognised
+    // as opted out.
+    const allJunctions = planSchema(served).tables.filter(t => t.kind === "junction");
+    const junctionByQualified = new Map(allJunctions.map(j => [j.qualified, j]));
     const wanted = served.map(({ descriptor }) => ({
         slug: descriptor.slug,
         schema: descriptor.schema,
@@ -165,7 +173,7 @@ export async function findServedTableProtection(
     for (const { descriptor } of served) {
         for (const relation of descriptor.relations) {
             if (relation.kind !== "manyToMany") continue;
-            const named = planned.filter(plan => plan.table === relation.through.table);
+            const named = allJunctions.filter(plan => plan.table === relation.through.table);
             const junction = named.find(plan => plan.schema === descriptor.schema) ?? named[0];
             if (!junction) continue;
             const set = owners.get(junction.qualified) ?? new Set<string>();
@@ -189,7 +197,7 @@ export async function findServedTableProtection(
                 if (name === target || name === relation.target) continue;
                 const declared = served.filter(({ descriptor: other }) => other.table === name || other.slug === name);
                 const own = declared.find(({ descriptor: other }) => other.schema === descriptor.schema) ?? declared[0];
-                const named = planned.filter(plan => plan.table === name);
+                const named = allJunctions.filter(plan => plan.table === name);
                 const qualified = own
                     ? `${own.descriptor.schema}.${own.descriptor.table}`
                     : (named.find(plan => plan.schema === descriptor.schema) ?? named[0])?.qualified;
@@ -200,8 +208,8 @@ export async function findServedTableProtection(
     const implicit = new Set([...owners.keys(), ...viaSteps.map(step => step.through)]);
     for (const qualified of implicit) {
         if (declaredQualified.has(qualified)) continue;
-        const plan = plans.get(qualified);
-        if (plan) wanted.push({ slug: "", schema: plan.schema, name: plan.table });
+        const junction = junctionByQualified.get(qualified);
+        if (junction) wanted.push({ slug: "", schema: junction.schema, name: junction.table });
     }
     const rows = await run(
         `SELECT w.slug, n.nspname AS schema, c.relname AS name, c.relrowsecurity AS rls,
@@ -427,7 +435,7 @@ export function warnServedUnprotectedTables(found: readonly UnprotectedServedTab
     const slugs = [...new Set(found.map(table => table.slug))];
     logger.warn(
         `🔓 [rls] Serving ${slugs.length} declared table(s) the database does not protect with row-level security as declared: ` +
-        `${slugs.join(", ")}. Their declaration says so (\`rlsRequired: false\`, or their database's ` +
+        `${slugs.join(", ")}. Their declaration says so (\`rls: "unmanaged"\`, \`rlsRequired: false\`, or their database's ` +
         "`rls: { required: false }`): who reads and writes their rows is the app's to enforce (hooks, scopes, who may sign in)."
     );
 }

@@ -219,6 +219,13 @@ export type RelationDescriptor =
  * baseline grants access, so a reader must never take an empty `rules` to mean
  * "open".
  *
+ * `"external"` means Postgres enforces row-level security with policies owned
+ * outside Rebase (SQL migrations, Supabase, Terraform, a DBA): Rebase emits no
+ * RLS or policy DDL for the table and verifies `relrowsecurity = true` at boot.
+ * `"unmanaged"` means no Postgres RLS is expected on the table and access is
+ * enforced by the application: Rebase emits no RLS or policy DDL and serves it
+ * with a boot notice. Both carry `rules: []` and `defaultPolicies: false`.
+ *
  * `"view"` is the posture of every `defineView`: a view has no policies of its
  * own. A plain view runs `security_invoker`, so the row-level security of the
  * tables it reads decides each row; a materialized one is read by
@@ -237,8 +244,8 @@ export type RelationDescriptor =
  * @group Schema
  */
 export interface RlsDescriptor {
-    /** `"admin-only"` or `"rules"` for a table, `"view"` for every view. */
-    posture: "admin-only" | "rules" | "view";
+    /** `"admin-only"`, `"rules"`, `"external"` or `"unmanaged"` for a table, `"view"` for every view. */
+    posture: "admin-only" | "rules" | "external" | "unmanaged" | "view";
     /** The rules came from `defaultRls`. */
     inherited?: true;
     /** The declared rules, exactly as written. */

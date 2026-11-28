@@ -591,7 +591,7 @@ export function diffPlanAgainstCatalogue(
             target: table.qualified,
             sql: `CREATE TABLE IF NOT EXISTS "${schema}"."${name}" (${definitions.join(", ")});`
         });
-        actions.push(lockAction(table));
+        if (table.rlsMode === "managed") actions.push(lockAction(table));
     }
 
     // 2b. Junction tables behind many-to-many relations. No collection declares
@@ -611,7 +611,7 @@ export function diffPlanAgainstCatalogue(
             sql: `CREATE TABLE IF NOT EXISTS "${table.schema}"."${table.table}" (${columns}` +
                 `, ${renderPrimaryKeyConstraint(table)});`
         });
-        actions.push(lockAction(table));
+        if (table.rlsMode === "managed") actions.push(lockAction(table));
     }
 
     const addColumn = (table: TablePlan, column: string, definition: string): void => {

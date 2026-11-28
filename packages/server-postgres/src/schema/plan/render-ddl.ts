@@ -364,7 +364,7 @@ export function renderPostgresDdl(plan: SchemaPlan, options: DdlRenderOptions = 
         // than getting as a side effect of another feature.
         indexStatements.push(...tableIndexStatements(table.indexes));
 
-        if (includePolicies) {
+        if (includePolicies && table.rlsMode === "managed") {
             // No FORCE: authenticated requests run as the non-owner
             // `rebase_user` role, which plain ENABLE already binds. The owner
             // (server context) must bypass — it is the trusted plane.
@@ -418,8 +418,9 @@ export function renderPoliciesDdl(plan: SchemaPlan): string {
     ddl += adminRolePreamble(plan);
 
     // Collections first, then the junctions no collection declares — the order
-    // the boot-time applier plans them in.
-    for (const table of plan.tables.filter(t => t.kind === "collection")) {
+    // the boot-time applier plans them in. Tables with `rls: "external"` or
+    // `rls: "unmanaged"` are left out: Rebase writes no RLS DDL for them.
+    for (const table of plan.tables.filter(t => t.kind === "collection" && t.rlsMode === "managed")) {
         ddl += `${renderEnableRls(table)}\n`;
         ddl += "\n";
         if (table.policies.length === 0) continue;
@@ -441,7 +442,7 @@ export function renderPoliciesDdl(plan: SchemaPlan): string {
         ddl += "\n";
     }
 
-    for (const table of plan.tables.filter(t => t.kind === "junction")) {
+    for (const table of plan.tables.filter(t => t.kind === "junction" && t.rlsMode === "managed")) {
         ddl += `${renderEnableRls(table)}\n`;
         ddl += "\n";
         if (table.policies.length === 0) continue;

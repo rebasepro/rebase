@@ -51,6 +51,18 @@ export function resolveRls(
         }
         return { ok: true, rls: { ...inherited.rls, inherited: true } };
     }
+    if (posture === "external" || posture === "unmanaged") {
+        if (defaultPolicies === true) {
+            return {
+                ok: false,
+                message:
+                    `\`rls: "${posture}"\` with \`defaultPolicies: true\` is contradictory: "${posture}" tells Rebase ` +
+                    "not to write any policies for this table, while `defaultPolicies: true` asks it to inject the " +
+                    "admin baseline. Drop `defaultPolicies: true`, or switch `rls` to `\"admin-only\"` or a list of rules."
+            };
+        }
+        return { ok: true, rls: { posture, rules: [], defaultPolicies: false } };
+    }
     if (posture === "admin-only") {
         if (defaultPolicies === false) {
             return {
@@ -93,8 +105,8 @@ export function resolveRls(
         ok: false,
         message:
             "the table has no usable `rls`. Every table needs an explicit row-level security posture: " +
-            "`\"admin-only\"`, `\"inherit\"` (the `defaultRls` exported from backend/schema/index.ts), or a " +
-            "non-empty list of rules."
+            "`\"admin-only\"`, `\"external\"`, `\"unmanaged\"`, `\"inherit\"` (the `defaultRls` exported from " +
+            "backend/schema/index.ts), or a non-empty list of rules."
     };
 }
 

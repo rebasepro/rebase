@@ -136,7 +136,7 @@ The pipeline from declaration to database is described in
 | Key | What it does |
 |---|---|
 | `columns` | **Required.** `col.*` builders by key, in physical order. At least one must be `.primaryKey()`. See [Columns](/docs/schema/columns/). |
-| `rls` | **Required.** `"admin-only"`, `"inherit"`, or a non-empty list of rules. See [Row-level security](/docs/collections/security-rules/). |
+| `rls` | **Required.** `"admin-only"`, `"external"` (Postgres enforces RLS with policies managed outside Rebase), `"unmanaged"` (no Postgres RLS; the app enforces access), `"inherit"`, or a non-empty list of rules. See [Row-level security](/docs/collections/security-rules/). |
 | `relations` | `rel.*` builders by relation name. See [Relations](/docs/collections/relations/). |
 | `slug` | The name in the API, the SDK and in scopes. The table's name when omitted. |
 | `table` | The SQL table name, when it differs from the name. |

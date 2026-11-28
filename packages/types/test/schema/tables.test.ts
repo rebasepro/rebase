@@ -50,15 +50,17 @@ describe("defineTable", () => {
             .toThrow(/`table` of table "t" must be a plain SQL identifier/);
     });
 
-    it("refuses a missing or empty rls, naming the three accepted postures", () => {
+    it("refuses a missing or empty rls, naming the accepted postures, and accepts external and unmanaged", () => {
         expect(() => defineTable("t", JSON.parse(JSON.stringify({ columns: {} }))))
             .toThrow(/declares no columns/);
         const columns = { id: id() };
         expect(() => defineTable("t", { columns, rls: JSON.parse("null") }))
-            .toThrow("`defineTable(\"t\", …)` has no usable `rls`. Every table needs an explicit row-level security posture. Accepted: `\"admin-only\"`, `\"inherit\"`");
+            .toThrow("`defineTable(\"t\", …)` has no usable `rls`. Every table needs an explicit row-level security posture. Accepted: `\"admin-only\"`, `\"external\"`, `\"unmanaged\"`, `\"inherit\"`");
         expect(() => defineTable("t", { columns, rls: JSON.parse("[]") }))
             .toThrow("`rls: []` grants nothing and says nothing. Write `rls: \"admin-only\"` to lock the table to admins.");
         expect(() => defineTable("t", { columns, rls: JSON.parse("\"open\"") })).toThrow(/has no usable `rls`/);
+        expect(defineTable("ext", { columns, rls: "external" }).config.rls).toBe("external");
+        expect(defineTable("app", { columns, rls: "unmanaged" }).config.rls).toBe("unmanaged");
     });
 });
 

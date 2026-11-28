@@ -75,6 +75,21 @@ describe("admin-only", () => {
     });
 });
 
+describe("external and unmanaged postures", () => {
+    it.each(["external", "unmanaged"] as const)("projects %s to a raw-condition rule so panel gating defers to the server", (posture) => {
+        const t = notes({ posture, rules: [], defaultPolicies: false });
+        const collection = collectionFromTable(t, { tables: [t] });
+        expect(collection.securityRules).toHaveLength(1);
+        expect(collection.securityRules?.[0]).toMatchObject({
+            name: `notes_${posture}`,
+            operations: ["all"],
+            condition: { kind: "raw" }
+        });
+        expect(can(t, admin)).toEqual(every);
+        expect(can(t, member)).toEqual(every);
+    });
+});
+
 describe("declared rules", () => {
     it("adds the admin baseline: admins can always act", () => {
         const t = notes(rules([{ operation: "select", access: "public" }]));

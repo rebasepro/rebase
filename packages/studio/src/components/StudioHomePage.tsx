@@ -177,11 +177,12 @@ export function StudioHomePage({
                     else if (typeof item.name === "string") tableNames.push(item.name);
                     // A `TableDescriptor`: columns and relations are arrays,
                     // and a served table's policies are its `rls` posture —
-                    // "rules" or "admin-only", never off.
+                    // "rules", "admin-only", or "external" (RLS on); "unmanaged"
+                    // enforces access in the app.
                     columns += countOf(item.columns);
                     relations += countOf(item.relations);
                     const rls = isRecord(item.rls) ? item.rls : undefined;
-                    if (rls?.posture === "rules" || rls?.posture === "admin-only") {
+                    if (rls?.posture === "rules" || rls?.posture === "admin-only" || rls?.posture === "external") {
                         rlsProtected++;
                     }
                 }

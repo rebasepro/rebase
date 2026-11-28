@@ -312,6 +312,9 @@ export interface EnumPlan {
     labels: string[];
 }
 
+/** How Rebase handles row-level security DDL for a planned table. */
+export type TableRlsMode = "managed" | "external" | "unmanaged";
+
 export interface TablePlan {
     schema: string;
     /** Bare table name, no schema prefix. */
@@ -353,7 +356,12 @@ export interface TablePlan {
      * column.
      */
     vectorColumns: VectorColumnSpec[];
-    /** RLS is enabled on every generated table; these are its policies. */
+    /**
+     * How Rebase handles RLS DDL for this table: `"managed"` enables RLS and
+     * writes `policies`; `"external"` and `"unmanaged"` emit no RLS or policy DDL.
+     */
+    rlsMode: TableRlsMode;
+    /** Policies Rebase writes when `rlsMode === "managed"`; empty otherwise. */
     policies: PolicyPlan[];
     triggers: TriggerPlan[];
     /** Whether `auth-users-columns` owns part of this table. */

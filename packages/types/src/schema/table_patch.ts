@@ -427,7 +427,12 @@ function adoptedTableProblems(spec: Record<string, unknown>): { key?: string; me
     }
     if (!Array.isArray(spec.relations) || !spec.relations.every(isRecord)) out.push({ key: "relations", message: "`relations` must be a list of relations." });
     const rls = spec.rls;
-    if (!isRecord(rls) || (rls.posture !== "admin-only" && rls.posture !== "rules") || !Array.isArray(rls.rules) || !rls.rules.every(isRecord)) {
+    if (
+        !isRecord(rls)
+        || (rls.posture !== "admin-only" && rls.posture !== "rules" && rls.posture !== "external" && rls.posture !== "unmanaged")
+        || !Array.isArray(rls.rules)
+        || !rls.rules.every(isRecord)
+    ) {
         out.push({ key: "rls", message: "`rls` must be `{ posture, rules }`, as introspection described it." });
     }
     if (spec.hooks !== undefined) out.push({ key: "hooks", message: "hooks are code: write them in the table's file once it is adopted." });
@@ -469,8 +474,8 @@ function relationProblems(value: unknown, where: string): string[] {
 
 /** Problems with an `rls` value sent on the wire. */
 function rlsProblems(value: unknown, where: string): string[] {
-    if (value === "admin-only" || value === "inherit") return [];
-    if (!Array.isArray(value)) return [`${where} must be "admin-only", "inherit" or a list of rules.`];
+    if (value === "admin-only" || value === "external" || value === "unmanaged" || value === "inherit") return [];
+    if (!Array.isArray(value)) return [`${where} must be "admin-only", "external", "unmanaged", "inherit" or a list of rules.`];
     if (value.length === 0) return [`${where} is an empty list of rules, which leaves nobody a policy. Send "admin-only" instead.`];
     return value.flatMap((rule, index) => (isRecord(rule) ? [] : [`${where}[${index}] must be a rule object.`]));
 }

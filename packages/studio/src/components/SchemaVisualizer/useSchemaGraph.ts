@@ -221,7 +221,7 @@ const buildGraph = (
             columns,
             isJunction: false,
             isUnmanaged: false,
-            rlsEnabled: isRlsEnabled(table.schema, table.table, true),
+            rlsEnabled: isRlsEnabled(table.schema, table.table, table.rls.posture !== "unmanaged"),
             historyEnabled: table.history === true
         };
 

@@ -1899,7 +1899,7 @@ interface PolicyConditionSite { clause, table }
 interface PolicyEvalContext { isAnonymous, roles, row, uid }
 interface PolicyJunction { declaringSides, endpoints, schema, table }
 interface PolicyJunctionEndpoint { junctionColumn, table }
-interface PolicyTable { auth, columns, database, defaultPolicies, idKey, links, rules, schema, slug, table, tenant }
+interface PolicyTable { auth, columns, database, defaultPolicies, idKey, links, posture, rules, schema, slug, table, tenant }
 interface PrimaryKeyInfo { fieldName, isDay, isUUID, type }
 interface PrintColumnOptions { enumIdentifier, key, transform, transforms }
 interface PrintIndexModuleOptions { defaultRls }

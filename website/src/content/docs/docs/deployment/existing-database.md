@@ -199,37 +199,52 @@ and `rls-check` after the first boot to see what those roles can reach.
 Some databases are not Rebase's to secure. Alembic, Prisma or a DBA owns the
 tables, nothing there enables row-level security, and the app decides who sees
 what itself: only staff can sign in, hooks check each write, a scope gates each
-route. A boot that provisions nothing (`REBASE_PROVISION=false`,
-`REBASE_MIGRATE_ON_BOOT=none`) withholds every such table by default
-(`503 TABLE_WITHHELD`), because Postgres would hand every row to every signed-in
-caller.
+route.
 
-Say that the app enforces access instead, for the whole database:
+Declare that posture directly on the table:
+
+```ts
+export const invoices = defineTable("invoices", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), total: col.numeric() },
+    rls: "unmanaged"
+});
+```
+
+Or for the whole project via `defaultRls = "unmanaged"` in
+`backend/schema/index.ts` alongside `rls: "inherit"` on each table. Rebase
+emits no `ENABLE ROW LEVEL SECURITY` or policy DDL for `"unmanaged"` tables
+(on `db push` or provisioning boots), serves them without withholding, and
+names them once at boot. Keep sign-in, roles, scopes and hooks enforcing
+access.
+
+If Postgres **does** enforce row-level security on those tables, with policies
+authored in SQL migrations, Supabase, or Terraform rather than in Rebase, use
+`rls: "external"` instead:
+
+```ts
+export const invoices = defineTable("invoices", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), total: col.numeric() },
+    rls: "external"
+});
+```
+
+Rebase emits no RLS or policy DDL for `"external"` tables and never prunes
+their policies (`--prune-policies`), while boot and `rebase doctor` still
+verify that `ENABLE ROW LEVEL SECURITY` is active on the table in Postgres.
+
+For tables that still declare Rebase rules on a database another tool owns,
+`rlsRequired: false` (or `database({ rls: { required: false } })` for the whole
+database) serves them on a non-provisioning boot even when the declared
+policies are not present, naming them in one warning:
 
 ```ts
 // backend/resources.ts
 export const main = database({ rls: { required: false } });
 ```
 
-or for one table:
-
-```ts
-export const invoices = defineTable("invoices", {
-    columns: { id: col.uuid().primaryKey().defaultRandom(), total: col.numeric() },
-    rls: "admin-only",
-    rlsRequired: false
-});
-```
-
-The tables are then served whatever the catalogue says, and the boot names
-them in one warning. A table's `rlsRequired: true` keeps it required under a
-database that says `required: false`. Nothing changes in the database: a boot
-that does provision still enables row-level security and writes the declared
-policies, and `rebase doctor` still reports the tables as unprotected.
-
-With row-level security off, the declared `rls` is not enforced by Postgres:
-`"admin-only"` does not stop a signed-in non-admin. Keep sign-in, roles and
-hooks doing that job.
+A table's `rlsRequired: true` keeps it required under a database that says
+`required: false`. With row-level security off, a declared rule is not enforced
+by Postgres: keep sign-in, roles and hooks doing that job.
 
 ### A database administrator creates the roles
 

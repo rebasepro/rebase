@@ -17,6 +17,7 @@ import { RLS_UID_SQL, type CompiledTable } from "@rebasepro/types";
 import { ADMIN_REQUEST_POLICY_SUFFIX, toPostgresIdentifier } from "@rebasepro/utils";
 
 import { generatePostgresPoliciesDdl, planTablePolicies } from "../schema/generate-postgres-ddl-logic";
+import { planSchema } from "../schema/plan/plan-schema";
 
 export interface PolicyRef {
     schema: string;
@@ -383,7 +384,17 @@ export async function checkPolicyDrift(
     const companions = adminLive && await companionsSafe(client)
         ? adminRequestCompanions(compiledTables)
         : new Map<string, PolicyRef>();
-    const schemas = [...new Set(expected.map((p) => p.schema))];
+    const schemaPlan = planSchema(compiledTables);
+    const externalTables = schemaPlan.tables
+        .filter((t) => t.rlsMode === "external")
+        .map((t) => ({ schema: t.schema, table: t.table }));
+    const nonManagedTables = new Set(
+        schemaPlan.tables
+            .filter((t) => t.rlsMode === "external" || t.rlsMode === "unmanaged")
+            .map((t) => `${t.schema}.${t.table}`)
+    );
+
+    const schemas = [...new Set([...expected.map((p) => p.schema), ...externalTables.map((t) => t.schema)])];
     // Nothing expected means nothing to reconcile against; scanning every
     // schema would report the whole database as orphaned.
     if (schemas.length === 0) return { missing: [], orphaned: [], diverged: [], insecure: [], rlsDisabled: [] };
@@ -397,10 +408,15 @@ export async function checkPolicyDrift(
     // Before comparing policy against policy: is the switch even on? A table
     // with RLS disabled matches every expected policy on every field compared
     // below, so this has to be asked separately or it cannot be asked at all.
+    // External tables are checked for `relrowsecurity` too (their policies live
+    // outside Rebase, so RLS still has to be on); unmanaged tables are skipped.
     const expectedTables = [...new Map(
         expected.map((p) => [`${p.schema}.${p.table}`, { schema: p.schema, table: p.table }])
     ).values()];
-    drift.rlsDisabled = await readTablesWithRlsOff(client, expectedTables);
+    const rlsCheckedTables = [...new Map(
+        [...expectedTables, ...externalTables].map((t) => [`${t.schema}.${t.table}`, t])
+    ).values()];
+    drift.rlsDisabled = await readTablesWithRlsOff(client, rlsCheckedTables);
 
     // Scan every live policy for the permissive tautology. This is deliberately
     // independent of the name-keyed diff below: a database pushed before the
@@ -456,6 +472,9 @@ export async function checkPolicyDrift(
     const declaredTables = new Set(expectedTables.map(t => `${t.schema}.${t.table}`));
     for (const [key, got] of liveByKey) {
         if (expectedByKey.has(key)) continue;
+        // Policies on `rls: "external"` / `rls: "unmanaged"` tables live outside
+        // Rebase by declaration, so they are never orphaned drift.
+        if (nonManagedTables.has(`${got.schema}.${got.table}`)) continue;
         // A table built-in auth serves and provisions itself, where no project
         // table is it: its policies are the boot's, not the project's strays.
         if (BUILT_IN_AUTH_TABLES.has(`${got.schema}.${got.table}`) && !declaredTables.has(`${got.schema}.${got.table}`)) continue;
