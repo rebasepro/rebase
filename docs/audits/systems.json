@@ -421,6 +421,7 @@
         "packages/ui/src/icons/**",
         "packages/ui/src/util/**",
         "packages/ui/src/scripts/**",
+        "packages/ui/src/theme/**",
         "packages/ui/src/*.css",
         "packages/ui/src/*.ts",
         "packages/app/src/debug/**"
