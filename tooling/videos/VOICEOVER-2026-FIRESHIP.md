@@ -29,11 +29,11 @@ production data, so no gags, no sarcasm, no memes. A number beats an adjective.
 
 ```ts
 const SCRIPT = lines([
-    ["hook", "A coding agent builds your backend in twenty minutes, and it ships with every table wide open. That happens all the time now: writing the code got fast, and trusting it in production stayed hard."],
-    ["problem", "Rebase, an open source backend for Postgres, puts security inside the database, so there is nothing to forget."],
-    ["schema", "One definition gives you a typed REST API, realtime, auth, storage, functions, and an admin panel on day one, Rebase CMS for your team and Studio for developers, with every click obeying row-level security."],
-    ["panel", "Agents are first-class callers."],
-    ["agents", "They get scoped keys, their writes are staged for human approval, and the real admin table even opens inside Claude, where nothing saves until you confirm."],
+    ["hook", "A coding agent builds your backend in twenty minutes, and it ships with every table wide open."],
+    ["problem", "That happens all the time now: writing the code got fast, and trusting it in production stayed hard."],
+    ["schema", "Rebase, an open source backend for Postgres, puts security inside the database, so there is nothing to forget."],
+    ["panel", "One definition gives you a typed REST API, realtime, auth, storage, functions, and an admin panel on day one, Rebase CMS for your team and Studio for developers, with every click obeying row-level security."],
+    ["agents", "Agents are first-class callers. They get scoped keys, their writes are staged for human approval, and the real admin table even opens inside Claude, where nothing saves until you confirm."],
     ["cloud", "MIT licensed, it self-hosts on any Postgres you already have. But here's the catch: Rebase Cloud is in private beta, so you request access. We run the exact same image on dedicated hardware, no per-seat pricing, clean exit anytime."],
     ["close", "Fast was solved; trust is the product. Start free, or request Cloud access, at rebase dot pro."],
 ]);
