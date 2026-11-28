@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { billingCommand } from "./resources";
 import { setJsonModeForTest, initOutputMode, isJsonMode } from "./context";
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 
 describe("rebase cloud billing checkout — skipped checkout responses", () => {
     let stdout: string[];
@@ -40,20 +41,16 @@ describe("rebase cloud billing checkout — skipped checkout responses", () => {
     });
 
     function mockClient(sessionResponse: { url: string; skipped?: string }) {
-        const fakeClient = {
-            functions: {
-                invoke: vi.fn(async () => sessionResponse)
-            },
-            data: {
-                table: (name: string) => ({
-                    findById: vi.fn(async () => {
-                        if (name === "projects") return { id: "proj-1", subdomain: "acme", organization: "org-1" };
-                        if (name === "organizations") return { id: "org-1", slug: "acme-org" };
-                        return null;
-                    })
-                })
-            }
-        } as unknown as context.CloudClient;
+        const fakeClient = fakeCloudClient({
+            invoke: () => sessionResponse,
+            collection: (slug) => ({
+                findById: () => {
+                    if (slug === "projects") return { id: "proj-1", subdomain: "acme", organization: "org-1" };
+                    if (slug === "organizations") return { id: "org-1", slug: "acme-org" };
+                    return undefined;
+                }
+            })
+        });
 
         vi.spyOn(context, "requireClient").mockResolvedValue({
             client: fakeClient,

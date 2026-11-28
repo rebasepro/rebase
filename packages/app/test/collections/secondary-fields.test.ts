@@ -3,8 +3,7 @@ import { resolveFormLayout } from "../../src/collections/form-layout";
 
 describe("resolveFormLayout — secondary field disclosure", () => {
     it("tucks admin.secondary fields into a collapsed 'More properties' section without dropping them", () => {
-        const collection = {
-            id: "posts",
+        const collection: AdminCollection<Record<string, unknown>> = {
             slug: "posts",
             name: "Posts",
             properties: {
@@ -13,7 +12,7 @@ describe("resolveFormLayout — secondary field disclosure", () => {
                 externalId: { name: "External ID", type: "string", admin: { secondary: true } },
                 sortOrder: { name: "Sort order", type: "number", admin: { secondary: true } }
             }
-        } as unknown as AdminCollection<Record<string, unknown>>;
+        };
 
         const layout = resolveFormLayout({
             collection,
