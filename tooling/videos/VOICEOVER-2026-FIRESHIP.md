@@ -29,13 +29,13 @@ production data, so no gags, no sarcasm, no memes. A number beats an adjective.
 
 ```ts
 const SCRIPT = lines([
-    ["hook", "Rebase is an open source backend for Postgres, built for a year when a coding agent writes your API in twenty minutes, and trusting it in production is the hard part."],
-    ["problem", "Agents optimize for green tests, not locked doors. Audit a typical agent-built database, and half the tables are wide open."],
-    ["schema", "So the access rules live in Postgres itself, not in middleware someone can forget to call. Declare each table and its policies once in TypeScript, push, and the engine enforces them on every query."],
-    ["panel", "From those same files you get a typed REST API, realtime, auth, storage, functions, and a full admin panel on day one. Your team gets Rebase CMS, developers get Studio, and every click still obeys row-level security."],
-    ["agents", "Agents touch live data now, so they're treated as first-class callers. Give one a scoped key, stage its writes for human approval, or open the real admin table inside Claude, where nothing saves until you confirm."],
-    ["cloud", "It's MIT licensed, so self-host it on any Postgres you already run. For zero ops, Rebase Cloud runs that exact image on dedicated hardware, with no per-seat pricing and a clean exit anytime."],
-    ["close", "Keep your database, ship faster with agents, and stop hand-building the back office. Start free, or request Cloud access at rebase dot pro."],
+    ["hook", "A coding agent builds your backend in twenty minutes, and it ships with every table wide open. That happens all the time now: writing the code got fast, and trusting it in production stayed hard."],
+    ["problem", "Rebase, an open source backend for Postgres, puts security inside the database, so there is nothing to forget."],
+    ["schema", "One definition gives you a typed REST API, realtime, auth, storage, functions, and an admin panel on day one, Rebase CMS for your team and Studio for developers, with every click obeying row-level security."],
+    ["panel", "Agents are first-class callers."],
+    ["agents", "They get scoped keys, their writes are staged for human approval, and the real admin table even opens inside Claude, where nothing saves until you confirm."],
+    ["cloud", "MIT licensed, it self-hosts on any Postgres you already have. But here's the catch: Rebase Cloud is in private beta, so you request access. We run the exact same image on dedicated hardware, no per-seat pricing, clean exit anytime."],
+    ["close", "Fast was solved; trust is the product. Start free, or request Cloud access, at rebase dot pro."],
 ]);
 ```
 
