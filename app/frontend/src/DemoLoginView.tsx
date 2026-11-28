@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { LoginView } from "@rebasepro/app";
-import { Button, Checkbox, cls, Typography } from "@rebasepro/ui";
+import { Button, Checkbox, Typography } from "@rebasepro/ui";
 import type { RebaseAuthController } from "@rebasepro/app";
 
 const DEMO_EMAIL = "demo@rebase.pro";
@@ -74,31 +74,33 @@ export function DemoLoginView({ authController, googleClientId }: DemoLoginViewP
             disabled={!privacyAccepted}
             onNewsletterOptIn={subscribeToNewsletter}
             topComponent={
-                <div className="flex flex-col gap-3 mb-1">
+                <div className="flex flex-col gap-3.5 mb-1">
                     {canOpenDemo && (
                         <div className="flex flex-col gap-2">
                             <Button
                                 variant="filled"
                                 color="primary"
-                                size="large"
+                                size="medium"
+                                className="h-10"
                                 fullWidth
                                 disabled={authController.authLoading}
                                 onClick={openDemo}
                             >
                                 Open the demo
                             </Button>
-                            <Typography variant="caption" color="secondary" className="text-center">
-                                A shared account, reset regularly. Opening it means you accept the{" "}
+                            <Typography variant="caption" color="disabled" className="text-center leading-relaxed">
+                                Shared account, reset regularly. By continuing you accept the{" "}
                                 <PrivacyPolicyLink />.
                             </Typography>
                         </div>
                     )}
 
-                    <div className={cls(
-                        "rounded-lg px-4 py-3 text-sm",
-                        "bg-surface-field text-surface-600 dark:text-surface-300"
-                    )}>
-                        Or sign in with your own account. Accept the privacy policy first.
+                    <div className="flex items-center gap-3 pt-1" role="separator">
+                        <span className="h-px flex-1 bg-hairline"/>
+                        <Typography variant="micro" color="disabled">
+                            or sign in
+                        </Typography>
+                        <span className="h-px flex-1 bg-hairline"/>
                     </div>
 
                     <label className="flex items-center gap-2 cursor-pointer">

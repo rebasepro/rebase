@@ -196,7 +196,7 @@ type AuthMode = "buttons" | "login" | "register" | "forgot" | "reset-password" |
  * The shared field background mixin (`dark:bg-black/30`) is invisible on the
  * near-black login card, so login inputs get an explicit border in dark mode.
  */
-const loginFieldClasses = "w-full dark:border dark:border-surface-700/70 dark:hover:border-surface-600";
+const loginFieldClasses = "w-full border border-hairline hover:border-hairline-strong";
 
 /** One warning per provider per page load — this is a config hint, not a log stream. */
 const warnedProviders = new Set<string>();
@@ -696,7 +696,7 @@ export function LoginView({
                                         <LoginButton
                                             disabled={disabled}
                                             text={"Sign in with email"}
-                                            icon={<MailIcon/>}
+                                            icon={<MailIcon size={16}/>}
                                             onClick={() => switchMode("login")}
                                         />
                                     )}
@@ -874,7 +874,9 @@ export function LoginView({
                         aria-label="Toggle theme">
                         {colorMode === "dark"
                             ? <MoonIcon size={iconSize.small}/>
-                            : <SunIcon size={iconSize.small}/>}
+                            : colorMode === "light"
+                                ? <SunIcon size={iconSize.small}/>
+                                : <SunMoonIcon size={iconSize.small}/>}
                     </IconButton>}>
                     <MenuItem onClick={() => setColorMode("dark")}><MoonIcon size={iconSize.smallest}/> {t("dark_mode")}</MenuItem>
                     <MenuItem onClick={() => setColorMode("light")}><SunIcon size={iconSize.smallest}/> {t("light_mode")}</MenuItem>
@@ -882,9 +884,9 @@ export function LoginView({
                 </Menu>
             </div>
 
-            <div className="relative flex flex-col items-center w-[440px] max-w-full p-8 sm:p-10 bg-surface-card/70 backdrop-blur-xl border border-hairline-strong rounded-2xl shadow-2xl z-10 transition-all duration-300 hover:shadow-primary/5">
+            <div className="relative flex flex-col items-center w-[400px] max-w-full p-7 sm:p-8 bg-surface-card border border-hairline rounded-xl shadow-sm z-10">
                 {/* Logo */}
-                <div className="w-24 h-24 m-2 mb-4 drop-shadow-md">
+                <div className="w-11 h-11 mb-5">
                     {logoComponent}
                 </div>
 
@@ -903,22 +905,22 @@ function LoginButton({
     return (
         <Button
             disabled={disabled}
-            className="w-full transition-transform duration-200 active:scale-[0.98]"
+            className="w-full h-10"
             variant="outlined"
-            size="large"
+            size="medium"
             onClick={onClick}>
-            <div className="flex items-center justify-center w-full gap-3 py-1">
-                <span className="flex items-center justify-center w-5 h-5">
+            <div className="flex items-center justify-center w-full gap-2.5">
+                <span className="flex items-center justify-center w-4 h-4 shrink-0">
                     {icon}
                 </span>
-                <Typography variant="button">{text}</Typography>
+                <Typography variant="button" className="text-[13px] font-medium">{text}</Typography>
             </div>
         </Button>
     );
 }
 
 const GoogleIcon = () => (
-    <svg viewBox="0 0 24 24" width="20" height="20">
+    <svg viewBox="0 0 24 24" width="16" height="16">
         <path fill="#4285F4"
             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
         <path fill="#34A853"
