@@ -6,6 +6,13 @@
       "lastSeen": "2026-11-25T17:06:21.248Z",
       "pagedAt": null,
       "pr": null
+    },
+    "ci:rebase:main": {
+      "title": "CI on main 05d5617e79 failing (run 46147177133): ci:static 6 gates (eslint conditional useMemo/useEffect in packages/app/src/core/Rebase.tsx:651,658; check:hooks new exhaustive-deps; rebase-props missing `theme` row in docs frontend/index.md; property-options missing FieldOptions.secondary row in customize-table.md; studio-tools no group for 'users' tool; derived-names: accounts_default_admin_* policies removed - needs intent decision), unit: test/admin_collection.test.ts, unit-postgres 1/3, build-gates; e2e-admin cancelled. Not small/clear: derived-names touches customer DB identifiers. No fix PR opened.",
+      "firstSeen": "2026-11-28T13:17:41.617Z",
+      "lastSeen": "2026-11-28T13:17:41.617Z",
+      "pagedAt": null,
+      "pr": null
     }
   }
 }
