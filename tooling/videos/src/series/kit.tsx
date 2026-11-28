@@ -123,6 +123,11 @@ export interface FilmSpec {
     /** The command under the address on the end card. Undefined keeps the
      *  series' `pnpm dlx @rebasepro/cli init`; null leaves the line out. */
     endCommand?: string | null;
+    /** The backdrop. "glow" (the default) is the site's hero field under the
+     *  drafting grid, banking per scene, with chroma grounds where a scene
+     *  asks; "dark" is plain `GROUND.base` under the grid for the whole film,
+     *  every scene's `ground`, `roll`, `reveal` and `bright` ignored. */
+    backdrop?: "glow" | "dark";
 }
 
 /* ── the timeline ───────────────────────────────────────────────────── */
@@ -305,6 +310,7 @@ export const Ribbon: React.FC = () => {
     const { fps } = useVideoConfig();
     const series = useSeries();
     const format = useFormat();
+    if (series.spec.backdrop === "dark") return <DraftingGrid chroma={false} />;
     /* The film opens on the hero at full colour from its first frame — no
        rise out of black, so the only change of strength is the bank to the
        ember when the scenes begin (and back for a bright one). */
@@ -374,8 +380,9 @@ export const Scenes: React.FC = () => {
     );
 };
 
-/** How long a scene takes to leave once the next has begun. */
-const EXIT = 14;
+/** How long a scene takes to leave once the next has begun: quicker than
+ *  the next one's entrance, so two headlines never sit on top of each other. */
+const EXIT = 8;
 
 /** A scene arrives on its cue — up a few pixels and in — and leaves as the
  *  next arrives: a dissolve with a slight shrink, never a slide across. */
@@ -507,7 +514,7 @@ function useActiveScene(): { index: number; total: number; chroma: boolean } {
         const start = series.starts[origIdx];
         if (start !== null && frame >= start) {
             active = idx;
-            chroma = isChromaGround(s.ground ?? GROUND.base);
+            chroma = series.spec.backdrop !== "dark" && isChromaGround(s.ground ?? GROUND.base);
         }
     });
     return { index: active, total: Math.max(1, contentScenes.length), chroma };
@@ -608,7 +615,7 @@ const EpisodeMark: React.FC = () => {
                 style={{
                     position: "absolute",
                     left: padX,
-                    right: padX,
+                    right: tall ? 1080 - 960 : padX,
                     top: tall ? 136 : 56,
                     display: "flex",
                     alignItems: "center",
@@ -635,7 +642,7 @@ const EpisodeMark: React.FC = () => {
                 </div>
                 <span
                     style={{
-                        color: chroma ? TONE.claim.muted : INK.muted,
+                        color: chroma ? TONE.claim.eyebrow : INK.muted,
                         fontVariantNumeric: "tabular-nums",
                         flexShrink: 0,
                     }}
@@ -786,7 +793,8 @@ const AuditProbe: React.FC = () => {
  *  episode mark and (tall) the feed's own overlays. */
 export function useStage(): { x: number; y: number; w: number; h: number; format: Format } {
     const format = useFormat();
-    return format === "tall" ? { x: 72, y: 230, w: 936, h: 790, format } : { x: 120, y: 150, w: 1380, h: 760, format };
+    /* Tall: nothing readable right of x = 960 (the platforms' button rail), so the stage stops there. */
+    return format === "tall" ? { x: 72, y: 230, w: 888, h: 790, format } : { x: 120, y: 150, w: 1380, h: 760, format };
 }
 
 /** A headline set word by word into clip boxes, each word landing on its
@@ -808,7 +816,8 @@ export const Words: React.FC<{
         <div style={{ fontFamily: FONT.display, fontWeight: weight, fontSize: size, lineHeight: 1.04, letterSpacing: TRACKING.display, color, ...style }}>
             {words.map((w, i) => {
                 const t = ramp(frame, at + i * step, 18, ENTER);
-                const marked = mark?.words.includes(w.replace(/[^\w'-]/g, ""));
+                const bareWord = (s: string) => s.replace(/[^\w'-]/g, "");
+                const marked = mark?.words.some((m) => bareWord(m) === bareWord(w));
                 return (
                     <span key={i} style={{ display: "inline-block", overflow: "hidden", paddingBottom: "0.2em", marginBottom: "-0.2em", verticalAlign: "top" }}>
                         <span
@@ -956,7 +965,15 @@ export const Headline: React.FC<{ text: string; at?: number; accent?: string; ma
     const { x, y, w, format } = useStage();
     return (
         <At x={x} y={y} w={width ?? w}>
-            <Words text={text} at={at} size={HEADLINE[format]} step={2} mark={accent && mark ? { words: mark, color: accent } : undefined} />
+            <Words
+                text={text}
+                at={at}
+                size={HEADLINE[format]}
+                step={2}
+                mark={accent && mark ? { words: mark, color: accent } : undefined}
+                /* Two lines share the words evenly: never one word left alone below. */
+                style={{ textWrap: "balance" }}
+            />
         </At>
     );
 };
@@ -973,8 +990,44 @@ export function useBody(lines = 1): { x: number; y: number; w: number; format: F
  *  (measured off the stills), so a line holds ~41 characters wide, ~30 tall. */
 export function useBodyFor(headline: string): { x: number; y: number; w: number; format: Format } {
     const { w, format } = useStage();
-    const perLine = Math.floor(w / (HEADLINE[format] * 0.44));
-    return useBody(Math.max(1, Math.ceil(headline.length / perLine)));
+    return useBody(headlineLines(headline, HEADLINE[format], w));
+}
+
+let measure: CanvasRenderingContext2D | null = null;
+const measured = new Map<string, number>();
+
+/**
+ * How many lines a headline really sets in: each word measured in the
+ * headline's own face, size and tracking, then wrapped as the browser wraps
+ * `Words` (each word an inline box carrying its trailing space). A guess
+ * from the character count was wrong both ways — glyph widths vary — and a
+ * headline that wrapped where one line was reserved ran into the body.
+ * Outside a browser (lint, audit scripts) it falls back to that guess.
+ */
+export function headlineLines(text: string, size: number, width: number): number {
+    const guess = Math.max(1, Math.ceil(text.length / Math.floor(width / (size * 0.44))));
+    if (typeof document === "undefined") return guess;
+    const font = `600 ${size}px ${FONT.display}`;
+    const key = `${font}|${width}|${text}`;
+    const hit = measured.get(key);
+    if (hit !== undefined) return hit;
+    measure ??= document.createElement("canvas").getContext("2d");
+    if (!measure) return guess;
+    measure.font = font;
+    measure.letterSpacing = `${parseFloat(TRACKING.display) * size}px`;
+    const words = text.split(" ");
+    let lines = 1;
+    let line = 0;
+    words.forEach((word, i) => {
+        const box = measure!.measureText(i < words.length - 1 ? `${word} ` : word).width;
+        if (line > 0 && line + box > width) {
+            lines++;
+            line = box;
+        } else line += box;
+    });
+    /* Remember it only once the face has loaded: a fallback's widths are not the headline's. */
+    if (document.fonts.check(font)) measured.set(key, lines);
+    return lines;
 }
 
 /* ── more building blocks ───────────────────────────────────────────── */
@@ -1132,7 +1185,7 @@ export const Editor: React.FC<{ file: string; code: string; size: number; at?: n
                 <div style={{ padding: "12px 22px", fontFamily: FONT.mono, fontSize: size * 0.72, color: INK.high, borderBottom: `2px solid ${accent}` }}>{file}</div>
             </div>
             <div style={{ display: "flex", padding: "18px 0" }}>
-                <div style={{ width: size * 2.4, textAlign: "right", paddingRight: size * 0.8, fontFamily: FONT.mono, fontSize: size, lineHeight: 1.65, color: INK.muted, opacity: 0.6 }}>
+                <div style={{ width: size * 2.4, flexShrink: 0, textAlign: "right", paddingRight: size * 0.8, fontFamily: FONT.mono, fontSize: size, lineHeight: 1.65, color: INK.muted, opacity: 0.6 }}>
                     {Array.from({ length: n }, (_, i) => (
                         <div key={i}>{i + 1}</div>
                     ))}

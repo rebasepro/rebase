@@ -117,11 +117,11 @@ const On: React.FC = () => {
     const monoMd = tall ? 16 : 19;
 
     const editorPanel = (
-        <div style={{ width: tall ? w : 636, flexShrink: 0 }}>
+        <div style={{ width: tall ? w : 680, flexShrink: 0 }}>
             <Editor
                 file="backend/schema/orders.ts"
                 code={ORDERS_SCHEMA}
-                size={tall ? 17 : 20}
+                size={tall ? 17 : 18}
                 at={0}
                 step={2}
                 accent={ACCENT}
@@ -153,7 +153,6 @@ const On: React.FC = () => {
                         }}
                     />
                     <span style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 17, color: INK.high }}>
-                        Managed runtime:{" "}
                         <span style={{ color: ACCENT, fontWeight: 600 }}>REBASE_HISTORY=true</span> by default
                     </span>
                 </div>
@@ -336,7 +335,7 @@ const On: React.FC = () => {
                     </span>
                 </div>
 
-                {/* row 5: user_id */}
+                {/* row 5: updated_by */}
                 <div
                     style={{
                         display: "flex",
@@ -349,7 +348,7 @@ const On: React.FC = () => {
                         opacity: 0.35 + 0.65 * rowUser,
                     }}
                 >
-                    <span style={{ fontFamily: FONT.mono, fontSize: monoSm, color: INK.muted }}>user_id</span>
+                    <span style={{ fontFamily: FONT.mono, fontSize: monoSm, color: INK.muted }}>updated_by</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <KeyBotIcon color={AMBER} size={16} />
                         <span style={{ fontFamily: FONT.mono, fontSize: monoMd, color: AMBER, fontWeight: 600 }}>
@@ -383,7 +382,7 @@ const On: React.FC = () => {
 
 /* ── scene 2: privacy ───────────────────────────────────────────────── */
 
-const H_PRIVACY = "Same RLS. Zero relation leaks.";
+const H_PRIVACY = "Same RLS. No leaked joins.";
 
 const Privacy: React.FC = () => {
     const frame = useCurrentFrame();
@@ -403,7 +402,7 @@ const Privacy: React.FC = () => {
 
     return (
         <>
-            <Headline text={H_PRIVACY} at={0} accent={ACCENT} mark={["Zero", "relation", "leaks."]} />
+            <Headline text={H_PRIVACY} at={0} accent={ACCENT} mark={["No", "leaked", "joins."]} />
             <At x={x} y={y} w={w}>
                 {/* Policy check bar */}
                 <div
@@ -568,6 +567,8 @@ const Privacy: React.FC = () => {
                             background: SURFACE.well,
                             border: `1.5px solid ${CORAL}`,
                             overflow: "hidden",
+                            display: "flex",
+                            flexDirection: "column",
                             opacity: 0.4 + 0.6 * blockO,
                             transform: blockO < 1 ? `translate${tall ? "Y" : "X"}(${(1 - blockO) * 14}px)` : undefined,
                         }}
@@ -599,7 +600,7 @@ const Privacy: React.FC = () => {
                                 NEVER EMBEDDED
                             </span>
                         </div>
-                        <div style={{ padding: tall ? "14px 18px" : "20px 22px", display: "flex", flexDirection: "column", gap: tall ? 8 : 12 }}>
+                        <div style={{ flex: 1, padding: tall ? "14px 18px" : "20px 22px", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: tall ? 8 : 12 }}>
                             {[
                                 { k: "customers.email", v: '"alice@acme.io"' },
                                 { k: "customers.billing_card", v: '"•••• 4242"' },
@@ -625,17 +626,6 @@ const Privacy: React.FC = () => {
                                     </span>
                                 </div>
                             ))}
-                            <div
-                                style={{
-                                    marginTop: 2,
-                                    fontFamily: FONT.mono,
-                                    fontSize: tall ? 13 : 15,
-                                    color: INK.copy,
-                                }}
-                            >
-                                customers.email / billing_card ·{" "}
-                                <span style={{ color: CORAL, fontWeight: 600 }}>NEVER EMBEDDED</span>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -646,22 +636,19 @@ const Privacy: React.FC = () => {
 
 /* ── scene 3: cli ───────────────────────────────────────────────────── */
 
-interface VersionRow {
-    ver: string;
+interface HistoryLine {
     id: string;
-    time: string;
-    action: string;
-    total: string;
-    status: string;
-    actor: string;
+    action: "create" | "update";
     bad?: boolean;
-    tone: string;
 }
 
-const VERSIONS: VersionRow[] = [
-    { ver: "v1", id: "hist_v1", time: "10:12:04", action: "create", total: "€149.00", status: "open", actor: "alice@acme.io", tone: ACCENT },
-    { ver: "v2", id: "hist_v2", time: "10:14:19", action: "update", total: "€149.00", status: "paid", actor: "stripe_hook", tone: GREEN },
-    { ver: "v3", id: "hist_v3", time: "11:03:42", action: "update", total: "€0.00", status: "cancelled", actor: "rk_live_agent", bad: true, tone: CORAL },
+/* `rebase data history` prints one line an entry — its id (a uuid) and its
+   action — newest first, then how to put one back (packages/cli/src/commands/data.ts). */
+const GOOD_ID = "7c1e4b20-5d3a-4f8e-9b61-2a0d7e93c4f5";
+const HISTORY_LINES: HistoryLine[] = [
+    { id: "e3b4f1a2-9c07-4d5e-8a61-0f2c7d94b8e3", action: "update", bad: true },
+    { id: GOOD_ID, action: "update" },
+    { id: "1a9f0c3d-62b8-4e17-a4d0-5be81f2c9a76", action: "create" },
 ];
 
 const H_CLI = "Inspect every version in CLI.";
@@ -680,78 +667,37 @@ const Cli: React.FC = () => {
             <At x={x} y={y} w={w}>
                 <Window title="zsh — production" at={-2} pad={tall ? "16px 20px" : "20px 26px"}>
                     <Prompt command="rebase data history orders ord_8841" at={2} size={tall ? 20 : 24} rate={0.4} />
-                    <div style={{ marginTop: tall ? 14 : 18, display: "flex", flexDirection: "column", gap: tall ? 10 : 12 }}>
-                        {VERSIONS.map((row, idx) => {
+                    <div style={{ marginTop: tall ? 10 : 14, display: "flex", flexDirection: "column", gap: tall ? 6 : 8 }}>
+                        {HISTORY_LINES.map((row, idx) => {
                             const rowO = ramp(frame, 14 + idx * 8, 10, ENTER);
                             return (
                                 <div
-                                    key={row.ver}
+                                    key={row.id}
                                     style={{
                                         display: "flex",
                                         alignItems: "center",
-                                        justifyContent: "space-between",
-                                        gap: tall ? 10 : 16,
-                                        padding: tall ? "11px 14px" : "13px 18px",
+                                        gap: tall ? 14 : 20,
+                                        padding: tall ? "8px 12px" : "10px 16px",
                                         borderRadius: RADIUS.lg,
                                         background: row.bad ? "rgba(251,80,102,0.14)" : SURFACE.sheet,
                                         border: row.bad ? `1.5px solid ${CORAL}` : `1px solid ${SURFACE.hairline}`,
-                                        opacity: 0.25 + 0.75 * rowO,
+                                        fontFamily: FONT.mono,
+                                        fontSize: tall ? 16 : 20,
+                                        opacity: rowO,
                                         transform: rowO < 1 ? `translateX(${(1 - rowO) * -14}px)` : undefined,
                                     }}
                                 >
-                                    <div style={{ display: "flex", alignItems: "center", gap: tall ? 10 : 14 }}>
-                                        <span
-                                            style={{
-                                                width: 10,
-                                                height: 10,
-                                                borderRadius: 99,
-                                                background: row.tone,
-                                                boxShadow: row.bad ? `0 0 10px ${CORAL}` : undefined,
-                                                flexShrink: 0,
-                                            }}
-                                        />
-                                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 17 : 20, color: row.tone, fontWeight: 600, minWidth: 34 }}>
-                                            {row.ver}
-                                        </span>
-                                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 18, color: INK.muted, minWidth: tall ? 62 : 76 }}>
-                                            {row.action}
-                                        </span>
-                                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 17 : 20, color: INK.high, fontWeight: 600 }}>
-                                            {row.total}
-                                        </span>
-                                        <span
-                                            style={{
-                                                fontFamily: FONT.mono,
-                                                fontSize: tall ? 14 : 16,
-                                                color: row.bad ? CORAL : row.ver === "v2" ? GREEN : INK.copy,
-                                                padding: "2px 9px",
-                                                borderRadius: RADIUS.md,
-                                                background: row.bad ? "rgba(251,80,102,0.18)" : SURFACE.card,
-                                            }}
-                                        >
-                                            {row.status}
-                                        </span>
-                                    </div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                        {!tall && (
-                                            <span style={{ fontFamily: FONT.mono, fontSize: 15, color: INK.muted }}>
-                                                {row.time}
-                                            </span>
-                                        )}
-                                        <span
-                                            style={{
-                                                fontFamily: FONT.mono,
-                                                fontSize: tall ? 14 : 16,
-                                                color: row.bad ? CORAL : INK.copy,
-                                                fontWeight: row.bad ? 600 : 400,
-                                            }}
-                                        >
-                                            by {row.actor}
-                                        </span>
-                                    </div>
+                                    <span style={{ color: row.bad ? CORAL : INK.high, fontWeight: 600 }}>{row.id}</span>
+                                    <span style={{ color: row.bad ? CORAL : INK.muted }}>{row.action}</span>
                                 </div>
                             );
                         })}
+                    </div>
+                    <div style={{ marginTop: tall ? 10 : 12 }}>
+                        <Log
+                            size={tall ? 15 : 18}
+                            lines={[{ text: "  Put one back with: rebase data revert orders ord_8841 <historyId>", at: 40, color: INK.muted }]}
+                        />
                     </div>
                 </Window>
 
@@ -778,8 +724,8 @@ const Cli: React.FC = () => {
                             justifyContent: "space-between",
                         }}
                     >
-                        <span>DIFF · v2 → v3 (ord_8841)</span>
-                        <span style={{ color: CORAL }}>2 FIELDS CORRUPTED BY rk_live_agent</span>
+                        <span>PREVIOUS_VALUES → VALUES</span>
+                        <span style={{ color: CORAL }}>UPDATED_BY rk_live_agent</span>
                     </div>
                     <div style={{ display: "flex", flexDirection: tall ? "column" : "row", gap: tall ? 10 : 20 }}>
                         {[
@@ -851,12 +797,11 @@ const Revert: React.FC = () => {
             <Headline text={H_REVERT} at={0} accent={GREEN} mark={["rewinds"]} />
             <At x={x} y={y} w={w}>
                 <Window title="zsh — production" at={-2} pad={tall ? "16px 20px" : "20px 26px"}>
-                    <Prompt command="rebase data revert orders ord_8841 hist_v2" at={2} size={tall ? 19 : 24} rate={0.38} />
+                    <Prompt command={`rebase data revert orders ord_8841 ${GOOD_ID} --yes`} at={2} size={tall ? 17 : 22} rate={0.3} />
                     <Log
-                        size={tall ? 16 : 19}
+                        size={tall ? 15 : 19}
                         lines={[
-                            { text: "  POST /api/data/orders/ord_8841/history/hist_v2/revert", at: rewindStart - 2, color: INK.muted },
-                            { text: "  ✓ Reverted orders/ord_8841 to hist_v2; the revert is a new history entry.", at: rewindStart + 12, color: GREEN },
+                            { text: `  ✓ Reverted orders/ord_8841 to ${GOOD_ID}; the revert is a new history entry.`, at: rewindStart + 4, color: GREEN },
                         ]}
                     />
                 </Window>
@@ -1040,7 +985,8 @@ export const TIME_MACHINE: FilmSpec = checkFilm({
     number: 5,
     title: "Built-in row undo",
     accent: ACCENT,
-    endCommand: "rebase data revert orders <id>",
+    backdrop: "dark",
+    endCommand: "rebase data revert orders <id> <historyId>",
     script: SCRIPT,
     toCorner: { line: "hook", end: true, plus: 2 },
     close: { line: "close", plus: -2 },

@@ -125,7 +125,7 @@ const Run: React.FC = () => {
 
     return (
         <>
-            <Headline text={RUN_HEADLINE} at={2} accent={ACCENT} mark={["zero", "account."]} />
+            <Headline text={RUN_HEADLINE} at={2} accent={ACCENT} mark={["zero", "account"]} />
             <At x={x} y={y} w={w}>
                 <Window title="zsh · ~/shop" at={0} accent={ACCENT} pad={tall ? "20px 22px" : "24px 28px"}>
                     <Prompt command="rebase cloud init --claim" at={2} size={tall ? 23 : 27} rate={0.45} />
@@ -293,7 +293,6 @@ const Locked: React.FC = () => {
                                     alignItems: tall ? "center" : "flex-start",
                                     justifyContent: tall ? "space-between" : "flex-start",
                                     gap: tall ? 18 : 18,
-                                    minHeight: tall ? 132 : 340,
                                     transform: lit > 0 && lit < 1 ? `scale(${0.985 + 0.015 * lit})` : undefined,
                                 }}
                             >
@@ -364,6 +363,7 @@ const Locked: React.FC = () => {
                                             color: INK.copy,
                                             marginTop: tall ? 6 : 12,
                                             lineHeight: 1.4,
+                                            textWrap: "balance",
                                         }}
                                     >
                                         {card.detail}
@@ -438,7 +438,7 @@ const Handover: React.FC = () => {
 
     return (
         <>
-            <Headline text={HANDOVER_HEADLINE} at={2} accent={GREEN} mark={["your", "org."]} />
+            <Headline text={HANDOVER_HEADLINE} at={2} accent={GREEN} mark={["your", "org"]} />
             <At x={x} y={y} w={w}>
                 <div
                     style={{
@@ -674,7 +674,7 @@ const Handover: React.FC = () => {
                                 </span>
                             </div>
 
-                            <div style={{ fontFamily: FONT.body, fontSize: tall ? 16 : 18, color: INK.muted, lineHeight: 1.4 }}>
+                            <div style={{ fontFamily: FONT.body, fontSize: tall ? 16 : 18, color: INK.muted, lineHeight: 1.4, textWrap: "balance" }}>
                                 {settled > 0.5
                                     ? "Prior sandbox usage waived. Mail ports 465 / 587 / 993 open."
                                     : "Your .env keeps working without changes once claimed."}
@@ -890,6 +890,8 @@ const Rotate: React.FC = () => {
                             justifyContent: "space-between",
                             gap: 16,
                             flexWrap: "wrap",
+                            opacity: rest,
+                            transform: rest < 1 ? `translateY(${(1 - rest) * 8}px)` : undefined,
                         }}
                     >
                         <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: FONT.mono, fontSize: tall ? 18 : 20 }}>
@@ -925,6 +927,7 @@ export const CLAIM: FilmSpec = checkFilm({
     number: 1,
     title: "Zero-account agent provisioning",
     accent: ACCENT,
+    backdrop: "dark",
     endCommand: "rebase cloud init --claim",
     script: SCRIPT,
     toCorner: { line: "hook", end: true, plus: 2 },

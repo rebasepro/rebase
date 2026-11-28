@@ -30,6 +30,8 @@ const SCRIPT = lines([
     ["close", "Because Cloud runs our exact MIT image, a standard dump plus eject moves everything onto your own server the same day."],
 ]);
 
+
+
 /* ── shared inline icons (clean 1.5-stroke SVGs, zero emojis) ───────── */
 
 const DatabaseIcon: React.FC<{ color: string; size?: number }> = ({ color, size = 22 }) => (
@@ -192,7 +194,7 @@ const Physics: React.FC = () => {
                                     border: `1px solid ${SURFACE.hairline}`,
                                 }}
                             >
-                                <div style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.muted, marginBottom: 10 }}>
+                                <div style={{ fontFamily: FONT.mono, fontSize: 14, color: INK.muted, marginBottom: 10 }}>
                                     1 SHARED ENGINE · 4 TENANTS COMPETING FOR CPU/RAM
                                 </div>
                                 <div style={{ display: "flex", gap: 6, height: tall ? 24 : 28 }}>
@@ -212,7 +214,7 @@ const Physics: React.FC = () => {
                                                 alignItems: "center",
                                                 justifyContent: "center",
                                                 fontFamily: FONT.mono,
-                                                fontSize: tall ? 13 : 14,
+                                                fontSize: 14,
                                                 color: INK.high,
                                                 overflow: "hidden",
                                             }}
@@ -323,8 +325,8 @@ const Physics: React.FC = () => {
                                     <div style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 17, fontWeight: 600, color: EMERALD }}>
                                         your_project · CloudNativePG pod
                                     </div>
-                                    <div style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.copy, marginTop: 4 }}>
-                                        100% own CPU • own RAM • own NVMe disk
+                                    <div style={{ fontFamily: FONT.mono, fontSize: 14, color: INK.copy, marginTop: 4 }}>
+                                        own CPU · own RAM · own disk
                                     </div>
                                 </div>
                                 <span
@@ -383,7 +385,7 @@ const DIALS: readonly DialRow[] = [
         label: "App",
         spec: "1 vCPU / 1 GiB",
         tenancy: "reserved · Guaranteed QoS",
-        unitNote: "itemized compute",
+        unitNote: "compute",
         fill: 0.44,
         color: PRIMARY_LIGHT,
     },
@@ -391,7 +393,7 @@ const DIALS: readonly DialRow[] = [
         label: "Database",
         spec: "10 GiB dedicated",
         tenancy: "dedicated · CNPG instance",
-        unitNote: "itemized storage + ram",
+        unitNote: "disk + RAM",
         fill: 0.34,
         color: CYAN,
     },
@@ -399,7 +401,7 @@ const DIALS: readonly DialRow[] = [
         label: "Storage",
         spec: "dedicated bucket",
         tenancy: "dedicated · S3-compatible",
-        unitNote: "€0 standing · usage only",
+        unitNote: "usage only",
         fill: 0.28,
         color: EMERALD,
     },
@@ -506,7 +508,7 @@ const Dials: React.FC = () => {
                                             <span
                                                 style={{
                                                     fontFamily: FONT.mono,
-                                                    fontSize: tall ? 13 : 14,
+                                                    fontSize: 14,
                                                     color: INK.copy,
                                                     whiteSpace: "nowrap",
                                                 }}
@@ -569,7 +571,7 @@ const Dials: React.FC = () => {
                                 <div
                                     style={{
                                         fontFamily: FONT.mono,
-                                        fontSize: tall ? 13 : 14,
+                                        fontSize: 14,
                                         letterSpacing: "0.14em",
                                         color: INK.muted,
                                         marginBottom: tall ? 10 : 14,
@@ -589,9 +591,7 @@ const Dials: React.FC = () => {
                                                 fontSize: tall ? 15 : 17,
                                             }}
                                         >
-                                            <span style={{ color: INK.copy }}>
-                                                {d.label} ({d.spec})
-                                            </span>
+                                            <span style={{ color: INK.copy }}>{d.label}</span>
                                             <span style={{ color: INK.high }}>{d.unitNote}</span>
                                         </div>
                                     ))}
@@ -696,7 +696,7 @@ const SignIn: React.FC = () => {
                             <div style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 19 : 21, color: INK.high }}>
                                 acme / shop
                             </div>
-                            <div style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.muted, marginTop: 2 }}>
+                            <div style={{ fontFamily: FONT.mono, fontSize: 14, color: INK.muted, marginTop: 2 }}>
                                 app.rebase.pro · owner@acme.dev
                             </div>
                         </div>
@@ -765,7 +765,7 @@ const SignIn: React.FC = () => {
                         <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 15 : 16, color: CYAN }}>
                             POST /api/auth/platform-signin
                         </span>
-                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.copy }}>
+                        <span style={{ fontFamily: FONT.mono, fontSize: 14, color: INK.copy }}>
                             • 1-min single-use token • auth:admin-signin
                         </span>
                     </div>
@@ -798,7 +798,7 @@ const SignIn: React.FC = () => {
                             <span style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: tall ? 17 : 18, color: INK.high }}>
                                 Rebase CMS
                             </span>
-                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.muted }}>
+                            <span style={{ fontFamily: FONT.mono, fontSize: 14, color: INK.muted }}>
                                 shop.rebase.website/admin
                             </span>
                         </div>
@@ -813,7 +813,7 @@ const SignIn: React.FC = () => {
                                 border: `1px solid rgba(52,211,153,0.45)`,
                                 fontFamily: FONT.mono,
                                 fontWeight: 600,
-                                fontSize: tall ? 13 : 14,
+                                fontSize: 14,
                                 color: EMERALD,
                             }}
                         >
@@ -872,10 +872,10 @@ const SignIn: React.FC = () => {
                                     Orders · live production table
                                 </div>
                                 <div style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.copy, marginTop: 8 }}>
-                                    ord_9412 · paid · €148.00 · Falkenstein CNPG
+                                    ord_9412 · paid · €148.00
                                 </div>
                                 <div style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.muted, marginTop: 4 }}>
-                                    ord_9411 · shipped · €64.00 · Falkenstein CNPG
+                                    ord_9411 · shipped · €64.00
                                 </div>
                             </div>
 
@@ -896,7 +896,7 @@ const SignIn: React.FC = () => {
                                 <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 16 : 18, color: EMERALD }}>
                                     0 bootstrap passwords
                                 </span>
-                                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.copy }}>
+                                <span style={{ fontFamily: FONT.mono, fontSize: 14, color: INK.copy }}>
                                     no REBASE_ADMIN_PASSWORD env var
                                 </span>
                             </div>
@@ -904,35 +904,6 @@ const SignIn: React.FC = () => {
                     </div>
                 </div>
 
-                {/* 4. Auto-link deploy summary footer */}
-                <div
-                    style={{
-                        marginTop: tall ? 12 : 14,
-                        padding: tall ? "10px 16px" : "11px 20px",
-                        borderRadius: RADIUS.lg,
-                        background: SURFACE.well,
-                        border: `1px solid ${SURFACE.hairlineStrong}`,
-                        display: "flex",
-                        flexDirection: tall ? "column" : "row",
-                        alignItems: tall ? "flex-start" : "center",
-                        justifyContent: "space-between",
-                        gap: tall ? 4 : 14,
-                        opacity: 0.35 + 0.65 * zeroIn,
-                    }}
-                >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: 99, background: PRIMARY_LIGHT, flexShrink: 0 }} />
-                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.high }}>
-                            rebase cloud deploy
-                        </span>
-                        <span style={{ fontFamily: FONT.body, fontSize: tall ? 14 : 15, color: INK.muted }}>
-                            auto-links / creates project &amp; prints
-                        </span>
-                    </div>
-                    <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: PRIMARY_LIGHT }}>
-                        &lt;console&gt;/projects/&lt;id&gt;?open=admin
-                    </span>
-                </div>
             </At>
         </>
     );
@@ -942,12 +913,13 @@ const SignIn: React.FC = () => {
 
 const Region: React.FC = () => {
     const frame = useCurrentFrame();
-    const headline = "Honest physics. Easy exit.";
+    const headline = "Warned before you save.";
     const { x, y, w, format } = useBodyFor(headline);
     const tall = format === "tall";
 
     const warnAt = useCue({ line: "region", word: "warns", plus: -4 }) ?? 9999;
-    const exitAt = useCue({ line: "region", word: "egress", plus: -8 }) ?? 9999;
+    /* The exit is said on the close line, to camera: land it as this line ends so it bridges into it. */
+    const exitAt = useCue({ line: "region", word: "front", plus: -6 }) ?? 9999;
 
     const mapIn = ramp(frame, 0, 10, ENTER);
     const warnIn = ramp(frame, warnAt, 12, ENTER);
@@ -960,7 +932,7 @@ const Region: React.FC = () => {
 
     return (
         <>
-            <Headline text={headline} at={0} accent={AMBER} mark={["Honest", "Easy"]} />
+            <Headline text={headline} at={0} accent={AMBER} mark={["Warned"]} />
             <At x={x} y={y} w={w}>
                 {/* 1. European placement card with dotted amber public-internet arc */}
                 <div
@@ -991,7 +963,7 @@ const Region: React.FC = () => {
                     <div
                         style={{
                             display: "grid",
-                            gridTemplateColumns: tall ? "1fr 160px 1fr" : "1fr 240px 1fr",
+                            gridTemplateColumns: tall ? "1fr 184px 1fr" : "1fr 240px 1fr",
                             alignItems: "center",
                             gap: tall ? 8 : 16,
                         }}
@@ -1007,7 +979,7 @@ const Region: React.FC = () => {
                         >
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                 <GlobeNodeIcon color={PRIMARY_LIGHT} size={20} />
-                                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: PRIMARY_LIGHT }}>
+                                <span style={{ fontFamily: FONT.mono, fontSize: 14, color: PRIMARY_LIGHT }}>
                                     APP · HETZNER
                                 </span>
                             </div>
@@ -1019,7 +991,7 @@ const Region: React.FC = () => {
                         {/* Dotted amber public-internet arc */}
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                             <svg
-                                width={tall ? 154 : 230}
+                                width={tall ? 170 : 230}
                                 height={60}
                                 viewBox="0 0 240 60"
                                 fill="none"
@@ -1040,9 +1012,10 @@ const Region: React.FC = () => {
                                 style={{
                                     fontFamily: FONT.mono,
                                     fontWeight: 600,
-                                    fontSize: tall ? 13 : 14,
+                                    fontSize: 14,
                                     color: AMBER,
-                                    letterSpacing: "0.08em",
+                                    letterSpacing: tall ? "0.04em" : "0.08em",
+                                    whiteSpace: "nowrap",
                                 }}
                             >
                                 ↔ PUBLIC INTERNET
@@ -1060,7 +1033,7 @@ const Region: React.FC = () => {
                         >
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                 <DatabaseIcon color={AMBER} size={20} />
-                                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: AMBER }}>
+                                <span style={{ fontFamily: FONT.mono, fontSize: 14, color: AMBER }}>
                                     EXTERNAL DB · BYODB
                                 </span>
                             </div>
@@ -1094,7 +1067,7 @@ const Region: React.FC = () => {
                             style={{
                                 fontFamily: FONT.mono,
                                 fontWeight: 600,
-                                fontSize: tall ? 13 : 14,
+                                fontSize: 14,
                                 color: GROUND.base,
                                 background: AMBER,
                                 padding: "4px 12px",
@@ -1109,13 +1082,15 @@ const Region: React.FC = () => {
                         style={{
                             marginTop: 10,
                             fontFamily: FONT.body,
-                            fontWeight: 600,
-                            fontSize: tall ? 19 : 22,
-                            lineHeight: 1.4,
+                            fontSize: tall ? 18 : 21,
+                            lineHeight: 1.45,
                             color: INK.high,
                         }}
                     >
-                        Public internet round trips · tens of ms latency · double egress billed — warned BEFORE saving
+                        {/* crossBoundaryWarning() in saas/backend/src/utils/tenancy.ts, excerpted */}
+                        &ldquo;Every query will cross the public internet instead of staying on one private network:
+                        expect tens of milliseconds per round trip rather than under one, egress billed on both
+                        sides&hellip;&rdquo;
                     </div>
                 </div>
 
@@ -1176,6 +1151,7 @@ export const HONEST_CLOUD: FilmSpec = checkFilm({
     number: 10,
     title: "Billed for physics",
     accent: CORAL,
+    backdrop: "dark",
     endCommand: null,
     script: SCRIPT,
     toCorner: { line: "hook", end: true, plus: 2 },

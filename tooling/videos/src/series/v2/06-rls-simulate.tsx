@@ -117,7 +117,8 @@ const Guess: React.FC = () => {
                         <div
                             style={{
                                 position: "absolute",
-                                left: -10,
+                                // Spans the gutter too, so the line numbers sit inside the band.
+                                left: -codeSize * 2.4 + 10,
                                 right: 14,
                                 top: leakBandTop - 3,
                                 height: leakBandHeight + 6,
@@ -130,14 +131,11 @@ const Guess: React.FC = () => {
                         />
                     </Editor>
 
-                    {/* Magnifying callout card */}
+                    {/* Callout card, under the editor so it never covers the code */}
                     <div
                         style={{
-                            position: tall ? "relative" : "absolute",
-                            right: tall ? undefined : 24,
-                            bottom: tall ? undefined : -38,
-                            marginTop: tall ? 16 : 0,
-                            width: tall ? w : 520,
+                            marginTop: 16,
+                            width: tall ? w : 620,
                             padding: tall ? "15px 18px" : "18px 22px",
                             borderRadius: RADIUS.xl,
                             background: SURFACE.well,
@@ -172,7 +170,7 @@ const Guess: React.FC = () => {
                             invoices · missing tenant check
                         </div>
                         <div style={{ fontFamily: FONT.body, fontSize: tall ? 15 : 17, color: INK.copy, marginTop: 4 }}>
-                            No customer_id = rebase.uid() filter — every buyer reads all invoices.
+                            No customer_id filter: every buyer reads every issued invoice.
                         </div>
                     </div>
                 </div>
@@ -208,12 +206,12 @@ const Sim: React.FC = () => {
                     {/* Top/Left: Terminal */}
                     <div style={{ flex: 1 }}>
                         <Window title="zsh — rebase rls" at={-2} pad={tall ? "15px 18px" : "20px 24px"}>
-                            <Prompt command="rebase rls simulate --user alice@acme.io" at={2} size={tall ? 18 : 20} rate={0.38} />
+                            <Prompt command="rebase rls simulate --user 3f0c9a7e-…" at={2} size={tall ? 18 : 20} rate={0.38} />
                             <Log
                                 size={tall ? 15 : 18}
                                 lines={[
                                     { text: "", at: 18 },
-                                    { text: "  As alice@acme.io   roles: buyer", at: 18, color: INK.high },
+                                    { text: "  As 3f0c9a7e-…  roles: buyer", at: 18, color: INK.high },
                                     { text: "  orders      1 of 42 rows", at: 24, color: GREEN },
                                     { text: "  invoices    1 of 42 rows", at: 28, color: GREEN },
                                     { text: "  customers   1 of 18 rows", at: 32, color: GREEN },
@@ -632,9 +630,12 @@ const Loop: React.FC = () => {
             }}
         >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: tall ? 8 : 12 }}>
-                <span style={{ fontFamily: FONT.mono, fontSize: 13, letterSpacing: "0.14em", color: CORAL, fontWeight: 600 }}>
-                    • POLICY CYCLE GRAPH
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 99, background: CORAL, flexShrink: 0 }} />
+                    <span style={{ fontFamily: FONT.mono, fontSize: 13, letterSpacing: "0.14em", color: CORAL, fontWeight: 600 }}>
+                        POLICY CYCLE GRAPH
+                    </span>
+                </div>
                 <span
                     style={{
                         fontFamily: FONT.mono,
@@ -653,7 +654,7 @@ const Loop: React.FC = () => {
             {/* Inline SVG cycle diagram: projects policy <-> members policy */}
             <svg
                 viewBox="0 0 440 180"
-                style={{ width: "100%", height: tall ? 134 : 210, display: "block" }}
+                style={{ width: "100%", height: tall ? 172 : 210, display: "block" }}
             >
                 <defs>
                     <marker id="arrow-coral" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -711,7 +712,7 @@ const Loop: React.FC = () => {
 
             {!tall && (
                 <div style={{ fontFamily: FONT.mono, fontSize: 14, color: INK.copy, textAlign: "center", marginTop: 8 }}>
-                    Postgres refuses every query on both tables at runtime
+                    Postgres refuses every query on both tables
                 </div>
             )}
         </div>
@@ -725,10 +726,12 @@ const Loop: React.FC = () => {
                     size={tall ? 15 : 18}
                     lines={[
                         { text: "", at: 12 },
-                        { text: "  × error  rls-policy-recursion  [projects]", at: 12, color: CORAL },
-                        { text: '    "projects" (select) reads members → projects', at: 17, color: INK.high },
-                        { text: "    42P17 infinite recursion detected in policy", at: 22, color: CORAL },
-                        { text: "    1 error · deploy blocked before production", at: 27, color: INK.muted },
+                        { text: '  ✗ projects.rls[0]  "projects" rls[0] (select)', at: 12, color: CORAL },
+                        { text: "    reads public.members in a sub-select, … so", at: 17, color: INK.high },
+                        { text: "    Postgres refuses every read of public.projects", at: 20, color: INK.high },
+                        { text: "    with 42P17 (infinite recursion detected …)", at: 23, color: CORAL },
+                        ...(tall ? [] : [{ text: "", at: 27 }]),
+                        { text: "  ✗ 1 error, 0 warnings", at: 27, color: CORAL },
                     ]}
                 />
             </Window>
@@ -789,7 +792,7 @@ const Loop: React.FC = () => {
                         rebase db push --prune-policies
                     </span>
                 </div>
-                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 12 : 14, color: INK.muted, whiteSpace: "nowrap" }}>
+                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.muted, whiteSpace: "nowrap" }}>
                     drops orphaned policies no table declares
                 </span>
             </div>
@@ -823,6 +826,7 @@ export const RLS_SIMULATE: FilmSpec = checkFilm({
     number: 6,
     title: "Prove permissions before prod",
     accent: ACCENT,
+    backdrop: "dark",
     endCommand: "rebase rls simulate",
     script: SCRIPT,
     toCorner: { line: "hook", end: true, plus: 2 },

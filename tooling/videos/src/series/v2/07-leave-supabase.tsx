@@ -1,6 +1,6 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
-import { ENTER, ramp, SHIFT } from "../../components/motion";
+import { ENTER, ramp } from "../../components/motion";
 import { CHROMA, FONT, GROUND, INK, RADIUS, SURFACE } from "../../theme";
 import { At, checkFilm, Headline, lines, Prompt, useBodyFor, useCue, type FilmSpec } from "../kit";
 
@@ -178,7 +178,7 @@ const Why: React.FC = () => {
                                     ERROR: schema &quot;auth&quot; does not exist
                                 </div>
                                 <div style={{ color: "rgba(251,80,102,0.82)", fontSize: tall ? 16 : 18, marginTop: 3 }}>
-                                    LINE 3: owner_id uuid default auth.uid() · 0 tables loaded
+                                    LINE 3: owner_id uuid default auth.uid()
                                 </div>
                             </div>
                         </div>
@@ -234,7 +234,7 @@ const Why: React.FC = () => {
 
 const H_CMD = "One flag reads Supabase.";
 
-const GENERATED_FILES = ["users.ts", "projects.ts", "tasks.ts", "members.ts", "invoices.ts", "+3 tables"];
+const GENERATED_FILES = ["profiles.ts", "projects.ts", "tasks.ts", "members.ts", "invoices.ts", "+3 tables"];
 
 const Cmd: React.FC = () => {
     const frame = useCurrentFrame();
@@ -247,7 +247,7 @@ const Cmd: React.FC = () => {
     const shellO = ramp(frame, 0, 8, ENTER);
     const connectedAt = Math.min(cConn, 28);
     const translateAt = connectedAt + 12;
-    const progress = ramp(frame, translateAt, 28, SHIFT);
+    const foundAt = translateAt + 10;
     const doneAt = Math.max(translateAt + 24, Math.min(cFlag + 6, translateAt + 30));
 
     const command = tall
@@ -275,56 +275,16 @@ const Cmd: React.FC = () => {
                         <Prompt command={command} at={2} size={tall ? 20 : 24} rate={0.28} />
 
                         <div style={{ marginTop: tall ? 18 : 22, display: "flex", flexDirection: "column", gap: 10, fontFamily: FONT.mono, fontSize: logSz }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, opacity: ramp(frame, connectedAt, 8, ENTER) }}>
-                                <span style={{ color: ACCENT }}>✓</span>
-                                <span style={{ color: INK.high }}>Connected</span>
-                                <span style={{ color: INK.muted }}>db.acme.supabase.co:5432/postgres (read-only)</span>
+                            {/* The driver's own lines (server-postgres schema/introspect-db.ts) */}
+                            <div style={{ color: INK.muted, opacity: ramp(frame, connectedAt, 8, ENTER) }}>
+                                Connected to database: db.acme.supabase.co:5432/postgres
                             </div>
-
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, opacity: ramp(frame, translateAt, 8, ENTER) }}>
-                                <span style={{ color: CYAN }}>→</span>
-                                <span style={{ color: INK.copy }}>Translating Supabase conventions</span>
+                            <div style={{ color: INK.muted, opacity: ramp(frame, translateAt, 8, ENTER) }}>
+                                Introspecting schema &apos;public&apos;...
                             </div>
-
-                            {/* Live progress bar */}
-                            <div style={{ marginTop: 4, marginBottom: 4, opacity: ramp(frame, translateAt, 8, ENTER) }}>
-                                <div
-                                    style={{
-                                        height: 8,
-                                        borderRadius: 99,
-                                        background: "rgba(255,255,255,0.08)",
-                                        overflow: "hidden",
-                                    }}
-                                >
-                                    <div
-                                        style={{
-                                            width: `${Math.round(progress * 100)}%`,
-                                            height: "100%",
-                                            borderRadius: 99,
-                                            background: `linear-gradient(90deg, ${CYAN}, ${ACCENT})`,
-                                        }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, opacity: ramp(frame, doneAt, 10, ENTER) }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                    <span style={{ color: ACCENT }}>✓</span>
-                                    <span style={{ color: ACCENT, fontWeight: 600 }}>Generated 8 tables</span>
-                                    <span style={{ color: INK.muted }}>in backend/schema/</span>
-                                </div>
-                                <span
-                                    style={{
-                                        fontSize: 15,
-                                        color: GROUND.base,
-                                        background: ACCENT,
-                                        padding: "4px 12px",
-                                        borderRadius: RADIUS.md,
-                                        fontWeight: 600,
-                                    }}
-                                >
-                                    0 WRITES TO SOURCE
-                                </span>
+                            <div style={{ color: CYAN, opacity: ramp(frame, foundAt, 8, ENTER) }}>Found 8 tables.</div>
+                            <div style={{ color: ACCENT, fontWeight: 600, opacity: ramp(frame, doneAt, 10, ENTER) }}>
+                                ✓ Introspected 8 tables — generated 8 table(s).
                             </div>
                         </div>
                     </div>
@@ -333,7 +293,8 @@ const Cmd: React.FC = () => {
                 {/* Generated files strip */}
                 <div
                     style={{
-                        display: "flex",
+                        display: tall ? "grid" : "flex",
+                        gridTemplateColumns: tall ? "repeat(3, 1fr)" : undefined,
                         flexWrap: "wrap",
                         gap: tall ? 10 : 12,
                         marginTop: tall ? 18 : 22,
@@ -566,7 +527,7 @@ const Honest: React.FC = () => {
     const rpcO = ramp(frame, doneAt + 4, 12, ENTER);
     const usersO = ramp(frame, doneAt + 16, 12, ENTER);
 
-    const cloudCmd = "rebase cloud db query --file backend/sql/introspected-left-behind.sql";
+    const cloudCmd = "rebase cloud db query --file backend/sql/_introspected-left-behind.sql";
 
     return (
         <>
@@ -625,7 +586,7 @@ const Honest: React.FC = () => {
                                 flex: 1,
                             }}
                         >
-                            <div style={{ display: "flex", flexDirection: "column", gap: tall ? 9 : 11 }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: tall ? 9 : 12 }}>
                                 <div
                                     style={{
                                         fontFamily: FONT.mono,
@@ -640,7 +601,7 @@ const Honest: React.FC = () => {
                                         textOverflow: "ellipsis",
                                     }}
                                 >
-                                    backend/sql/introspected-left-behind.sql
+                                    backend/sql/_introspected-left-behind.sql
                                 </div>
 
                                 <div
@@ -661,7 +622,7 @@ const Honest: React.FC = () => {
                                                     flexDirection: tall ? "column" : "row",
                                                     alignItems: tall ? "flex-start" : "center",
                                                     gap: tall ? 3 : 10,
-                                                    padding: tall ? "8px 11px" : "10px 13px",
+                                                    padding: tall ? "8px 11px" : "14px 14px",
                                                     borderRadius: RADIUS.lg,
                                                     background: SURFACE.sheet,
                                                     border: `1px solid ${o > 0.5 ? `${AMBER}44` : SURFACE.hairline}`,
@@ -782,7 +743,11 @@ const Honest: React.FC = () => {
                                         opacity: ramp(frame, doneAt, 10, ENTER),
                                     }}
                                 >
-                                    ✓ Applied triggers, functions &amp; CHECKs on Rebase Cloud
+                                    <span style={{ display: "flex", gap: 18 }}>
+                                        <span>CREATE TRIGGER</span>
+                                        <span>CREATE FUNCTION</span>
+                                        <span>ALTER TABLE</span>
+                                    </span>
                                 </div>
                             </div>
 
@@ -858,7 +823,7 @@ const Honest: React.FC = () => {
                                             border: "1px solid rgba(52,211,153,0.3)",
                                         }}
                                     >
-                                        --dry-run · 0 EMAILS
+                                        SAME USER IDS
                                     </span>
                                 </div>
                                 <div style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 16, color: INK.high, fontWeight: 600 }}>
@@ -866,7 +831,7 @@ const Honest: React.FC = () => {
                                     rebase users import users.csv
                                 </div>
                                 <div style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 14, color: INK.copy }}>
-                                    Keeps every original Supabase user ID · zero email spam
+                                    Creates each account under its Supabase id · sends no email
                                 </div>
                             </div>
                         </div>
@@ -884,6 +849,7 @@ export const LEAVE_SUPABASE: FilmSpec = checkFilm({
     number: 7,
     title: "One-command Supabase escape",
     accent: ACCENT,
+    backdrop: "dark",
     endCommand: "rebase schema introspect --from supabase",
     script: SCRIPT,
     toCorner: { line: "hook", end: true, plus: 2 },

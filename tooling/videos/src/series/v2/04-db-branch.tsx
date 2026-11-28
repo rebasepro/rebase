@@ -226,9 +226,10 @@ const Clone: React.FC = () => {
                     <Log
                         size={tall ? 20 : 23}
                         lines={[
-                            { text: '  Evicting idle pools on "rebase"...', at: 20, color: INK.muted },
-                            { text: "  ✓ Branch rb_agent_backfill created in 0.42s", at: 28, color: EMERALD },
-                            { text: "  Parent: rebase  ·  Database: rb_agent_backfill", at: 36, color: INK.copy },
+                            { text: "  Name:   agent_backfill", at: 20, color: INK.muted },
+                            { text: '  ✓ Branch "agent_backfill" created successfully.', at: 28, color: EMERALD },
+                            { text: "    Database: rb_agent_backfill", at: 34, color: INK.copy },
+                            { text: "    Parent:   rebase", at: 38, color: INK.copy },
                         ]}
                     />
                 </Window>
@@ -483,7 +484,7 @@ const Wild: React.FC = () => {
                                             height: 6,
                                             borderRadius: 99,
                                             background: AMBER,
-                                            opacity: 0.45 + 0.55 * Math.sin(frame / 3),
+                                            opacity: 0.6 + 0.4 * Math.sin(frame / 3),
                                         }}
                                     />
                                     <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 16 : 18, color: INK.high }}>
@@ -526,14 +527,14 @@ const Wild: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Live write activity pulse */}
-                        <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                        {/* Live write activity pulse (wide only: tall has no room above the branch bar) */}
+                        {!tall && <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                             <span style={{ fontFamily: FONT.mono, fontSize: 13, color: INK.muted }}>WRITE LOAD</span>
                             <svg width={tall ? 260 : 320} height="48" viewBox="0 0 320 48" aria-hidden="true">
                                 <line x1="0" y1="45" x2="320" y2="45" stroke={SURFACE.hairline} strokeWidth="1" />
                                 <polyline points={sparkPoints} fill="none" stroke={AMBER} strokeWidth="2.4" strokeLinejoin="round" />
                             </svg>
-                        </div>
+                        </div>}
                     </div>
 
                     {/* Right: Production flatline — completely isolated */}
@@ -586,12 +587,26 @@ const Wild: React.FC = () => {
                                 <div style={{ fontFamily: FONT.mono, fontSize: 13, letterSpacing: "0.12em", color: INK.muted, marginBottom: 10 }}>
                                     AGENT MUTATIONS ON PROD
                                 </div>
-                                <svg width="100%" height={tall ? 44 : 64} viewBox="0 0 320 56" preserveAspectRatio="none" aria-hidden="true">
-                                    <line x1="0" y1="28" x2="320" y2="28" stroke="rgba(52,211,153,0.28)" strokeWidth="2" />
-                                    <line x1="0" y1="28" x2={radarX} y2="28" stroke={EMERALD} strokeWidth="2.8" />
-                                    <circle cx={radarX} cy="28" r="5" fill={EMERALD} />
-                                    <circle cx={radarX} cy="28" r="10" fill="none" stroke="rgba(52,211,153,0.4)" strokeWidth="1.5" />
-                                </svg>
+                                <div style={{ position: "relative", height: tall ? 36 : 64 }}>
+                                    <svg width="100%" height="100%" viewBox="0 0 320 56" preserveAspectRatio="none" aria-hidden="true">
+                                        <line x1="0" y1="28" x2="320" y2="28" stroke="rgba(52,211,153,0.28)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                        <line x1="0" y1="28" x2={radarX} y2="28" stroke={EMERALD} strokeWidth="2.8" vectorEffect="non-scaling-stroke" />
+                                    </svg>
+                                    <div
+                                        style={{
+                                            position: "absolute",
+                                            left: `${(radarX / 320) * 100}%`,
+                                            top: "50%",
+                                            width: 10,
+                                            height: 10,
+                                            marginLeft: -5,
+                                            marginTop: -5,
+                                            borderRadius: 99,
+                                            background: EMERALD,
+                                            boxShadow: "0 0 0 5px rgba(52,211,153,0.18)",
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -636,29 +651,31 @@ const Merge: React.FC = () => {
                     <Log
                         size={logSize}
                         lines={[
-                            { text: "  public.orders   +42 updated   0 deleted   2 skipped", at: 20, color: INK.high },
-                            { text: "  fingerprint     sha256:9f4c…e81a", at: 28, color: INK.muted },
+                            { text: "  Data: 1 table(s) with changed rows", at: 20, color: INK.copy },
+                            { text: "    public.orders: +0  ~42  -0  2 conflict(s)", at: 26, color: INK.high },
+                            { text: "  Fingerprint: 9f4c2b…e81a", at: 32, color: INK.muted },
                         ]}
                     />
 
                     <div style={{ height: tall ? 16 : 20 }} />
 
-                    <Prompt command="rebase db branch merge agent_backfill" at={mergeCue} size={cmdSize} rate={0.38} />
+                    <Prompt command="rebase db branch merge agent_backfill --on-conflict target --yes" at={mergeCue} size={cmdSize} rate={0.38} />
                     <div style={{ height: 8 }} />
                     <Log
                         size={logSize}
                         lines={[
-                            { text: "  ✓ Diff fingerprint verified (9f4c…e81a) · single transaction", at: mergeCue + 20, color: INK.copy },
-                            { text: '  ✓ Merged 42 verified rows onto "rebase"', at: mergeCue + 28, color: EMERALD },
+                            { text: "  ✓ public.orders  +0 ~40 -0", at: mergeCue + 26, color: INK.high },
+                            { text: "  2 row(s) both sides changed kept the target's version.", at: mergeCue + 32, color: INK.muted },
+                            { text: '  ✓ Merged "agent_backfill" into rebase.', at: mergeCue + 38, color: EMERALD },
                         ]}
                     />
                 </Window>
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: tall ? 10 : 14, marginTop: tall ? 16 : 20 }}>
                     {[
-                        { label: "+42 updated", color: EMERALD },
-                        { label: "2 conflicts skipped", color: AMBER },
-                        { label: "Fingerprint locked", color: CYAN },
+                        { label: "~42 rows changed", color: EMERALD },
+                        { label: "2 conflicts kept target", color: AMBER },
+                        { label: "Fingerprint checked", color: CYAN },
                         { label: "Standard Postgres", color: mergedLit > 0.4 ? EMERALD : INK.copy },
                     ].map((chip, i) => {
                         const o = ramp(frame, 10 + i * 5, 10, ENTER);
@@ -696,6 +713,7 @@ export const DB_BRANCH: FilmSpec = checkFilm({
     script: SCRIPT,
     toCorner: { line: "hook", end: true, plus: 2 },
     close: { line: "close", plus: -2 },
+    backdrop: "dark",
     endCommand: "rebase db branch create experiment",
     layer: BranchGraphLayer,
     scenes: [

@@ -119,8 +119,7 @@ const Deploy: React.FC = () => {
     const cSec = useCue({ line: "deploy", word: "seconds", plus: -6 }) ?? 9999;
 
     const shellO = ramp(frame, 0, 8, ENTER);
-    const uploadAt = 24;
-    const bootAt = 34;
+    const startedAt = 24;
     const liveAt = Math.min(cLive, 48);
     const flip = ramp(frame, Math.min(cSec, liveAt + 10), 12, ENTER);
 
@@ -149,14 +148,18 @@ const Deploy: React.FC = () => {
                             rate={0.34}
                         />
                         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 8, fontFamily: FONT.mono, fontSize: tall ? 18 : 21 }}>
-                            <div style={{ color: INK.copy, opacity: ramp(frame, uploadAt, 8, ENTER) }}>
-                                <span style={{ color: ACCENT }}>→</span> Uploading bundle · POST /api/functions/previews/songbuzz
-                            </div>
-                            <div style={{ color: INK.copy, opacity: ramp(frame, bootAt, 8, ENTER) }}>
-                                <span style={{ color: ACCENT }}>→</span> Provisioning isolated pod + empty Postgres DB
+                            {/* The CLI's own lines (cli deploy.ts + previews.ts previewLines) */}
+                            <div style={{ color: GREEN, opacity: ramp(frame, startedAt, 8, ENTER) }}>
+                                ✓ Preview deploy started (deployment 7c41e0b2).
                             </div>
                             <div style={{ color: GREEN, fontWeight: 600, opacity: ramp(frame, liveAt, 10, ENTER) }}>
-                                ✓ Live check passed (200 OK) · backend: preview
+                                ✓ Preview deployed
+                            </div>
+                            <div style={{ color: INK.copy, opacity: ramp(frame, liveAt + 4, 8, ENTER) }}>
+                                It runs its own backend, on a database of its own — not production&apos;s data.
+                            </div>
+                            <div style={{ color: INK.copy, opacity: ramp(frame, liveAt + 8, 8, ENTER) }}>
+                                Production is unchanged.
                             </div>
                         </div>
                     </div>
@@ -226,6 +229,8 @@ const Deploy: React.FC = () => {
                             fontWeight: 600,
                             color: GREEN,
                             flexShrink: 0,
+                            // In tall it drops under the address: line it up with the text, not the globe.
+                            marginLeft: tall ? 52 : 0,
                             opacity: 0.4 + 0.6 * flip,
                         }}
                     >
@@ -243,9 +248,9 @@ const Deploy: React.FC = () => {
 const H_ISOLATED = "Isolated pod. Empty Postgres.";
 
 const PREVIEW_LANES = [
-    { name: "--new-quiz", host: "songbuzz--new-quiz.rebase.website" },
-    { name: "--billing-v2", host: "songbuzz--billing-v2.rebase.website" },
-    { name: "--rls-fix", host: "songbuzz--rls-fix.rebase.website" },
+    { name: "new-quiz", host: "songbuzz--new-quiz.rebase.website" },
+    { name: "billing-v2", host: "songbuzz--billing-v2.rebase.website" },
+    { name: "rls-fix", host: "songbuzz--rls-fix.rebase.website" },
 ] as const;
 
 const Isolated: React.FC = () => {
@@ -552,7 +557,7 @@ const Why: React.FC = () => {
                                         </span>
                                     </div>
 
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                         <span
                                             style={{
                                                 display: "inline-flex",
@@ -570,9 +575,6 @@ const Why: React.FC = () => {
                                             }}
                                         >
                                             {bounced > 0.4 ? "✓ CONTAINED IN PREVIEW" : "→ BLOCKING…"}
-                                        </span>
-                                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 16 : 18, color: bounced > 0.4 ? ACCENT : CORAL }}>
-                                            ×→
                                         </span>
                                     </div>
                                 </div>
@@ -739,7 +741,7 @@ const Guard: React.FC = () => {
                                 textDecorationThickness: "2px",
                             }}
                         >
-                            POST /api/functions/deploy {"{ preview: true }"}
+                            POST /api/functions/deploy {"{ preview: {} }"}
                         </span>
                         <span style={{ fontFamily: FONT.body, fontSize: tall ? 17 : 19, color: "rgba(251,80,102,0.88)" }}>
                             → older server ignores unknown flag &amp; overwrites prod
@@ -832,7 +834,7 @@ const Guard: React.FC = () => {
                                 404
                             </span>
                             <span style={{ fontFamily: FONT.mono, fontSize: tall ? 18 : 21, fontWeight: 600, color: INK.high }}>
-                                previews_unavailable
+                                FUNCTION_NOT_FOUND
                             </span>
                         </div>
 
@@ -847,7 +849,7 @@ const Guard: React.FC = () => {
                                 color: GREEN,
                             }}
                         >
-                            <span>✓ Nothing deployed</span>
+                            <span>✓ previews_unavailable · nothing deployed</span>
                         </div>
                     </div>
                 </div>
@@ -863,6 +865,7 @@ export const SAFE_PREVIEWS: FilmSpec = checkFilm({
     number: 8,
     title: "Agent previews that cannot touch prod",
     accent: ACCENT,
+    backdrop: "dark",
     endCommand: "rebase cloud deploy --preview",
     script: SCRIPT,
     toCorner: { line: "hook", end: true, plus: 2 },

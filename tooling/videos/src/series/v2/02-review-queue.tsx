@@ -106,7 +106,7 @@ const Stage: React.FC = () => {
 
     return (
         <>
-            <Headline text={STAGE_HEADLINE} at={2} accent={ACCENT} mark={["propose,"]} />
+            <Headline text={STAGE_HEADLINE} at={2} accent={ACCENT} mark={["propose"]} />
             <At x={x} y={y} w={w}>
                 <div
                     style={{
@@ -255,7 +255,7 @@ const Stage: React.FC = () => {
                     <Editor
                         file="backend/review.ts"
                         code={REVIEW_CONFIG_CODE}
-                        size={tall ? 18 : 21}
+                        size={18}
                         at={2}
                         step={1.5}
                         accent={ACCENT}
@@ -329,8 +329,8 @@ const Hold: React.FC = () => {
                     <span style={{ color: ACCENT, fontWeight: 600 }}>PATCH</span>{" "}
                     <span style={{ color: INK.high }}>/api/functions/review</span>
                 </div>
-                <div style={{ color: INK.copy, fontSize: tall ? 15 : 16 }}>
-                    {`{ collection: "orders", id: 1042, status: "refunded" }`}
+                <div style={{ color: INK.copy, fontSize: tall ? 15 : 16, whiteSpace: "pre" }}>
+                    {tall ? `{ collection: "orders", id: 1042, status: "refunded" }` : `{ collection: "orders",\n  id: 1042, status: "refunded" }`}
                 </div>
             </div>
 
@@ -360,21 +360,12 @@ const Hold: React.FC = () => {
     );
 
     const connector = tall ? (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 64 }}>
-            <svg width={520} height={64} viewBox="0 0 520 64" fill="none">
-                {/* Active route down-left to staged_changes */}
-                <path d="M 260 4 L 260 28 L 130 28 L 130 58" stroke={ACCENT} strokeWidth="2.5" />
-                <polygon points="124,52 136,52 130,62" fill={ACCENT} />
-                <circle
-                    cx={travel < 0.35 ? 260 : travel < 0.75 ? interpolate(travel, [0.35, 0.75], [260, 130]) : 130}
-                    cy={travel < 0.35 ? interpolate(travel, [0, 0.35], [6, 28]) : travel < 0.75 ? 28 : interpolate(travel, [0.75, 1], [28, 56])}
-                    r="5"
-                    fill={ACCENT}
-                />
-                {/* Blocked route down-right to public.orders */}
-                <path d="M 260 28 L 390 28 L 390 56" stroke={CORAL} strokeWidth="2" strokeDasharray="6 6" opacity={0.75} />
-                <circle cx="325" cy="28" r="10" fill={GROUND.base} stroke={CORAL} strokeWidth="2" />
-                <path d="M 321 24 L 329 32 M 329 24 L 321 32" stroke={CORAL} strokeWidth="2" strokeLinecap="round" />
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 56 }}>
+            <svg width={24} height={56} viewBox="0 0 24 56" fill="none">
+                {/* Every write routes down into staged_changes */}
+                <path d="M 12 4 L 12 44" stroke={ACCENT} strokeWidth="2.5" />
+                <polygon points="6,42 18,42 12,52" fill={ACCENT} />
+                <circle cx="12" cy={interpolate(travel, [0, 1], [6, 40])} r="5" fill={ACCENT} />
             </svg>
         </div>
     ) : (
@@ -551,7 +542,7 @@ const Hold: React.FC = () => {
     );
 };
 
-const DIFF_HEADLINE = "Inspect the diff. Click approve.";
+const DIFF_HEADLINE = "Read the diff. Click approve.";
 
 interface DiffRow {
     field: string;
@@ -580,7 +571,7 @@ const Diff: React.FC = () => {
 
     return (
         <>
-            <Headline text={DIFF_HEADLINE} at={2} accent={GREEN} mark={["approve."]} />
+            <Headline text={DIFF_HEADLINE} at={2} accent={GREEN} mark={["approve"]} />
             <At x={x} y={y} w={w}>
                 <div
                     style={{
@@ -925,7 +916,7 @@ const Apply: React.FC = () => {
                             const lit = ramp(frame, stepTimes[i], 10, ENTER);
                             const active = lit > 0.35;
                             const sqlText = tall && i === 2
-                                ? "UPDATE public.orders SET status='refunded', refund_amount=14900 WHERE id=1042;"
+                                ? "UPDATE public.orders SET status='refunded',\nrefund_amount=14900 WHERE id=1042;"
                                 : tall && i === 3
                                     ? "UPDATE rebase.staged_changes SET status='approved';"
                                     : step.sql;
@@ -964,6 +955,7 @@ const Apply: React.FC = () => {
                                                 color: active ? INK.high : INK.copy,
                                                 lineHeight: 1.35,
                                                 wordBreak: "break-word",
+                                                whiteSpace: "pre-line",
                                             }}
                                         >
                                             {sqlText}
@@ -1020,6 +1012,7 @@ export const REVIEW_QUEUE: FilmSpec = checkFilm({
     number: 2,
     title: "Agents propose, humans approve",
     accent: ACCENT,
+    backdrop: "dark",
     endCommand: "pnpm add @rebasepro/plugin-review",
     script: SCRIPT,
     toCorner: { line: "hook", end: true, plus: 2 },

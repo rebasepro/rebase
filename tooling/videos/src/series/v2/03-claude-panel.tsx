@@ -56,13 +56,6 @@ const SparkIcon: React.FC<{ color: string; size?: number }> = ({ color, size = 1
     </svg>
 );
 
-const TerminalIcon: React.FC<{ color: string; size?: number }> = ({ color, size = 16 }) => (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true">
-        <rect x="2.5" y="3.5" width="15" height="13" rx="2.4" stroke={color} strokeWidth="1.6" />
-        <path d="m6 8 2.6 2.2L6 12.4M10.4 12.4h3.6" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-);
-
 /* ── scenes ─────────────────────────────────────────────────────────── */
 
 /** Split hazard vs. fix card: blind plain-text mutations vs. the hosted Rebase MCP connector. */
@@ -292,7 +285,10 @@ const Open: React.FC = () => {
     // Smoothly pan from table view (1-table.png) to switches & stats (3-switches-and-stats.png) when filters/forms hit
     const switchesMix = ramp(frame, Math.max(openCue + 24, filtersCue - 2), 18, SHIFT);
 
-    const imgH = tall ? 382 : 410;
+    /* Tall crops to the screenshot's left columns at a legible scale
+       instead of shrinking the whole 1568px capture to 9px text. */
+    const imgH = tall ? 440 : 410;
+    const imgW: number | string = tall ? 1240 : "100%";
     const capabilities = [
         { label: "Live search", at: searchCue },
         { label: "Filters & sorting", at: filtersCue },
@@ -403,11 +399,11 @@ const Open: React.FC = () => {
                             src={staticFile("claude/1-table.png")}
                             style={{
                                 position: "absolute",
-                                inset: 0,
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "left top",
+                                left: 0,
+                                top: 0,
+                                width: imgW,
+                                height: "auto",
+                                transformOrigin: "left top",
                                 opacity: 1 - switchesMix,
                                 transform: `scale(${interpolate(appReveal, [0, 1], [1.03, 1])})`,
                             }}
@@ -416,31 +412,13 @@ const Open: React.FC = () => {
                             src={staticFile("claude/3-switches-and-stats.png")}
                             style={{
                                 position: "absolute",
-                                inset: 0,
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "left top",
+                                left: 0,
+                                top: 0,
+                                width: imgW,
+                                height: "auto",
                                 opacity: switchesMix,
                             }}
                         />
-                        {/* Subtle view mode indicator */}
-                        <div
-                            style={{
-                                position: "absolute",
-                                right: 16,
-                                bottom: 14,
-                                padding: "6px 12px",
-                                borderRadius: RADIUS.md,
-                                background: "rgba(9,10,12,0.84)",
-                                border: `1px solid ${SURFACE.hairlineStrong}`,
-                                fontFamily: FONT.mono,
-                                fontSize: 14,
-                                color: INK.copy,
-                            }}
-                        >
-                            {switchesMix > 0.5 ? "Live switches & stats · Rebase MCP App" : "Live collection view · Rebase MCP App"}
-                        </div>
                     </div>
 
                     {/* Capability strip */}
@@ -746,6 +724,11 @@ const Confirm: React.FC = () => {
         { name: "cron", desc: "Trigger jobs", at: cronCue },
     ];
 
+    /* The Save bar sits at 99-165px of the 1568px-wide capture; the frame
+       scales with the panel so it lands on the bar in both shapes. */
+    const shotScale = (tall ? w - 2 : 874) / 1568;
+    const planBar = { top: Math.round(99 * shotScale) - 1, height: Math.round(66 * shotScale) };
+
     const screenshotPanel = (
         <div
             style={{
@@ -803,8 +786,8 @@ const Confirm: React.FC = () => {
                         position: "absolute",
                         left: "1%",
                         right: "1%",
-                        top: tall ? "15.5%" : "14.5%",
-                        height: tall ? "10.5%" : "10%",
+                        top: planBar.top,
+                        height: planBar.height,
                         borderRadius: 8,
                         border: `2px solid ${AMBER}`,
                         opacity: 0.35 + 0.65 * waitsLit,
@@ -832,31 +815,6 @@ const Confirm: React.FC = () => {
                     </span>
                 )}
             </div>
-        </div>
-    );
-
-    const selfHostedBar = (
-        <div
-            style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                padding: tall ? "12px 16px" : "14px 20px",
-                borderRadius: FRAME.radius,
-                background: SURFACE.well,
-                border: `1px solid ${SURFACE.hairlineStrong}`,
-                opacity: frameIn,
-            }}
-        >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <TerminalIcon color={ACCENT} size={18} />
-                <span style={{ fontFamily: FONT.mono, fontSize: tall ? 14 : 15, color: INK.muted }}>SELF-HOSTED</span>
-            </div>
-            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 17 : 20, fontWeight: 500, color: INK.high }}>
-                <span style={{ color: ACCENT, marginRight: 8 }}>$</span>
-                rebase cloud connect &lt;url&gt;
-            </span>
         </div>
     );
 
@@ -908,15 +866,13 @@ const Confirm: React.FC = () => {
                                 })}
                             </div>
                         </div>
-                        {selfHostedBar}
                     </div>
                 ) : (
                     <div style={{ display: "flex", gap: 24, alignItems: "stretch" }}>
                         {/* Left: Real screenshot + self-hosted command */}
                         <div style={{ width: 876, display: "flex", flexDirection: "column", gap: 16 }}>
                             {screenshotPanel}
-                            {selfHostedBar}
-                        </div>
+                            </div>
 
                         {/* Right: Guarded write tool chips + confirm protocol */}
                         <div
@@ -1003,6 +959,7 @@ export const CLAUDE_PANEL: FilmSpec = checkFilm({
     script: SCRIPT,
     toCorner: { line: "hook", end: true, plus: 2 },
     close: { line: "close", plus: -2 },
+    backdrop: "dark",
     endCommand: "rebase cloud connect <url>",
     scenes: [
         { id: "blind", at: { line: "blind", plus: -16 }, render: Blind, roll: 0.24 },

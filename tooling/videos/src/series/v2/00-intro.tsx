@@ -77,7 +77,7 @@ const Problem: React.FC = () => {
 
     return (
         <>
-            <Headline text={H_PROBLEM} at={2} accent={CORAL} mark={["Wide-open", "tables."]} />
+            <Headline text={H_PROBLEM} at={2} accent={CORAL} mark={["Wide-open", "tables"]} />
             <At x={x} y={y} w={w} style={{ opacity: termO }}>
                 <Window title="zsh · rls-check 0.18.1" at={0} accent={CORAL} pad={tall ? "16px 20px" : "20px 26px"}>
                     <Prompt command="npx @rebasepro/rls-check" at={2} size={tall ? 21 : 25} rate={0.45} />
@@ -211,14 +211,14 @@ const Schema: React.FC = () => {
 
     const atDeclare = useCue({ line: "schema", word: "Rebase,", plus: -4 }) ?? 18;
     const atPush = useCue({ line: "schema", word: "security", plus: -4 }) ?? 55;
-    const atEnforces = useCue({ line: "schema", word: "forget.", plus: -4 }) ?? 70;
+    const atEnforces = useCue({ line: "schema", word: "database,", plus: -4 }) ?? 70;
 
     const sqlO = ramp(frame, Math.min(atPush, 45), 14, ENTER);
     const cleanO = ramp(frame, atEnforces, 14, ENTER);
 
     return (
         <>
-            <Headline text={H_SCHEMA} at={2} accent={CYAN} mark={["Postgres."]} />
+            <Headline text={H_SCHEMA} at={2} accent={CYAN} mark={["Postgres"]} />
             <At x={x} y={y} w={w}>
                 <div style={{ display: "flex", flexDirection: tall ? "column" : "row", gap: tall ? 10 : 24, alignItems: "stretch" }}>
                     {/* Left: TypeScript table definition */}
@@ -226,7 +226,7 @@ const Schema: React.FC = () => {
                         <Editor
                             file="backend/schema/orders.ts"
                             code={TABLE_CODE}
-                            size={tall ? 13 : 19}
+                            size={tall ? 14 : 17}
                             at={Math.min(4, atDeclare)}
                             step={1.5}
                             accent={CYAN}
@@ -239,7 +239,7 @@ const Schema: React.FC = () => {
                             <Editor
                                 file="compiled · postgres policy"
                                 code={POLICY_SQL}
-                                size={tall ? 13 : 18}
+                                size={tall ? 14 : 17}
                                 at={Math.min(atPush, 45) + 4}
                                 step={2}
                                 accent={GREEN}
@@ -253,7 +253,7 @@ const Schema: React.FC = () => {
                                 borderRadius: RADIUS.xl,
                                 border: `1.5px solid ${cleanO > 0.5 ? GREEN : TONE.claim.cardBorder}`,
                                 background: cleanO > 0.5 ? "rgba(8,9,10,0.86)" : "rgba(8,9,10,0.65)",
-                                padding: tall ? "12px 18px" : "20px 24px",
+                                padding: tall ? "10px 18px" : "20px 24px",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "space-between",
@@ -276,7 +276,7 @@ const Schema: React.FC = () => {
                                     >
                                         9 critical
                                     </span>
-                                    <span style={{ fontFamily: FONT.mono, fontSize: tall ? 18 : 20, color: INK.muted }}>→</span>
+                                    <span style={{ fontFamily: FONT.mono, fontSize: tall ? 18 : 20, color: INK.muted, opacity: cleanO }}>→</span>
                                     <span style={{ fontFamily: FONT.mono, fontWeight: 600, fontSize: tall ? 20 : 24, color: GREEN, opacity: cleanO }}>
                                         0 critical · clean
                                     </span>
@@ -323,11 +323,11 @@ const Panel: React.FC = () => {
 
     const studioBlend = ramp(frame, atStudio, 14, SHIFT);
     const rlsO = ramp(frame, atRls, 12, ENTER);
-    const frameH = tall ? 430 : 480;
+    const frameH = tall ? 520 : 480;
 
     return (
         <>
-            <Headline text={H_PANEL} at={2} accent={CYAN} mark={["one", "file."]} />
+            <Headline text={H_PANEL} at={2} accent={CYAN} mark={["one", "file"]} />
             <At x={x} y={y} w={w}>
                 {/* Backend surface pills */}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: tall ? 8 : 12, marginBottom: tall ? 14 : 18 }}>
@@ -475,7 +475,7 @@ const Agents: React.FC = () => {
 
     return (
         <>
-            <Headline text={H_AGENTS} at={2} accent={AMBER} mark={["your", "rules."]} />
+            <Headline text={H_AGENTS} at={2} accent={AMBER} mark={["your", "rules"]} />
             <At x={x} y={y} w={w}>
                 <div style={{ display: "flex", flexDirection: tall ? "column" : "row", gap: tall ? 14 : 22, alignItems: "stretch" }}>
                     {/* Left: Scoped key + Review queue cards */}
@@ -487,12 +487,17 @@ const Agents: React.FC = () => {
                                 border: `1px solid ${SURFACE.hairlineStrong}`,
                                 background: SURFACE.sheet,
                                 padding: tall ? "14px 16px" : "20px 22px",
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "space-between",
                                 opacity: keyO,
                             }}
                         >
-                            <Label at={0} color={CYAN} size={tall ? 13 : 14}>SCOPED AGENT KEY</Label>
-                            <div style={{ marginTop: 12, fontFamily: FONT.mono, fontSize: tall ? 16 : 19, color: INK.high }}>
-                                data:read:articles
+                            <div>
+                                <Label at={0} color={CYAN} size={tall ? 13 : 14}>SCOPED AGENT KEY</Label>
+                                <div style={{ marginTop: 12, fontFamily: FONT.mono, fontSize: tall ? 16 : 19, color: INK.high }}>
+                                    data:read:articles
+                                </div>
                             </div>
                             <div
                                 style={{
@@ -517,14 +522,19 @@ const Agents: React.FC = () => {
                                 border: `1px solid ${SURFACE.hairlineStrong}`,
                                 background: SURFACE.sheet,
                                 padding: tall ? "14px 16px" : "20px 22px",
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "space-between",
                                 opacity: stageO,
                                 transform: `translateY(${(1 - stageO) * 8}px)`,
                             }}
                         >
-                            <Label at={Math.min(atStage, 42)} color={AMBER} size={tall ? 13 : 14}>REVIEW QUEUE</Label>
-                            <div style={{ marginTop: 12, fontFamily: FONT.mono, fontSize: tall ? 15 : 18, color: INK.high }}>
-                                status: <span style={{ color: CORAL, textDecoration: "line-through" }}>paid</span>{" "}
-                                <span style={{ color: INK.muted }}>→</span> <span style={{ color: AMBER }}>refunded</span>
+                            <div>
+                                <Label at={Math.min(atStage, 42)} color={AMBER} size={tall ? 13 : 14}>REVIEW QUEUE</Label>
+                                <div style={{ marginTop: 12, fontFamily: FONT.mono, fontSize: tall ? 16 : 19, color: INK.high }}>
+                                    status: <span style={{ color: CORAL, textDecoration: "line-through" }}>paid</span>{" "}
+                                    <span style={{ color: INK.muted }}>→</span> <span style={{ color: AMBER }}>refunded</span>
+                                </div>
                             </div>
                             <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
                                 <span
@@ -586,7 +596,7 @@ const Agents: React.FC = () => {
                                 {planBlend > 0.5 ? "PLAN → CONFIRM TO SAVE" : "show_collection · LIVE"}
                             </span>
                         </div>
-                        <div style={{ position: "relative", width: "100%", height: tall ? 330 : 410, background: "#0D0F12" }}>
+                        <div style={{ position: "relative", width: "100%", height: tall ? 400 : 410, background: "#0D0F12" }}>
                             <Img
                                 src={staticFile("claude/1-table.png")}
                                 style={{
@@ -653,7 +663,7 @@ const Cloud: React.FC = () => {
     const exitO = ramp(frame, atExit, 12, ENTER);
 
     const bullet = (text: string, color: string) => (
-        <div key={text} style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: FONT.body, fontSize: tall ? 18 : 21, color: INK.high }}>
+        <div key={text} style={{ display: "flex", alignItems: "baseline", gap: 10, fontFamily: FONT.body, fontSize: tall ? 20 : 21, color: INK.high }}>
             <span style={{ fontFamily: FONT.mono, color, fontWeight: 600 }}>✓</span>
             <span>{text}</span>
         </div>
@@ -661,7 +671,7 @@ const Cloud: React.FC = () => {
 
     return (
         <>
-            <Headline text={H_CLOUD} at={2} accent={GREEN} mark={["Cloud."]} />
+            <Headline text={H_CLOUD} at={2} accent={GREEN} mark={["Cloud"]} />
             <At x={x} y={y} w={w}>
                 <div style={{ display: "flex", flexDirection: tall ? "column" : "row", gap: tall ? 16 : 24 }}>
                     {/* Left: MIT Self-Host */}
@@ -687,7 +697,7 @@ const Cloud: React.FC = () => {
                             </span>
                         </div>
                         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: tall ? 10 : 14 }}>
-                            {bullet("Keep your Postgres — or boot zero-code from DATABASE_URL", CYAN)}
+                            {bullet("Keep your Postgres · boot from DATABASE_URL", CYAN)}
                             {bullet("Built-in PGlite locally & standalone Studio at /_studio", CYAN)}
                             {bullet("Full backend, defineRpc, CMS, Studio & MCP — 100% MIT", CYAN)}
                         </div>
@@ -727,7 +737,7 @@ const Cloud: React.FC = () => {
                         </div>
                         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: tall ? 10 : 14 }}>
                             {bullet("Dedicated Postgres + automated backups", GREEN)}
-                            {bullet("Priced by hardware · €0 per CMS seat", GREEN)}
+                            {bullet("Priced per resource · €0 per CMS seat", GREEN)}
                             {bullet("Deploy from CLI, previews, or roll back in Claude", GREEN)}
                         </div>
                     </div>
@@ -765,6 +775,7 @@ export const INTRO_FILM: FilmSpec = checkFilm({
     number: 0,
     title: "Rebase — Product Introduction",
     accent: CYAN,
+    backdrop: "dark",
     endCommand: "pnpm dlx @rebasepro/cli init",
     script: SCRIPT,
     toCorner: { line: "hook", end: true, plus: 2 },

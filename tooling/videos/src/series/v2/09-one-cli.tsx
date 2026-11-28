@@ -18,6 +18,8 @@ const AMBER = "#F59E0B";
 const EMERALD = "#34D399";
 const CORAL = CHROMA.coral;
 const CYAN = CHROMA.cyan;
+/* Coral means "refused" in this film; the cron row needs its own neutral hue. */
+const VIOLET = "#A78BFA";
 
 const SCRIPT = lines([
     ["hook", "Agents are fast in a terminal, until a piped script misreads a flag and deletes production."],
@@ -27,6 +29,8 @@ const SCRIPT = lines([
     ["token", "For CI and background bots, mint a ninety-day token scoped to deploys and logs. It can't create keys or overwrite live backups."],
     ["close", "One CLI, for humans at a keyboard and agents in a shell."],
 ]);
+
+
 
 /* ── shared inline icons (clean 1.5-stroke SVGs, zero emojis) ───────── */
 
@@ -92,25 +96,31 @@ const REACH_COMMANDS: readonly ReachCommand[] = [
         tag: "DATA",
         color: AMBER,
         cmd: "rebase data query orders --format csv --cloud",
-        out: "id,status,total · 1,420 rows streamed (csv)",
+        out: "id,status,total · 9412,paid,148.00",
     },
     {
         tag: "LOGS",
         color: CYAN,
         cmd: "rebase logs -f --level error --project shop",
-        out: "[error] webhook.stripe timeout · pod shop-7f9b · 204ms",
+        out: "14:02:11 ERROR [api] stripe webhook timed out",
+    },
+    {
+        tag: "CRON",
+        color: VIOLET,
+        cmd: "rebase cron run nightly-digest --project shop",
+        out: "✓ Ran nightly-digest in 1.4s.",
     },
     {
         tag: "STORAGE",
         color: EMERALD,
         cmd: "rebase storage cp ./banner.webp :media/banner.webp",
-        out: "✓ uploaded 84 KB through storage policies",
+        out: "✓ Uploaded ./banner.webp to :media/banner.webp (86016 bytes).",
     },
     {
         tag: "SQL",
         color: PRIMARY_LIGHT,
         cmd: 'rebase cloud db query "select count(*) from orders"',
-        out: "count: 48219 · tunnel closed (zero local psql)",
+        out: "SELECT 1 · count 48219",
     },
 ];
 
@@ -121,9 +131,10 @@ const Reach: React.FC = () => {
     const tall = format === "tall";
 
     const logsAt = useCue({ line: "reach", word: "tail", plus: -4 }) ?? 9999;
+    const cronAt = useCue({ line: "reach", word: "crons", plus: -4 }) ?? 9999;
     const storageAt = useCue({ line: "reach", word: "upload", plus: -4 }) ?? 9999;
     const sqlAt = useCue({ line: "reach", word: "SQL", plus: -6 }) ?? 9999;
-    const triggers = [2, logsAt, storageAt, sqlAt];
+    const triggers = [2, logsAt, cronAt, storageAt, sqlAt];
 
     const shellIn = ramp(frame, 0, 10, ENTER);
 
@@ -201,7 +212,9 @@ const Reach: React.FC = () => {
                                 >
                                     <div
                                         style={{
-                                            minWidth: tall ? 86 : 96,
+                                            width: tall ? 104 : 112,
+                                            flexShrink: 0,
+                                            boxSizing: "border-box",
                                             textAlign: "center",
                                             padding: "5px 10px",
                                             borderRadius: RADIUS.md,
@@ -240,7 +253,7 @@ const Reach: React.FC = () => {
                                                 marginTop: 6,
                                                 fontFamily: FONT.mono,
                                                 fontSize: tall ? 16 : 18,
-                                                color: i === 2 ? EMERALD : INK.copy,
+                                                color: item.tag === "STORAGE" || item.tag === "CRON" ? EMERALD : INK.copy,
                                                 opacity: outIn,
                                             }}
                                         >
@@ -250,33 +263,6 @@ const Reach: React.FC = () => {
                                 </div>
                             );
                         })}
-                    </div>
-
-                    {/* Zero-code + admin scaffold footer strip */}
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 12,
-                            padding: tall ? "10px 18px" : "11px 24px",
-                            background: SURFACE.sheet,
-                            borderTop: `1px solid ${SURFACE.hairline}`,
-                            fontFamily: FONT.mono,
-                            fontSize: tall ? 14 : 15,
-                        }}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                            <span style={{ width: 6, height: 6, borderRadius: 99, background: CYAN, flexShrink: 0 }} />
-                            <span style={{ color: INK.high }}>rebase dev --zero-code</span>
-                            <span style={{ color: INK.muted }}>·</span>
-                            <span style={{ color: INK.high }}>rebase apps add admin</span>
-                        </div>
-                        {!tall && (
-                            <span style={{ color: INK.muted, letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
-                                run from DATABASE_URL alone · add admin anytime
-                            </span>
-                        )}
                     </div>
                 </div>
             </At>
@@ -310,7 +296,7 @@ const Proxy: React.FC = () => {
             step: "01",
             title: "CLI (--project shop)",
             pill: "user session · no key",
-            detail: "Sends signed command by project slug",
+            detail: "Presents your cloud login session",
             accent: CYAN,
             icon: <TerminalIcon color={CYAN} size={22} />,
         },
@@ -513,7 +499,7 @@ const Proxy: React.FC = () => {
                                                 />
                                                 <path d="M44 6l8 6-8 6" stroke={EMERALD} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                                             </svg>
-                                            <span style={{ fontFamily: FONT.mono, fontSize: 13, color: INK.muted }}>
+                                            <span style={{ fontFamily: FONT.mono, fontSize: 15, color: INK.muted }}>
                                                 {i === 0 ? "slug" : "key"}
                                             </span>
                                         </div>
@@ -524,7 +510,7 @@ const Proxy: React.FC = () => {
                     </div>
                 )}
 
-                {/* Drafted zero-secret shield card + hidden --prompt note */}
+                {/* Drafted zero-secret shield card */}
                 <div
                     style={{
                         marginTop: tall ? 16 : 24,
@@ -581,34 +567,12 @@ const Proxy: React.FC = () => {
                                 padding: "7px 15px",
                                 borderRadius: 99,
                                 whiteSpace: "nowrap",
+                                /* Tall stacks the pill under the copy: start it on the copy's column. */
+                                marginLeft: tall ? 60 : 0,
                             }}
                         >
                             0 secrets on disk
                         </div>
-                    </div>
-
-                    {/* Hidden secret prompt note */}
-                    <div
-                        style={{
-                            padding: tall ? "10px 20px" : "12px 26px",
-                            background: SURFACE.well,
-                            borderTop: `1px solid ${SURFACE.hairline}`,
-                            display: "flex",
-                            flexDirection: tall ? "column" : "row",
-                            alignItems: tall ? "flex-start" : "center",
-                            justifyContent: "space-between",
-                            gap: tall ? 4 : 16,
-                        }}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ width: 6, height: 6, borderRadius: 99, background: CYAN, flexShrink: 0 }} />
-                            <span style={{ fontFamily: FONT.mono, fontSize: tall ? 15 : 16, fontWeight: 600, color: INK.high }}>
-                                rebase cloud env set KEY --prompt
-                            </span>
-                        </div>
-                        <span style={{ fontFamily: FONT.mono, fontSize: tall ? 13 : 15, color: INK.muted }}>
-                            hidden prompt — never enters agent chat or shell history
-                        </span>
                     </div>
                 </div>
             </At>
@@ -627,10 +591,9 @@ const Guard: React.FC = () => {
     const slamAt = useCue({ line: "guard", word: "stops", plus: -4 }) ?? 9999;
     const approveAt = useCue({ line: "guard", word: "approve", plus: -8 }) ?? 9999;
 
-    const cmd = `rebase data delete orders --where 'status=="draft"' --json`;
+    const cmd = "rebase data delete orders --where status=draft --json";
     const shellIn = ramp(frame, 0, 10, ENTER);
     const typed = Math.round(ramp(frame, 2, 24, (t) => t) * cmd.length);
-    const metaIn = ramp(frame, 22, 10, ENTER);
     const slam = ramp(frame, slamAt, 10, ENTER);
     const footerIn = ramp(frame, approveAt, 12, ENTER);
 
@@ -708,17 +671,6 @@ const Guard: React.FC = () => {
                             {cmd.slice(0, typed)}
                             {typed < cmd.length && <span style={{ color: AMBER, marginLeft: 2 }}>▌</span>}
                         </div>
-                        <div
-                            style={{
-                                marginTop: 12,
-                                fontFamily: FONT.mono,
-                                fontSize: tall ? 16 : 18,
-                                color: INK.muted,
-                                opacity: metaIn,
-                            }}
-                        >
-                            • matched 1,204 rows in orders · awaiting interactive confirmation
-                        </div>
                     </div>
                 </div>
 
@@ -773,19 +725,31 @@ const Guard: React.FC = () => {
                         </div>
                     </div>
 
-                    <div style={{ padding: tall ? "18px 20px" : "22px 26px", fontFamily: FONT.mono, fontSize: tall ? 21 : 25, lineHeight: 1.55 }}>
+                    <div style={{ padding: tall ? "18px 20px" : "22px 26px", fontFamily: FONT.mono, fontSize: tall ? 18 : 23, lineHeight: 1.55 }}>
+                        {/* `fail()` in packages/cli/src/commands/cloud/context.ts, under --json */}
                         <div style={{ color: INK.copy }}>{"{"}</div>
-                        <div style={{ paddingLeft: 26 }}>
+                        <div style={{ paddingLeft: "2ch" }}>
                             <span style={{ color: CYAN }}>&quot;error&quot;</span>
+                            <span style={{ color: INK.muted }}>{": {"}</span>
+                        </div>
+                        <div style={{ paddingLeft: "4ch" }}>
+                            <span style={{ color: CYAN }}>&quot;message&quot;</span>
+                            <span style={{ color: INK.muted }}>: </span>
+                            <span style={{ color: INK.high }}>&quot;This action is destructive and needs confirmation.&quot;</span>
+                            <span style={{ color: INK.muted }}>,</span>
+                        </div>
+                        <div style={{ paddingLeft: "4ch" }}>
+                            <span style={{ color: CYAN }}>&quot;code&quot;</span>
                             <span style={{ color: INK.muted }}>: </span>
                             <span style={{ color: CORAL, fontWeight: 600 }}>&quot;confirmation_required&quot;</span>
                             <span style={{ color: INK.muted }}>,</span>
                         </div>
-                        <div style={{ paddingLeft: 26 }}>
+                        <div style={{ paddingLeft: "4ch" }}>
                             <span style={{ color: CYAN }}>&quot;hint&quot;</span>
                             <span style={{ color: INK.muted }}>: </span>
-                            <span style={{ color: INK.high }}>&quot;pass --yes&quot;</span>
+                            <span style={{ color: INK.high }}>&quot;Re-run with --yes to proceed.&quot;</span>
                         </div>
+                        <div style={{ paddingLeft: "2ch", color: INK.copy }}>{"}"}</div>
                         <div style={{ color: INK.copy }}>{"}"}</div>
                     </div>
                 </div>
@@ -828,8 +792,8 @@ interface CapabilityChip {
 }
 
 const CAPABILITIES: readonly CapabilityChip[] = [
-    { name: "deploy", allowed: true, detail: "deploy · --preview · rollbacks" },
-    { name: "logs", allowed: true, detail: "runtime logs · cron · metrics" },
+    { name: "deploy", allowed: true, detail: "cloud deploy · --preview · previews" },
+    { name: "logs", allowed: true, detail: "cloud logs · metrics · cron" },
     { name: "tokens create", allowed: false, detail: "cannot mint new tokens" },
     { name: "db restore", allowed: false, detail: "cannot overwrite live database" },
 ];
@@ -901,7 +865,7 @@ const Token: React.FC = () => {
                         <div
                             style={{
                                 fontFamily: FONT.mono,
-                                fontSize: tall ? 19 : 23,
+                                fontSize: tall ? 18 : 23,
                                 lineHeight: 1.45,
                                 color: INK.high,
                                 wordBreak: "break-word",
@@ -920,7 +884,7 @@ const Token: React.FC = () => {
                                 opacity: exportIn,
                             }}
                         >
-                            export REBASE_TOKEN=rk_live_shop_90d_••••••••
+                            export REBASE_TOKEN=rk_live_••••••••••••
                         </div>
                     </div>
                 </div>
@@ -1034,6 +998,7 @@ export const ONE_CLI: FilmSpec = checkFilm({
     number: 9,
     title: "One agent-safe CLI",
     accent: AMBER,
+    backdrop: "dark",
     endCommand: "pnpm dlx @rebasepro/cli init",
     script: SCRIPT,
     toCorner: { line: "hook", end: true, plus: 2 },
