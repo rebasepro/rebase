@@ -1457,8 +1457,8 @@ section:has(> .hero-backdrop) .chapter-index { color: rgb(var(--tone-max-rgb) / 
         text-shadow: 0 2px 30px rgb(var(--shadow-rgb) / calc(0.45 * var(--shadow-k)));
     }
     .hero-glow {
-        -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 78%);
-        mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 78%);
+        -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 22%, rgb(0 0 0 / 0.55) 52%, transparent 82%);
+        mask-image: linear-gradient(to bottom, #000 0%, #000 22%, rgb(0 0 0 / 0.55) 52%, transparent 82%);
     }
 }
 

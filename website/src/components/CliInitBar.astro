@@ -82,12 +82,12 @@ const DEFAULT_COMMAND = "pnpm dlx @rebasepro/cli init";
         data-copy-done-label={t("copy.command.done")}
         data-copy-fail-label={t("copy.command.failed")}
         class:list={[
-            "copy-btn cli-init-copy group flex min-w-0 flex-1 items-center justify-between gap-3 rounded-r-lg font-mono transition-colors hover:bg-tone-max/[0.05] data-copied:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
-            isHero ? "px-4 text-sm" : "px-3 text-xs",
+            "copy-btn cli-init-copy group flex min-w-0 flex-1 items-center justify-between gap-2 rounded-r-lg font-mono transition-colors hover:bg-tone-max/[0.05] data-copied:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+            isHero ? "px-3 sm:px-4 text-xs sm:text-sm" : "px-2.5 text-xs",
         ]}
         title={t("copy.command")}
     >
-        <span class="flex min-w-0 items-center gap-2 truncate">
+        <span class="flex min-w-0 items-center gap-1.5 sm:gap-2 truncate">
             <span class="select-none text-tone-500" aria-hidden="true">$</span>
             <code class="truncate">
                 <span class="cli-init-runner-text" data-cli-runner-text>pnpm dlx</span>{" "}
@@ -99,7 +99,7 @@ const DEFAULT_COMMAND = "pnpm dlx @rebasepro/cli init";
         <span
             class:list={[
                 "cli-init-chip inline-flex shrink-0 items-center gap-1.5 rounded-md border border-tone-max/10 bg-tone-max/[0.06] font-mono uppercase tracking-[0.12em] text-tone-300 transition-colors group-hover:border-tone-max/20 group-hover:text-tone-max",
-                isHero ? "px-2 py-1 text-2xs" : "px-1.5 py-0.5 text-3xs",
+                isHero ? "px-2 py-1 text-2xs" : "p-1.5 text-3xs",
             ]}
         >
             <svg data-copy-idle class="h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -109,7 +109,7 @@ const DEFAULT_COMMAND = "pnpm dlx @rebasepro/cli init";
             <svg data-copy-done hidden class="h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M20 6 9 17l-5-5"/>
             </svg>
-            <span class="grid text-center">
+            <span class:list={["grid text-center", isHero ? "hidden sm:grid" : "sr-only"]}>
                 <span data-copy-label class="col-start-1 row-start-1">{t("copy.command")}</span>
                 <span aria-hidden="true" class="invisible col-start-1 row-start-1">{t("copy.command.done")}</span>
             </span>

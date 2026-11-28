@@ -187,7 +187,7 @@ const flatNavLinks = [
 ];
 ---
 <header class="site-header sticky top-0 z-20">
-    <nav class="mx-auto flex min-h-(--header-h) max-w-6xl items-center justify-between py-2 px-4 lg:px-8" aria-label="Global">
+    <nav class="relative z-[60] mx-auto flex min-h-(--header-h) max-w-6xl items-center justify-between py-2 px-4 lg:px-8" aria-label="Global">
         <div class="flex items-center">
             <a id="header-logo-link" href={translatePath("/")} class="flex items-center -m-1.5 p-1.5 relative z-50 mr-6" transition:name="site-logo">
                 <!-- Intrinsic size is declared so the header reserves the box before
@@ -610,16 +610,20 @@ const flatNavLinks = [
         const menuIconClosed = document.getElementById('menu-icon-closed');
         const menuIconOpen = document.getElementById('menu-icon-open');
 
+        function closeMobileMenu() {
+            if (!mobileMenu) return;
+            mobileMenu.classList.add('hidden');
+            menuIconClosed.classList.remove('hidden');
+            menuIconOpen.classList.add('hidden');
+            document.body.style.overflow = '';
+            mobileMenuButton.setAttribute('aria-expanded', 'false');
+        }
+
         mobileMenuButton.addEventListener('click', function() {
             var isExpanded = mobileMenuButton.getAttribute('aria-expanded') === 'true';
 
             if (isExpanded) {
-                // Close menu
-                mobileMenu.classList.add('hidden');
-                menuIconClosed.classList.remove('hidden');
-                menuIconOpen.classList.add('hidden');
-                document.body.style.overflow = '';
-                mobileMenuButton.setAttribute('aria-expanded', 'false');
+                closeMobileMenu();
             } else {
                 // Open menu
                 mobileMenu.classList.remove('hidden');
@@ -627,6 +631,13 @@ const flatNavLinks = [
                 menuIconOpen.classList.remove('hidden');
                 document.body.style.overflow = 'hidden';
                 mobileMenuButton.setAttribute('aria-expanded', 'true');
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && mobileMenuButton.getAttribute('aria-expanded') === 'true') {
+                closeMobileMenu();
+                mobileMenuButton.focus();
             }
         });
 
