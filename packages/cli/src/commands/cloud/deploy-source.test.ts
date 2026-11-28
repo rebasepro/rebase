@@ -490,6 +490,56 @@ describe("a bundle deploy blocked by another deploy", () => {
 
         expect(said.join("\n")).toContain("rebase cloud billing setup");
     });
+
+    it("surfaces 409 project_paused (pending billing) without misreporting deploy_in_progress", async () => {
+        bundle("backend");
+        controlPlane();
+        invoke.mockRejectedValueOnce(Object.assign(
+            new Error("This project is paused pending billing. Start it, then deploy."),
+            { status: 409, code: "project_paused" }
+        ));
+
+        await expect(deploy("--no-source")).rejects.toMatchObject({ code: 1 });
+
+        const text = said.join("\n");
+        expect(text).toContain("pending billing");
+        expect(text).toContain("rebase cloud billing checkout");
+        expect(text).not.toContain("already in progress");
+    });
+
+    it("surfaces 409 project_paused (stopped) with start guidance", async () => {
+        bundle("backend");
+        controlPlane();
+        invoke.mockRejectedValueOnce(Object.assign(
+            new Error("This project is stopped. Start it, then deploy."),
+            { status: 409, code: "project_paused" }
+        ));
+
+        await expect(deploy("--no-source")).rejects.toMatchObject({ code: 1 });
+
+        const text = said.join("\n");
+        expect(text).toContain("rebase cloud start");
+        expect(text).not.toContain("already in progress");
+    });
+
+    it("surfaces 402 payment_action_required with the payAt 3DS verification URL", async () => {
+        bundle("backend");
+        controlPlane();
+        invoke.mockRejectedValueOnce(Object.assign(
+            new Error("Your first payment did not go through: the card needs authentication."),
+            {
+                status: 402,
+                code: "payment_action_required",
+                details: { payAt: "https://invoice.stripe.com/i/acct_1/test_3ds" }
+            }
+        ));
+
+        await expect(deploy("--no-source")).rejects.toMatchObject({ code: 1 });
+
+        const text = said.join("\n");
+        expect(text).toContain("https://invoice.stripe.com/i/acct_1/test_3ds");
+        expect(text).not.toContain("rebase cloud billing setup");
+    });
 });
 
 /** The entries of an uploaded archive, without directories or the `./` prefix. */

@@ -2215,6 +2215,43 @@ const UPCOMING_UNSERVED: Unserved = {
     hint: "`rebase cloud compute` prints what a project is quoted per month."
 };
 
+/**
+ * Turn the relative setup path `POST /stripe-billing/session` returns when
+ * checkout was skipped (`/p/<slug>/setup`) into a full console URL.
+ */
+async function resolveSkippedCheckoutUrl(
+    client: CloudClient,
+    controlPlaneUrl: string,
+    projectId: string,
+    rawUrl: string
+): Promise<string> {
+    if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
+    const base = controlPlaneUrl.replace(/\/+$/, "");
+    const suffix = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
+    if (suffix.startsWith("/o/")) return `${base}${suffix}`;
+    try {
+        const proj: unknown = await client.data.table("projects").findById(projectId);
+        if (proj && typeof proj === "object") {
+            const orgRaw: unknown = Reflect.get(proj, "organization")
+                ?? Reflect.get(proj, "organizationId")
+                ?? Reflect.get(proj, "organization_id");
+            const orgId = typeof orgRaw === "object" && orgRaw !== null
+                ? Reflect.get(orgRaw, "id")
+                : orgRaw;
+            if (typeof orgId === "string" || typeof orgId === "number") {
+                const orgRow: unknown = await client.data.table("organizations").findById(String(orgId));
+                const slug: unknown = orgRow && typeof orgRow === "object" ? Reflect.get(orgRow, "slug") : undefined;
+                if (typeof slug === "string" && slug.trim()) {
+                    return `${base}/o/${encodeURIComponent(slug.trim())}${suffix}`;
+                }
+            }
+        }
+    } catch {
+        // Fall through to the project-by-id console route.
+    }
+    return `${base}/projects/${encodeURIComponent(projectId)}`;
+}
+
 export async function billingCommand(rawArgs: string[]): Promise<void> {
     // Parsed before the client is built: an unusable line should be refused
     // without first spending a login round-trip on it.
@@ -2312,12 +2349,29 @@ simulated: Boolean(res.simulated) }
     if (action === "checkout") {
         const projectId = await requireProject(rawArgs, client);
         try {
-            const res = await client.functions.invoke<{ url?: string }>(
+            const res = await client.functions.invoke<{ url?: string; skipped?: string }>(
                 "stripe-billing",
                 { projectId },
                 { path: "session" }
             );
             if (!res.url) fail("Billing session could not be created.", undefined, "checkout_failed");
+            if (res.skipped) {
+                const resolvedUrl = await resolveSkippedCheckoutUrl(client, url, projectId, res.url);
+                const headline = res.skipped === "card_on_file"
+                    ? "Billed card on file — checkout skipped and deployment started."
+                    : res.skipped === "already_paid"
+                        ? "This project is already paid for — checkout skipped and deployment started."
+                        : `Billing skipped (${res.skipped}) — deployment started.`;
+                emit(
+                    () => {
+                        success(headline);
+                        note(`Project setup: ${chalk.cyan(resolvedUrl)}`);
+                        noteBlank();
+                    },
+                    { url: resolvedUrl, projectId, skipped: res.skipped }
+                );
+                return;
+            }
             emit(
                 () => {
                     console.log("");

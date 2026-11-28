@@ -2203,16 +2203,67 @@ command: "cloud deploy" });
  * The refusal names the blocker, because "which one, since when, from where"
  * is the difference between an actionable refusal and a dead end.
  */
-function resolveTriggerFailure(e: unknown, fallback = "Failed to trigger deployment"): never {
-    const err = e as {
-        status?: number;
-        message?: string;
-        code?: string;
-        details?: { deployment?: BlockingDeployment };
-    };
+interface TriggerErrorInfo {
+    status?: number;
+    message?: string;
+    code?: string;
+    deployment?: BlockingDeployment;
+    payAt?: string;
+}
 
-    if (err?.status === 409) {
-        const blocking = err.details?.deployment;
+function readTriggerError(e: unknown): TriggerErrorInfo {
+    if (typeof e !== "object" || e === null) return {};
+    const statusRaw: unknown = Reflect.get(e, "status");
+    const messageRaw: unknown = Reflect.get(e, "message");
+    const codeRaw: unknown = Reflect.get(e, "code");
+    const detailsRaw: unknown = Reflect.get(e, "details");
+    let deployment: BlockingDeployment | undefined;
+    let payAt: string | undefined;
+    if (typeof detailsRaw === "object" && detailsRaw !== null) {
+        const depRaw: unknown = Reflect.get(detailsRaw, "deployment");
+        if (typeof depRaw === "object" && depRaw !== null) {
+            const idRaw: unknown = Reflect.get(depRaw, "id");
+            const mineRaw: unknown = Reflect.get(depRaw, "mine");
+            const triggerRaw: unknown = Reflect.get(depRaw, "triggerSource");
+            const createdRaw: unknown = Reflect.get(depRaw, "createdAt");
+            deployment = {
+                id: typeof idRaw === "string" || typeof idRaw === "number" ? String(idRaw) : undefined,
+                mine: typeof mineRaw === "boolean" ? mineRaw : undefined,
+                triggerSource: typeof triggerRaw === "string" ? triggerRaw : undefined,
+                createdAt: typeof createdRaw === "string" ? createdRaw : undefined
+            };
+        }
+        const payAtRaw: unknown = Reflect.get(detailsRaw, "payAt");
+        if (typeof payAtRaw === "string" && payAtRaw.trim()) {
+            payAt = payAtRaw.trim();
+        }
+    }
+    return {
+        status: typeof statusRaw === "number" ? statusRaw : undefined,
+        message: typeof messageRaw === "string" ? messageRaw : undefined,
+        code: typeof codeRaw === "string" ? codeRaw : undefined,
+        deployment,
+        payAt
+    };
+}
+
+function resolveTriggerFailure(e: unknown, fallback = "Failed to trigger deployment"): never {
+    const err = readTriggerError(e);
+
+    if (err.status === 409) {
+        if (err.code === "project_paused") {
+            const msg = err.message || "This project is paused.";
+            const hint = /pending billing/i.test(msg)
+                ? "Complete billing with `rebase cloud billing checkout` (or in the console), then deploy again."
+                : /waking up|asleep/i.test(msg)
+                    ? "Wait about a minute for the project to finish waking, then deploy again."
+                    : "Start the project with `rebase cloud start`, then deploy again.";
+            fail(msg, hint, "project_paused");
+        }
+        if (err.code && err.code !== "deploy_in_progress") {
+            fail(err.message || fallback, undefined, err.code);
+        }
+        const blocking = err.deployment;
         const where = blocking?.triggerSource && blocking.triggerSource !== "unknown"
             ? ` from the ${blocking.triggerSource}`
             : "";
@@ -2231,8 +2282,24 @@ function resolveTriggerFailure(e: unknown, fallback = "Failed to trigger deploym
         );
     }
 
-    if (err?.status === 402) {
-        // Billing gate: no card on file, card declined, or needs auth.
+    if (err.status === 402) {
+        if (err.code === "payment_action_required") {
+            fail(
+                err.message || "Your payment requires authentication before deploying.",
+                err.payAt
+                    ? `Complete payment verification at ${err.payAt}, then deploy again.`
+                    : "Complete the pending payment verification from the console's Billing page, then deploy again.",
+                "payment_action_required"
+            );
+        }
+        if (err.code === "payment_failed") {
+            fail(
+                err.message || "Payment failed before deploying.",
+                "Update your payment method with `rebase cloud billing setup` (or in the console's Billing page), then deploy again.",
+                "payment_failed"
+            );
+        }
+        // Billing gate: no card on file or generic 402.
         fail(
             err.message || "Payment required before deploying.",
             "Attach a card once with `rebase cloud billing setup`, then deploy again.",

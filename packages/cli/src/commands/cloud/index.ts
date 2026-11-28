@@ -284,7 +284,7 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
     // other page in the family is one JSON value when piped. `deploy --help`
     // alone printed text, so an agent reading the family's help as JSON
     // choked on exactly the command it most needed to read.
-    if (group === "deploy" && !wantsHelp) initOutputMode(rawArgs, { whenPiped: "human" });
+    if ((group === "deploy" || group === "access-token") && !wantsHelp) initOutputMode(rawArgs, { whenPiped: "human" });
     // A flag is never an action. `rebase cloud env --frobnicate` used to read
     // the flag as the action and refuse it as an unknown *command* — a refusal,
     // but about the wrong half of the line; the group's own parser is what
