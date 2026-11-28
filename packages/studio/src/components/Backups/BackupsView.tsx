@@ -240,12 +240,12 @@ export function BackupsView() {
     return (
         <div className="flex flex-col h-full w-full overflow-hidden bg-surface-card">
             {/* Header */}
-            <div className={cls("flex items-center justify-between px-5 py-2.5 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
+            <div className={cls("flex items-center justify-between px-4 h-[44px] border-b bg-surface-sheet shrink-0", defaultBorderMixin)}>
                 <div className="flex items-center gap-2">
-                    <DatabaseIcon size={iconSize.small} className="text-primary"/>
+                    <DatabaseIcon size={iconSize.smallest} className="text-text-secondary dark:text-text-secondary-dark"/>
                     <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_backups")}</Typography>
-                    <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{backups.length}</Chip>
-                    <Chip size="smallest" className="bg-surface-raised text-surface-500 dark:text-surface-400 uppercase font-mono text-[10px]">{destinationKind}</Chip>
+                    <Chip size="smallest" className="font-mono tabular-nums">{backups.length}</Chip>
+                    <Chip size="smallest" className="uppercase font-mono text-[10px]">{destinationKind}</Chip>
                 </div>
                 <IconButton aria-label={t("refresh_data")} size="small" onClick={load} title={t("refresh_data")}>
                     <RefreshCwIcon size={iconSize.smallest}/>

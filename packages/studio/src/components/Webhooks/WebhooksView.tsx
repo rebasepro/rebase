@@ -30,7 +30,7 @@ import {
     SendIcon,
     WebhookIcon
 } from "@rebasepro/ui";
-import { useSnackbarController, useTableDescriptors, useTranslation } from "@rebasepro/app";
+import { ConfirmationDialog, useSnackbarController, useTableDescriptors, useTranslation } from "@rebasepro/app";
 import {
     asBoolean,
     asNullableString,
@@ -239,6 +239,8 @@ export function WebhooksView() {
         }
     };
 
+    const [confirmDeleteWebhook, setConfirmDeleteWebhook] = useState<WebhookRow | null>(null);
+
     const handleDelete = async (w: WebhookRow) => {
         try {
             await requestJson(`/admin/webhooks/${encodeURIComponent(w.id)}`, { method: "DELETE" });
@@ -251,25 +253,23 @@ export function WebhooksView() {
 
     return (
         <div className="flex flex-col h-full w-full bg-surface-sheet overflow-hidden">
-            <div className={cls("px-5 py-3 border-b flex items-center justify-between gap-4", defaultBorderMixin)}>
-                <div className="flex items-center gap-2.5">
-                    <WebhookIcon size={iconSize.medium} className={"text-text-secondary"} />
-                    <div>
-                        <Typography variant="h6">{t("studio_tool_webhooks")}</Typography>
-                        <Typography variant="caption" color="secondary">
-                            {t("studio_webhooks_subtitle")}
-                        </Typography>
-                    </div>
+            <div className={cls("h-[44px] px-4 border-b bg-surface-sheet flex items-center justify-between gap-4 shrink-0", defaultBorderMixin)}>
+                <div className="flex items-center gap-2 min-w-0">
+                    <WebhookIcon size={iconSize.smallest} className={"text-text-secondary dark:text-text-secondary-dark shrink-0"} />
+                    <Typography variant="subtitle2" className="truncate">{t("studio_tool_webhooks")}</Typography>
+                    <Typography variant="caption" color="disabled" className="hidden md:inline truncate">
+                        {t("studio_webhooks_subtitle")}
+                    </Typography>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 shrink-0">
                     <Tooltip title={t("refresh")}>
                         <IconButton size="small" aria-label={t("studio_webhooks_refresh_aria")} onClick={() => void loadWebhooks()}>
-                            <RefreshCwIcon size={iconSize.small} />
+                            <RefreshCwIcon size={iconSize.smallest} />
                         </IconButton>
                     </Tooltip>
                     {!notOffered && (
                         <Button size="small" color="primary" variant="filled" onClick={openCreate}>
-                            <PlusIcon size={iconSize.small} />
+                            <PlusIcon size={iconSize.smallest} />
                             {t("studio_webhooks_new")}
                         </Button>
                     )}
@@ -349,10 +349,15 @@ export function WebhooksView() {
                                                 </IconButton>
                                             </Tooltip>
                                             <IconButton size="small" aria-label={t("studio_webhooks_edit_aria", { name: w.name })} onClick={() => openEdit(w)}>
-                                                <PencilIcon size={iconSize.small} />
+                                                <PencilIcon size={iconSize.smallest} />
                                             </IconButton>
-                                            <IconButton size="small" aria-label={t("studio_webhooks_delete_aria", { name: w.name })} onClick={() => void handleDelete(w)}>
-                                                <Trash2Icon size={iconSize.small} className={"text-red-500"} />
+                                            <IconButton
+                                                size="small"
+                                                aria-label={t("studio_webhooks_delete_aria", { name: w.name })}
+                                                className="text-text-secondary hover:text-red-500"
+                                                onClick={() => setConfirmDeleteWebhook(w)}
+                                            >
+                                                <Trash2Icon size={iconSize.smallest} />
                                             </IconButton>
                                         </TableCell>
                                     </TableRow>
@@ -438,6 +443,7 @@ export function WebhooksView() {
                     <Button variant="text" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>
                     <Button
                         variant="filled"
+                        color="primary"
                         disabled={saving || !name.trim() || !url.trim() || events.length === 0}
                         onClick={() => void handleSave()}
                     >
@@ -445,6 +451,20 @@ export function WebhooksView() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <ConfirmationDialog
+                open={confirmDeleteWebhook !== null}
+                onAccept={() => {
+                    if (confirmDeleteWebhook) {
+                        const target = confirmDeleteWebhook;
+                        setConfirmDeleteWebhook(null);
+                        void handleDelete(target);
+                    }
+                }}
+                onCancel={() => setConfirmDeleteWebhook(null)}
+                title={confirmDeleteWebhook ? t("studio_webhooks_delete_aria", { name: confirmDeleteWebhook.name }) : t("delete")}
+                body={confirmDeleteWebhook ? t("delete_confirmation", { defaultValue: `Delete webhook "${confirmDeleteWebhook.name}"? This action cannot be undone.` }) : ""}
+            />
         </div>
     );
 }

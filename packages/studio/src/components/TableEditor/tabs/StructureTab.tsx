@@ -265,7 +265,9 @@ CREATE TRIGGER ${table.name}_before_update
                         }
                     />
                     {constraints.length === 0 ? (
-                        <Typography variant="body2" color="secondary">{t("studio_tables_no_constraints")}</Typography>
+                        <div className="rounded-lg bg-surface-field/50 px-4 py-3">
+                            <Typography variant="body2" color="secondary">{t("studio_tables_no_constraints")}</Typography>
+                        </div>
                     ) : (
                         <Section>
                             <Table className="w-full">
@@ -277,12 +279,15 @@ CREATE TRIGGER ${table.name}_before_update
                                 </TableHeader>
                                 <TableBody>
                                     {constraints.map(constraint => (
-                                        <TableRow key={constraint.name}>
+                                        <TableRow key={constraint.name} className="group">
                                             <TableCell><Typography variant="mono" className="text-xs">{constraint.name}</Typography></TableCell>
                                             <TableCell><Typography variant="body2">{t(`studio_tables_constraint_${constraint.kind}`)}</Typography></TableCell>
                                             <TableCell><Typography variant="mono" className="text-xs" color="secondary">{constraint.definition}</Typography></TableCell>
                                             <TableCell className="text-right">
-                                                <IconButton size="small" aria-label={t("studio_tables_drop_constraint", { name: constraint.name })}
+                                                <IconButton
+                                                    size="small"
+                                                    className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-red-500"
+                                                    aria-label={t("studio_tables_drop_constraint", { name: constraint.name })}
                                                     onClick={() => void confirm({
                                                         title: t("studio_tables_drop_constraint", { name: constraint.name }),
                                                         path: `${base}/constraints/${encodeURIComponent(constraint.name)}`,
@@ -316,7 +321,9 @@ CREATE TRIGGER ${table.name}_before_update
                         }
                     />
                     {details.triggers.length === 0 ? (
-                        <Typography variant="body2" color="secondary">{t("studio_tables_no_triggers")}</Typography>
+                        <div className="rounded-lg bg-surface-field/50 px-4 py-3">
+                            <Typography variant="body2" color="secondary">{t("studio_tables_no_triggers")}</Typography>
+                        </div>
                     ) : (
                         <Section>
                             <Table className="w-full">

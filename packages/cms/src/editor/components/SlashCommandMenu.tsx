@@ -451,7 +451,7 @@ c })}
             style={{ position: "fixed",
 zIndex: 9999,
 visibility: "hidden" }}
-            className={cls("text-surface-900 dark:text-white max-h-[280px] w-72 overflow-y-auto rounded-md border bg-surface-card px-1 py-2 shadow transition-none", defaultBorderMixin)}
+            className={cls("text-text-primary dark:text-text-primary-dark max-h-[280px] w-72 overflow-y-auto rounded-lg border bg-surface-card p-1 shadow-md transition-none", defaultBorderMixin)}
         >
             {filteredItems.map((item, index) => (
                 <button
@@ -466,15 +466,15 @@ visibility: "hidden" }}
                         }
                     }}
                     onMouseDown={(e) => e.preventDefault()}
-                    className={cls("flex w-full items-center space-x-2 rounded-md px-2 py-1 text-left text-sm hover:bg-surface-hover",
+                    className={cls("flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-surface-hover transition-colors duration-100",
                         index === selectedIndex ? "bg-surface-active" : "")}
                 >
-                    <div className={cls("flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-surface-card", defaultBorderMixin)}>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-raised text-text-secondary dark:text-text-secondary-dark">
                         {item.icon}
                     </div>
-                    <div className="flex flex-col overflow-hidden">
-                        <p className="font-medium truncate">{item.title}</p>
-                        <p className="text-xs text-surface-700 dark:text-surface-accent-300 truncate">
+                    <div className="flex flex-col overflow-hidden min-w-0">
+                        <p className="text-[13px] font-medium leading-tight truncate text-text-primary dark:text-text-primary-dark">{item.title}</p>
+                        <p className="text-[11px] leading-snug text-text-secondary dark:text-text-secondary-dark truncate">
                             {item.description}
                         </p>
                     </div>
@@ -513,8 +513,8 @@ const TableGridPicker = ({
 }) => {
     return (
         <div className="flex flex-col gap-1 items-center justify-center p-1 w-fit">
-            <span className="text-xs text-gray-500 font-medium mb-1">
-                {hoveredCol + 1} x {hoveredRow + 1} Table
+            <span className="text-xs text-text-secondary dark:text-text-secondary-dark font-medium tabular-nums mb-1">
+                {hoveredCol + 1} × {hoveredRow + 1} Table
             </span>
             <div className="flex flex-col gap-1">
                 {Array.from({ length: 5 }).map((_, r) => (
@@ -526,7 +526,7 @@ const TableGridPicker = ({
                                     "w-5 h-5 border rounded-sm cursor-pointer transition-colors duration-75",
                                     r <= hoveredRow && c <= hoveredCol
                                         ? "bg-primary-bg border-primary"
-                                        : "bg-surface-card border-gray-200 dark:border-gray-700 hover:border-primary/50"
+                                        : "bg-surface-card border-hairline hover:border-primary/50"
                                 )}
                                 onMouseEnter={() => onHover(r, c)}
                                 onClick={() => onSelect(hoveredRow + 1, hoveredCol + 1)}

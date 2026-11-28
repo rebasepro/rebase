@@ -832,7 +832,7 @@ function RowDialog({ table, columns, primaryKey, row, onClose, onSaved }: {
                                 onChange={(event) => setValues(prev => ({ ...prev, [column.name]: event.target.value }))}
                             />
                             {!column.notNull && !locked && (
-                                <FilterChip size="small" active={isNull} className="mt-5"
+                                <FilterChip size="small" active={isNull} className="mt-2.5 shrink-0 font-mono text-[11px]"
                                     onClick={() => setNulls(prev => {
                                         const next = new Set(prev);
                                         if (next.has(column.name)) next.delete(column.name); else next.add(column.name);

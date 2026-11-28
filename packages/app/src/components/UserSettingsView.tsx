@@ -218,20 +218,24 @@ export function UserSettingsView() {
         // apps, collections): 6xl, the kit's side padding. It was a 4xl column
         // with its own 48px padding, so its title sat inside everyone else's.
         <Container maxWidth="6xl" className="flex-grow w-full py-6">
-            <Typography variant="h4" className="mb-8">{t("account_settings")}</Typography>
+            <Typography variant="h5" className="mb-5 font-semibold tracking-tight">{t("account_settings")}</Typography>
 
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ActiveTab)} className="mb-8">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ActiveTab)} className="mb-6">
                 <Tab value="profile">{t("profile")}</Tab>
                 {hasPasswordChange && <Tab value="security">{t("security")}</Tab>}
                 <Tab value="sessions">{t("sessions")}</Tab>
             </Tabs>
 
             {activeTab === "profile" && (
-                <div className="flex flex-col gap-6 max-w-xl">
-                    <div className="flex items-center gap-6 mb-2">
-                        <Avatar src={photoURL || undefined} className="w-24 h-24 text-3xl">
+                <div className="flex flex-col gap-5 max-w-xl">
+                    <div className="flex items-center gap-4 mb-1">
+                        <Avatar src={photoURL || undefined} className="w-16 h-16 text-xl">
                             {displayName ? displayName[0].toUpperCase() : (user.email ? user.email[0].toUpperCase() : "A")}
                         </Avatar>
+                        <div className="min-w-0">
+                            {displayName && <Typography variant="subtitle1" className="font-medium truncate">{displayName}</Typography>}
+                            {user.email && <Typography variant="caption" color="secondary" className="truncate block">{user.email}</Typography>}
+                        </div>
                     </div>
                     <TextField
                         label={t("display_name")}
@@ -244,8 +248,8 @@ export function UserSettingsView() {
                         onChange={(e) => setPhotoURL(e.target.value)}
                     />
                     {profileError && <Typography color="error">{profileError}</Typography>}
-                    <div className="mt-4">
-                        <Button variant="filled" onClick={handleSaveProfile} disabled={savingProfile}>
+                    <div className="mt-2">
+                        <Button variant="filled" color="primary" onClick={handleSaveProfile} disabled={savingProfile}>
                             {savingProfile ? t("saving") : t("save_profile")}
                         </Button>
                     </div>
